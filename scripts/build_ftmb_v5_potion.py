@@ -250,6 +250,10 @@ def main():
     ap.add_argument("--store-values", type=int, default=0, metavar="N",
                     help="store up to N raw value strings per record and write FTMB v6 "
                          "(per-value attention, choice 0106). 0 = off (v5).")
+    ap.add_argument("--cede-labels", default=None, metavar="PATH",
+                    help="path to a ceded-leaf list (labels/ceded_leaves.txt). Records carrying "
+                         "these labels are dropped as training targets so the leaf leaves the "
+                         "model's output label space (spec 2026-06-27-model-label-space-reshape).")
     args = ap.parse_args()
 
     global _POTIONS
@@ -270,6 +274,8 @@ def main():
         P.STORE_VALUES_CAP = args.store_values
     argv = ["prepare_multibranch_data.py"] + V19_ARGS + [
         "--output", args.output, "--workers", str(args.workers)]
+    if args.cede_labels:
+        argv += ["--cede-labels", args.cede_labels]
     mode = " ++ ".join(_POTIONS)
     out_ver = "v6" if args.store_values > 0 else f"v{P.VERSION_V4}"
     print(f"[build] potion embed swap [{mode}]; EMBED_DIM={P.EMBED_DIM} "

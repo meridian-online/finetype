@@ -407,6 +407,16 @@ enum Commands {
         /// strings into per-value embeddings for the attention pool.
         #[arg(long)]
         value_encoder: Option<PathBuf>,
+
+        /// Cede-list: path to a file of taxonomy leaves (one per line, `#` comments
+        /// ignored) to DENY from the output label space (spec
+        /// 2026-06-27-model-label-space-reshape). These leaves are removed from the
+        /// model's softmax head — it can no longer emit them — and are recovered
+        /// deterministically in the Sharpen layer. n_classes shrinks by the number of
+        /// ceded leaves present in the taxonomy; the validation branch (valid_dim,
+        /// one feature per taxonomy type) is unaffected.
+        #[arg(long)]
+        cede_labels: Option<PathBuf>,
     },
 
     /// Autonomous type-inference triangulator (bead finetype-7zi).
@@ -627,6 +637,7 @@ fn main() -> Result<()> {
             no_tui,
             model_config,
             value_encoder,
+            cede_labels,
         } => cmd_train_multi_branch(
             data,
             output,
@@ -644,6 +655,7 @@ fn main() -> Result<()> {
             no_tui,
             model_config,
             value_encoder,
+            cede_labels,
         ),
 
         Commands::ExtractFeatures {
@@ -805,6 +817,7 @@ fn cmd_train_multi_branch(
     no_tui: bool,
     model_config: Option<PathBuf>,
     value_encoder: Option<PathBuf>,
+    cede_labels: Option<PathBuf>,
 ) -> Result<()> {
     use finetype_model::model2vec_shared::Model2VecResources;
     use finetype_train::multi_branch::{
@@ -827,13 +840,51 @@ fn cmd_train_multi_branch(
 
     // Load taxonomy to get sorted labels
     let taxonomy = Taxonomy::from_directory(&taxonomy)?;
-    let labels_list: Vec<String> = taxonomy.labels().to_vec();
-    let label_to_idx: std::collections::HashMap<String, u32> = taxonomy
-        .label_to_index()
-        .into_iter()
-        .map(|(k, v)| (k, v as u32))
+
+    // Reshape cede-list (spec 2026-06-27-model-label-space-reshape ac-1): leaves to
+    // DENY from the output label space. They are removed from labels_list/label_to_idx
+    // here, so the softmax head shrinks and the existing record-filter below drops
+    // their training rows for free (their label is no longer in label_to_idx). The
+    // validation branch (valid_dim, one feature per taxonomy type) is unaffected.
+    let cede_set: std::collections::HashSet<String> = match &cede_labels {
+        Some(path) => {
+            let txt = std::fs::read_to_string(path)?;
+            txt.lines()
+                .map(|l| l.split('#').next().unwrap_or("").trim())
+                .filter(|l| !l.is_empty())
+                .map(|l| l.to_string())
+                .collect()
+        }
+        None => std::collections::HashSet::new(),
+    };
+
+    let labels_list: Vec<String> = taxonomy
+        .labels()
+        .iter()
+        .filter(|l| !cede_set.contains(*l))
+        .cloned()
         .collect();
-    let n_classes = taxonomy.len();
+    // Rebuild label_to_idx from the (possibly filtered) list so class indices are
+    // contiguous 0..n_classes and stay consistent with labels_list / label_map.json.
+    let label_to_idx: std::collections::HashMap<String, u32> = labels_list
+        .iter()
+        .enumerate()
+        .map(|(i, l)| (l.clone(), i as u32))
+        .collect();
+    let n_classes = labels_list.len();
+    if !cede_set.is_empty() {
+        let matched = cede_set
+            .iter()
+            .filter(|l| taxonomy.label_to_index().contains_key(*l))
+            .count();
+        eprintln!(
+            "Reshape cede-list: {} leaves denied ({} matched taxonomy); n_classes {} -> {}",
+            cede_set.len(),
+            matched,
+            taxonomy.len(),
+            n_classes,
+        );
+    }
 
     eprintln!("Loading training data from {}...", data.display());
     let (header, records, table_groups) = read_training_data(&data)?;

@@ -114,6 +114,55 @@ COLUMN_LEVEL_TYPES = {
     "representation.identifier.increment",
 }
 
+# Leaves ceded to the deterministic Sharpen layer (spec 2026-06-27-model-label-space-reshape,
+# ac-1). Populated from --cede-labels in main(); empty by default so every existing retrain is
+# byte-identical. When non-empty, records carrying a ceded label are dropped as training TARGETS
+# (the leaf leaves the model's output label space → n_classes shrinks) while sibling_headers are
+# PRESERVED, so a ceded column still contributes cross-column header context.
+CEDE_LABELS = set()
+
+
+def load_cede_labels(path):
+    """Read the ceded-leaf list (one leaf per line, # comments ignored)."""
+    labels = set()
+    with open(path, "rt") as f:
+        for line in f:
+            line = line.split("#", 1)[0].strip()
+            if line:
+                labels.add(line)
+    return labels
+
+
+def filter_ceded_groups(v3_groups, cede_labels):
+    """Drop records whose label is a ceded leaf, keeping sibling_headers intact.
+
+    A ceded column is removed only as a prediction TARGET; its header stays in the
+    group's sibling_headers (and surviving records keep their original column_index,
+    which still resolves into that unchanged list) so it remains cross-column context.
+    Groups left with zero target records are dropped. Returns (groups, stats).
+    """
+    if not cede_labels:
+        return v3_groups, {"ceded_records": 0, "dropped_groups": 0, "labels_hit": set()}
+    kept_groups = []
+    ceded_records = 0
+    labels_hit = set()
+    for g in v3_groups:
+        kept = []
+        for rec in g["records"]:
+            if rec["label"] in cede_labels:
+                ceded_records += 1
+                labels_hit.add(rec["label"])
+            else:
+                kept.append(rec)
+        if kept:
+            # Preserve the FULL sibling_headers (ceded columns remain context).
+            kept_groups.append({"sibling_headers": g["sibling_headers"], "records": kept})
+    return kept_groups, {
+        "ceded_records": ceded_records,
+        "dropped_groups": len(v3_groups) - len(kept_groups),
+        "labels_hit": labels_hit,
+    }
+
 # Profile eval dataset names — must be excluded from training to prevent contamination
 EVAL_DATASET_NAMES = {
     "api_users_json", "books_catalog", "codes_and_ids", "countries",
@@ -2611,6 +2660,24 @@ def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
         })
         total_records += len(records)
 
+    # ─── Cede leaves to the deterministic Sharpen layer (reshape) ────
+    # spec 2026-06-27-model-label-space-reshape ac-1: drop ceded leaves as
+    # training TARGETS so they leave the model's output label space.
+    if CEDE_LABELS:
+        v3_groups, cede_stats = filter_ceded_groups(v3_groups, CEDE_LABELS)
+        total_records = sum(len(g["records"]) for g in v3_groups)
+        print(f"\nCede filter ({len(CEDE_LABELS)} leaves in cede set): dropped "
+              f"{cede_stats['ceded_records']} records across {len(cede_stats['labels_hit'])} "
+              f"leaves; {cede_stats['dropped_groups']} groups emptied; "
+              f"{len(v3_groups)} groups / {total_records} records remain")
+        # Round-trip guard: no ceded leaf may survive into the output label space.
+        surviving = {rec["label"] for g in v3_groups for rec in g["records"]} & CEDE_LABELS
+        assert not surviving, f"cede filter leak — these ceded leaves survived: {sorted(surviving)}"
+        n_classes = len({rec["label"] for g in v3_groups for rec in g["records"]})
+        print(f"  output label space: {n_classes} classes "
+              f"({len(cede_stats['labels_hit'])} leaves ceded, "
+              f"{len(CEDE_LABELS) - len(cede_stats['labels_hit'])} cede-set leaves absent from data)")
+
     # ─── Write binary file ──────────────────────────────────
     _n_sibling_headers = sum(len(g["sibling_headers"]) for g in v3_groups)
     print(f"n_sibling_headers: {_n_sibling_headers}")
@@ -2759,6 +2826,13 @@ def main():
             # behaviour for all other retrains.
             include_column_level_types = True
             i += 1
+        elif args[i] == "--cede-labels":
+            # spec 2026-06-27-model-label-space-reshape ac-1: path to the ceded-leaf
+            # list. Records carrying these labels are dropped as training targets so
+            # the leaf leaves the model's output label space (n_classes shrinks).
+            global CEDE_LABELS
+            CEDE_LABELS = load_cede_labels(args[i + 1])
+            i += 2
         elif args[i] == "--eval-row-hashes":
             eval_row_hashes_path = args[i + 1]
             i += 2
