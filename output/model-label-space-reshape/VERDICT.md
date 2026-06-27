@@ -50,3 +50,29 @@ a data-preserving variant is a different, attractor-risky, unproven bet.
   no standalone value), the cede-filter infra (Rust `--cede-labels` deny-list, Python filter),
   the ac-0 partition. All reusable if the data-preserving variant is ever revisited.
 - The fast-path sizing (~8% columns skippable) is independent and could be pursued separately.
+
+## Addendum — "are Sense and Sharpen fighting?" (2026-06-28)
+
+No. Tested two ways on seed 43:
+- Of the 36 regressions, **0 were Sharpen breaking a correct reshaped Sense** (all 36 had
+  raw Sense already wrong).
+- On kept classes, Sharpen lifts BOTH models equally: raw gap −1.6pp ≈ composed gap −1.8pp.
+  A fighting/mis-tuned Sharpen would widen the composed gap past the raw gap; it doesn't.
+
+Decomposition of the −2.0pp (seed 43), apples-to-apples:
+| slice | s43 | reshaped | delta |
+|---|---|---|---|
+| kept-class raw | 0.492 | 0.476 | −1.6pp |
+| kept-class composed | 0.835 | 0.817 | −1.8pp |
+| ceded-class composed | 0.938 | 0.906 | −3.1pp |
+
+So the loss is a DIVISION-OF-LABOUR gap, not a Sense↔Sharpen conflict:
+- **−1.8pp kept-class** = genuine (modest) model deficit, most likely the 131k→87k
+  training-data reduction the leaf-drop forces.
+- **−3.1pp ceded-class** = recovery gap (header-gated isbn, sub-leaf precision, <3-value
+  cols) — partly CLOSEABLE with better recovery.
+
+Verdict unchanged (NO-GO: the kept-class deficit alone misses parity), but the gap is smaller
+and more structured than "−4pp model regression," and the two stages are not working against
+each other. A data-preserving variant (+better recovery) could approach parity but needs a
+residual catch-all class = the attractor trap. Substrate: the raw-vs-composed diagnostic above.
