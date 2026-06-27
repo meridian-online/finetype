@@ -47,6 +47,23 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Re-sharpen cached Sense predictions (diagnostic: corpus-honest gate fast path).
+    ///
+    /// Reads a TSV of `id<TAB>header<TAB>sense_label<TAB>sense_conf<TAB>values(0x1f-joined)`
+    /// and writes `id<TAB>composed_label`, running the real Sharpen stack WITHOUT the
+    /// value-encode (compose_from_sense). Lets a Sharpen-rule change be corpus-honest-gated
+    /// in minutes instead of re-encoding the 33k sample. Spec 2026-06-27-composed-accuracy-roadmap.
+    Resharpen {
+        /// Input TSV (id, header, sense_label, sense_conf, 0x1f-joined values)
+        #[arg(short, long)]
+        input: PathBuf,
+        /// Output TSV (id, composed_label)
+        #[arg(short, long)]
+        output: PathBuf,
+        /// Model directory
+        #[arg(short, long, default_value = "models/default")]
+        model: PathBuf,
+    },
     /// Classify text input
     Infer {
         /// Single text input
@@ -534,6 +551,12 @@ fn main() -> Result<()> {
             output,
         } => cmd_validate_table(file, schema, db, table, append, lenient, output),
 
+        Commands::Resharpen {
+            input,
+            output,
+            model,
+        } => cmd_resharpen(input, output, model),
+
         Commands::Profile {
             file,
             files,
@@ -710,6 +733,55 @@ fn cmd_mcp() -> Result<()> {
     // Run the async server
     tokio::runtime::Runtime::new()?.block_on(server.serve_stdio())?;
 
+    Ok(())
+}
+
+/// Re-sharpen cached Sense predictions through the real Sharpen stack without the
+/// value-encode (corpus-honest gate fast path, spec 2026-06-27-composed-accuracy-roadmap).
+/// Input TSV: `id<TAB>header<TAB>sense_label<TAB>sense_conf<TAB>values(0x1f-joined)`.
+/// Output TSV: `id<TAB>composed_label`.
+fn cmd_resharpen(input: PathBuf, output: PathBuf, model: PathBuf) -> Result<()> {
+    use finetype_model::{ColumnClassifier, ColumnConfig};
+    use std::io::{BufRead, BufReader, BufWriter, Write};
+
+    let config = ColumnConfig {
+        sample_size: 100,
+        ..Default::default()
+    };
+    let mb = load_multi_branch_classifier(&model)?;
+    let mut cc = ColumnClassifier::with_multi_branch(mb, config);
+    wire_model2vec_and_siblings(&mut cc);
+    let mut taxonomy = load_taxonomy(&PathBuf::from("labels"))?;
+    taxonomy.compile_validators();
+    taxonomy.compile_locale_validators();
+    cc.set_taxonomy(taxonomy);
+
+    let reader = BufReader::new(std::fs::File::open(&input)?);
+    let mut out = BufWriter::new(std::fs::File::create(&output)?);
+    let mut n = 0usize;
+    for line in reader.lines() {
+        let line = line?;
+        if line.is_empty() {
+            continue;
+        }
+        let mut parts = line.splitn(5, '\t');
+        let id = parts.next().unwrap_or("");
+        let header = parts.next().unwrap_or("");
+        let sense_label = parts.next().unwrap_or("");
+        let sense_conf: f32 = parts.next().unwrap_or("1.0").parse().unwrap_or(1.0);
+        let values: Vec<String> = parts
+            .next()
+            .unwrap_or("")
+            .split('\u{1f}')
+            .filter(|v| !v.is_empty())
+            .map(|s| s.to_string())
+            .collect();
+        let composed = cc.compose_from_sense(header, &values, sense_label, sense_conf)?;
+        writeln!(out, "{}\t{}", id, composed.label)?;
+        n += 1;
+    }
+    out.flush()?;
+    eprintln!("resharpen: composed {} columns -> {}", n, output.display());
     Ok(())
 }
 

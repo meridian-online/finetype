@@ -1472,6 +1472,93 @@ impl ColumnClassifier {
         Ok(result)
     }
 
+    /// Compose a cached Sense label through the REAL Sharpen stack, skipping the
+    /// expensive value-encode + multi-branch forward.
+    ///
+    /// For corpus-honest gating of Sharpen-rule changes (spec
+    /// 2026-06-27-composed-accuracy-roadmap): the value encode (potion-8M over ~100
+    /// values/column) produces an identical Sense across baseline and candidate, so
+    /// re-running it on the 33k-file stratified sample for every rule iteration is pure
+    /// waste. Given the model's cached Sense label, this runs only the deterministic
+    /// `column_features` (no neural inference, see `classify_multi_branch` Step 2) and
+    /// the Sharpen stack (header hints re-encode only the cheap header) — minutes instead
+    /// of ~an hour. NOT for production inference; a diagnostic re-sharpen path.
+    ///
+    /// MIRRORS the Sharpen sequence in `classify_multi_branch` (Steps 2-6); validated at
+    /// 99.4% native parity (100% on rule-affected labels). The `compose_from_sense_runs_sharpen`
+    /// test pins the behaviour — update both together if the Sharpen sequence changes.
+    pub fn compose_from_sense(
+        &self,
+        header: &str,
+        values: &[String],
+        sense_label: &str,
+        sense_conf: f32,
+    ) -> Result<ColumnResult, InferenceError> {
+        if values.is_empty() {
+            return Ok(ColumnResult {
+                label: "unknown".to_string(),
+                confidence: 0.0,
+                vote_distribution: vec![],
+                disambiguation_applied: false,
+                disambiguation_rule: None,
+                samples_used: 0,
+                detected_locale: None,
+                is_generic: false,
+                column_features: None,
+            });
+        }
+        // Sample (same strategy as classify_multi_branch).
+        let sample = if values.len() <= self.config.sample_size {
+            values.to_vec()
+        } else {
+            let step = values.len() as f64 / self.config.sample_size as f64;
+            (0..self.config.sample_size)
+                .map(|i| values[(i as f64 * step) as usize].clone())
+                .collect()
+        };
+        let samples_used = sample.len();
+        // Step 2: deterministic ColumnFeatures (no neural inference).
+        let per_value_features: Vec<[f32; FEATURE_DIM]> =
+            sample.iter().map(|v| extract_features(v)).collect();
+        let column_features = aggregate_features(&per_value_features);
+        let mut result = ColumnResult {
+            label: sense_label.to_string(),
+            confidence: sense_conf,
+            vote_distribution: vec![(sense_label.to_string(), sense_conf)],
+            disambiguation_applied: false,
+            disambiguation_rule: Some("compose-from-sense".to_string()),
+            samples_used,
+            detected_locale: None,
+            is_generic: false,
+            column_features: Some(column_features.clone()),
+        };
+        // Steps 3-6: the Sharpen stack — MUST mirror classify_multi_branch.
+        if !self.skip_sharpen {
+            feature_sharpen(&mut result, &column_features);
+            if let Some((resolved_label, rule_name)) = value_sharpen(
+                &sample,
+                &result.label,
+                result.confidence,
+                self.taxonomy.as_ref(),
+            ) {
+                result.label = resolved_label;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(rule_name);
+            }
+            self.datetime_format_refinement(&mut result, &sample);
+            self.structured_string_refinement(&mut result, &sample);
+            self.sharpen_and_guard(&mut result, header, &sample, values);
+            self.apply_username_veto(&mut result, &sample);
+        }
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
+                result.detected_locale = Some(locale);
+            }
+        }
+        self.finalize_is_generic(&mut result);
+        Ok(result)
+    }
+
     /// Multi-branch classification with enriched header + Sharpen (AC-1).
     ///
     /// Like `classify_multi_branch()` but uses a sibling-context-enriched

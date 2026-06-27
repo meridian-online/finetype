@@ -6248,6 +6248,53 @@ datetime.timestamp.sql_standard:
     );
 }
 
+// ── compose_from_sense (corpus-honest gate fast path, spec 2026-06-27) ──
+
+#[test]
+fn compose_from_sense_runs_sharpen() {
+    // compose_from_sense must run the REAL Sharpen stack on an injected Sense label
+    // (the gate fast path). Proven empirically at 99.4% native parity; this pins the
+    // behaviour so a refactor of the Sharpen sequence can't silently make it a no-op.
+    let yaml = r#"
+technology.internet.url:
+  title: URL
+  designation: universal
+  tier: [VARCHAR, internet]
+  release_priority: 3
+  samples: ["https://x.com/a"]
+  validation:
+    type: string
+    pattern: '^https?://[^\s]+$'
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+
+    // Injected Sense = plain_text (demoted); the url recovery reader must restore url.
+    let urls: Vec<String> = vec![
+        "https://bitcointalk.org/index.php?topic=1".to_string(),
+        "https://bitcointalk.org/index.php?topic=2".to_string(),
+        "https://bitcointalk.org/index.php?topic=3".to_string(),
+    ];
+    let r = cc
+        .compose_from_sense("parent_id", &urls, "representation.text.plain_text", 1.0)
+        .unwrap();
+    assert_eq!(r.label, "technology.internet.url", "url recovery must fire");
+
+    // A genuine prose residual stays put — no spurious recovery.
+    let prose: Vec<String> = vec![
+        "just some prose here".to_string(),
+        "and more words today".to_string(),
+        "a third line of text".to_string(),
+    ];
+    let r2 = cc
+        .compose_from_sense("notes", &prose, "representation.text.plain_text", 1.0)
+        .unwrap();
+    assert_eq!(r2.label, "representation.text.plain_text");
+}
+
 // ── structured_string_refinement (spec 2026-06-19-plain-text-type-discovery) ──
 
 #[test]
