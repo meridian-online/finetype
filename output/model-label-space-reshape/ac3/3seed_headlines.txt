@@ -1,0 +1,5 @@
+reshaped seed 42 + recovery: 755/931 = 0.811 (95% CI 0.785-0.835)
+reshaped seed 43 + recovery: 775/931 = 0.832 (95% CI 0.807-0.855)
+reshaped seed 44 + recovery: 737/931 = 0.792 (95% CI 0.764-0.816)
+baseline s43 (rule off): 794/931 = 0.853 (95% CI 0.829-0.874)
+DONE Sun 28 Jun 2026 01:22:35 AEST

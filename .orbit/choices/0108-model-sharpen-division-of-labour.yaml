@@ -1,8 +1,22 @@
 id: '0108'
 title: 'Division of labour: the Sense model owns open-vocab semantics + broad shape; cede the closed/format/checksum tail to Sharpen + validators'
-status: proposed
+status: rejected
 date_created: 2026-06-27
-date_modified: 2026-06-27
+date_modified: 2026-06-28
+verdict: |
+  REJECTED 2026-06-28 on the 3-seed retrain. The leaf-drop reshape costs gold
+  accuracy on EVERY seed — composed gold 0.811 / 0.832 / 0.792 (mean 0.812) vs the
+  s43 baseline 0.853, i.e. −4.1pp mean, −2.0pp best. Not seed variance: a consistent,
+  structural regression that misses choice 0104's parity-or-better bar. The recovery
+  rule (`ceded_leaf_recovery`) is gold-clean, but the reshaped MODEL degrades on the
+  KEPT classes (residual boundary `alphanumeric_id→word`) plus attractor drift to
+  held-back leaves recovery cannot catch. Confound: the leaf-drop necessarily removes
+  the ceded columns' training rows (131k→87k), so the cost blends class-removal and
+  data-reduction; recovering the data means a residual catch-all class — the attractor
+  trap the reshape was meant to avoid. The over-emit problem (the original motivation)
+  is real but its fix is TRAINING NEGATIVES (task t-000133e418), not label-space
+  surgery. Substrate: output/model-label-space-reshape/VERDICT.md, the ac-2/ac-3
+  results, memory `reshape-leaf-drop-costs-gold`.
 body: |
   # 0108. The Sense model's real job is open-vocabulary semantics + broad shape; the closed/format/checksum tail belongs to Sharpen + validators
 

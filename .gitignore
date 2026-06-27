@@ -327,3 +327,9 @@ output/url-veto/
 # Representative-baseline study (this session) — regenerable dumps + local finding;
 # durable record is memory representative-baseline-is-068 + card 0020 + the spec.
 output/representative-baseline/
+
+# reshape measurement intermediates (large/reproducible; conclusions are in *.md)
+output/model-label-space-reshape/ac2/*.ftmb
+output/model-label-space-reshape/ac2/*.tsv
+output/model-label-space-reshape/ac3/*.tsv
+output/model-label-space-reshape/retrain/*.log
