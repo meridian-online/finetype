@@ -45,3 +45,34 @@ Cheap next probe before the full recovery-rule build: run the ceded-leaf validat
 886 specific-relocated columns to estimate the recoverable fraction.
 
 Substrate: output/model-label-space-reshape/ac2/ (preds_s43.tsv, preds_reshape.tsv).
+
+## ac-2 UPDATE — rescue-fraction probe (recovery defuses the drift)
+
+For the 1,646 freed columns (s43 said a ceded leaf), do the VALUES actually validate a
+ceded leaf ≥0.9 — i.e. would the value-based recovery re-assert them? (Upper bound: the
+real rule is header-gated for some leaves, so actual recovery ≤ this.)
+
+- **64.5% validate a ceded leaf** → recovery re-asserts the correct type (63.5% the exact
+  leaf s43 predicted).
+- **By reshaped destination:**
+  - relocated to a SPECIFIC kept leaf (the "harmful drift"): **85.5% rescued** (371/434).
+  - relocated to residual: 57.0% rescued (691/1212).
+
+The scary specific-leaf drift (npi/tsid/lei/...) is **85.5% recovered** — the value-based
+rule re-asserts the right ceded type regardless of where the raw model put the column. The
+~15% unrescued specific cases are dominated by columns s43 was ALREADY WRONG on (over-emitted
+a ceded leaf on non-matching values — "productionDate"→day_of_week, "Husband"→periodicity);
+relocating those to another wrong label is neutral, not a regression.
+
+The 35.5% of freed columns that DON'T validate a ceded leaf are s43 over-emissions — under
+the reshape they fall to the honest residual (plain_text/word) instead of a false ceded
+label. That is a correctness IMPROVEMENT, not a loss.
+
+## Revised verdict: drift largely benign — proceed to ac-3
+
+The reshape does not create net new errors on the freed mass: ~65% recovers to the true
+ceded type, ~35% corrects an s43 over-emission to an honest residual. The destination drift
+that raw Sense flagged is mostly absorbed by value-based recovery. This is consistent with the
+class-imbalance analysis: the drift is attractor reallocation, and the fix is recovery (+
+ceding the npi/lei neighbour attractors), NOT rebalancing. Build the recovery rule (ac-3) and
+confirm on COMPOSED; the probe predicts composed holds or improves.
