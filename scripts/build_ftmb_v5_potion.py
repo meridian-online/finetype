@@ -254,6 +254,11 @@ def main():
                     help="path to a ceded-leaf list (labels/ceded_leaves.txt). Records carrying "
                          "these labels are dropped as training targets so the leaf leaves the "
                          "model's output label space (spec 2026-06-27-model-label-space-reshape).")
+    ap.add_argument("--distilled", default=None, metavar="PATH",
+                    help="override the distilled CSV source (default: V19's "
+                         "output/distillation-v3/sherlock_distilled.csv.gz). Every other "
+                         "blend param stays identical — a true one-variable swap of the "
+                         "training labels (spec 2026-06-28-clean-label-retrain).")
     args = ap.parse_args()
 
     global _POTIONS
@@ -272,7 +277,11 @@ def main():
     install_patches()
     if args.store_values > 0:
         P.STORE_VALUES_CAP = args.store_values
-    argv = ["prepare_multibranch_data.py"] + V19_ARGS + [
+    v19_args = list(V19_ARGS)
+    if args.distilled:
+        v19_args[v19_args.index("--distilled") + 1] = args.distilled
+        print(f"[build] distilled source OVERRIDE -> {args.distilled}")
+    argv = ["prepare_multibranch_data.py"] + v19_args + [
         "--output", args.output, "--workers", str(args.workers)]
     if args.cede_labels:
         argv += ["--cede-labels", args.cede_labels]
