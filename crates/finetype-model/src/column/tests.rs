@@ -6503,6 +6503,84 @@ fn isbn_header_recovery_declines_failed_checksum_and_no_header() {
     );
 }
 
+// ── ceded_leaf_recovery (model label-space reshape ac-3) ──
+
+#[test]
+fn ceded_leaf_recovery_reasserts_uuid_over_relocated_label() {
+    // The reshaped model can't emit uuid, so it relocates a uuid column onto a
+    // digit/hex neighbour (alphanumeric_id here, ac-2 drift). The value-based recovery
+    // re-asserts uuid from the conclusive validator, regardless of the wrong label.
+    let yaml = r#"
+representation.identifier.uuid:
+  title: UUID
+  designation: universal
+  tier: [VARCHAR, identifier]
+  validation:
+    type: string
+    pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+  samples: ["550e8400-e29b-41d4-a716-446655440000"]
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+
+    let uuids: Vec<String> = vec![
+        "550e8400-e29b-41d4-a716-446655440000",
+        "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+        "6ba7b811-9dad-11d1-80b4-00c04fd430c8",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense(
+            "token",
+            &uuids,
+            "representation.identifier.alphanumeric_id",
+            1.0,
+        )
+        .unwrap();
+    assert_eq!(
+        r.label, "representation.identifier.uuid",
+        "ceded_leaf_recovery must re-assert uuid from values"
+    );
+}
+
+#[test]
+fn ceded_leaf_recovery_declines_non_validating_values() {
+    // Same eligible leaf (uuid), but the values are NOT uuids — recovery must NOT fire
+    // (no over-emission onto non-matching columns).
+    let yaml = r#"
+representation.identifier.uuid:
+  title: UUID
+  designation: universal
+  tier: [VARCHAR, identifier]
+  validation:
+    type: string
+    pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+  samples: ["550e8400-e29b-41d4-a716-446655440000"]
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+
+    let words: Vec<String> = vec!["apple", "banana", "cherry", "date"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("fruit", &words, "representation.text.word", 1.0)
+        .unwrap();
+    assert_ne!(
+        r.label, "representation.identifier.uuid",
+        "ceded_leaf_recovery must not fire on non-validating values"
+    );
+}
+
 // ── unlocode_format_veto (BACKLOG #11) ──
 
 #[test]

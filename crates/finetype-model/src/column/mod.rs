@@ -384,6 +384,65 @@ fn is_generic_prediction(
 /// `datetime_format_refinement` to assert only leaves the downstream validation veto
 /// (threshold 0.5) will accept — the 0.9 bar here sits comfortably above it, so a
 /// confirmed assertion is never re-vetoed, and an under-bar column keeps the model's label.
+/// Conclusive, value-self-sufficient cede leaves the reshaped model no longer emits,
+/// re-asserted from values by `ceded_leaf_recovery` (spec 2026-06-27-model-label-space-reshape).
+/// = ac-0 CEDE_CLEAN − (leaves owned by datetime_format_refinement / structured_string_refinement
+/// / isbn_header_recovery) − (permissive-validator leaves color_hex/rgb the ac-0 challenge demoted).
+/// Every validator here is structurally exclusive; ordering is irrelevant (exactly-one-match gate).
+const CEDED_RECOVERY_LEAVES: &[&str] = &[
+    "container.key_value.query_string",
+    "container.object.html",
+    "container.object.json",
+    "container.object.json_array",
+    "container.object.xml",
+    "datetime.component.day_of_week",
+    "datetime.component.month_name",
+    "datetime.component.periodicity",
+    "finance.banking.iban",
+    "finance.crypto.bitcoin_address",
+    "finance.crypto.ethereum_address",
+    "finance.currency.currency_code",
+    "finance.currency.currency_symbol",
+    "finance.rate.basis_points",
+    "finance.securities.figi",
+    "geography.address.street_suffix",
+    "geography.coordinate.dms",
+    "geography.coordinate.mgrs",
+    "geography.coordinate.plus_code",
+    "geography.format.wkt",
+    "geography.location.continent",
+    "geography.transportation.iso6346",
+    "identity.commerce.isrc",
+    "identity.government.pan_india",
+    "identity.government.vin",
+    "identity.medical.icd10",
+    "identity.person.email",
+    "identity.person.email_display",
+    "identity.person.gender",
+    "identity.person.phone_e164",
+    "representation.boolean.terms",
+    "representation.file.mime_type",
+    "representation.format.color_hsl",
+    "representation.identifier.uuid",
+    "representation.numeric.si_number",
+    "representation.scientific.inchi",
+    "representation.text.emoji",
+    "technology.cloud.aws_arn",
+    "technology.cloud.s3_uri",
+    "technology.code.doi",
+    "technology.cryptographic.jwt",
+    "technology.identifier.ulid",
+    "technology.internet.cidr",
+    "technology.internet.data_uri",
+    "technology.internet.http_method",
+    "technology.internet.ip_v4",
+    "technology.internet.ip_v4_with_port",
+    "technology.internet.ip_v6",
+    "technology.internet.mac_address",
+    "technology.internet.urn",
+    "technology.internet.user_agent",
+];
+
 fn label_validates_sample(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bool {
     let mut checked = 0usize;
     let mut passed = 0usize;
@@ -2147,6 +2206,7 @@ impl ColumnClassifier {
         self.city_region_header_corroboration(result, header, sample);
         self.country_code_corroboration(result, header, sample);
         self.timezone_abbreviation_recovery(result, header, sample);
+        self.ceded_leaf_recovery(result, sample);
     }
 
     /// `timezone_abbreviation_recovery` (default ON). Recovers the
@@ -2277,6 +2337,61 @@ impl ColumnClassifier {
         result.disambiguation_rule =
             Some(format!("isbn_header_recovery:{}", header.to_lowercase()));
         result.detected_locale = None;
+    }
+
+    /// `ceded_leaf_recovery` (default ON). The recall side of the model label-space
+    /// reshape (spec 2026-06-27-model-label-space-reshape ac-3). The reshaped Sense
+    /// model no longer emits the closed/format/checksum leaves (they were dropped
+    /// from its softmax head); this re-asserts them deterministically from VALUES,
+    /// so recall is recovered, not lost.
+    ///
+    /// Fires when ≥90% of the sample passes exactly ONE eligible leaf's OWN strict
+    /// taxonomy validator (`label_validates_sample` — the same gate the validation
+    /// veto uses, so the two stay a single source of truth). The eligible set is the
+    /// ac-0 CONCLUSIVE (value-self-sufficient) cede subset MINUS the leaves a
+    /// more-specific rule already owns (datetime FORMATS → `datetime_format_refinement`;
+    /// url/message_id/windows_path/qualified_name → `structured_string_refinement`;
+    /// isbn → `isbn_header_recovery`) MINUS the permissive-validator leaves the ac-0
+    /// adversarial challenge demoted (color_hex/rgb — optional `#` lets bare numbers
+    /// pass). Each remaining validator is structurally exclusive, so a match is
+    /// correct-by-construction.
+    ///
+    /// AUTHORITATIVE OVERRIDE: a conclusive validator may override even a confident
+    /// model prediction (a real `uuid` IS a uuid, not the `npi`/`tsid` the reshaped
+    /// model relocates it to — ac-2 destination drift). EXACTLY-ONE-MATCH gate: never
+    /// guess on overlap; if two eligible leaves both validate, defer (the common
+    /// overlaps — ip_v4 vs ip_v4_with_port, json vs json_array — are mutually
+    /// exclusive in practice, so this rarely costs recall). Value-based (decision
+    /// 0048); RHH-disableable.
+    fn ceded_leaf_recovery(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("ceded_leaf_recovery") {
+            return;
+        }
+        let Some(tax) = self.taxonomy.as_ref() else {
+            return;
+        };
+        let non_empty = sample.iter().filter(|v| !v.trim().is_empty()).count();
+        if non_empty < 3 {
+            // Too few values to assert a conclusive type safely.
+            return;
+        }
+        let mut matches = CEDED_RECOVERY_LEAVES
+            .iter()
+            .copied()
+            .filter(|leaf| *leaf != result.label.as_str())
+            .filter(|leaf| label_validates_sample(tax, leaf, sample));
+        let Some(leaf) = matches.next() else {
+            return;
+        };
+        // Ambiguity guard: a second eligible leaf also validates — do not guess.
+        if matches.next().is_some() {
+            return;
+        }
+        result.label = leaf.to_string();
+        result.confidence = result.confidence.max(0.9);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("ceded_leaf_recovery".to_string());
+        result.detected_locale = detect_locale_from_validation(sample, leaf, tax);
     }
 
     /// `increment_substance_veto` (default ON). The first full-column-statistics
