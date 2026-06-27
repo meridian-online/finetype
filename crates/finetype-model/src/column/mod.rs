@@ -2138,6 +2138,7 @@ impl ColumnClassifier {
     ) {
         self.amount_bare_number_veto(result, header, sample);
         self.url_bare_number_veto(result, header, sample);
+        self.utc_bare_number_veto(result, header, sample);
         self.checksum_substance_guard(result, header, sample);
         self.isbn_header_recovery(result, header, sample);
         self.binary_vocab_veto(result, header, sample);
@@ -2602,6 +2603,52 @@ impl ColumnClassifier {
             result.disambiguation_applied = true;
             result.disambiguation_rule =
                 Some(format!("url_bare_number_veto:{}", header.to_lowercase()));
+            if let Some(taxonomy) = self.taxonomy.as_ref() {
+                result.detected_locale =
+                    detect_locale_from_validation(sample, &result.label, taxonomy);
+            }
+        }
+    }
+
+    /// `utc_bare_number_veto` (default ON). Twin of `url_bare_number_veto`.
+    /// A `utc_offset`/`tz`-ish header makes the header-hint machinery promote the
+    /// column to `datetime.offset.utc` via an early `return`, so the early
+    /// `schema_validation_gate` never re-checks the hint's assertion. But the
+    /// taxonomy's `datetime.offset.utc` is an explicit offset STRING ("UTC
+    /// +05:00", validator `^UTC [+-]\d{2}:\d{2}$`); a column of bare hour-offsets
+    /// (`-8`, `5.5`, `0`, `3.5`) cannot be one — it fails that validator ~100%.
+    /// Undo the hint's promotion by value shape: a bare-number `utc` is demoted
+    /// to decimal/integer. Demotion only — a genuine `UTC +HH:MM` column contains
+    /// non-numeric values and passes through untouched. Measured on gold: 5
+    /// `utc_offset` columns (OpenFlights + 4 gittables) were emitted as
+    /// `datetime.offset.utc`; four are already gold-labelled decimal (the fifth
+    /// re-adjudicated to decimal — same bare-number shape). Value-based last-resort
+    /// Sharpen (decisions 0038/0048); the v24 CORROBORATION_SCOPE add for utc was
+    /// inert/regressive, so this is the correct lever (roadmap #3).
+    fn utc_bare_number_veto(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("utc_bare_number_veto") || result.label != "datetime.offset.utc" {
+            return;
+        }
+        let (is_bare, _) = values_look_like_bare_numbers(sample);
+        if is_bare {
+            // A numeric UTC-offset column is decimal the moment it carries a
+            // half/quarter-hour zone (+5.5, -3.5, +5.45). Those sort after the
+            // integer offsets, beyond the 16-value window
+            // `values_look_like_bare_numbers` scans, so decide decimal-vs-integer
+            // over the WHOLE sample here — otherwise an integer-headed column
+            // (OpenFlights `utc_offset`) misses its true decimal type.
+            let any_decimal = sample
+                .iter()
+                .any(|v| v.contains('.') && v.trim().parse::<f64>().is_ok());
+            result.label = if any_decimal {
+                "representation.numeric.decimal_number".to_string()
+            } else {
+                "representation.numeric.integer_number".to_string()
+            };
+            result.confidence = result.confidence.min(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("utc_bare_number_veto:{}", header.to_lowercase()));
             if let Some(taxonomy) = self.taxonomy.as_ref() {
                 result.detected_locale =
                     detect_locale_from_validation(sample, &result.label, taxonomy);
