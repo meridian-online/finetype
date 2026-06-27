@@ -118,17 +118,6 @@ pub fn evaluate_validation_veto(
 /// Why a rule and not training data: categorical trained as a flat-softmax
 /// shape class is a presence-driven attractor (memory
 /// `categorical-is-a-residual-category`; v23 +529%, v27 proxy 5.76×/6.22×).
-/// A plain base-10 number: an optional sign then digits with at most one '.'.
-/// Deliberately excludes scientific notation / NaN / inf so f64::parse edge
-/// cases cannot masquerade as numeric residuals.
-fn is_plain_number(v: &str) -> bool {
-    let body = v.strip_prefix(['+', '-']).unwrap_or(v);
-    !body.is_empty()
-        && body.chars().all(|c| c.is_ascii_digit() || c == '.')
-        && body.chars().filter(|c| *c == '.').count() <= 1
-        && body.chars().any(|c| c.is_ascii_digit())
-}
-
 pub fn veto_shape_fallback(values: &[Option<&str>]) -> Option<&'static str> {
     let non_null: Vec<&str> = values
         .iter()
@@ -139,6 +128,43 @@ pub fn veto_shape_fallback(values: &[Option<&str>]) -> Option<&'static str> {
     let n = non_null.len();
     if n < 3 {
         return None;
+    }
+
+    // epoch-shape (BACKLOG #5): a pure-integer column in the narrow Unix-epoch
+    // band. When an identifier header-hint (npi / numeric_code) is asserted on
+    // epoch integers the validator hard-vetoes them; recover to the datetime leaf
+    // instead of declining to `unknown`. Post-hard-veto (this fn IS the fallback)
+    // + decline-only. Must precede the id-shape block, whose `distinct_ratio >=
+    // 0.7` arm returns None for pure-numeric columns. Bands are deliberately tight
+    // ([1e9,2e9] / [1e12,2e12]); ALL values must parse as ints AND sit in one band,
+    // so ordinary large integers (counts, 10-digit IDs past 2e9, phone numbers)
+    // fall outside.
+    const EPOCH_SEC_MIN: i64 = 1_000_000_000; // 2001-09-09
+    const EPOCH_SEC_MAX: i64 = 2_000_000_000; // 2033-05-18
+    const EPOCH_MS_MIN: i64 = 1_000_000_000_000; // 2001-09-09
+    const EPOCH_MS_MAX: i64 = 2_000_000_000_000; // 2033-05-18
+    let parse_int = |v: &str| -> Option<i64> {
+        v.parse::<i64>().ok().or_else(|| {
+            v.parse::<f64>()
+                .ok()
+                .filter(|f| f.fract() == 0.0)
+                .map(|f| f as i64)
+        })
+    };
+    let ints: Vec<i64> = non_null.iter().filter_map(|v| parse_int(v)).collect();
+    if ints.len() == n {
+        if ints
+            .iter()
+            .all(|x| (EPOCH_SEC_MIN..=EPOCH_SEC_MAX).contains(x))
+        {
+            return Some("datetime.epoch.unix_seconds");
+        }
+        if ints
+            .iter()
+            .all(|x| (EPOCH_MS_MIN..=EPOCH_MS_MAX).contains(x))
+        {
+            return Some("datetime.epoch.unix_milliseconds");
+        }
     }
 
     let distinct: HashSet<&str> = non_null.iter().copied().collect();
@@ -190,6 +216,17 @@ pub fn veto_shape_fallback(values: &[Option<&str>]) -> Option<&'static str> {
     }
 
     None
+}
+
+/// A plain base-10 number: an optional sign then digits with at most one '.'.
+/// Deliberately excludes scientific notation / NaN / inf so f64::parse edge
+/// cases cannot masquerade as numeric residuals (BACKLOG #4 helper).
+fn is_plain_number(v: &str) -> bool {
+    let body = v.strip_prefix(['+', '-']).unwrap_or(v);
+    !body.is_empty()
+        && body.chars().all(|c| c.is_ascii_digit() || c == '.')
+        && body.chars().filter(|c| *c == '.').count() <= 1
+        && body.chars().any(|c| c.is_ascii_digit())
 }
 
 #[cfg(test)]
@@ -355,6 +392,33 @@ identity.person.gender_code:
         assert_eq!(
             veto_shape_fallback(&floats),
             Some("representation.numeric.decimal_number")
+        );
+    }
+
+    #[test]
+    fn fallback_epoch_recovery_on_narrow_band() {
+        // BACKLOG #5: post-veto pure-integer columns inside the Unix-epoch bands
+        // recover to the datetime leaf, not unknown.
+        let secs = opts(&["1577836800", "1609459200", "1640995200", "1672531200"]);
+        assert_eq!(
+            veto_shape_fallback(&secs),
+            Some("datetime.epoch.unix_seconds")
+        );
+        let ms = opts(&[
+            "1577836800000",
+            "1609459200000",
+            "1640995200000",
+            "1672531200000",
+        ]);
+        assert_eq!(
+            veto_shape_fallback(&ms),
+            Some("datetime.epoch.unix_milliseconds")
+        );
+        // Out-of-band large integers spanning past 2e9 are NOT epochs → integer.
+        let ids = opts(&["3000000001", "5500000002", "9990000003", "1234567890"]);
+        assert_eq!(
+            veto_shape_fallback(&ids),
+            Some("representation.numeric.integer_number")
         );
     }
 

@@ -3945,6 +3945,41 @@ fn test_text_length_demotion_short_entity_not_demoted() {
 }
 
 #[test]
+fn test_full_address_whitespace_guard_demotes_nospace_id() {
+    // BACKLOG #8: single-token letter+digit strings collapsed into full_address
+    // (idx 43: CUDNN benchmark IDs) → alphanumeric_id.
+    let values: Vec<String> = vec![
+        "ACTIVATION_FWD8731790411514196767<CUDNN_ACTIVATION_CLIPPED_RELU>",
+        "CONV_FWD_1234<CUDNN_CONVOLUTION>",
+        "ADD_TENSOR_99<CUDNN_OP>",
+        "POOL_MAX_42<CUDNN_POOLING>",
+        "BATCHNORM_FWD_7<CUDNN_BN>",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let (label, rule) = disambiguate_full_address_whitespace_guard(&values).unwrap();
+    assert_eq!(label, "representation.identifier.alphanumeric_id");
+    assert!(rule.starts_with("full_address_whitespace_guard"));
+}
+
+#[test]
+fn test_full_address_whitespace_guard_keeps_real_addresses() {
+    // Real multi-token addresses (whitespace present) must NOT be demoted, incl.
+    // comma-less foreign addresses.
+    let values: Vec<String> = vec![
+        "123 Main St Springfield IL",
+        "Hauptstrasse 12 8001 Zurich",
+        "45 Rue de la Paix Paris",
+        "789 Pine Rd Austin TX",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    assert!(disambiguate_full_address_whitespace_guard(&values).is_none());
+}
+
+#[test]
 fn test_text_length_demotion_borderline_not_demoted() {
     // Values right at the boundary (median ~95 chars) should NOT be demoted
     let values: Vec<String> = vec![
@@ -6466,6 +6501,68 @@ fn isbn_header_recovery_declines_failed_checksum_and_no_header() {
         r2.label, "identity.commerce.isbn",
         "must decline without header"
     );
+}
+
+// ── unlocode_format_veto (BACKLOG #11) ──
+
+#[test]
+fn unlocode_format_veto_demotes_contradicting_values() {
+    // unlocode over UK-postcode values (space + digits — forbidden by the unlocode
+    // shape) → demoted. With no postal locale defined, the safe fallback is unknown.
+    let yaml = r#"
+geography.transportation.unlocode:
+  title: UN/LOCODE
+  designation: universal
+  tier: [VARCHAR, transportation]
+  samples: ["USNYC"]
+  validation:
+    type: string
+    pattern: '^[A-Z]{2}[A-Z2-9]{3}$'
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    let postcodes: Vec<String> = vec!["CM13 3GF", "SW1A 1AA", "EC1A 1BB"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("loc", &postcodes, "geography.transportation.unlocode", 0.97)
+        .unwrap();
+    assert_ne!(
+        r.label, "geography.transportation.unlocode",
+        "contradicting values must demote the unlocode overcall"
+    );
+}
+
+#[test]
+fn unlocode_format_veto_keeps_valid_unlocodes() {
+    // Genuine UN/LOCODEs pass the shape → untouched.
+    let yaml = r#"
+geography.transportation.unlocode:
+  title: UN/LOCODE
+  designation: universal
+  tier: [VARCHAR, transportation]
+  samples: ["USNYC"]
+  validation:
+    type: string
+    pattern: '^[A-Z]{2}[A-Z2-9]{3}$'
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    let codes: Vec<String> = vec!["USNYC", "DEHAM", "NLRTM", "GBLON"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("loc", &codes, "geography.transportation.unlocode", 0.97)
+        .unwrap();
+    assert_eq!(r.label, "geography.transportation.unlocode");
 }
 
 // ── structured_string_refinement (spec 2026-06-19-plain-text-type-discovery) ──

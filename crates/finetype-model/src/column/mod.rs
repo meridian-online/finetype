@@ -2142,6 +2142,7 @@ impl ColumnClassifier {
         self.isbn_header_recovery(result, header, sample);
         self.binary_vocab_veto(result, header, sample);
         self.increment_substance_veto(result, values);
+        self.unlocode_format_veto(result, sample);
         self.city_region_header_corroboration(result, header, sample);
         self.country_code_corroboration(result, header, sample);
         self.timezone_abbreviation_recovery(result, header, sample);
@@ -2193,6 +2194,44 @@ impl ColumnClassifier {
             }
             _ => {}
         }
+    }
+
+    /// `unlocode_format_veto` (default ON). UN/LOCODE is a closed 5-char shape
+    /// (`^[A-Z]{2}[A-Z2-9]{3}$` — no space, no digit after the leading 2 letters).
+    /// The model over-emits it at high confidence on value-identical short codes —
+    /// notably alphanumeric postcodes (`CM13 3GF`, a UK postcode) that carry a
+    /// space/digit unlocode forbids. unlocode is rare, so an assertion whose OWN
+    /// values fail the unlocode pattern (`sample_contradicts_label`, <=10% pass) is
+    /// a misfire. Demote-only. Shape-aware route: if the contradicting values pass a
+    /// CONCRETE postal locale pattern, assert postal_code (lands the UK-postcode gold
+    /// col); otherwise fall back to `unknown` — NOT the permissive universal postal
+    /// block (minLength 3 / maxLength 10), per the Precision Principle. Value-based
+    /// (0048); RHH-disableable.
+    fn unlocode_format_veto(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("unlocode_format_veto")
+            || result.label != "geography.transportation.unlocode"
+        {
+            return;
+        }
+        let Some(tax) = self.taxonomy.as_ref() else {
+            return;
+        };
+        if !sample_contradicts_label(tax, "geography.transportation.unlocode", sample) {
+            return;
+        }
+        // Route ONLY on a concrete locale match, NOT the permissive universal postal
+        // block; otherwise demote to unknown.
+        let locale = detect_locale_from_validation(sample, "geography.address.postal_code", tax);
+        let target = if locale.is_some() {
+            "geography.address.postal_code"
+        } else {
+            "unknown"
+        };
+        result.label = target.to_string();
+        result.detected_locale = locale;
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("unlocode_format_veto".to_string());
     }
 
     /// `isbn_header_recovery` (default ON). Recovers `identity.commerce.isbn` on a

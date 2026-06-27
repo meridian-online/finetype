@@ -34,6 +34,33 @@ calls `feature_sharpen`. `feature_disambiguate` is the raw-classify step (929). 
 spec anchored the wrong twin; verified against the call graph before applying. Both functions carry an
 identical F5 block; F5b in `feature_sharpen` alone makes native + gate agree.
 
+## Batch 2 — pilots (#5, #8, #11), shipped
+
+Candidate gated in isolation vs the Batch-1 binary (so only these 3 rules show).
+
+| gate | result |
+|---|---|
+| **Gold (reframe)** | 780/927 = 0.841 → **785/927 = 0.847** (+5 cols) |
+| **Gold regression check** | 7 changed → **5 fixes, 0 regressions, 2 neutral** |
+| **Corpus-honest (batch1 → batch2)** | **GO, 0 triggers**; 635/837,625 changed |
+
+Corpus footprint: 625 full_address→alphanumeric_id (#8 — gate-confirmed no oracle-address
+loss), 8 unlocode→unknown (#11 demote path), 2 entity→alnum (2nd-order).
+
+Gold fixes:
+- **#5 epoch recovery**: `earningsTimestamp(Start)` ×3 → unix_seconds, `last_seen_timestamp` →
+  unix_milliseconds (post-veto, narrow-band).
+- **#11 unlocode→postal**: `postcode` unlocode→postal_code (idx 24; postal route fired on a
+  concrete locale match, not the permissive universal block).
+- **#8 full_address whitespace**: corpus-safe + latent on gold (no gold col this run, 0 regress).
+
+**HELD for separate evaluation: #6 NPI Luhn** — corpus-wide checksum-guard change (adds
+`checksum: npi` + an n_unique==1 backstop affecting ALL checksum types) with ~0 new gold yield
+(#6b already recovered its ISBN cols). Queued; gate it alone watching the collapse band on
+isbn/aba recall.
+
+## Session total: composed gold 0.832 → 0.847 (+14 cols, 0 regressions), 8 rules, all GO.
+
 ## Substrate
 - baseline binary: `output/sharpen-audit/tierA/finetype_base_0823`
 - candidate binary: `output/sharpen-audit/tierA/finetype_batch1`

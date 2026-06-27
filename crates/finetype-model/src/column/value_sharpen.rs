@@ -304,6 +304,15 @@ pub(crate) fn value_sharpen(
         }
     }
 
+    // Rule 16b: full_address whitespace guard (BACKLOG #8). A real address is
+    // always multi-token; a single-token column the model collapsed into the
+    // address attractor is an identifier (idx 43/44: CUDNN benchmark IDs).
+    if result_label == "geography.address.full_address" {
+        if let Some((label, rule)) = disambiguate_full_address_whitespace_guard(values) {
+            return Some((label, rule));
+        }
+    }
+
     // Rule 31: Version vs dmy_short_dot gate.
     // If model predicts dmy_short_dot but ≥30% of X.Y.Z values have segments
     // that are impossible as DD.MM.YY dates (day=0, month>12, month=0, year>99),
@@ -1796,6 +1805,53 @@ pub(crate) fn disambiguate_text_length_demotion(
     } else {
         None
     }
+}
+
+/// Whitespace guard: full_address demands multi-token values (BACKLOG #8).
+///
+/// full_address is locale_specific. The locale-robust signal that a value IS an
+/// address is internal whitespace — every real address is multi-token (street +
+/// locality), regardless of punctuation convention. So this guard is
+/// WHITESPACE-ONLY: it deliberately does NOT require commas or street numbers,
+/// because that positive-evidence clause false-demotes comma-less foreign
+/// addresses (e.g. `Hauptstrasse 12 8001 Zurich`). A correct address always has
+/// whitespace, so the guard can never demote a true positive.
+pub(crate) fn disambiguate_full_address_whitespace_guard(
+    values: &[String],
+) -> Option<(String, String)> {
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
+    if non_empty.len() < 4 {
+        return None;
+    }
+    let with_space = non_empty
+        .iter()
+        .filter(|v| v.chars().any(char::is_whitespace))
+        .count();
+    let space_frac = with_space as f32 / non_empty.len() as f32;
+    // Overwhelmingly single-token -> cannot be addresses (0.15 ceiling).
+    if space_frac > 0.15 {
+        return None;
+    }
+    // Confirm the alphanumeric_id DESTINATION (letter+digit per value). This only
+    // inspects the single-token subset (no real address reaches here) and protects
+    // pure-word single tokens from being mis-routed to alphanumeric_id.
+    let alnum = non_empty
+        .iter()
+        .filter(|v| {
+            v.chars().any(|c| c.is_ascii_alphabetic()) && v.chars().any(|c| c.is_ascii_digit())
+        })
+        .count();
+    if (alnum as f32 / non_empty.len() as f32) < 0.80 {
+        return None;
+    }
+    Some((
+        "representation.identifier.alphanumeric_id".to_string(),
+        format!("full_address_whitespace_guard:space_frac={space_frac:.2}"),
+    ))
 }
 /// Demote "attractor" types back to generic representation.* types when
 /// the evidence doesn't support the specific prediction.
