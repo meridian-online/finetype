@@ -42,6 +42,21 @@ From **choice 0095 taxonomy-gap ledger** (gaps surfaced during gold adjudication
 From **determinability-probe findings** (the 7 taxonomy-gap columns, panel said "other"):
 - `street_name`, `file_path` / filename, `publication_year`, `link` (URL-ish), `block`.
 
+From the **#3-utc unblock** (2026-06-27, composed-accuracy-roadmap):
+- **`numeric UTC offset`** — a column of numeric hour-offsets (`-8`, `5.5`, `+5.45`) that
+  *means* a timezone offset but has no leaf: `datetime.offset.utc` is STRING-only ("UTC
+  +05:00", validator `^UTC [+-]\d{2}:\d{2}$`), so numeric offsets fall to `decimal_number`.
+  Surfaced by the `utc_offset` cluster (5 gold cols, OpenFlights + gittables). LOW priority:
+  decimal IS the honest storage type and the cluster is already resolved correctly by
+  `utc_bare_number_veto`; a leaf would only recover the semantic, not accuracy. Decide
+  add-leaf vs document-as-decimal at the next taxonomy pass. Small volume.
+
+**Anti-candidate (do NOT add a leaf):** `entity_name` vs `plain_text` is NOT a taxonomy gap —
+the boundary is real and `entity_name` is kept distinct (choice 0102). The confusion is the
+*model over-emitting* entity_name (12 of 16 plain_text→entity_name re-adjudications KEPT gold;
+0-for-6 retrain attractor, task t-000133e418). Fix is training negatives, not taxonomy. Same
+for `integer`↔`binary` (value-determinable subtype) — keep both.
+
 ## What to produce
 
 A ranked taxonomy-gap ledger: candidate type · corpus volume · determinability · example
