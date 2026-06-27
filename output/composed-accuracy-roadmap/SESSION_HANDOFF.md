@@ -1,83 +1,97 @@
-# Session handoff → next session is the MODEL LABEL-SPACE RESHAPE
+# Session handoff → next session is the CLEAN-LABEL RETRAIN (is the data the ceiling?)
 
-_Updated 2026-06-27 (end of the ac-2 + architecture-discovery session)._
+_Updated 2026-06-28 (end of the model-label-space-reshape session)._
 
 ## Headline
 
-**Composed gold 0.847 → 0.863 this session**, all on main + pushed. Banked: the
-batch-path speed win + CSV-ingestion robustness, the #3-utc Sharpen rule, and the
-full ac-2 eval cleanup (17+2 value-verified re-adjudications). Then a substrate
-survey produced the next architectural move as a written-up spec.
+The label-space reshape is **NO-GO** — and the post-mortem points at a bigger,
+unexamined lever: **the training labels, not the model, are the suspected ceiling.**
+Next session holds the model still and cleans the labels — the one experiment two
+months of architecture work never ran.
 
-## What this session shipped (all on main, pushed)
+## What this session settled (all committed + pushed)
 
-| commit | what | composed gold |
-|---|---|---|
-| 841cd2b | batch-path taxonomy hoist (~19% faster) + `parallel=false` CSV fallback + batch skip-and-log | 0.847 (held; +4 recovered) |
-| ec117d0 | `utc_bare_number_veto` (#3) + 1 re-adjudication (adversarially verified) | 0.847→0.852 |
-| 4a6a5df | ac-2(a) 17 clean re-adjudications (of 34 verified; 17 kept = model over-emit) | 0.852→0.861 |
-| f4581dd | ac-2(b) re-pull = NO-OP (all 931 scored; the "31 missing" was stale) | 0.861 |
-| 4dfe549 | ac-2(c) 2 contested re-adjudications (of 13; 11 kept) | 0.861→0.863 |
-| **8f2096f** | **discovery spec: model label-space reshape** | — |
+- **Reshape (drop 134 validator-ownable leaves → 111-class model + recovery rule): NO-GO.**
+  3-seed composed gold 0.811/0.832/0.792 (mean 0.812) vs s43 baseline 0.853 = −4.1pp
+  mean, all below baseline — consistent, not variance. choice 0108 → rejected; memory
+  `reshape-leaf-drop-costs-gold`; `output/model-label-space-reshape/VERDICT.md`.
+- **Diagnosed precisely (not Sense↔Sharpen fighting):** the −2pp decomposes into −1.8pp
+  kept-class model deficit (the forced 131k→87k training-data cut) + −3.1pp ceded
+  recovery gap. Sharpen lifts both models equally; it never overrode a correct Sense.
+- **The recovery rule (`ceded_leaf_recovery`) is gold-clean** (zero over-fire) but a no-op
+  on the shipped 244-model — kept on the branch, not shipped.
+- **Fast-path sized:** a value-only deterministic front-door skips the model on **~8% of
+  corpus columns** (`fastpath_sizing.md`). Independent of the reshape; could ship alone.
 
-**Live composed gold (reframe PRIMARY) = 803/931 = 0.863.** Raw Sense ~0.52.
+## NEXT SESSION = clean-label retrain (run `/design` to scope the spec)
 
-## NEXT SESSION = `2026-06-27-model-label-space-reshape` (spec written, 8 ACs)
+**The thesis (load-bearing):** the raw Sense ceiling (~0.52) is **stable across every
+architecture** we've tried (potion-4M/8M/16M, two-view, attention, gte transformer:
+0.50–0.57, oracle cap 0.599). A ceiling that doesn't move when you change the model is the
+fingerprint of a **label/data ceiling**, not a model limit. And the data lever is already
+**proven on raw Sense** (`encoder-data-lever-proven`, 2026-06-18): corpus-mined columns +
+GeoNames/Wikidata **vocabulary-membership labels** lifted the contested *semantic* set from
+the shipped 0.684 → **0.82–0.89** (GeoNames made city/country/country_code near-perfect).
 
-**The thesis (load-bearing):** Sharpen carries composed accuracy (3 retrains
-+4-7pp raw Sense, composed ZERO). The model's fine value-determinable label space
-is its main LIABILITY — it manufactures the over-emission that NO-GOs every fresh
-retrain (isbn collapse, currency_code 3.2×, user_agent 7.2×). This session's gold
-work is the same signal: 28 of 47 re-adjudication candidates were KEPT because the
-model over-emits, not because gold was wrong.
+**The gap (what's never been run):** that proof was always entangled with a transformer
+encoder upgrade (which died: composed-tied, 100× latency) and measured on **raw Sense**, never
+isolated on **composed gold** with the **shipped static architecture**. As far as the substrate
+shows, the cell "static model + clean vocab labels + composed gold" is **empty**. Every big
+experiment changed the *model* on top of the *same noisy distilled-Sherlock labels*.
 
-**The move:** drop the validator-ownable closed/format/checksum leaves from the
-model's TRAINING label space; cede them to Sharpen+validators (correct-by-
-construction; recovery already ships). Simplicity + accuracy + the unblock for a
-shippable retrain, in one reshape.
+**The experiment:** rebuild the training set with **vocabulary-membership labels** (GeoNames
+geo, Wikidata person — generators exist: `scripts/generate_geonames_geography.py`,
+`scripts/generate_wikidata_person_columns.py`) for the **semantic families**, **hold the
+shipped architecture + Sharpen fixed**, retrain, measure **composed gold**. One retrain.
+It isolates the variable every prior experiment confounded.
 
-**Read first:** `orbit spec show 2026-06-27-model-label-space-reshape` + its
-`interview.md` (the ranked levers + the full DO-NOT-REPROPOSE dead-end catalog —
-do not re-run a proven failure). Survey provenance: workflow `wf_e68a56d0-90b`.
+**The honest caveat:** *composed is rule-bound* has 3 confirmations — the skeptic's prior is
+"Sharpen already compensates, composed won't move." BUT the data lever targets the **semantic
+mass** (geography/person — open-vocab, *no validator*), which is exactly the bucket Sharpen
+structurally CANNOT fix (ceiling-discovery called it "irreducible by the model"). That's the
+one place clean labels could move composed where rules can't. **Decisive either way:** if
+composed moves, the "model is the ceiling" framing flips; if not, the ceiling is proven
+irreducible and we stop chasing the model for good.
 
-**Sequence (in interview.md):**
-1. **ac-6(a)** delete the 0107-blessed orphan modules (CharCNN/Tiered/TextClassifier/
-   legacy Trainer) — free, gold-no-regression gated. Good first move.
-2. **ac-0 → ac-3** the leaf-drop reshape. The decisive cheap experiment is **ac-2**:
-   single-seed potion retrain on the reduced label space → does the corpus
-   over-emit band clear? Fold the encoder/branch ablations (ac-6b: dual→single
-   potion −20-40ms; drop the validation branch) into the same retrain.
-3. **ac-4** abstaining-head DE-RISK probe (kill-switch: are over-tighten misses
-   separable in the shared trunk?) — only after the leaf-drop clears; **ac-5**
-   builds the full gate only if ac-4 passes, measured on composed PASS-THROUGH.
-4. **ac-7** the division-of-labour MADR (owner decision the ship depends on).
+## Author's two carry-over ideas (bake into the spec)
 
-## Guardrails (carry-over)
-- Model swap → gold-parity + gold-adjudicated relocation review (0104), NOT
-  corpus-honest GO (0% pass; structurally unpassable by any retrain).
-- Sharpen rule → `gate_from_cache.sh` (~seconds, reuses
-  `output/sharpen-audit/tierA/sense_cache.tsv`) or `corpus_honest_gate_fast.sh`.
-- Re-adjudication / gold change → adversarial defend-gold verification + leakage
-  guard (label-only = membership identical = ALL PASS). Corrections skew AWAY from
-  the model (it cleans gold, doesn't inflate).
-- Do NOT cede open-vocab leaves (city/entity_name/username/numeric_code) — closure
-  not semantics decides; those are the retrain-negatives target (t-000133e418).
-- Dead branches, do not re-propose: see the interview.md catalog (bigger static
-  encoder, transformer in-model, value-fusion, m2v witness, hierarchical head,
-  44-stat trunk, additive flat-softmax retrains, residual merge).
+1. **Don't trust labels — sample-check continuously (training AND eval).** We've found large
+   numbers of issues in gold over recent sessions (33 re-adjudications) and validator traps
+   this session (color_hex passing bare numbers). Vocabulary-membership has its OWN failure
+   modes — `region` collapses on GeoNames admin1 names (recall 0.07–0.33), and `[PA,TX,NY,CA]`
+   correctly → residual but membership can mislabel. So make "pull the real values and check
+   they make sense" a **gate before training on any label source**, not an afterthought — or
+   we just swap distilled-noise for vocab-noise. Sample N columns per family, eyeball, fix.
+2. **Keep an eye on inference speed — decoupled track.** Honest framing: **label count itself
+   is NOT a speed lever** (softmax width is negligible — the "retired-240 trap"). The real
+   levers are (a) the **~8% fast-path** (sized this session, ships independently), (b) the
+   **free IO/encoder wins** in `next-train-research/RESEARCH.md` (single potion-4M encoder
+   −20–40ms; batch-path taxonomy hoist; deterministic fast-path before model load), and
+   (c) the architecture-speed connection to WATCH: **if clean labels let a SMALLER/simpler
+   model hit the same composed accuracy, that's the real win.** So when running the clean-label
+   retrain, also try a smaller encoder / fewer params and see if clean labels make it viable.
 
 ## Key memories to read at session start
-`composed-is-rule-bound`, `specialiser-is-the-abstaining-witness`,
-`categorical-is-a-residual-category`, `sense-stage-ceiling-and-free-latency-wins`,
-`repull-is-noop-gold-is-fully-scored`, `eval-csv-fragility-is-reader-not-format`.
 
-## Open follow-ups (filed)
-- ac-6 SECOND HALF — N files per duckdb spawn (t-00007d2e), latency only.
-- #6 NPI Luhn HELD (t-00016c8f), corpus-wide checksum change, gate alone.
-- ac-2(c) defensible-tail remainder + taxonomy-gap ledger (numeric UTC offset)
-  in `.orbit/memos/2026-06-19-taxonomy-gap-discovery.md`.
+`encoder-data-lever-proven` (the proof + the GeoNames/Wikidata recipe),
+`determinability-probe-gold-is-the-ceiling` (gold-label quality + taxonomy gaps cap the score),
+`composed-is-rule-bound` (the caveat), `sense-stage-ceiling-and-free-latency-wins`,
+`reshape-leaf-drop-costs-gold` (why the model lever is closed),
+`ceiling-discovery-both-levers-dead` (the semantic mass = the target bucket).
 
-## How to continue
-1. `orbit session prime`, then `orbit spec show 2026-06-27-model-label-space-reshape`.
-2. Read this file + that spec's `interview.md` + the memories above.
-3. Start ac-6(a) (free) or scope ac-0 (the cede/keep/exclude partition).
+## Substrate
+
+`output/fine-tuned-encoder-discovery/` (the data-lever proof: `contested_residual_mining_proof.md`,
+`build_ac01_*.md`, `mining_proof.py`, `geonames_proof.py`), `eval/gold/lens_reference/`
+(GeoNames files: cities15000, admin1CodesASCII, iso3166), `output/next-train-research/RESEARCH.md`
+(the 0.60–0.66 abstaining-head alternative + the free latency wins),
+`scripts/prepare_multibranch_data.py` (where the training blend + labels are built).
+
+## First moves
+
+1. `orbit session prime`; read this + the memories above.
+2. `/design` a clean-label-retrain spec — ac-0 should be the **label-trust audit** (idea 1):
+   sample-verify GeoNames/Wikidata vocab labels per family before any retrain.
+3. The decisive cheap experiment: one static retrain on the clean-label blend for the semantic
+   families → composed gold vs s43 0.853 (the go/no-go on "data is the ceiling").
+4. Carry the speed track (idea 2) opportunistically — try a smaller encoder in the same retrain.
