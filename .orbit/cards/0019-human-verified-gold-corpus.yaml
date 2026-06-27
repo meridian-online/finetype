@@ -37,6 +37,7 @@ specs:
 - .orbit/specs/2026-06-16-mixed-teacher-gold-readjudication/spec.yaml
 - .orbit/specs/2026-06-17-cardinality-boundary-readjudication/spec.yaml
 - .orbit/specs/2026-06-18-representative-accuracy-gate/spec.yaml
+- .orbit/specs/2026-06-27-m2v-witness-specialiser-pilot/spec.yaml
 relations:
 - card: 0014-profile-validate-precision
   type: feeds

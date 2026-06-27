@@ -1,8 +1,8 @@
 id: 2026-06-27-m2v-witness-specialiser-pilot
 goal: Pilot a per-class m2v-embedding GBT abstaining witness on ONE high-value contested boundary, wired as a high-precision corroborating veto and gated via the fast re-anchored corpus-honest gate — testing whether the cheap, modular per-class embedding-witness framework produces a shippable specialist (the m2v variant of the proven +1.1pp gte witness gate).
 cards:
-- '0019'
-status: open
+- 0019-human-verified-gold-corpus
+status: closed
 labels:
 - specialiser
 - sense-architecture
@@ -15,7 +15,7 @@ acceptance_criteria:
     over-emit, plain_text under-recall, region, or the user_agent corpus wart) +
     rationale. (m2v separability ceiling ~0.80 contested; composed-rule-bound.)
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-1
   description: |
@@ -23,21 +23,21 @@ acceptance_criteria:
     FTMB (output/multibranch-training/m2v8m-244.ftmb), eval set from the gold FTMB
     (output/embed-frontier/gold_m2v8m.ftmb). Round-trips: dims + label join verified.
   gate: false
-  checked: false
+  checked: true
 - id: ac-2
   description: |
     Train a per-class one-vs-rest GBT (ydf 0.16.1) on the m2v embedding for the
     target class; report separability (AUC/CV) + the precision-recall curve on gold.
     Cross-check against the known m2v probe ceiling (~0.80 contested).
   gate: false
-  checked: false
+  checked: true
 - id: ac-3
   description: |
     Calibrate a HIGH-PRECISION abstention threshold (assert only at precision >=0.9;
     abstain otherwise). DELIVERABLE: the precision-at-recall the witness achieves in
     the asserting regime — the load-bearing shippability number for an abstaining veto.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-4
   description: |
@@ -63,5 +63,14 @@ acceptance_criteria:
     the boundary's verdict; and whether the framework generalises to a suite of
     per-class witnesses or is one-off. GO/NO-GO on building the framework out.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
+memories_considered:
+- key: specialiser-is-the-abstaining-witness
+  disposition: adopted
+  reason: This memory framed the m2v witness as live extension (3) of the specialiser strategy. The pilot tested it and the outcome refines the lesson into a NO-GO. The full-bucket gold sweep showed the cheap per-class m2v witness carves a high-precision abstaining region only on closed-vocabulary types (country/year/country_code/isbn), three of four already Sharpen-owned; the lone semantic win is country, a gazetteer lookup that folds into extension (1). The open residual that motivated the witness (word/plain_text/entity_name/alphanumeric_id/city) is uncrackable even at near-perfect AUC (city 0.987 / R@P.90 0.000). Memory updated — extension (3) is now a 4th dead-end; surviving specialisers are the abstaining value-rule plus the deterministic gazetteer reader (now also covering country). Methodology keeper recorded — precision-at-recall, not AUC, gates an abstaining veto.
+  cite_evidence:
+  - cite_path: output/m2v-witness-pilot/RESULT.md
+    excerpt: Of the four buckets that carve (country, year, country_code, isbn), three are already value-determined — Sharpen owns them via validators / closed-sets / checksums. The one semantic bucket the witness cracks is country (R@P.90 0.818), and country is a gazetteer lookup. The open semantic residual that motivated the witness (word, plain_text, entity_name, alphanumeric_id, city) is uncrackable.
+    read_at: 2026-06-27T02:32:10Z
+closed_at: 2026-06-27T02:32:41.155239Z
