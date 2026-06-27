@@ -95,7 +95,7 @@ acceptance_criteria:
     deterministic recovery path (Sharpen rule / validator / fast-path) so recall
     is recovered, NOT lost. Output: the explicit cede / keep / exclude partition.
   gate: true
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-1
   description: |
@@ -106,7 +106,6 @@ acceptance_criteria:
     NO excluded open-vocab leaf was removed.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-2
   description: |
     LOAD-BEARING MEASUREMENT — does the reshape clear the retrain NO-GO blocker?
@@ -162,7 +161,6 @@ acceptance_criteria:
     ship each only if composed ties within CI.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-7
   description: |
     Record the division of labour as a MADR choice: coarse model on open-vocab
