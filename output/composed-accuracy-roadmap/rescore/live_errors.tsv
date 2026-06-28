@@ -1,0 +1,137 @@
+column_name	gold	pred
+ID	representation.numeric.integer_number	representation.identifier.increment
+__index_level_12__	representation.numeric.integer_number	datetime.component.year
+__index_level_32__	representation.numeric.integer_number	datetime.component.year
+deferredLongTermLiab	representation.numeric.integer_number	finance.banking.aba_routing
+deferredLongTermLiab	representation.numeric.integer_number	representation.identifier.increment
+Comments	representation.numeric.integer_number	representation.boolean.binary
+noc	representation.numeric.integer_number	representation.boolean.binary
+noc	representation.numeric.integer_number	representation.boolean.binary
+Submission Time	datetime.epoch.unix_milliseconds	identity.commerce.ean
+noc	representation.numeric.integer_number	representation.boolean.binary
+confirmed	representation.numeric.integer_number	representation.boolean.binary
+venue_country	geography.location.country_code	technology.code.locale_code
+PA	representation.text.plain_text	geography.location.country_code
+TEAM_ABBREVIATION	representation.text.word	representation.text.entity_name
+name	representation.text.plain_text	identity.person.full_name
+name	representation.identifier.alphanumeric_id	geography.location.city
+groupingname	representation.text.word	representation.text.entity_name
+username	identity.person.username	representation.text.word
+ipni_id	representation.identifier.alphanumeric_id	unknown
+3187480517	representation.numeric.integer_number	
+498176	representation.numeric.integer_number	
+3110054519	representation.numeric.integer_number	
+BenchmarkName	representation.identifier.alphanumeric_id	unknown
+idPedido	datetime.epoch.unix_milliseconds	identity.commerce.ean
+BenchmarkName	representation.identifier.alphanumeric_id	unknown
+BenchmarkName	representation.identifier.alphanumeric_id	representation.text.word
+BenchmarkName	representation.identifier.alphanumeric_id	unknown
+BenchmarkName	representation.identifier.alphanumeric_id	unknown
+1001	representation.numeric.integer_number	
+tld	technology.internet.top_level_domain	representation.alphanumeric.alphanumeric_id
+Created	datetime.epoch.unix_seconds	representation.numeric.decimal_number
+Created	datetime.epoch.unix_seconds	representation.numeric.decimal_number
+Created	datetime.epoch.unix_seconds	representation.numeric.decimal_number
+Shortname	representation.text.plain_text	representation.text.entity_name
+Title	representation.text.plain_text	representation.text.entity_name
+ObjectName	representation.text.plain_text	representation.text.entity_name
+name	representation.text.entity_name	geography.location.city
+id	representation.identifier.alphanumeric_id	geography.coordinate.geohash
+title	representation.text.plain_text	container.array.semicolon_separated
+permit_type	representation.text.word	representation.alphanumeric.alphanumeric_id
+work_type	representation.text.word	geography.location.state_code
+job__	representation.numeric.integer_number	representation.text.word
+street_name	representation.text.plain_text	geography.address.street_address
+leave_status_as_of_june_30	representation.text.word	representation.boolean.terms
+type	representation.text.word	representation.alphanumeric.alphanumeric_id
+name	representation.text.entity_name	geography.address.street_name
+date_of_transfer	datetime.timestamp.sql_standard	unknown
+street	representation.text.plain_text	geography.address.street_address
+TLD	technology.internet.top_level_domain	representation.discrete.ordinal
+IDN_TLD	technology.internet.top_level_domain	representation.text.word
+GlobalRank	representation.numeric.integer_number	representation.identifier.increment
+April 9, 2021 9:32 PM UTC	representation.text.plain_text	representation.text.entity_name
+April 9, 2021 9:32 PM UTC	representation.text.plain_text	representation.text.entity_name
+utc	datetime.epoch.unix_seconds	identity.medical.npi
+template_name	representation.identifier.alphanumeric_id	finance.crypto.ethereum_address
+template_name	representation.identifier.alphanumeric_id	identity.academic.orcid
+template_name	representation.identifier.alphanumeric_id	representation.text.plain_text
+3.791666667	representation.numeric.decimal_number	
+longTermDebt	representation.numeric.integer_number	identity.medical.npi
+T:StockSharp.Poloniex.PoloniexMessageAdapter/summary	representation.text.plain_text	representation.text.entity_name
+135.60	representation.numeric.decimal_number	
+92.14	representation.numeric.decimal_number	
+145.07	representation.numeric.decimal_number	
+134.11	representation.numeric.decimal_number	
+species_code_6	representation.identifier.alphanumeric_id	representation.text.entity_name
+name	geography.location.region	representation.text.entity_name
+Source Type	representation.text.word	geography.location.region
+country_name_filter	geography.location.country	geography.location.region
+toCountry	geography.location.country	geography.location.region
+id	geography.location.country_code	unknown
+TEAM_ABBREVIATION	representation.text.word	identity.person.last_name
+Type	representation.text.word	geography.transportation.iata_code
+state	representation.text.word	geography.location.region
+state	representation.text.word	geography.location.region
+state	representation.text.word	geography.location.region
+County	geography.location.region	representation.text.entity_name
+person,state,district,vote,name,party	container.object.csv	representation.text.entity_name
+State ID	representation.numeric.integer_number	representation.identifier.increment
+finc_class_facet	representation.text.word	representation.text.entity_name
+group_id:id	representation.identifier.alphanumeric_id	representation.text.plain_text
+group_id:id	representation.identifier.alphanumeric_id	representation.text.plain_text
+discriminator_type	representation.file.extension	representation.text.word
+cell_type	representation.text.word	representation.identifier.alphanumeric_id
+call_type	representation.text.plain_text	representation.text.entity_name
+group_id:id	representation.identifier.alphanumeric_id	representation.text.plain_text
+food_category	representation.text.word	representation.text.entity_name
+Status	representation.text.plain_text	representation.text.entity_name
+category	representation.text.plain_text	representation.text.entity_name
+ID	representation.numeric.integer_number	representation.identifier.increment
+ID	representation.numeric.integer_number	representation.identifier.increment
+ID	representation.numeric.integer_number	representation.identifier.increment
+ID	representation.numeric.integer_number	representation.identifier.increment
+TEAM_ID	representation.numeric.integer_number	identity.medical.npi
+TEAM_ID	representation.numeric.integer_number	identity.medical.npi
+TEAM_ABBREVIATION	representation.text.word	geography.transportation.iata_code
+TEAM_ABBREVIATION	representation.text.word	unknown
+TEAM_ABBREVIATION	representation.text.word	geography.transportation.iata_code
+LayerName	representation.identifier.alphanumeric_id	technology.cryptographic.token_urlsafe
+ipni_id	representation.identifier.alphanumeric_id	unknown
+coord_id	representation.identifier.alphanumeric_id	unknown
+href	technology.internet.url	container.key_value.query_string
+href	technology.internet.url	container.key_value.query_string
+parent_id	technology.internet.url	container.key_value.query_string
+parent_id	technology.internet.url	container.key_value.query_string
+parent_id	technology.internet.url	container.key_value.query_string
+parent_id	technology.internet.url	container.key_value.query_string
+parent_id	technology.internet.url	container.key_value.query_string
+signature_source_url	representation.text.plain_text	representation.text.entity_name
+link_id	representation.identifier.alphanumeric_id	technology.internet.url
+gis_longitude	geography.coordinate.longitude	geography.coordinate.latitude
+iso_region	geography.location.region	geography.location.state_code
+state	geography.location.state_code	geography.location.country_code
+gis_nta_name	representation.text.plain_text	geography.location.city
+county	geography.location.region	unknown
+continent	representation.text.word	unknown
+naic_code_description	representation.text.word	representation.text.entity_name
+magType	representation.text.word	technology.internet.top_level_domain
+net	representation.text.word	geography.location.region
+ttxid	representation.identifier.alphanumeric_id	unknown
+transaction_id	representation.identifier.alphanumeric_id	container.object.json
+mag	representation.numeric.decimal_number	unknown
+place	representation.text.plain_text	geography.address.full_address
+block	representation.text.plain_text	representation.identifier.alphanumeric_id
+1998	datetime.component.year	
+conversation_no	representation.numeric.integer_number	datetime.component.year
+regular_gross_paid	finance.currency.amount	representation.numeric.decimal_number
+base_salary	finance.currency.amount	representation.numeric.decimal_number
+total_ot_paid	finance.currency.amount	representation.numeric.decimal_number
+total_other_pay	finance.currency.amount	representation.numeric.decimal_number
+price	finance.currency.amount	representation.numeric.integer_number
+borough	geography.location.region	representation.text.word
+fbi_code	representation.identifier.alphanumeric_id	unknown
+title_description	representation.text.plain_text	representation.text.entity_name
+publicationyear	datetime.component.year	unknown
+neighborhoods_analysis_boundaries	representation.text.plain_text	geography.location.city
+Demo URL	representation.text.plain_text	representation.text.entity_name
