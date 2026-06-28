@@ -2413,9 +2413,16 @@ impl ColumnClassifier {
         {
             return;
         }
-        // Only demote on a confident NOT-an-increment verdict; `None` (too few
-        // integers to judge) leaves the label untouched.
-        if values_form_increment(values) != Some(false) {
+        // Keep `increment` whenever the FULL column is a confirmed contiguous near-unique
+        // run (`Some(true)`); demote `None` (too few integers to judge) and `Some(false)`
+        // (a stepped sample that only looks sequential) to integer. NOTE: the aggressive
+        // "default everything to integer unless a counter header" variant was corpus-honest
+        // NO-GO — the gated-YDF oracle confirms ~128k contiguous-run increments on the
+        // corpus, so wholesale demotion collapses 98% of its oracle support. The
+        // increment-vs-integer-ID boundary is corpus-contested; gold's 8 integer-ID
+        // over-emits cannot be recovered without that collapse, so only the value-decidable
+        // None/Some(false) slice is taken (spec 2026-06-27-composed-accuracy-roadmap #12).
+        if values_form_increment(values) == Some(true) {
             return;
         }
         result.label = "representation.numeric.integer_number".to_string();
