@@ -1639,7 +1639,6 @@ dependencies = [
  "anyhow",
  "candle-core",
  "candle-nn",
- "chrono",
  "clap",
  "csv",
  "finetype-core",

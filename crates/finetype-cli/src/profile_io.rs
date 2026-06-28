@@ -218,8 +218,7 @@ pub(crate) fn read_csv_input(
     // batch mode, taking the rest of the run down with them).
     if !out.status.success() {
         if let Some(opts) = csv_opts {
-            let retry =
-                format!("SELECT * FROM read_csv({input_literal}, {opts}, parallel=false)");
+            let retry = format!("SELECT * FROM read_csv({input_literal}, {opts}, parallel=false)");
             out = run_duckdb(&retry)?;
         }
     }
