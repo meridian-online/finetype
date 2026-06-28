@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.38] - 2026-06-28
+
+### Changed
+
+- **Sharpen accuracy: composed gold 0.832 → 0.852** from a campaign of value-based rules — five
+  Tier-A value rules plus pilots #5/#8/#11, the `utc_bare_number_veto` (bare-number columns under
+  UTC-ish headers no longer mislabel as a timestamp), a URL recovery reader in
+  `structured_string_refinement`, and `schema_fail_demotion` extended to six identifier/code
+  over-emit labels.
+- **Faster inference.** A deterministic fast-path runs *before* the model loads — value-determinable
+  columns (no header) skip the model entirely (`deterministic_fast_path`, wired at `main.rs`); the
+  taxonomy compile is hoisted out of the per-file profile loop (roughly halves the per-file batch
+  marginal); single-column `infer` skips the sibling-context model load. CSV ingestion is more
+  robust (non-parallel DuckDB retry on read failure).
+
+### Removed
+
+- **Legacy inference paths removed (choice 0107).** The value-level model architecture
+  (CharCNN/Tiered/Transformer), the abandoned late-fusion path, and the legacy Sense→Sharpen path
+  are gone — multi-branch is the only inference path (−3,973 lines). The
+  `representation.discrete.categorical` sentinel is collapsed; producers emit `word` directly.
+
+### Fixed
+
+- CI hygiene: rustfmt drift in `profile_io.rs`; dropped the now-unused `chrono` dependency from
+  `finetype-cli` (orphaned by the choice-0107 removal).
+
+### Discovery
+
+- **Model label-space reshape: NO-GO** (choice 0108 rejected). Dropping the 134 validator-ownable
+  leaves and recovering them deterministically costs ~4pp gold across 3 seeds — the kept-class model
+  degrades on its residual boundary.
+- **Clean-label retrain: NO-GO — training-label quality is not the accuracy ceiling** (spec
+  `2026-06-28-clean-label-retrain`). Swapping the geography/person training labels for
+  GeoNames/Wikidata vocab-membership clean positives left composed gold flat (0.845 vs 0.853); the
+  shipped model already saturates semantic gold (city 0.96, country_code 0.93, continent 1.00).
+  Replacing real columns with synthetic clean ones *regressed* −7.9pp (a distribution shift, not a
+  label-quality signal). 4th confirmation that composed accuracy is rule-bound.
+
 ## [0.6.37] - 2026-06-25
 
 ### Added
