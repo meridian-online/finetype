@@ -76,7 +76,16 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", type=Path, default=OUT)
     ap.add_argument("--manifest", type=Path, default=MANIFEST)
+    ap.add_argument("--augment", action="store_true",
+                    help="AUGMENT mode: KEEP all v3 rows (preserve real-column formats) and ADD "
+                         "clean generator positives on top, instead of REPLACING the target "
+                         "families. Isolates label-cleanliness from the synthetic distribution "
+                         "shift that REPLACE confounds (the REPLACE run regressed gold on exactly "
+                         "the families it synthesised — city/country/continent).")
     args = ap.parse_args()
+    drop_set = set() if args.augment else REPLACE_LEAVES
+    print(f"mode: {'AUGMENT (keep v3 + add clean)' if args.augment else 'REPLACE (drop target v3 + add clean)'}",
+          file=sys.stderr)
 
     for name, p in [("v3", V3), ("geo_gen", GEO_GEN), ("person_gen", PERSON_GEN)]:
         if not p.exists():
@@ -93,10 +102,10 @@ def main():
         w = csv.writer(fout)
         w.writerow(["final_label", "sample_values", "column_name"])
 
-        # (1) v3 base, minus the replaced families
+        # (1) v3 base. REPLACE mode drops the target families; AUGMENT keeps everything.
         for row in stream(V3):
             lab = (row.get("final_label") or "").strip()
-            if not lab or lab in REPLACE_LEAVES:
+            if not lab or lab in drop_set:
                 continue
             w.writerow([lab, row.get("sample_values") or "", row.get("column_name") or ""])
             per_source["v3_base"] += 1

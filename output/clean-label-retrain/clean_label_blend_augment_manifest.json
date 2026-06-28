@@ -1,0 +1,52 @@
+{
+  "out": "output/clean-label-retrain/clean_label_blend_augment.csv.gz",
+  "total_rows": 131441,
+  "replace_leaves": [
+    "geography.location.city",
+    "geography.location.continent",
+    "geography.location.country",
+    "geography.location.country_code",
+    "geography.location.region",
+    "identity.person.full_name"
+  ],
+  "geo_keep": [
+    "geography.location.city",
+    "geography.location.continent",
+    "geography.location.country",
+    "geography.location.country_code",
+    "geography.location.country_code_iso3",
+    "geography.location.county",
+    "geography.location.region",
+    "geography.location.us_state"
+  ],
+  "geo_drop": [
+    "geography.address.postal_code",
+    "geography.coordinate.latitude",
+    "geography.coordinate.longitude"
+  ],
+  "per_source_rows": {
+    "v3_base": 102441,
+    "geo_gen": 21000,
+    "person_gen": 8000
+  },
+  "geo_gen_labels_seen": {
+    "geography.address.postal_code": 3000,
+    "geography.coordinate.latitude": 3000,
+    "geography.coordinate.longitude": 3000,
+    "geography.location.city": 3000,
+    "geography.location.continent": 3000,
+    "geography.location.country": 3000,
+    "geography.location.country_code": 6000,
+    "geography.location.region": 3000,
+    "geography.location.us_state": 3000
+  },
+  "per_label_rows_target": {
+    "geography.location.city": 8137,
+    "geography.location.continent": 3355,
+    "geography.location.country": 6488,
+    "geography.location.country_code": 6776,
+    "geography.location.region": 8429,
+    "geography.location.state_code": 0,
+    "identity.person.full_name": 14441
+  }
+}

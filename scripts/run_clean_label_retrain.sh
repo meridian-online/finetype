@@ -36,6 +36,16 @@ train_one() {  # <potion> <config> <train_ftmb> <model_out> <gold_ftmb>
       --distilled "$BLEND" --output "$ftmb" --workers 8
   else echo "skip (exists): $ftmb"; fi
 
+  # Pre-flight: config.valid_dim MUST equal the FTMB's valid_dim, else the validation
+  # branch matmul mismatches and the whole train wastes hours (taxonomy-drift guard).
+  local cfg_vd ftmb_vd
+  cfg_vd=$("$PY" -c "import json;print(json.load(open('$config'))['valid_dim'])")
+  ftmb_vd=$("$PY" -c "import struct;f=open('$ftmb','rb');f.read(4);f.read(4);f.read(8);f.read(8);f.read(4);print(struct.unpack('<H',f.read(2))[0])")
+  if [[ "$cfg_vd" != "$ftmb_vd" ]]; then
+    echo "FAIL: config valid_dim=$cfg_vd != FTMB valid_dim=$ftmb_vd ($config vs $ftmb)"; exit 1
+  fi
+  echo "[$out] valid_dim OK ($cfg_vd)"
+
   echo "--- [$out] train seed $SEED ---"
   if [[ ! -f "$out/model.safetensors" ]]; then
     "$BIN" train-multi-branch --data "$ftmb" --output "$out" --model-config "$config" \
@@ -64,18 +74,25 @@ print(f'Injected {len(c[\"type_index_keys\"])} type_index_keys')"
   else echo "skip (exists): $goldftmb"; fi
 }
 
-# ---- 8M primary (shipped architecture) ----
-train_one minishlab/potion-base-8M models/m2v8m-244-config.json \
-  output/clean-label-retrain/clean_m2v8m-244.ftmb models/clean8m-s42 \
-  output/embed-frontier/gold_m2v8m.ftmb
+# Taxonomy drifted 244->245 since s43 (datetime.offset.timezone_abbreviation, a Sharpen-
+# recovered leaf with ZERO training rows). The 0.853 baseline was measured on THIS 245-binary
+# (its Sharpen recovers the 6 gold tz_abbr columns), so 245 is the reference environment. We
+# train the candidate at 245 — the extra leaf is inert (no training data, Sharpen-recovered in
+# both baseline and candidate) so it does not affect the geo/person variable under test.
 
-# ---- 4M speed track ----
-train_one minishlab/potion-base-4M models/m2v-244-config.json \
+# ---- 8M primary (shipped architecture) — DECISIVE go/no-go ----
+train_one minishlab/potion-base-8M models/m2v8m-245-config.json \
+  output/clean-label-retrain/clean_m2v8m-244.ftmb models/clean8m-s42 \
+  output/clean-label-retrain/gold_m2v8m_245.ftmb
+echo "================ DECISIVE: 8M composed(reframe) vs baseline 0.853 — $(date) ================"
+scripts/score_clean_label.sh models/clean8m-s42 output/clean-label-retrain/gold_m2v8m_245.ftmb clean8m
+echo "baseline s43 composed(reframe) = 794/931 = 0.853 (go/no-go bar)"
+
+# ---- 4M speed track (does clean data make the smaller encoder viable?) ----
+train_one minishlab/potion-base-4M models/m2v-245-config.json \
   output/clean-label-retrain/clean_m2v4m-244.ftmb models/clean4m-s42 \
   output/clean-label-retrain/gold_m2v4m.ftmb
-
-echo "--- SCORE (composed gold, reframe) ---"
-scripts/score_clean_label.sh models/clean8m-s42 output/embed-frontier/gold_m2v8m.ftmb clean8m
+echo "================ SPEED TRACK: 4M composed(reframe) — $(date) ================"
 scripts/score_clean_label.sh models/clean4m-s42 output/clean-label-retrain/gold_m2v4m.ftmb clean4m
 echo "baseline s43 composed(reframe) = 794/931 = 0.853 (go/no-go bar)"
 echo "================ DONE — $(date) ================"
