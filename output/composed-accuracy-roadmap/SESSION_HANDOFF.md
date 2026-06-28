@@ -1,8 +1,20 @@
-# Session handoff → next session is the CLEAN-LABEL RETRAIN (is the data the ceiling?)
+# Session handoff → CLEAN-LABEL RETRAIN — DONE, thesis REFUTED
+
+> **RESOLVED 2026-06-28.** The clean-label retrain RAN. **Verdict: NO-GO — training-label
+> quality is NOT the accuracy ceiling.** Holding the shipped arch + Sharpen fixed and swapping
+> geo/person labels to GeoNames/Wikidata clean positives gave composed gold (reframe) **0.845 ≈
+> s43 0.853 (FLAT, within CI)** — clean labels don't move composed even for the semantic mass.
+> The shipped model already saturates semantic gold (city 0.958, country_code 0.926, continent
+> 1.000), so there was no headroom. 4th confirmation of `composed-is-rule-bound`. **Stop chasing
+> data/labels for composed accuracy.** Full verdict: `output/clean-label-retrain/VERDICT.md`;
+> memory `clean-label-retrain-refutes-data-ceiling`. The original hypothesis below is kept for
+> the record.
+
+---
 
 _Updated 2026-06-28 (end of the model-label-space-reshape session)._
 
-## Headline
+## Headline (ORIGINAL HYPOTHESIS — now refuted, see banner above)
 
 The label-space reshape is **NO-GO** — and the post-mortem points at a bigger,
 unexamined lever: **the training labels, not the model, are the suspected ceiling.**
