@@ -273,6 +273,35 @@ pub(crate) fn cmd_profile(
             runner_up: Option<String>,
         }
 
+        /// Synthesise a human-readable reason an `unknown` column could not be
+        /// typed, so an analyst sees WHY a column is untyped, not just THAT it
+        /// is (card 0020, honest typing — Pillar 1). `None` for typed columns.
+        ///
+        /// Three causes, in order of specificity: a tighter type was predicted
+        /// but its format validation rejected the values (the hard veto); too
+        /// few values to judge; or the model found no confident type.
+        fn unknown_reason_for(p: &ColProfile) -> Option<String> {
+            if p.label != "unknown" {
+                return None;
+            }
+            if p.validation_vetoed {
+                let rejected = p.vetoed_type.as_deref().unwrap_or("a tighter type");
+                let leaf = rejected.rsplit('.').next().unwrap_or(rejected);
+                return Some(match p.validation_pass_rate {
+                    Some(r) => format!(
+                        "validation rejected '{}': only {}% of values matched its format",
+                        leaf,
+                        (r * 100.0).round() as i64
+                    ),
+                    None => format!("validation rejected '{}'", leaf),
+                });
+            }
+            if p.non_null_count < 3 {
+                return Some("too few non-null values to classify".to_string());
+            }
+            Some("no type matched with sufficient confidence".to_string())
+        }
+
         /// Per-column validation + quality data.
         struct ColProfileQuality {
             valid_count: usize,
@@ -953,6 +982,11 @@ pub(crate) fn cmd_profile(
 
                 // Project profile rows + raw column values into the helper's
                 // borrowed-input shape. `columns` parallels `profiles` by index.
+                // Synthesise an unknown-reason per column (card 0020: honest
+                // typing — an analyst sees WHY a column is untyped). Held in a
+                // parallel Vec so the schema columns can borrow it.
+                let unknown_reasons: Vec<Option<String>> =
+                    profiles.iter().map(unknown_reason_for).collect();
                 let cols: Vec<json_schema::TableSchemaColumn<'_>> = profiles
                     .iter()
                     .enumerate()
@@ -963,6 +997,7 @@ pub(crate) fn cmd_profile(
                             label: &p.label,
                             values,
                             null_count: p.null_count,
+                            unknown_reason: unknown_reasons[i].as_deref(),
                         }
                     })
                     .collect();

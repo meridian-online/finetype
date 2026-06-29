@@ -33,6 +33,12 @@
 //! `x-finetype-null-rate` and `x-finetype-cardinality` diagnostic
 //! extensions. Stats are observed-from-the-input numbers, not part of
 //! the type contract, and live outside the verbosity contract above.
+//!
+//! An `unknown` column (which carries no type, so the two-extension
+//! contract does not apply to it) additionally gets `x-finetype-unknown-reason`
+//! when a reason is available — a human-readable "why this is untyped" string
+//! (card 0020 honest typing). Like the `--stats` diagnostics, it is an
+//! analyst-facing annotation outside the typed-column verbosity contract.
 
 use finetype_core::enum_domain::{detect_enum_domain, label_is_enum_keyword_eligible, EnumConfig};
 use finetype_core::{Definition, Taxonomy};
@@ -53,6 +59,10 @@ pub struct TableSchemaColumn<'a> {
     pub values: &'a [String],
     /// Number of null/empty cells observed in the column.
     pub null_count: usize,
+    /// For an `unknown` column, a human-readable reason it could not be typed
+    /// (card 0020 honest typing — an analyst sees WHY, not just THAT). `None`
+    /// for typed columns or when no reason is available.
+    pub unknown_reason: Option<&'a str>,
 }
 
 /// Emit a table-level JSON Schema document.
@@ -81,6 +91,9 @@ pub fn emit_table_schema(
             let mut prop = serde_json::Map::new();
             prop.insert("type".into(), json!("string"));
             prop.insert("x-finetype-label".into(), json!("unknown"));
+            if let Some(reason) = col.unknown_reason {
+                prop.insert("x-finetype-unknown-reason".into(), json!(reason));
+            }
             properties.insert(col.name.to_string(), Value::Object(prop));
             continue;
         }
@@ -316,18 +329,21 @@ mod tests {
                 label: "geography.location.country_code",
                 values: &country,
                 null_count: 0,
+                unknown_reason: None,
             },
             TableSchemaColumn {
                 name: "colour",
                 label: "representation.text.word",
                 values: &word,
                 null_count: 0,
+                unknown_reason: None,
             },
             TableSchemaColumn {
                 name: "n",
                 label: "representation.numeric.integer_number",
                 values: &ints,
                 null_count: 0,
+                unknown_reason: None,
             },
         ];
         let schema = emit_table_schema(&cols, "t", "id", &taxonomy, true, 32);
@@ -362,6 +378,46 @@ mod tests {
             n.get("x-finetype-enum").is_none(),
             "integer_number is denylisted — no enum domain",
         );
+    }
+
+    #[test]
+    fn unknown_column_carries_reason_when_present() {
+        let taxonomy = Taxonomy::from_directory(labels_path()).expect("load taxonomy");
+        let vals: Vec<String> = vec![];
+        let cols = vec![
+            TableSchemaColumn {
+                name: "mystery",
+                label: "unknown",
+                values: &vals,
+                null_count: 3,
+                unknown_reason: Some(
+                    "validation rejected 'npi': only 12% of values matched its format",
+                ),
+            },
+            TableSchemaColumn {
+                name: "bare",
+                label: "unknown",
+                values: &vals,
+                null_count: 3,
+                unknown_reason: None,
+            },
+        ];
+        let schema = emit_table_schema(&cols, "t", "id", &taxonomy, false, 0);
+        let props = schema
+            .get("properties")
+            .and_then(|p| p.as_object())
+            .unwrap();
+        // Reason surfaces alongside the unknown label.
+        let m = props.get("mystery").unwrap();
+        assert_eq!(m.get("x-finetype-label"), Some(&json!("unknown")));
+        assert_eq!(
+            m.get("x-finetype-unknown-reason").and_then(|r| r.as_str()),
+            Some("validation rejected 'npi': only 12% of values matched its format"),
+        );
+        // No reason → the key is simply absent (no empty noise).
+        let b = props.get("bare").unwrap();
+        assert_eq!(b.get("x-finetype-label"), Some(&json!("unknown")));
+        assert!(b.get("x-finetype-unknown-reason").is_none());
     }
 
     #[test]

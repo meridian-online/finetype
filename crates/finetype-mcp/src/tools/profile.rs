@@ -165,6 +165,9 @@ pub async fn handle(
                     label: &labels[i],
                     values,
                     null_count,
+                    // The MCP tool classifies from headers/values without the
+                    // CLI veto signals, so no unknown-reason is available here.
+                    unknown_reason: None,
                 }
             })
             .collect();
