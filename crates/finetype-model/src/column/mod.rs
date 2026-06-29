@@ -2200,7 +2200,7 @@ impl ColumnClassifier {
         self.utc_bare_number_veto(result, header, sample);
         self.checksum_substance_guard(result, header, sample);
         self.isbn_header_recovery(result, header, sample);
-        self.binary_vocab_veto(result, header, sample);
+        self.binary_vocab_veto(result, header, sample, values);
         self.increment_substance_veto(result, values);
         self.unlocode_format_veto(result, sample);
         self.city_region_header_corroboration(result, header, sample);
@@ -2576,12 +2576,24 @@ impl ColumnClassifier {
     /// numeric binaries ({0,1} only) carry no out-of-domain value and pass
     /// through. Measured on gold: 12 of 18 integer columns the model called
     /// `binary` carry a value above 1.
-    fn binary_vocab_veto(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+    ///
+    /// Scans the FULL column (`values`), not the down-sampled `sample` (BACKLOG
+    /// #14): the rare value above 1 that proves "count, not flag" is exactly what
+    /// stride-sampling drops (`Comments` … 5/14/30 in 3 of 162 rows; `noc` … 17;
+    /// `confirmed` … 81397), so a sample-only scan misses it and leaves the count
+    /// mislabelled `binary`.
+    fn binary_vocab_veto(
+        &self,
+        result: &mut ColumnResult,
+        header: &str,
+        sample: &[String],
+        values: &[String],
+    ) {
         if rhh::is_disabled("binary_vocab_veto") || result.label != "representation.boolean.binary"
         {
             return;
         }
-        let non_empty: Vec<&str> = sample
+        let non_empty: Vec<&str> = values
             .iter()
             .map(|v| v.trim())
             .filter(|v| !v.is_empty())

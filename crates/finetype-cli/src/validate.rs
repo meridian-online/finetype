@@ -600,8 +600,17 @@ pub(crate) fn resolve_veto_outcome(
     if !disabled {
         let opt: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
         if let Some(fallback) = finetype_core::veto_shape_fallback(&opt) {
-            if fallback != predicted {
-                let rule = if fallback.ends_with("alphanumeric_id") {
+            // Re-asserting the SAME label the veto rejected is normally circular,
+            // so a fallback equal to `predicted` demotes to `unknown`. The one
+            // exception is the `alphanumeric_id` id residual (BACKLOG #13): its
+            // validation pattern requires a LETTER, so it hard-vetoes columns the
+            // shape detector independently confirms are ids (BenchmarkName's
+            // `CONV_FWD…<…>` — out of the pattern's charset). The shape signal
+            // (distinct + id charset) and the strict pattern legitimately
+            // disagree, so the shape detector's id verdict is allowed to stand.
+            let is_id_residual = fallback.ends_with("alphanumeric_id");
+            if fallback != predicted || is_id_residual {
+                let rule = if is_id_residual {
                     "veto_fallback:id"
                 } else {
                     "veto_fallback:vocab"

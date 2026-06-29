@@ -181,6 +181,15 @@ pub fn veto_shape_fallback(values: &[Option<&str>]) -> Option<&'static str> {
         if mixed as f64 / n as f64 >= 0.6 {
             return Some("representation.identifier.alphanumeric_id");
         }
+        // digit-separator id (BACKLOG #13/#18): letter-free values that are
+        // digit groups joined by a separator (`-`, `_`, `/`) are composite
+        // identifiers (IPNI `69732-1`, tax id `0480196-01-999`, genomic coord
+        // `15_77227420`), not numbers — `alphanumeric_id`'s validation pattern
+        // hard-vetoes them because it requires a letter. Require near-unique
+        // values (genuine ids) and screen out calendar dates / short ranges.
+        if distinct_ratio >= 0.9 && non_null.iter().all(|v| is_digit_separator_id(v)) {
+            return Some("representation.identifier.alphanumeric_id");
+        }
         // numeric residual (BACKLOG #4, idx 74/103/104): letter-free, mostly-distinct
         // values that are all plain numbers are integers/decimals, not unknown. Post-
         // hard-veto only (this fn IS the veto fallback), so it cannot relocate a
@@ -216,6 +225,57 @@ pub fn veto_shape_fallback(values: &[Option<&str>]) -> Option<&'static str> {
     }
 
     None
+}
+
+/// A digit-separator identifier: two or more all-digit groups joined by `-` or
+/// `_`, with at least 6 digits total, that is NOT a date or time. Recovers
+/// composite numeric ids (`69732-1`, `0480196-01-999`, `15_77227420`,
+/// `156794164312_10154286`) that `alphanumeric_id`'s letter-requiring validation
+/// pattern hard-vetoes (BACKLOG #13/#18 helper).
+///
+/// `/` is deliberately NOT a separator: slash-joined digit runs are fractions
+/// (`1397/2400`) and slash dates (`3/10/2010`), never composite ids. The
+/// temporal screen rejects a value whose EVERY group is a valid calendar/clock
+/// component — a small day/month (`12`), a 4-digit year, a packed `YYYYMMDD`,
+/// or a packed `HHMMSS` — which covers `2021-03-15`, `2020-10-20_12-25-49` and
+/// `20190619-140629`. A genuine id carries at least one group that none of
+/// those shapes admit (`69732`, `77227420`, `156794164312`).
+fn is_digit_separator_id(v: &str) -> bool {
+    let groups: Vec<&str> = v.split(['-', '_']).collect();
+    if groups.len() < 2 {
+        return false;
+    }
+    if !groups
+        .iter()
+        .all(|g| !g.is_empty() && g.bytes().all(|b| b.is_ascii_digit()))
+    {
+        return false;
+    }
+    let total_digits: usize = groups.iter().map(|g| g.len()).sum();
+    if total_digits < 6 {
+        return false;
+    }
+    // An id needs at least one group that is not a plausible date/time component.
+    groups.iter().any(|g| !is_temporal_component(g))
+}
+
+/// Whether a pure-digit group could be a single calendar/clock component:
+/// a 1–2 digit day/month/hour/minute/second, a 4-digit year, a packed
+/// `HHMMSS`, or a packed `YYYYMMDD`. Packed forms are bounds-checked so a long
+/// id digit-run (`77227420` → month 74) is not mistaken for one.
+fn is_temporal_component(g: &str) -> bool {
+    let n = |a: usize, b: usize| g[a..b].parse::<u32>().unwrap_or(u32::MAX);
+    match g.len() {
+        1 | 2 => true,
+        4 => g.parse::<u32>().is_ok_and(|y| (1900..=2100).contains(&y)),
+        6 => n(0, 2) <= 23 && n(2, 4) <= 59 && n(4, 6) <= 59, // HHMMSS
+        8 => {
+            (1900..=2100).contains(&n(0, 4))
+                && (1..=12).contains(&n(4, 6))
+                && (1..=31).contains(&n(6, 8))
+        } // YYYYMMDD
+        _ => false,
+    }
 }
 
 /// A plain base-10 number: an optional sign then digits with at most one '.'.
@@ -352,6 +412,60 @@ identity.person.gender_code:
             veto_shape_fallback(&wfo),
             Some("representation.identifier.alphanumeric_id")
         );
+    }
+
+    #[test]
+    fn fallback_digit_separator_ids() {
+        // BACKLOG #13/#18: letter-free digit groups joined by a separator are
+        // composite ids, not numbers — recover to alphanumeric_id.
+        let ipni = opts(&["69732-1", "442514-1", "774083-1", "131795-2"]);
+        assert_eq!(
+            veto_shape_fallback(&ipni),
+            Some("representation.identifier.alphanumeric_id")
+        );
+        let ttx = opts(&["0480196-01-999", "1172642-12-171", "1347285-11-231"]);
+        assert_eq!(
+            veto_shape_fallback(&ttx),
+            Some("representation.identifier.alphanumeric_id")
+        );
+        let coord = opts(&["15_77227420", "2_32884931", "21_25412449", "8_29807728"]);
+        assert_eq!(
+            veto_shape_fallback(&coord),
+            Some("representation.identifier.alphanumeric_id")
+        );
+    }
+
+    #[test]
+    fn fallback_digit_separator_rejects_false_friends() {
+        // Year-month dates are not ids.
+        let ym = opts(&["2021-03", "2021-04", "2020-11", "2019-07"]);
+        assert_eq!(veto_shape_fallback(&ym), None);
+        // Full ISO dates are not ids.
+        let ymd = opts(&["2021-03-15", "2021-04-02", "2020-11-30", "2019-07-21"]);
+        assert_eq!(veto_shape_fallback(&ymd), None);
+        // M/D/YYYY slash dates (year LAST) are not ids — `/` is not a separator
+        // AND every group is a plausible day/month/year (the `DOB` false friend).
+        let mdy = opts(&["3/10/2010", "5/1/2013", "2/3/2011", "6/18/2011"]);
+        assert_eq!(veto_shape_fallback(&mdy), None);
+        // Packed date_time strings are not ids (the `date`/`Time` false friends).
+        let dt = opts(&[
+            "2020-10-20_12-25-49",
+            "2020-10-20_12-26-50",
+            "2020-01-09_17-46-25",
+            "2020-01-09_17-47-43",
+        ]);
+        assert_eq!(veto_shape_fallback(&dt), None);
+        let packed = opts(&["20190619-140629", "20190619-140637", "20190619-140605"]);
+        assert_eq!(veto_shape_fallback(&packed), None);
+        // Slash fractions are not ids (the `Total` false friend).
+        let frac = opts(&["1397/2400", "1526/2300", "1158/2300", "1334/2300"]);
+        assert_eq!(veto_shape_fallback(&frac), None);
+        // Year ranges are not ids.
+        let yr = opts(&["1999-2024", "2001-2020", "1990-2010", "2005-2022"]);
+        assert_eq!(veto_shape_fallback(&yr), None);
+        // Short ranges (under the 6-digit floor) are not ids.
+        let ranges = opts(&["10-20", "30-40", "50-60", "70-80"]);
+        assert_eq!(veto_shape_fallback(&ranges), None);
     }
 
     #[test]

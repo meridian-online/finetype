@@ -6419,6 +6419,30 @@ technology.internet.url:
     assert_eq!(r2.label, "representation.text.plain_text");
 }
 
+// ── binary_vocab_veto full-column feed (BACKLOG #14) ──
+
+#[test]
+fn binary_vocab_veto_full_column_catches_rare_count() {
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+
+    // Mostly {0,1} with a single rare value above 1 — a count, not a flag.
+    let mut counts: Vec<String> = vec!["0".into(); 60];
+    counts.push("1".into());
+    counts.push("30".into());
+    let r = cc
+        .compose_from_sense("Comments", &counts, "representation.boolean.binary", 0.5)
+        .unwrap();
+    assert_eq!(r.label, "representation.numeric.integer_number");
+
+    // A genuine {0,1} binary is untouched.
+    let bins: Vec<String> = vec!["0".into(), "1".into(), "0".into(), "1".into(), "1".into()];
+    let r2 = cc
+        .compose_from_sense("flag", &bins, "representation.boolean.binary", 0.5)
+        .unwrap();
+    assert_eq!(r2.label, "representation.boolean.binary");
+}
+
 // ── isbn_header_recovery (BACKLOG #6b) ──
 
 #[test]
