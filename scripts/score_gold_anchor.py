@@ -450,10 +450,55 @@ def cmd_score(args: argparse.Namespace) -> int:
     macro_r = [r["recall"] for r in rows_out if r["recall"] == r["recall"]]
     n_correct = sum(1 for c, pr2 in all_pairs if c == pr2)
     alo, ahi = wilson(n_correct, len(all_pairs))
+
+    # Companion (production) headline: score a SECOND fixture — typically the
+    # uniform-random representative corpus — and show it next to the curated-hard
+    # gold number, so whoever reads the eval sees the honest production accuracy
+    # (a column drawn at random), not just the curated optimisation target.
+    # Reuses the same join + reframe `norm`. Backward-compatible: with no
+    # companion args the report is byte-identical to before.
+    def headline_for(gold_path: Path, predictions_path: Path) -> tuple[int, int, float, float]:
+        cgold = load_gold(gold_path)
+        cpreds: dict[tuple[str, str], str] = {}
+        with predictions_path.open() as fh:
+            for r in csv.DictReader(fh, delimiter="\t"):
+                cpreds[(r["file_content_sha256"], r["column_name"])] = r["predicted_label"]
+        cpairs = [
+            (norm(r["curated_label"]), norm(p))
+            for r in cgold
+            if (p := cpreds.get((r["file_content_sha256"], r["column_name"]))) is not None
+        ]
+        nc = sum(1 for c, p in cpairs if c == p)
+        lo, hi = wilson(nc, len(cpairs))
+        return nc, len(cpairs), lo, hi
+
+    companion_block: list[str] = []
+    comp_gold = getattr(args, "companion_gold", None)
+    comp_preds = getattr(args, "companion_predictions", None)
+    if comp_gold and comp_preds:
+        cnc, ctot, clo, chi = headline_for(comp_gold, comp_preds)
+        cname = getattr(args, "companion_name", None) or "production (representative)"
+        if ctot:
+            companion_block = [
+                f"**Production accuracy — {cname}:** {cnc}/{ctot} = "
+                f"{cnc/ctot:.3f} (95% CI {clo:.3f}-{chi:.3f})  ",
+                "",
+                "> The headline above is the **curated-hard gold** set — hand-picked "
+                "contested columns and the engine's optimisation target, so it overstates "
+                "everyday accuracy. This companion scores a **uniform-random** draw of "
+                "production columns: the honest number an analyst sees on a column picked at "
+                "random. The gap is by design, not a regression.",
+                "",
+            ]
+
     lines += [
         "",
         f"**Headline — column accuracy:** {n_correct}/{len(all_pairs)} = "
         f"{n_correct/len(all_pairs):.3f} (95% CI {alo:.3f}-{ahi:.3f})  ",
+        "",
+    ]
+    lines += companion_block
+    lines += [
         f"**Macro precision** (mean over labels): {sum(macro_p)/len(macro_p):.3f}  ",
         f"**Macro recall** (mean over labels): {sum(macro_r)/len(macro_r):.3f}  ",
     ]
@@ -504,6 +549,17 @@ def main() -> int:
                         "to one text residual (entity_name stays distinct); enum-ness is the "
                         "orthogonal x-finetype-enum property, not a competing label. Headline "
                         "becomes invariant to the categorical-vs-residual boundary on both sides.")
+    s.add_argument("--companion-gold", type=Path, default=None,
+                   help="Optional SECOND gold fixture (e.g. eval/repr/representative_corpus.tsv). "
+                        "When given with --companion-predictions, the report shows that fixture's "
+                        "headline next to the primary one — the honest production accuracy on a "
+                        "uniform-random column alongside the curated-hard gold. Scored with the "
+                        "same --reframe norm as the primary fixture.")
+    s.add_argument("--companion-predictions", type=Path, default=None,
+                   help="Predictions TSV for --companion-gold (same schema as --predictions).")
+    s.add_argument("--companion-name", default="production (representative)",
+                   help="Display name for the companion headline (default: "
+                        "'production (representative)').")
     s.set_defaults(func=cmd_score)
 
     args = ap.parse_args()

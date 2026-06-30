@@ -127,6 +127,19 @@ GOLD_PRED="$OUT/predictions_${LABEL}.tsv"
 FINETYPE_MODEL="$MODEL" "$VPY" scripts/score_gold_anchor.py predict \
     --gold "$GOLD" --columns "$COLS" --binary "$BIN" \
     --out "$GOLD_PRED" || echo "  predict failed"
+
+# Representative companion (card 0020 scenario 1): predict on the uniform-random
+# representative fixture — the SAME corpus columns parquet ($COLS) is a superset, so
+# no extra data source is needed — to surface its PRODUCTION headline next to the
+# curated-hard gold number. If the predict fails, the companion is simply omitted.
+REPR_GOLD="eval/repr/representative_corpus.tsv"
+REPR_PRED="$OUT/predictions_${LABEL}_repr.tsv"
+FINETYPE_MODEL="$MODEL" "$VPY" scripts/score_gold_anchor.py predict \
+    --gold "$REPR_GOLD" --columns "$COLS" --binary "$BIN" \
+    --out "$REPR_PRED" || echo "  repr predict failed (companion omitted)"
+COMPANION_ARGS=()
+[[ -s "$REPR_PRED" ]] && COMPANION_ARGS=(--companion-gold "$REPR_GOLD" --companion-predictions "$REPR_PRED")
+
 # Reframe (spec 2026-06-17-enum-accuracy-reframe) is the PRIMARY headline: the gold
 # fixture migrated `categorical` -> text residual, so the legacy scorer reports a
 # phantom regression (model still emits `categorical` until the rules are retired in
@@ -135,6 +148,7 @@ FINETYPE_MODEL="$MODEL" "$VPY" scripts/score_gold_anchor.py predict \
 echo "  [PRIMARY] enum-reframe scoring:"
 "$VPY" scripts/score_gold_anchor.py score \
     --gold "$GOLD" --predictions "$GOLD_PRED" --reframe \
+    ${COMPANION_ARGS[@]+"${COMPANION_ARGS[@]}"} \
     --model-name "${LABEL}${SEED_TAG}-reframe" --out-dir "$OUT" || echo "  reframe score failed"
 echo "  [legacy — misleads until ac-03 retires the categorical Sharpen rules]:"
 "$VPY" scripts/score_gold_anchor.py score \
