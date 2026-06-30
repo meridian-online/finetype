@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`x-finetype-unknown-reason` on every profile surface.** When a column stays `unknown`,
+  `profile` now explains why — e.g. *"validation rejected 'email': only 0% of values matched its
+  format"*, *"too few non-null values to classify"*, or *"no type matched with sufficient
+  confidence"*. Previously only `-o json-schema` carried the reason; it now also appears on
+  `-o json` (verbose) and across the MCP `profile` tool. The MCP surfaces emit the two non-veto
+  reasons (no veto signal there); the CLI additionally surfaces the *"validation rejected …"* case.
+
+### Fixed
+
+- **`cargo install finetype-cli` from crates.io.** The `embed-models` build fallback (taken when no
+  local `models/` symlink is present, as in the crates.io source tarball) still fetched the retired
+  `char-cnn-v11` as the default and then panicked — it is not a multi-branch model — so a clean
+  crates.io install could not build. The fallback now fetches the live multi-branch default
+  (`m2v8m-s43` plus its dual-encoder value model) from the `finetype-model` repo, mirroring
+  `download-model.sh`. GitHub-release and Homebrew builds were unaffected.
+
 ## [0.6.38] - 2026-06-28
 
 ### Changed
