@@ -16,6 +16,20 @@ Anchors verified against live code: `CORROBORATION_SCOPE` (mod.rs:1736), `schema
 >   and the native-gate-via-`gate_candidate_from_cache.py` recipe (the fast resharpen gate is blind
 >   to veto-layer rules). Confirms the staged 0.86→0.88→0.90 is optimistic: DEMOTE arms collapse,
 >   RECOVERY arms clear. Realistic ceiling ~0.86, not 0.88.
+> - **2026-06-30 PIVOT TO PRODUCT (engine lever confirmed spent).** A 4-reader survey verified
+>   all 11 Tier-A "bankable" fixes (#1-#11) are ALREADY shipped inside live 0.864 (NPI-Luhn half
+>   of #6 held at ~0 gold); the residual is ~110/136 DEMOTE-shaped errors that collapse H05, so
+>   ~0pp cheap engine work remains. Shipped instead, per the ceiling-pivot: (a) **crates.io install
+>   fix** - the embed-models build fallback fetched retired char-cnn and panicked, so `cargo install`
+>   was broken; now fetches the live m2v8m-s43 multi-branch default (commit 21c4fc3). (b)
+>   **x-finetype-unknown-reason parity** across CLI `-o json` + all MCP profile surfaces (was
+>   json-schema-only; commit 43be66f). (c) **representative (production ~0.69) headline surfaced
+>   alongside curated-hard gold** in the eval report via `score_gold_anchor.py --companion-gold`,
+>   wired into `eval_rule.sh` (commit c626326). Honest-scope point: gold (~0.864) is the curated
+>   optimisation target; ~0.69 is what an analyst sees on a random column. Remaining product threads:
+>   docs/public accuracy-claim placement (deferred follow-up); representative fixture
+>   panel->adjudicated upgrade (needs LLM opt-in). Only surviving engine thread: the gold-invisible
+>   geo/entity over-emission retrain (t-000133e418, gold-parity not corpus-honest, additive 0-for-6).
 
 ## 1. Headline — the honest reachability read
 
