@@ -105,6 +105,25 @@ fn parse_csv(csv_data: &str) -> Result<(Vec<String>, Vec<Vec<String>>), ErrorDat
     Ok((headers, columns))
 }
 
+/// Why an `unknown` column stayed untyped, for the MCP surfaces.
+///
+/// Parity with the CLI's `unknown_reason_for` (profile.rs), reduced: the MCP
+/// classifier exposes no validation-veto signal, so only the two non-veto
+/// reasons are reachable here. The CLI additionally surfaces the "validation
+/// rejected '<leaf>': only N% matched" case from the veto layer. Returns
+/// `None` for any typed column. `non_null_count` is the count of non-empty
+/// cells (the `< 3` cut matches the CLI's `non_null_count < 3`).
+fn reduced_unknown_reason(label: &str, non_null_count: usize) -> Option<&'static str> {
+    if label != "unknown" {
+        return None;
+    }
+    Some(if non_null_count < 3 {
+        "too few non-null values to classify"
+    } else {
+        "no type matched with sufficient confidence"
+    })
+}
+
 pub async fn handle(
     server: &FineTypeServer,
     request: ProfileRequest,
@@ -160,14 +179,16 @@ pub async fn handle(
             .map(|(i, name)| {
                 let values: &[String] = columns.get(i).map(|v| v.as_slice()).unwrap_or(&[]);
                 let null_count = row_count.saturating_sub(values.len());
+                // Parity with the CLI json-schema surface: explain why an
+                // `unknown` column stayed untyped. `values` holds only the
+                // non-empty cells, so its length is the non-null count.
+                let unknown_reason = reduced_unknown_reason(&labels[i], values.len());
                 json_schema::TableSchemaColumn {
                     name,
                     label: &labels[i],
                     values,
                     null_count,
-                    // The MCP tool classifies from headers/values without the
-                    // CLI veto signals, so no unknown-reason is available here.
-                    unknown_reason: None,
+                    unknown_reason,
                 }
             })
             .collect();
@@ -282,6 +303,7 @@ pub async fn handle(
                 "is_generic": true,
                 "samples_used": 0,
                 "detected_locale": null,
+                "x-finetype-unknown-reason": "too few non-null values to classify",
             }));
             continue;
         }
@@ -301,6 +323,16 @@ pub async fn handle(
             "samples_used": result.samples_used,
             "detected_locale": result.detected_locale,
         });
+
+        // x-finetype-unknown-reason: parity with the json-schema/CLI surfaces —
+        // tell the caller why an `unknown` column stayed untyped. `values` here
+        // is non-empty, so its length is the non-null count.
+        if let Some(reason) = reduced_unknown_reason(&result.label, values.len()) {
+            col_json
+                .as_object_mut()
+                .unwrap()
+                .insert("x-finetype-unknown-reason".to_string(), json!(reason));
+        }
 
         // Validation quality metrics
         if request.validate {
@@ -361,4 +393,42 @@ pub async fn handle(
         Content::text(serde_json::to_string_pretty(&json_value).unwrap()),
         Content::text(md),
     ]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::reduced_unknown_reason;
+
+    #[test]
+    fn typed_columns_have_no_reason() {
+        assert_eq!(
+            reduced_unknown_reason("representation.identifier.alphanumeric_id", 100),
+            None
+        );
+        assert_eq!(reduced_unknown_reason("datetime.date.iso", 0), None);
+    }
+
+    #[test]
+    fn sparse_unknown_is_too_few_values() {
+        assert_eq!(
+            reduced_unknown_reason("unknown", 0),
+            Some("too few non-null values to classify")
+        );
+        assert_eq!(
+            reduced_unknown_reason("unknown", 2),
+            Some("too few non-null values to classify")
+        );
+    }
+
+    #[test]
+    fn populated_unknown_is_no_confident_type() {
+        assert_eq!(
+            reduced_unknown_reason("unknown", 3),
+            Some("no type matched with sufficient confidence")
+        );
+        assert_eq!(
+            reduced_unknown_reason("unknown", 5000),
+            Some("no type matched with sufficient confidence")
+        );
+    }
 }

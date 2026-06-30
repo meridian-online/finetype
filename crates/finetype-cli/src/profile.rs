@@ -727,6 +727,13 @@ pub(crate) fn cmd_profile(
                         if p.validation_advisory_low {
                             obj.insert("validation_advisory_low".to_string(), json!(true));
                         }
+                        // x-finetype-unknown-reason: why an `unknown` column stayed
+                        // untyped — parity with the json-schema surface (ab75b83) so
+                        // the explanation reads identically across CLI json,
+                        // json-schema and MCP. None for any typed column.
+                        if let Some(reason) = unknown_reason_for(p) {
+                            obj.insert("x-finetype-unknown-reason".to_string(), json!(reason));
+                        }
                         // Include unique values for categorical columns in verbose mode
                         if verbose {
                             if let Some(ref uv) = p.unique_values {
