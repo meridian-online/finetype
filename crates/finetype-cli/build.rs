@@ -17,9 +17,17 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "embed-models")]
-const HF_REPO: &str = "https://huggingface.co/meridian-online/finetype-char-cnn/resolve/main";
+const HF_REPO: &str = "https://huggingface.co/meridian-online/finetype-model/resolve/main";
 #[cfg(feature = "embed-models")]
-const CACHE_VERSION: &str = "0.5.3";
+const CACHE_VERSION: &str = "0.6.38";
+/// The active default model — MUST match the `models/default` symlink target.
+/// The crates.io source tarball ships no `models/` symlink, so this fallback
+/// hardcodes the current default; bump it on every default-model ship (see
+/// docs/RELEASE.md). The retired char-cnn-v11 fallback shipped here until
+/// v0.6.38 and made a clean `cargo install` from crates.io panic, because
+/// `generate_embedded_models` rejects any non-multi-branch default.
+#[cfg(feature = "embed-models")]
+const DEFAULT_MODEL: &str = "m2v8m-s43";
 
 /// Convert a path to a string safe for use inside `include_bytes!()` / `include_str!()`.
 /// On Windows, `canonicalize()` produces `\\?\D:\...` paths with backslashes that Rust
@@ -114,15 +122,30 @@ fn download_models() -> PathBuf {
     // Create models directory
     fs::create_dir_all(&models_dir).expect("Failed to create models cache directory");
 
-    // Download and setup models/default -> char-cnn-v11
+    // Download the active multi-branch default model. These are the three files
+    // generate_embedded_models embeds (model.safetensors + config.json +
+    // label_map.json); the legacy char-cnn shape (labels.json / config.yaml) was
+    // removed in choice 0107, so fetching it here made the embed step panic.
     download_model_group(
         &models_dir,
-        "char-cnn-v11",
-        &["model.safetensors", "labels.json", "config.yaml"],
+        DEFAULT_MODEL,
+        &["model.safetensors", "label_map.json", "config.json"],
     );
 
-    // Download optional model groups (graceful degradation if they fail)
-    download_model_group_optional(
+    // Dual-encoder: the value-aggregation branch needs a SECOND Model2Vec encoder
+    // (e.g. potion-8M) co-located at <model>/value_model2vec/, declared by
+    // config.value_embed_model. Required for m2v8m-s43 — the model fails to load
+    // without it. Mirrors download-model.sh's value-encoder fetch.
+    let value_subdir = format!("{DEFAULT_MODEL}/value_model2vec");
+    download_model_group(
+        &models_dir,
+        &value_subdir,
+        &["model.safetensors", "tokenizer.json"],
+    );
+
+    // Header branch + semantic classifier: the shared Model2Vec (potion-4M)
+    // encoder. Required — the multi-branch header branch depends on it.
+    download_model_group(
         &models_dir,
         "model2vec",
         &[
@@ -133,27 +156,18 @@ fn download_models() -> PathBuf {
         ],
     );
 
-    download_model_group_optional(
-        &models_dir,
-        "entity-classifier",
-        &["model.safetensors", "config.json", "label_index.json"],
-    );
-
-    download_model_group_optional(&models_dir, "sense", &["model.safetensors", "config.json"]);
-
-    // Create models/default symlink
+    // Create models/default symlink -> the multi-branch default.
     let default_link = models_dir.join("default");
     let _ = fs::remove_file(&default_link);
     #[cfg(unix)]
     {
         use std::os::unix::fs::symlink;
-        symlink("char-cnn-v11", &default_link).expect("Failed to create models/default symlink");
+        symlink(DEFAULT_MODEL, &default_link).expect("Failed to create models/default symlink");
     }
     #[cfg(windows)]
     {
         // On Windows, create a plain text file containing the target path
-        fs::write(&default_link, "char-cnn-v11")
-            .expect("Failed to create models/default link file");
+        fs::write(&default_link, DEFAULT_MODEL).expect("Failed to create models/default link file");
     }
 
     println!(
@@ -224,38 +238,6 @@ fn download_model_group(models_dir: &Path, group_name: &str, files: &[&str]) {
 
     println!(
         "cargo:warning=Downloaded {} ({} files)",
-        group_name,
-        files.len()
-    );
-}
-
-/// Download a model group, but don't panic if it fails (optional models).
-#[cfg(feature = "embed-models")]
-fn download_model_group_optional(models_dir: &Path, group_name: &str, files: &[&str]) {
-    let group_dir = models_dir.join(group_name);
-    fs::create_dir_all(&group_dir).ok();
-
-    for file in files {
-        let file_path = group_dir.join(file);
-
-        // Skip if already downloaded
-        if file_path.exists() {
-            continue;
-        }
-
-        let url = format!("{}/{}/{}", HF_REPO, group_name, file);
-        if download_file(&url, &file_path).is_err() {
-            println!(
-                "cargo:warning=Failed to download {}/{} — this component will be disabled",
-                group_name, file
-            );
-            let _ = fs::remove_dir_all(&group_dir);
-            return;
-        }
-    }
-
-    println!(
-        "cargo:warning=Downloaded {} ({} files) — optional component enabled",
         group_name,
         files.len()
     );
