@@ -1,5 +1,0 @@
-key: test-regenerates-tracked-precise-audit
-body: The sharpen-demotion-guard ac-01b integration test rewrites the TRACKED file .orbit/specs/2026-04-21-sharpen-demotion-guard/precise_audit.tsv on every `cargo test` run (it emits the real-taxonomy precise-validation audit for review). So any `cargo test` dirties the working tree with that one file — it is NOT a real change. Before committing after a test run, `git checkout -- .orbit/specs/2026-04-21-sharpen-demotion-guard/precise_audit.tsv` (or don't stage it). Recurred ~4x in the frictionless-datapackage session. If it becomes a nuisance, the fix is to have the test write under target/ instead of the tracked path — but the committed copy is an intentional reviewable baseline, so don't gitignore it without deciding that.
-timestamp: 2026-06-24T04:41:17.057931Z
-labels:
-- code-investigate

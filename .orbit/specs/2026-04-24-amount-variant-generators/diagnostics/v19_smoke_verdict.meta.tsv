@@ -1,9 +1,0 @@
-key	value
-verdict	GO
-target_columns	11
-target_fixes	11
-target_regressions	0
-net_lift	11
-threshold	>= 3
-artefact	diagnostics/v19_smoke_delta.tsv
-note	net_lift in {3,4} requires 3-seed confirmation before promotion

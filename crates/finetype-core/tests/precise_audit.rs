@@ -2,7 +2,7 @@
 //!
 //! Walks every definition in `labels/definitions_*.yaml` and emits a
 //! sorted TSV to
-//! `.orbit/specs/2026-04-21-sharpen-demotion-guard/precise_audit.tsv`
+//! `tests/fixtures/precise_audit.tsv`
 //! with columns `(type_key, has_enum, pattern, is_precise)`.
 //!
 //! The TSV is diffable in PRs — regenerated on every CI run — and is
@@ -12,8 +12,7 @@
 //!
 //! Run: `cargo test -p finetype-core --test precise_audit -- --nocapture`
 //!
-//! Spec: .orbit/specs/2026-04-21-sharpen-demotion-guard/spec.yaml (ac-01b)
-//! MADR: .orbit/choices/0059-demotion-guard-over-promotion.md
+//! Decision: recorded in a private planning repo (demotion guard over promotion, MADR 0059)
 
 use finetype_core::taxonomy::Taxonomy;
 use std::path::PathBuf;
@@ -33,7 +32,7 @@ fn workspace_root() -> PathBuf {
 fn dgd_ac01b_emit_precise_audit_tsv() {
     let root = workspace_root();
     let labels_dir = root.join("labels");
-    let out_path = root.join(".orbit/specs/2026-04-21-sharpen-demotion-guard/precise_audit.tsv");
+    let out_path = root.join("tests/fixtures/precise_audit.tsv");
 
     let taxonomy = Taxonomy::from_directory(&labels_dir)
         .expect("load taxonomy from labels/ — is labels/ present in workspace?");

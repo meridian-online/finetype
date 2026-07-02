@@ -4,7 +4,7 @@
   FineType pass-2 tabletop brief preparation — one-shot launchd template.
 
   Bead: finetype-53r "Bonus" section.
-  Authority: orbit/contracts/2026-05-10-pass2-prep-prompt.md option C.
+  Authority: scripts/contracts/2026-05-10-pass2-prep-prompt.md option C.
 
   Fires exactly once: 2026-05-10 06:03 Australia/Brisbane (AEST).
   StartCalendarInterval pinned to specific Year+Month+Day+Hour+Minute

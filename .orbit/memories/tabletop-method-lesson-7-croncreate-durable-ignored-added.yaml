@@ -1,4 +1,0 @@
-key: tabletop-method-lesson-7-croncreate-durable-ignored-added
-body: 'tabletop-method-lesson-7-croncreate-durable-ignored: Added 2026-05-03. CronCreate''s `durable: true` parameter was silently ignored on Hugh''s harness — both attempts produced session-only crons; .claude/scheduled_tasks.json never created. For multi-day reminders, never trust a session-bound mechanism. Fallback that worked: file the prompt at a sibling artefact path (e.g. orbit/contracts/2026-05-10-pass2-prep-prompt.md) for manual or launchd invocation. Methodology pass-2: contract write step ALWAYS files next-tabletop prompt as a sibling artefact even if a cron tool also schedules it. Artefact is single source of truth; cron is convenience layer.'
-timestamp: 1970-01-01T00:00:00Z
-labels: []

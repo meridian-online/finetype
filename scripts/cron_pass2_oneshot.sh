@@ -8,7 +8,7 @@
 #
 # Sequence:
 #   1. Extract the prompt body from
-#      .orbit/contracts/2026-05-10-pass2-prep-prompt.md (option B's awk
+#      scripts/contracts/2026-05-10-pass2-prep-prompt.md (option B's awk
 #      command in that file is the source-of-truth extraction).
 #   2. Invoke `claude -p` with bypassPermissions so the agent can read,
 #      write, and commit/push the brief.
@@ -43,7 +43,7 @@ for arg in "$@"; do
     esac
 done
 
-PROMPT_FILE="$REPO_ROOT/.orbit/contracts/2026-05-10-pass2-prep-prompt.md"
+PROMPT_FILE="$REPO_ROOT/scripts/contracts/2026-05-10-pass2-prep-prompt.md"
 PLIST_NAME="online.meridian.finetype-pass2-2026-05-10.plist"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_NAME"
 LABEL="online.meridian.finetype-pass2-2026-05-10"

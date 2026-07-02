@@ -1,5 +1,0 @@
-key: gittables-validate-strptime-epoch-ns
-body: finetype validate generates 'TRY(strptime(col, fmt))' SQL on temporal columns but DuckDB rejects with candidate-bindings listing epoch_ns(TIME)/epoch_ns(TIME_NS) etc — the strptime overload requested doesn't exist. 558/14112 errors (4%) in gittables corpus pass ac-06. The error wraps in epoch_ns candidate suggestions which obscures the root cause; likely a temporal-format string strptime can't parse.
-timestamp: 2026-05-21T10:31:40.616762Z
-labels:
-- code-investigate

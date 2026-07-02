@@ -1,5 +1,0 @@
-key: gittables-validate-binder-error-leading-whitespace
-body: 'FIXED in v0.6.20 (this branch) as a side effect of the parquet-direct path. Original bug: profile (Rust CSV parser preserves whitespace) and validate (DuckDB CSV reader strips whitespace) disagreed on column names → Binder Error. With validate reading parquet directly via read_parquet, both surfaces preserve names verbatim and agree. Tested across 3 previously-failing files (Q6.14.parquet, ClaDan.parquet, ClaDan_1.parquet): all now validate cleanly. 8807/14112 errors (62%) from gittables corpus pass run-1 resolved.'
-timestamp: 2026-05-21T11:05:50.847826Z
-labels:
-- code-investigate

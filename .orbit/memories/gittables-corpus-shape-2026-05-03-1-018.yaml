@@ -1,4 +1,0 @@
-key: gittables-corpus-shape-2026-05-03-1-018
-body: 'gittables-corpus-shape-2026-05-03: 1,018,286 parquet files at /Users/hugh/datasets/gittables, 40 GB on disk. Topic-clustered directories (miles_per_hour/, inflation_rate/, etc.). Same source parquet appears in multiple topic dirs — content-hash dedup required for any leakage discipline (path-level dedup insufficient). 155 GB free on /. Avg ~40KB/file. Profile + validate ~1.8s/file on M1. Full corpus scan: ~28 days at 12 cycles/day × 3000 fresh files/cycle.'
-timestamp: 1970-01-01T00:00:00Z
-labels: []

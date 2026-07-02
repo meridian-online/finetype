@@ -1,4 +1,0 @@
-key: geohash-length-deliberate-6-floor
-body: Geohash canonical length is 1-12 chars (each char = 5 bits precision; min 1 = ~5000km cell). FineType's pattern is ^[0-9b-hjkmnp-z]{6,12}$ — a DELIBERATE v13 deviation (floor raised 4->6) to avoid mistyping short alphanumeric codes as geohashes. The 32ghs alphabet (excludes a/i/l/o) is canonically correct. Do not 'fix' the 6-floor to canonical 1-12 without re-evaluating the short-ID false-positive trade — the floor is a length-heuristic precision guard the value-based Sharpen demotion (Rule 32) cannot replace (it only catches values that FAIL the pattern, not short all-valid-base32 IDs that pass it). Description + pattern reconciled to 6-12 on 2026-06-05.
-timestamp: 2026-06-05T06:42:57.05265Z
-labels: []

@@ -1,1 +1,0 @@
-{"properties":{"email":{"type":"string","pattern":"^[^@]+@[^@]+\\.[^@]+$"},"phone":{"type":"string","pattern":"^\\+?[0-9().+ -]{7,}$"}}}

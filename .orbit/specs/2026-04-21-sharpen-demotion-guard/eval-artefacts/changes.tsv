@@ -1,7 +1,0 @@
-dataset	column	gt	pre	post
-ecommerce_orders	status	status	representation.discrete.categorical	representation.text.word
-multilingual	locale	language code	representation.discrete.categorical	representation.text.word
-ecommerce_orders_json	status	status	representation.discrete.categorical	representation.text.word
-coverage_closure_phase_ab	excel_format	representation.file.excel_format	representation.discrete.categorical	representation.text.word
-coverage_closure_phase_ab	word	representation.text.word	representation.discrete.categorical	representation.text.word
-coverage_closure_phase_ab	http_method	technology.internet.http_method	representation.discrete.categorical	representation.text.word
