@@ -271,6 +271,7 @@ output/destination-drift-precheck/*.runlog
 eval/gittables/corpus_pass_latdec/corpus_pass/columns.parquet
 eval/gittables/corpus_pass_latdec/corpus_pass/files.parquet
 eval/gittables/corpus_pass_latdec/corpus_pass/execute_log.jsonl
+eval/gittables/corpus_pass_latdec/corpus_pass/execute_summary.json
 # Mining-factory distilled training inputs (regenerable from
 # scripts/mining_factory/manufacture.py + distillation pipeline).
 output/mining-factory/*.csv.gz
@@ -333,3 +334,62 @@ output/model-label-space-reshape/ac2/*.ftmb
 output/model-label-space-reshape/ac2/*.tsv
 output/model-label-space-reshape/ac3/*.tsv
 output/model-label-space-reshape/retrain/*.log
+
+# ── m2v dual-encoder model dirs (2026-06 potion campaign) ──
+# Multi-GB weight artifacts; pushed to HuggingFace per choice 0014. Only the
+# tracked models/default symlink (→ m2v8m-s43) points in; weights fetched by
+# .github/scripts/download-model.sh. Explicit-dir list mirrors the
+# char-cnn-v13/14/15 precedent above.
+models/m2v-code16m-encoder/
+models/m2v32m/
+models/m2v8m/
+models/m2v8m-s42/
+models/m2v8m-s43/
+models/m2v8m-s44/
+
+# ── Regenerable experiment bulk under output/ (2026-06 campaigns) ──
+# Same discipline as every block above: the .md reports / verdict JSONs /
+# manifests in these dirs stay tracked; only the bulk below is ignored.
+# Never-tracked bulk extensions (0 tracked instances — safe as globs):
+output/**/*.ftmb
+output/**/*.pid
+output/**/*.out
+# Wholesale bulk working dirs (verified to contain no durable records):
+output/composed-accuracy-roadmap/incgate/
+output/composed-accuracy-roadmap/tierb-gate/
+output/distillation-identity/
+output/identity-fortification/
+# clean-label-retrain: keep VERDICT/ac0 md + manifests; drop blends + score tsvs
+output/clean-label-retrain/*.csv.gz
+output/clean-label-retrain/scores/*.tsv
+output/clean-label-retrain/scores/*/*.tsv
+# composed-accuracy-roadmap/rescore: keep report_*.md; drop preds/metrics tsv
+output/composed-accuracy-roadmap/rescore/*.tsv
+# dual-encoder-native: keep **/report_*.md; drop metrics/preds tsv
+output/dual-encoder-native/**/*.tsv
+# embed-frontier: keep ac0*_*.md; drop eval ftmb (glob above) + preds
+output/embed-frontier/preds/
+# gte-tiny-embed-swap: keep ac0*_result.md; drop run sentinels
+output/gte-tiny-embed-swap/*.done
+output/gte-tiny-embed-swap/_floortrain_done.txt
+# sharpen-audit: keep ac*_*.md, score_*/report_*.md, tierA/report_*.md +
+# BATCH1_RESULT.md; drop preds/metrics tsv, ablation dumps, tierA caches/binaries
+output/sharpen-audit/*.tsv
+output/sharpen-audit/ablation/
+output/sharpen-audit/guard_ablation/
+output/sharpen-audit/score_*/*.tsv
+output/sharpen-audit/tierA/*.tsv
+output/sharpen-audit/tierA/cache/
+output/sharpen-audit/tierA/gate_batch1/
+output/sharpen-audit/tierA/gate_batch2/
+output/sharpen-audit/tierA/finetype_*
+
+# Nested corpus-pass byproducts inside experiment dirs (parquets, jsonl,
+# execute_summary) — regenerable from scripts/gittables_corpus_pass.py,
+# same as eval/gittables/corpus_pass/. The verdict .txt/.md alongside them
+# stay tracked. Mirrors the output/**/sample_pass/ rule above.
+output/**/corpus_pass/
+
+# Scratch memory dumps at repo root (knowledge already saved as orbit
+# memories; kept on disk, never tracked).
+/scratch_*.txt
