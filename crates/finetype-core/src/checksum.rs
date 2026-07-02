@@ -160,6 +160,152 @@ pub fn sedol(value: &str) -> bool {
     check == (10 - sum % 10) % 10
 }
 
+/// Alphanumeric value A–Z/0–9 for ISIN/LEI/IBAN: digits 0–9, letters A–Z =
+/// 10–35. Returns `None` for anything else. (Unlike [`alnum_value`] this admits
+/// no CUSIP `*`/`@`/`#` extras — these schemes are strictly `[A-Z0-9]`.)
+fn alnum36(c: char) -> Option<u32> {
+    if c.is_ascii_digit() {
+        c.to_digit(10)
+    } else if c.is_ascii_uppercase() {
+        Some(c as u32 - 'A' as u32 + 10)
+    } else {
+        None
+    }
+}
+
+/// Fold an alphanumeric slice to its ISO 7064 Mod 97-10 remainder.
+///
+/// Each digit contributes one decimal digit; each letter A–Z its two-digit
+/// value (10–35). The whole is reduced mod 97 digit-by-digit, so the running
+/// remainder is always < 97 and nothing overflows however long the input.
+/// Returns `None` if any character is not `[A-Z0-9]`.
+fn mod97(chars: &[char]) -> Option<u32> {
+    let mut r = 0u32;
+    for &c in chars {
+        let v = alnum36(c)?;
+        if v >= 10 {
+            r = (r * 10 + v / 10) % 97;
+            r = (r * 10 + v % 10) % 97;
+        } else {
+            r = (r * 10 + v) % 97;
+        }
+    }
+    Some(r)
+}
+
+/// Validate a numeric string by its Luhn (mod-10) check digit.
+///
+/// Standard Luhn over the whole value: from the rightmost digit, every second
+/// digit is doubled (subtracting 9 when the result exceeds 9); the total is
+/// divisible by 10. Spaces and hyphens are stripped; a leading sign, a
+/// non-digit, or fewer than two digits fails. This is the shared primitive the
+/// generator's `luhn_check_digit` computes against, exposed here so algo-exists
+/// numeric types (credit card, IMEI, NPI, …) enrol with a `checksum: luhn`
+/// directive rather than a bespoke veto.
+pub fn luhn(value: &str) -> bool {
+    let t = value.trim();
+    if t.starts_with('-') || t.starts_with('+') {
+        return false;
+    }
+    let Some(digits) = t
+        .chars()
+        .filter(|c| *c != '-' && *c != ' ')
+        .map(|c| c.to_digit(10))
+        .collect::<Option<Vec<u32>>>()
+    else {
+        return false;
+    };
+    if digits.len() < 2 {
+        return false;
+    }
+    let mut sum = 0u32;
+    for (i, &d) in digits.iter().rev().enumerate() {
+        let mut d = d;
+        if i % 2 == 1 {
+            d *= 2;
+            if d > 9 {
+                d -= 9;
+            }
+        }
+        sum += d;
+    }
+    sum.is_multiple_of(10)
+}
+
+/// Validate a 12-character ISIN by its Luhn check digit (ISO 6166).
+///
+/// Two-letter country code + 9-char NSIN + 1 check digit. Every character is
+/// expanded to its value (digits 0–9, letters A–Z = 10–35) as decimal digits,
+/// then the whole is Luhn-validated. The taxonomy pattern checks shape
+/// (`^[A-Z]{2}[A-Z0-9]{9}[0-9]$`) but not the check digit — a 12-char
+/// alphanumeric with a plausible final digit otherwise passes. Spaces/hyphens
+/// are stripped; any other length, or a non-`[A-Z0-9]` character, fails.
+pub fn isin(value: &str) -> bool {
+    let chars: Vec<char> = value
+        .trim()
+        .chars()
+        .filter(|c| *c != '-' && *c != ' ')
+        .collect();
+    if chars.len() != 12 {
+        return false;
+    }
+    let mut expanded = String::with_capacity(24);
+    for &c in &chars {
+        match alnum36(c) {
+            Some(v) if v >= 10 => {
+                expanded.push((b'0' + (v / 10) as u8) as char);
+                expanded.push((b'0' + (v % 10) as u8) as char);
+            }
+            Some(v) => expanded.push((b'0' + v as u8) as char),
+            None => return false,
+        }
+    }
+    luhn(&expanded)
+}
+
+/// Validate a 20-character LEI by its ISO 7064 Mod 97-10 check digits (ISO 17442).
+///
+/// The full 20 characters (letters A–Z = 10–35, expanded to two digits each)
+/// reduce to 1 mod 97. The taxonomy pattern checks shape
+/// (`^[0-9]{4}[A-Z0-9]{14}[0-9]{2}$`) but not the check digits. Spaces are
+/// stripped; any other length, or a non-`[A-Z0-9]` character, fails.
+pub fn lei(value: &str) -> bool {
+    let chars: Vec<char> = value.trim().chars().filter(|c| *c != ' ').collect();
+    if chars.len() != 20 {
+        return false;
+    }
+    mod97(&chars) == Some(1)
+}
+
+/// Validate an IBAN by its ISO 7064 Mod 97-10 check digits (ISO 13616).
+///
+/// Move the first four characters (country code + 2 check digits) to the end,
+/// expand letters (A–Z = 10–35), and confirm the result is 1 mod 97. Spaces are
+/// stripped and letters upper-cased (IBANs print in groups of four). Length must
+/// be 15–34, the first two characters letters and the next two digits; anything
+/// else fails.
+pub fn iban(value: &str) -> bool {
+    let chars: Vec<char> = value
+        .trim()
+        .chars()
+        .filter(|c| *c != ' ')
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+    if chars.len() < 15 || chars.len() > 34 {
+        return false;
+    }
+    if !(chars[0].is_ascii_uppercase()
+        && chars[1].is_ascii_uppercase()
+        && chars[2].is_ascii_digit()
+        && chars[3].is_ascii_digit())
+    {
+        return false;
+    }
+    // Rearranged = BBAN + country code + check digits (first four moved to end).
+    let rearranged: Vec<char> = chars[4..].iter().chain(chars[..4].iter()).copied().collect();
+    mod97(&rearranged) == Some(1)
+}
+
 /// Resolve a `checksum:` directive name to its validating function.
 ///
 /// Returns `None` for an unknown name so the caller can surface the typo
@@ -171,6 +317,10 @@ pub fn resolve(name: &str) -> Option<fn(&str) -> bool> {
         "aba" => Some(aba),
         "cusip" => Some(cusip),
         "sedol" => Some(sedol),
+        "luhn" => Some(luhn),
+        "isin" => Some(isin),
+        "lei" => Some(lei),
+        "iban" => Some(iban),
         _ => None,
     }
 }
@@ -256,11 +406,93 @@ mod tests {
     }
 
     #[test]
+    fn luhn_accepts_and_rejects() {
+        // Canonical Luhn vectors (a test credit-card PAN and the Wikipedia example).
+        assert!(luhn("4532015112830366"));
+        assert!(luhn("79927398713"));
+        // Bumping the check digit (rightmost, never doubled) breaks the mod-10.
+        assert!(!luhn("4532015112830367"));
+        assert!(!luhn("79927398714"));
+        assert!(!luhn("-4532015112830366")); // signed
+        assert!(!luhn("4")); // single digit
+        assert!(!luhn("4532a15112830366")); // non-digit
+    }
+
+    #[test]
+    fn isin_accepts_taxonomy_samples() {
+        // The finance.securities.isin `samples:` are curated valid ISINs.
+        for v in ["US0378331005", "GB0002634946", "JP3633400001", "DE0007164600"] {
+            assert!(isin(v), "should be a valid ISIN: {v}");
+        }
+    }
+
+    #[test]
+    fn isin_rejects_lookalikes() {
+        assert!(!isin("US0378331004")); // check digit bumped
+        assert!(!isin("GB0002634947"));
+        assert!(!isin("US037833100")); // 11 chars
+        assert!(!isin("US03783310055")); // 13 chars
+        assert!(!isin("US037833100$")); // non-alnum
+    }
+
+    #[test]
+    fn iban_accepts_taxonomy_samples() {
+        // The finance.banking.iban `samples:` are curated valid IBANs.
+        for v in [
+            "GB29NWBK60161331926819",
+            "DE89370400440532013000",
+            "FR7630006000011234567890189",
+            "NL91ABNA0417164300",
+            "ES9121000418450200051332",
+            "IT60X0542811101000000123456",
+        ] {
+            assert!(iban(v), "should be a valid IBAN: {v}");
+        }
+        // Printed in groups of four (as IBANs usually are) — still valid.
+        assert!(iban("GB29 NWBK 6016 1331 9268 19"));
+        // Lower-case tolerated (transform upper-cases anyway).
+        assert!(iban("gb29nwbk60161331926819"));
+    }
+
+    #[test]
+    fn iban_rejects_lookalikes() {
+        assert!(!iban("GB30NWBK60161331926819")); // check digits bumped
+        assert!(!iban("DE88370400440532013000"));
+        assert!(!iban("GB2")); // too short
+        assert!(!iban("1B29NWBK60161331926819")); // country not letters
+        assert!(!iban("GBA0NWBK60161331926819")); // check position not digits
+    }
+
+    #[test]
+    fn lei_accepts_taxonomy_samples() {
+        // The finance.securities.lei `samples:` are curated valid LEIs.
+        for v in [
+            "529900T8BM49AURSDO55",
+            "213800WSGIIZCXF1P572",
+            "549300MLUDYVRQOOXS22",
+        ] {
+            assert!(lei(v), "should be a valid LEI: {v}");
+        }
+    }
+
+    #[test]
+    fn lei_rejects_lookalikes() {
+        assert!(!lei("529900T8BM49AURSDO56")); // check digits bumped
+        assert!(!lei("529900T8BM49AURSDO5")); // 19 chars
+        assert!(!lei("529900T8BM49AURSDO555")); // 21 chars
+        assert!(!lei("529900T8BM49AURSDO5$")); // non-alnum
+    }
+
+    #[test]
     fn resolve_known_and_unknown() {
         assert!(resolve("isbn").is_some());
         assert!(resolve("aba").is_some());
         assert!(resolve("cusip").is_some());
         assert!(resolve("sedol").is_some());
+        assert!(resolve("luhn").is_some());
+        assert!(resolve("isin").is_some());
+        assert!(resolve("lei").is_some());
+        assert!(resolve("iban").is_some());
         assert!(resolve("not_a_scheme").is_none());
     }
 }
