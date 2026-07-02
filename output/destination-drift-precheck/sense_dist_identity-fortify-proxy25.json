@@ -1,0 +1,26 @@
+{
+  "label": "identity-fortify-proxy25",
+  "model": "models/sherlock-identity-fortify-proxy25-s42",
+  "files_sampled": 1000,
+  "files_profiled": 0,
+  "convert_err": 0,
+  "total_cols": 0,
+  "seed": 42,
+  "watch": {
+    "categorical_count": 0,
+    "categorical_pct": 0.0,
+    "geography": {
+      "city": 0,
+      "region": 0,
+      "country": 0
+    },
+    "v24_fp_labels": {
+      "utc": 0,
+      "url": 0,
+      "boolean": 0,
+      "integer": 0
+    },
+    "_superseded_by": "scripts/drift_report.py (full-label-space gate)"
+  },
+  "label_counts": {}
+}

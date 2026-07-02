@@ -1,0 +1,1748 @@
+{
+  "ftmb_version": 5,
+  "format": "v4",
+  "seed": 42,
+  "samples_per_type": 1200,
+  "ratio_distilled": 0.7,
+  "min_values": 5,
+  "distilled_source": "output/clean-label-retrain/clean_label_blend.csv.gz",
+  "filter_distilled": true,
+  "distilled_cap": 600,
+  "hard_negatives": 75,
+  "taxonomy_types": 245,
+  "blended_types": 244,
+  "records_written": 143592,
+  "errors": 0,
+  "dimensions": {
+    "char": 960,
+    "embed": 1024,
+    "stats": 27,
+    "header": 128
+  },
+  "table_groups": 18067,
+  "avg_group_size": 7.9,
+  "distilled_grouping_strategy": "proximity",
+  "synthetic_grouping_strategy": "table_templates",
+  "n_table_templates": 26,
+  "blend_ratio_stats": {
+    "container.array.comma_separated": {
+      "distilled": 122,
+      "synthetic": 1078,
+      "total": 1200,
+      "distilled_ratio": 0.102,
+      "oversampled": false
+    },
+    "container.array.pipe_separated": {
+      "distilled": 3,
+      "synthetic": 1197,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "container.array.semicolon_separated": {
+      "distilled": 12,
+      "synthetic": 1188,
+      "total": 1200,
+      "distilled_ratio": 0.01,
+      "oversampled": false
+    },
+    "container.array.whitespace_separated": {
+      "distilled": 13,
+      "synthetic": 1187,
+      "total": 1200,
+      "distilled_ratio": 0.011,
+      "oversampled": false
+    },
+    "container.key_value.query_string": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "container.object.csv": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "container.object.html": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "container.object.json": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "container.object.json_array": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "container.object.xml": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "container.object.yaml": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "datetime.component.day_of_week": {
+      "distilled": 600,
+      "synthetic": 600,
+      "total": 1200,
+      "distilled_ratio": 0.5,
+      "oversampled": false
+    },
+    "datetime.component.month_name": {
+      "distilled": 9,
+      "synthetic": 1191,
+      "total": 1200,
+      "distilled_ratio": 0.007,
+      "oversampled": false
+    },
+    "datetime.component.periodicity": {
+      "distilled": 6,
+      "synthetic": 1194,
+      "total": 1200,
+      "distilled_ratio": 0.005,
+      "oversampled": false
+    },
+    "datetime.component.year": {
+      "distilled": 600,
+      "synthetic": 600,
+      "total": 1200,
+      "distilled_ratio": 0.5,
+      "oversampled": false
+    },
+    "datetime.date.abbrev_month_no_comma": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "datetime.date.abbreviated_month": {
+      "distilled": 162,
+      "synthetic": 1038,
+      "total": 1200,
+      "distilled_ratio": 0.135,
+      "oversampled": false
+    },
+    "datetime.date.chinese_ymd": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.compact_dmy": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.compact_mdy": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.compact_ym": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.compact_ymd": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.dmy_dash": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "datetime.date.dmy_dash_abbrev": {
+      "distilled": 4,
+      "synthetic": 1196,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "datetime.date.dmy_dash_abbrev_short": {
+      "distilled": 4,
+      "synthetic": 1196,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "datetime.date.dmy_dot": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.dmy_short_dot": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.dmy_short_slash": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "datetime.date.dmy_slash": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "datetime.date.dmy_space_abbrev": {
+      "distilled": 30,
+      "synthetic": 1170,
+      "total": 1200,
+      "distilled_ratio": 0.025,
+      "oversampled": false
+    },
+    "datetime.date.dmy_space_full": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "datetime.date.full_month_no_comma": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "datetime.date.iso": {
+      "distilled": 23,
+      "synthetic": 1177,
+      "total": 1200,
+      "distilled_ratio": 0.019,
+      "oversampled": false
+    },
+    "datetime.date.iso_week": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.jp_era_long": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.jp_era_short": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.julian": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "datetime.date.korean_ymd": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.long_full_month": {
+      "distilled": 105,
+      "synthetic": 1095,
+      "total": 1200,
+      "distilled_ratio": 0.087,
+      "oversampled": false
+    },
+    "datetime.date.mdy_dash": {
+      "distilled": 5,
+      "synthetic": 1195,
+      "total": 1200,
+      "distilled_ratio": 0.004,
+      "oversampled": false
+    },
+    "datetime.date.mdy_short_slash": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "datetime.date.mdy_slash": {
+      "distilled": 50,
+      "synthetic": 1150,
+      "total": 1200,
+      "distilled_ratio": 0.042,
+      "oversampled": false
+    },
+    "datetime.date.month_year_abbrev": {
+      "distilled": 11,
+      "synthetic": 1189,
+      "total": 1200,
+      "distilled_ratio": 0.009,
+      "oversampled": false
+    },
+    "datetime.date.month_year_full": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "datetime.date.month_year_slash": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "datetime.date.ordinal": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.short_dmy": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.short_mdy": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.short_ymd": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.weekday_abbreviated_month": {
+      "distilled": 8,
+      "synthetic": 1192,
+      "total": 1200,
+      "distilled_ratio": 0.007,
+      "oversampled": false
+    },
+    "datetime.date.weekday_dmy_full": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "datetime.date.weekday_full_month": {
+      "distilled": 6,
+      "synthetic": 1194,
+      "total": 1200,
+      "distilled_ratio": 0.005,
+      "oversampled": false
+    },
+    "datetime.date.year_month": {
+      "distilled": 12,
+      "synthetic": 1188,
+      "total": 1200,
+      "distilled_ratio": 0.01,
+      "oversampled": false
+    },
+    "datetime.date.ymd_dot": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.date.ymd_slash": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "datetime.duration.iso_8601": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.epoch.unix_microseconds": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.epoch.unix_milliseconds": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.epoch.unix_seconds": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.offset.iana": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "datetime.offset.timezone_abbreviation": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.offset.utc": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.period.fiscal_year": {
+      "distilled": 24,
+      "synthetic": 1176,
+      "total": 1200,
+      "distilled_ratio": 0.02,
+      "oversampled": false
+    },
+    "datetime.period.quarter": {
+      "distilled": 6,
+      "synthetic": 1194,
+      "total": 1200,
+      "distilled_ratio": 0.005,
+      "oversampled": false
+    },
+    "datetime.time.hm_12h": {
+      "distilled": 3,
+      "synthetic": 1197,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "datetime.time.hm_24h": {
+      "distilled": 600,
+      "synthetic": 600,
+      "total": 1200,
+      "distilled_ratio": 0.5,
+      "oversampled": false
+    },
+    "datetime.time.hms_12h": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.time.hms_24h": {
+      "distilled": 44,
+      "synthetic": 1156,
+      "total": 1200,
+      "distilled_ratio": 0.037,
+      "oversampled": false
+    },
+    "datetime.time.iso": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.clf": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.ctime": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.dmy_hm": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "datetime.timestamp.dot_dmy_24h": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "datetime.timestamp.dot_ymd_24h": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.epoch_nanoseconds": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "datetime.timestamp.iso_8601": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.iso_8601_compact": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.iso_8601_micros_offset": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.iso_8601_microseconds": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.iso_8601_millis_offset": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.iso_8601_milliseconds": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "datetime.timestamp.iso_8601_offset": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.iso_microseconds": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.iso_milliseconds": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.iso_seconds": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.iso_space_zulu": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.mdy_12h": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.mdy_24h": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.pg_short_offset": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.rfc_2822": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.rfc_2822_ordinal": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.rfc_3339": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.slash_ymd_24h": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.sql_microseconds": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.sql_microseconds_offset": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.sql_milliseconds": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "datetime.timestamp.sql_standard": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "datetime.timestamp.syslog_bsd": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.banking.aba_routing": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.banking.bsb": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.banking.iban": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.banking.swift_bic": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.crypto.bitcoin_address": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.crypto.ethereum_address": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.currency.amount": {
+      "distilled": 21,
+      "synthetic": 1179,
+      "total": 1200,
+      "distilled_ratio": 0.018,
+      "oversampled": false
+    },
+    "finance.currency.amount_accounting": {
+      "distilled": 4,
+      "synthetic": 1196,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "finance.currency.amount_apostrophe": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.currency.amount_code_prefix": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.currency.amount_comma": {
+      "distilled": 40,
+      "synthetic": 1160,
+      "total": 1200,
+      "distilled_ratio": 0.033,
+      "oversampled": false
+    },
+    "finance.currency.amount_comma_suffix": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.currency.amount_crypto": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.currency.amount_lakh": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.currency.amount_multisym": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.currency.amount_neg_trailing": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.currency.amount_nodecimal": {
+      "distilled": 20,
+      "synthetic": 1180,
+      "total": 1200,
+      "distilled_ratio": 0.017,
+      "oversampled": false
+    },
+    "finance.currency.amount_space": {
+      "distilled": 3,
+      "synthetic": 1197,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "finance.currency.currency_code": {
+      "distilled": 85,
+      "synthetic": 1115,
+      "total": 1200,
+      "distilled_ratio": 0.071,
+      "oversampled": false
+    },
+    "finance.currency.currency_symbol": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "finance.payment.credit_card_number": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.rate.basis_points": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.rate.yield": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.securities.cusip": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.securities.figi": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.securities.isin": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.securities.lei": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "finance.securities.sedol": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "geography.address.full_address": {
+      "distilled": 840,
+      "synthetic": 360,
+      "total": 1200,
+      "distilled_ratio": 0.7,
+      "oversampled": false
+    },
+    "geography.address.postal_code": {
+      "distilled": 20,
+      "synthetic": 1180,
+      "total": 1200,
+      "distilled_ratio": 0.017,
+      "oversampled": false
+    },
+    "geography.address.street_name": {
+      "distilled": 545,
+      "synthetic": 655,
+      "total": 1200,
+      "distilled_ratio": 0.454,
+      "oversampled": false
+    },
+    "geography.address.street_suffix": {
+      "distilled": 15,
+      "synthetic": 1185,
+      "total": 1200,
+      "distilled_ratio": 0.013,
+      "oversampled": false
+    },
+    "geography.contact.calling_code": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "geography.coordinate.coordinates": {
+      "distilled": 8,
+      "synthetic": 1192,
+      "total": 1200,
+      "distilled_ratio": 0.007,
+      "oversampled": false
+    },
+    "geography.coordinate.dms": {
+      "distilled": 14,
+      "synthetic": 1186,
+      "total": 1200,
+      "distilled_ratio": 0.012,
+      "oversampled": false
+    },
+    "geography.coordinate.geohash": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "geography.coordinate.latitude": {
+      "distilled": 4,
+      "synthetic": 1196,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "geography.coordinate.longitude": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "geography.coordinate.mgrs": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "geography.coordinate.plus_code": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "geography.format.wkt": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "geography.index.h3": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "geography.location.city": {
+      "distilled": 840,
+      "synthetic": 360,
+      "total": 1200,
+      "distilled_ratio": 0.7,
+      "oversampled": false
+    },
+    "geography.location.continent": {
+      "distilled": 840,
+      "synthetic": 360,
+      "total": 1200,
+      "distilled_ratio": 0.7,
+      "oversampled": false
+    },
+    "geography.location.country": {
+      "distilled": 840,
+      "synthetic": 360,
+      "total": 1200,
+      "distilled_ratio": 0.7,
+      "oversampled": false
+    },
+    "geography.location.country_code": {
+      "distilled": 840,
+      "synthetic": 360,
+      "total": 1200,
+      "distilled_ratio": 0.7,
+      "oversampled": false
+    },
+    "geography.location.region": {
+      "distilled": 840,
+      "synthetic": 360,
+      "total": 1200,
+      "distilled_ratio": 0.7,
+      "oversampled": false
+    },
+    "geography.location.state_code": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "geography.transportation.hs_code": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "geography.transportation.iata_code": {
+      "distilled": 77,
+      "synthetic": 1123,
+      "total": 1200,
+      "distilled_ratio": 0.064,
+      "oversampled": false
+    },
+    "geography.transportation.icao_code": {
+      "distilled": 46,
+      "synthetic": 1154,
+      "total": 1200,
+      "distilled_ratio": 0.038,
+      "oversampled": false
+    },
+    "geography.transportation.iso6346": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "geography.transportation.unlocode": {
+      "distilled": 3,
+      "synthetic": 1197,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "identity.academic.orcid": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.commerce.ean": {
+      "distilled": 4,
+      "synthetic": 1196,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "identity.commerce.isbn": {
+      "distilled": 600,
+      "synthetic": 600,
+      "total": 1200,
+      "distilled_ratio": 0.5,
+      "oversampled": false
+    },
+    "identity.commerce.isrc": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.commerce.issn": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.commerce.upc": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.government.abn": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.government.ein": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.government.eu_vat": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.government.pan_india": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.government.ssn": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.government.vin": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.medical.cpt": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.medical.dea_number": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.medical.hcpcs": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "identity.medical.icd10": {
+      "distilled": 3,
+      "synthetic": 1197,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "identity.medical.loinc": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.medical.ndc": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "identity.medical.npi": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.person.blood_type": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.person.email": {
+      "distilled": 7,
+      "synthetic": 1193,
+      "total": 1200,
+      "distilled_ratio": 0.006,
+      "oversampled": false
+    },
+    "identity.person.email_display": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "identity.person.first_name": {
+      "distilled": 137,
+      "synthetic": 1063,
+      "total": 1200,
+      "distilled_ratio": 0.114,
+      "oversampled": false
+    },
+    "identity.person.full_name": {
+      "distilled": 600,
+      "synthetic": 600,
+      "total": 1200,
+      "distilled_ratio": 0.5,
+      "oversampled": false
+    },
+    "identity.person.gender": {
+      "distilled": 517,
+      "synthetic": 683,
+      "total": 1200,
+      "distilled_ratio": 0.431,
+      "oversampled": false
+    },
+    "identity.person.gender_code": {
+      "distilled": 527,
+      "synthetic": 673,
+      "total": 1200,
+      "distilled_ratio": 0.439,
+      "oversampled": false
+    },
+    "identity.person.height": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "identity.person.last_name": {
+      "distilled": 213,
+      "synthetic": 987,
+      "total": 1200,
+      "distilled_ratio": 0.177,
+      "oversampled": false
+    },
+    "identity.person.password": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.person.phone_e164": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "identity.person.phone_number": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "identity.person.username": {
+      "distilled": 324,
+      "synthetic": 876,
+      "total": 1200,
+      "distilled_ratio": 0.27,
+      "oversampled": false
+    },
+    "identity.person.weight": {
+      "distilled": 41,
+      "synthetic": 1159,
+      "total": 1200,
+      "distilled_ratio": 0.034,
+      "oversampled": false
+    },
+    "representation.boolean.binary": {
+      "distilled": 108,
+      "synthetic": 1092,
+      "total": 1200,
+      "distilled_ratio": 0.09,
+      "oversampled": false
+    },
+    "representation.boolean.initials": {
+      "distilled": 114,
+      "synthetic": 1086,
+      "total": 1200,
+      "distilled_ratio": 0.095,
+      "oversampled": false
+    },
+    "representation.boolean.terms": {
+      "distilled": 118,
+      "synthetic": 1082,
+      "total": 1200,
+      "distilled_ratio": 0.098,
+      "oversampled": false
+    },
+    "representation.discrete.ordinal": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "representation.file.excel_format": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "representation.file.extension": {
+      "distilled": 34,
+      "synthetic": 1166,
+      "total": 1200,
+      "distilled_ratio": 0.028,
+      "oversampled": false
+    },
+    "representation.file.file_size": {
+      "distilled": 171,
+      "synthetic": 1029,
+      "total": 1200,
+      "distilled_ratio": 0.142,
+      "oversampled": false
+    },
+    "representation.file.mime_type": {
+      "distilled": 50,
+      "synthetic": 1150,
+      "total": 1200,
+      "distilled_ratio": 0.042,
+      "oversampled": false
+    },
+    "representation.format.color_hex": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "representation.format.color_hsl": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "representation.format.color_rgb": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "representation.identifier.alphanumeric_id": {
+      "distilled": 600,
+      "synthetic": 600,
+      "total": 1200,
+      "distilled_ratio": 0.5,
+      "oversampled": false
+    },
+    "representation.identifier.increment": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "representation.identifier.numeric_code": {
+      "distilled": 402,
+      "synthetic": 798,
+      "total": 1200,
+      "distilled_ratio": 0.335,
+      "oversampled": false
+    },
+    "representation.identifier.uuid": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "representation.numeric.decimal_number": {
+      "distilled": 600,
+      "synthetic": 600,
+      "total": 1200,
+      "distilled_ratio": 0.5,
+      "oversampled": false
+    },
+    "representation.numeric.decimal_number_comma": {
+      "distilled": 160,
+      "synthetic": 1040,
+      "total": 1200,
+      "distilled_ratio": 0.133,
+      "oversampled": false
+    },
+    "representation.numeric.integer_number": {
+      "distilled": 600,
+      "synthetic": 600,
+      "total": 1200,
+      "distilled_ratio": 0.5,
+      "oversampled": false
+    },
+    "representation.numeric.percentage": {
+      "distilled": 95,
+      "synthetic": 1105,
+      "total": 1200,
+      "distilled_ratio": 0.079,
+      "oversampled": false
+    },
+    "representation.numeric.scientific_notation": {
+      "distilled": 4,
+      "synthetic": 1196,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "representation.numeric.si_number": {
+      "distilled": 233,
+      "synthetic": 967,
+      "total": 1200,
+      "distilled_ratio": 0.194,
+      "oversampled": false
+    },
+    "representation.scientific.cas_number": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "representation.scientific.dna_sequence": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "representation.scientific.measurement_unit": {
+      "distilled": 61,
+      "synthetic": 1139,
+      "total": 1200,
+      "distilled_ratio": 0.051,
+      "oversampled": false
+    },
+    "representation.scientific.protein_sequence": {
+      "distilled": 3,
+      "synthetic": 1197,
+      "total": 1200,
+      "distilled_ratio": 0.003,
+      "oversampled": false
+    },
+    "representation.scientific.rna_sequence": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "representation.scientific.smiles": {
+      "distilled": 11,
+      "synthetic": 784,
+      "total": 795,
+      "distilled_ratio": 0.014,
+      "oversampled": false
+    },
+    "representation.text.emoji": {
+      "distilled": 9,
+      "synthetic": 1191,
+      "total": 1200,
+      "distilled_ratio": 0.007,
+      "oversampled": false
+    },
+    "representation.text.entity_name": {
+      "distilled": 600,
+      "synthetic": 600,
+      "total": 1200,
+      "distilled_ratio": 0.5,
+      "oversampled": false
+    },
+    "representation.text.plain_text": {
+      "distilled": 600,
+      "synthetic": 600,
+      "total": 1200,
+      "distilled_ratio": 0.5,
+      "oversampled": false
+    },
+    "representation.text.word": {
+      "distilled": 600,
+      "synthetic": 600,
+      "total": 1200,
+      "distilled_ratio": 0.5,
+      "oversampled": false
+    },
+    "technology.cloud.aws_arn": {
+      "distilled": 0,
+      "synthetic": 735,
+      "total": 735,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.cloud.s3_uri": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.code.doi": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.code.imei": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.code.locale_code": {
+      "distilled": 194,
+      "synthetic": 1006,
+      "total": 1200,
+      "distilled_ratio": 0.162,
+      "oversampled": false
+    },
+    "technology.code.qualified_name": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.cryptographic.hash": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "technology.cryptographic.jwt": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.cryptographic.token_urlsafe": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.development.calver": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.development.docker_ref": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "technology.development.version": {
+      "distilled": 21,
+      "synthetic": 1179,
+      "total": 1200,
+      "distilled_ratio": 0.018,
+      "oversampled": false
+    },
+    "technology.filesystem.windows_path": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.identifier.snowflake_id": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.identifier.tsid": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.identifier.ulid": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.internet.cidr": {
+      "distilled": 1,
+      "synthetic": 1199,
+      "total": 1200,
+      "distilled_ratio": 0.001,
+      "oversampled": false
+    },
+    "technology.internet.data_uri": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.internet.hostname": {
+      "distilled": 124,
+      "synthetic": 1076,
+      "total": 1200,
+      "distilled_ratio": 0.103,
+      "oversampled": false
+    },
+    "technology.internet.http_method": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.internet.ip_v4": {
+      "distilled": 5,
+      "synthetic": 1195,
+      "total": 1200,
+      "distilled_ratio": 0.004,
+      "oversampled": false
+    },
+    "technology.internet.ip_v4_with_port": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.internet.ip_v6": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.internet.mac_address": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.internet.message_id": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.internet.top_level_domain": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.internet.url": {
+      "distilled": 2,
+      "synthetic": 1198,
+      "total": 1200,
+      "distilled_ratio": 0.002,
+      "oversampled": false
+    },
+    "technology.internet.urn": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    },
+    "technology.internet.user_agent": {
+      "distilled": 0,
+      "synthetic": 1200,
+      "total": 1200,
+      "distilled_ratio": 0.0,
+      "oversampled": false
+    }
+  },
+  "augmentation_rate": 0.35,
+  "augmentation_stats": {
+    "augmented_columns": 102055,
+    "total_columns": 291930,
+    "augmentation_types": {
+      "case_variation": 14560,
+      "whitespace": 43743,
+      "null_mix": 29053,
+      "encoding": 14699
+    }
+  }
+}

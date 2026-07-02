@@ -1,0 +1,27 @@
+drift report: v19fx_s42 (n=13533) -> dual-enc-potion8m-s43-full (n=13478)
+band: |Δrate| >= 0.400pp AND move >= 3.00×
+
+label                                                  base         cand      Δpp       ×  flag
+-----------------------------------------------------------------------------------------------
+representation.numeric.integer_number           1752/12.95%  2346/17.41%  +4.460   1.34×  
+representation.text.word                         359/ 2.65%   804/ 5.97%  +3.313   2.25×  
+container.array.comma_separated                  404/ 2.99%     7/ 0.05%  -2.933   0.02×  
+technology.internet.user_agent                    45/ 0.33%   359/ 2.66%  +2.331   7.93×  NO-GO
+representation.identifier.increment              699/ 5.17%   429/ 3.18%  -1.982   0.62×  
+representation.discrete.categorical              231/ 1.71%     0/ 0.00%  -1.707   0.00×  
+representation.text.plain_text                   847/ 6.26%   684/ 5.07%  -1.184   0.81×  
+representation.text.entity_name                  457/ 3.38%   613/ 4.55%  +1.171   1.35×  
+unknown                                         1470/10.86%  1307/ 9.70%  -1.165   0.89×  
+technology.internet.top_level_domain             163/ 1.20%    17/ 0.13%  -1.078   0.11×  
+representation.identifier.numeric_code           100/ 0.74%     1/ 0.01%  -0.732   0.01×  
+finance.currency.amount                           82/ 0.61%    10/ 0.07%  -0.532   0.13×  
+representation.numeric.decimal_number           4234/31.29%  4270/31.68%  +0.395   1.01×  
+representation.identifier.alphanumeric_id        104/ 0.77%   151/ 1.12%  +0.352   1.46×  
+identity.person.gender_code                       51/ 0.38%     6/ 0.04%  -0.332   0.13×  
+identity.person.username                          10/ 0.07%    54/ 0.40%  +0.327   5.21×  
+identity.person.full_name                        433/ 3.20%   390/ 2.89%  -0.306   0.90×  
+technology.code.qualified_name                     0/ 0.00%    34/ 0.25%  +0.252  69.28×  
+geography.address.postal_code                     45/ 0.33%    13/ 0.10%  -0.236   0.30×  
+technology.filesystem.windows_path                 0/ 0.00%    28/ 0.21%  +0.208  57.23×  
+
+VERDICT: NO-GO — 1 label(s) drifted beyond the band: technology.internet.user_agent
