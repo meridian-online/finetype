@@ -2,30 +2,6 @@
   "env": {
     "CLAUDE_STREAM_IDLE_TIMEOUT_MS": "600000"
   },
-  "hooks": {
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "command": "bd prime",
-            "type": "command"
-          }
-        ],
-        "matcher": ""
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "command": "bd prime",
-            "type": "command"
-          }
-        ],
-        "matcher": ""
-      }
-    ]
-  },
   "permissions": {
     "allow": [
       "Bash(*)",
