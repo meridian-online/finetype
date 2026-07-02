@@ -1,4 +1,0 @@
-key: earthquake-id-geohash-mislabel-retrain
-body: 'Model-retrain candidate: the multi-branch sibling-context head emits geography.coordinate.geohash onto high-cardinality alphanumeric IDENTIFIER columns. Concrete case: USGS earthquake ''id'' column (us6000pgkh = network code + event code, 14,132 unique) mislabeled geohash. 72% of values coincidentally satisfy base32 so the value-based Sharpen demotion (Rule 32, >50% schema-fail bar) cannot catch it without regressing real short geohashes. Right lever is the model (training-data addition so the sibling head stops emitting geohash on identifier-shaped columns), not a Sharpen/pattern hack. Surfaced by spec 2026-06-03-earthquake-roundtrip-precision ac-03 — left as scoped-partial.'
-timestamp: 2026-06-05T06:42:57.095281Z
-labels: []

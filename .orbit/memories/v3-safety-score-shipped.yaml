@@ -1,4 +1,0 @@
-key: v3-safety-score-shipped
-body: 'v3 safety_score (= 1 - v2''s risk term) shipped as advisory column on eval/gittables/corpus_pass/corroborated_gaps.parquet and into report.md cluster headers (format: ''Rank #N — gap_id — N cols — action: ... — safety: 0.NN''). Bands: ≥ 0.80 HIGH (safe candidate), 0.50–0.80 MODERATE (requires Sense-distribution pre/post check), < 0.50 LOW (prefer Sharpen rule or taxonomy). Advisory not blocking — one labelled retrain outcome (v23) is illustration not validation. Implementation: scripts/compute_cluster_safety_score.py, scripts/augment_corroborated_gaps_with_safety.py. Spec: 2026-05-31-reachability-safety-score (all six ACs closed). CLAUDE.md training_data_addition paragraph updated; Sense-distribution pre/post check STAYS mandatory (v3 is an input to it, not a replacement). True validation accrues from the next two or three retrain bets.'
-timestamp: 2026-05-29T07:01:01.718775Z
-labels: []

@@ -1,5 +1,0 @@
-key: gittables-validate-parquet-input-broken
-body: 'FIXED in v0.6.20 (this branch, not yet released). Fix B: finetype validate''s engine pre-pass now sniffs file extension and routes parquet through ''duckdb -c COPY ... read_parquet → temp CSV'' before csv::Reader. The materialise SQL path''s read_parquet branch was already there but unreachable; engine pre-pass now reaches it. Also added all-varchar staging projection for parquet (SELECT COLUMNS(*)::VARCHAR FROM read_parquet(...)) to match the CSV path''s all_varchar=true contract — typed transforms downstream (REGEXP_REPLACE, LIKE) assume VARCHAR staging. Tested on Q6.14.parquet and ClaDan.parquet: rc=0, 0 rejects. The 62% Binder Error bucket from gittables corpus pass run-1 is fully resolved. Remaining buckets (parse_json missing, strptime, unicode escape, cascade) are unrelated pre-existing bugs.'
-timestamp: 2026-05-21T11:05:47.265273Z
-labels:
-- code-investigate

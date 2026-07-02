@@ -4,7 +4,7 @@
   FineType cron-firing agent — launchd template.
 
   Bead: finetype-53r.
-  Authority: orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml
+  Authority: scripts/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml
               §1 cycle cadence + §2 standing orders.
 
   Install:

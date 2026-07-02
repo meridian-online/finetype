@@ -1,4 +1,0 @@
-key: tabletop-method-pass2-fodder-five-methodology-lessons-from
-body: 'tabletop-method-pass2-fodder: Five methodology lessons from second instance (2026-05-03 finetype). 1) Probe ''what do you want the cron to OWN'' early — bottom-up briefs from spec dirs miss order-of-magnitude scope changes. 2) Step-1 metric-gameability check: ''is the proposed metric game-able by the contracted agent?'' before scenario walks. 3) Explicitly ask ''what value comes from data the gate doesn''t see?'' to prevent subset-only contracts. 4) Cross-cycle invariants always become halts (cron has no inter-cycle memory) — not branches. 5) Contract-write step files auxiliary artefacts AND engineering beads, not just the contract YAML.'
-timestamp: 1970-01-01T00:00:00Z
-labels: []

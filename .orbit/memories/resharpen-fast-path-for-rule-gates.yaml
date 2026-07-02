@@ -1,6 +1,0 @@
-key: resharpen-fast-path-for-rule-gates
-body: 'Sharpen-rule changes can be corpus-honest-gated in MINUTES (not the ~27min stratified-sample re-encode) via the re-sharpen fast path (commit cbd331c, spec 2026-06-27-composed-accuracy-roadmap). ColumnClassifier::compose_from_sense (crates/finetype-model/src/column/mod.rs) runs the REAL Sharpen stack on a cached Sense label, skipping the value-encode — column_features are deterministic (extract_features, no neural inference) and only the cheap header is encoded. The ''finetype resharpen'' subcommand batches it over a TSV of (id, header, sense_label, sense_conf, 0x1f-joined values). VALIDATED 99.4% composed parity vs native on gold (800/805; 100% on rule-affected labels); the 5 mismatches are datetime-veto edge cases, common-mode across baseline/candidate so they cancel in a relocation gate. WORKFLOW: cache the model''s Sense on the 33k sample ONCE (the only encode cost), then re-sharpen rules-off/rules-on in 0.17s each -> corpus_honest_gate.py. Pays off across every Tier-A/B/C rule gate. The full corpus pass is ~6.8h (24,337s, execute_summary.json); the 6.6% gate sample is ~27min at --jobs 8. Links [[composed-accuracy-ceiling-and-backlog]].'
-timestamp: 2026-06-27T00:03:36.56269Z
-labels:
-- infra
-- code-investigate

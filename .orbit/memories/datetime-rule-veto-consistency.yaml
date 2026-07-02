@@ -1,6 +1,0 @@
-key: datetime-rule-veto-consistency
-body: 'A Sharpen rule that ASSERTS a tight typed leaf can be hard-rejected DOWNSTREAM by the validation veto (crates/finetype-cli/src/profile.rs runs col_validation_veto AFTER the classifier) into unknown/alphanumeric_id — strictly WORSE than the model''s original guess. Discovered building datetime_format_refinement: the detector''s looser format-family regexes asserted iso_8601_milliseconds for a zoneless value, but the taxonomy''s iso millis pattern REQUIRES trailing Z, so the veto (threshold 0.5 pass-rate) demoted it. Fix: any value-based rule that sets a tight leaf must GATE on the taxonomy''s own validator (validate_value_for_label, pass-rate >= a bar above 0.5) before committing — same validator the veto uses, so the two stay a single source of truth and the rule can never assert a leaf the veto then rejects. Veto runs in profile.rs (CLI), NOT in column/mod.rs; validation_veto.rs VETO_THRESHOLD=0.5.'
-timestamp: 2026-06-19T04:21:44.987833Z
-labels:
-- code-investigate
-- topology

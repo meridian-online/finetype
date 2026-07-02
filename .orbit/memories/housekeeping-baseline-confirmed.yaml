@@ -1,4 +1,0 @@
-key: housekeeping-baseline-confirmed
-body: 'Housekeeping/simplification session (card 0019 scenario 5) baseline CONFIRMED 2026-06-15: gold 690/931=0.741 (CI 0.712-0.768) on shipped v19 default + current main (post amount-veto v0.6.30); cargo test --release 686 passed/35 ignored; release build clean. This is the no-regression gate every refactor commit must hold. Predictions: output/housekeeping-baseline/predictions_baseline.tsv. Gold run recipe: eval/gittables/.venv/bin/python scripts/score_gold_anchor.py predict --gold eval/gold/gold_corpus_v1.tsv --columns eval/gittables/corpus_pass/columns.parquet --binary target/release/finetype --out <pred>; then score.'
-timestamp: 2026-06-14T19:38:46.291735Z
-labels: []

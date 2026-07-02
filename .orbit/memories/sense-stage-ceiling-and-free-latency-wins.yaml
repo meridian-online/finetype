@@ -1,8 +1,0 @@
-key: sense-stage-ceiling-and-free-latency-wins
-body: 'Raw Sense gold caps at ~0.57-0.60 for this architecture: best-ever 0.571 (gte two-view, ONE fragile seed; 3-seed mean ~0.544), perfect 2-encoder ORACLE ceiling 0.599 (output/embed-frontier twoview_result.md:13), per-value attention 0.561 (+3.9pp at +2.3ms/col). A 0.75 raw-Sense target is +0.15 above the oracle and NOT reachable by any model change. The ONLY structural lever on the dominant 56% over-tighten error mass is a two-stage/abstaining head (loose-vs-tight taken OUT of the flat softmax) on the EXISTING static encoder — latency-neutral, projection ~0.60-0.66, but UNPROVEN recover-vs-relocate (6 prior additive retrains all relocated) and may be Sharpen-redundant at composed. FREE latency wins (independent of accuracy): batch-path taxonomy hoist (profile.rs:243, ~halves per-file batch marginal), single-potion-4M value-encoder revert (Sense flat, -20-40ms load; confirm the confounded 0.769-vs-0.794 composed A/B), deterministic fast-path before model load (card 0006). Accuracy and latency only conflict on the ENCODER axis (per-value attention/transformer add latency); the head/feature/data axis and the IO axis are free. Substrate: output/next-train-research/RESEARCH.md. Links [[composed-is-rule-bound]] [[ceiling-discovery-both-levers-dead]] [[column-stats-separate-residual-gaps]].'
-timestamp: 2026-06-26T20:59:40.088789Z
-labels:
-- sense
-- latency
-cites:
-- path: output/next-train-research/RESEARCH.md

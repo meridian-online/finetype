@@ -1,5 +1,0 @@
-key: schema-validation-gate-bypassed-on-multibranch
-body: 'schema_validation_gate (crates/finetype-model/src/column/mod.rs:860) runs ONLY on the legacy classify_column path. The shipped default sherlock-v19 is multi-branch: classify_column / classify_column_with_header early-return into classify_multi_branch BEFORE line 860, so the early validator gate NEVER fires for the default model. The multi-branch path''s only validator-driven demotion is the hand-rolled vetoes/guards in apply_post_sharpen_guards. Consequence: ''strengthen the taxonomy validator so the early gate catches X'' is a NO-OP for the production pipeline. Substance checks for the multi-branch default must live in the deterministic guard layer, not the validator. Falsified the validator-fix campaign''s original premise (see checksum-substance-guard-pattern).'
-timestamp: 2026-06-15T06:14:09.742788Z
-labels:
-- topology

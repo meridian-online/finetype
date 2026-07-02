@@ -20,7 +20,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ## Communicating with the analyst
 
-The author is the project owner — technically deep, reads fast, decides faster. They're not the implementer in the moment; they want to know *what shifted* and *what to do about it*, not how the sausage was made. `.orbit/STYLE.md` governs the agent's voice for every response. The discipline below applies specifically to **synthesis** — session summaries, finding reports, status updates, anything that compresses technical detail into product-level reasoning.
+The author is the project owner — technically deep, reads fast, decides faster. They're not the implementer in the moment; they want to know *what shifted* and *what to do about it*, not how the sausage was made. The **Voice** guide at the end of this section governs the agent's voice for every response. The discipline below applies specifically to **synthesis** — session summaries, finding reports, status updates, anything that compresses technical detail into product-level reasoning.
 
 - **Lead with the headline as user experience, not a stat.** "8 in 100 tables round-trip cleanly" beats "gate_score = 0.0819". Numbers belong inside user experience, not as the user experience.
 - **Translate each measurement into what the user lives.** Not "28% fail criterion B" but "FineType says these are emails, then validation rejects 5% of them — which is right?". The second form makes the finding load-bearing for product decisions.
@@ -30,6 +30,17 @@ The author is the project owner — technically deep, reads fast, decides faster
 - **One-line for a stakeholder at the end.** If the author could paste a single sentence to someone else and it would carry the finding, the writing is done.
 
 Engineering-internal detail (Rust traces, SQL, perf numbers, error-bucket counts) stays engineering-internal unless it reframes the product-level story. The level matches the question, not the agent's depth of knowledge.
+
+### Voice — how the agent talks to the author
+
+The author reads fast and decides faster — write so they can act, not parse. British English; direct, warm, never chatty (no performative formality, no peppy enthusiasm, no clinical cold).
+
+- **Lead with the answer.** Open with the recommendation or answer; if a question has one, give it, if it doesn't, say so. Don't restate the question, don't apologise, don't park the conclusion behind context.
+- **Pick one action, in plain voice.** Recommendations are imperative ("Run X on Y"), not hedged ("it might be worth considering perhaps X"). One action per response, not a menu — if two paths genuinely matter, lay them out *and* pick one. Name an uncertain assumption inline rather than sanding the recommendation into mush.
+- **Keep it short.** Three reasons is a ceiling, not a target; one often beats three. Detail belongs available on request, not dumped.
+- **Plain words.** Words a peer outside the project would understand; define a term of art the first time you reach for it. No corporate hedging, no jargon ladders.
+- **In autonomy, act — don't perform a brief.** When making the next move (not surfacing a closing recommendation), the right form is the single imperative action taken, or a structural NO-GO if authorisation is genuinely missing — not "three options with a pick".
+- **Avoid:** burying the lede, stacking hedges, pre-emptive detail dumps, menus without a pick, undefined jargon, apologetic preambles, restating the question.
 
 ## Architectural direction (settled — do not re-ask)
 
@@ -84,7 +95,7 @@ Open follow-ups: card 0019 scenario 5 is live — deletions/simplifications gate
 
 ## Decision register
 
-108 architectural decisions in `.orbit/choices/` (MADR format). Browse: `ls .orbit/choices/` or Ctrl+B (fzf + glow preview).
+Architectural decisions live in the team's private planning repo (MADR decision records + roadmap). Inline references below cite decisions by number/name (e.g. "choice 0107", "decision 0041") — resolve them there.
 
 ## Code-review & audit tooling
 
@@ -101,60 +112,3 @@ To run the **B07 consumer-graph audit** before a load-bearing edit, use the **co
 **Before promoting a model or cutting a release:** Read `docs/RELEASE.md`.
 
 **For shipped feature history and release notes:** See `CHANGELOG.md`.
-
-
-<!-- BEGIN ORBIT-STATE INTEGRATION -->
-## Orbit-state Substrate
-
-This project uses **orbit-state** as its agent substrate — files-canonical state under `.orbit/` (cards, choices, specs, tasks, memories), with a SQLite index and an MCP server that share the same Rust core. Run `orbit session prime` at session start.
-
-### Quick Reference
-
-```bash
-orbit session prime         # Surfaces open specs + recent memories
-orbit task ready            # Claimable work (open, no claim)
-orbit task show <id>        # Inspect a task
-orbit task claim <id>       # Claim a task
-orbit task done <id>        # Complete a task
-orbit spec list             # Open specs
-orbit memory remember "..." # Persist a decision across sessions
-orbit memory search <kw>    # Search prior memories
-```
-
-### Rules
-
-- Use `orbit` verbs for ALL task and spec tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists.
-- Run `orbit session prime` at the start of every session.
-- Use `orbit memory remember` for persistent knowledge — do NOT use MEMORY.md files.
-
-## Session Completion
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File tasks for remaining work** — open new tasks under the active spec for anything that needs follow-up.
-2. **Run quality gates** (if code changed) — tests, linters, builds.
-3. **Update task status** — mark finished tasks done; append updates on in-progress items.
-4. **PUSH TO REMOTE** — this is MANDATORY:
-   ```bash
-   git pull --rebase
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** — clear stashes, prune remote branches.
-6. **Verify** — all changes committed AND pushed.
-7. **Hand off** — provide context for next session.
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds.
-- NEVER stop before pushing — that leaves work stranded locally.
-- NEVER say "ready to push when you are" — YOU must push.
-- If push fails, resolve and retry until it succeeds.
-<!-- END ORBIT-STATE INTEGRATION -->
-
-
-@.orbit/METHOD.md
-
-
-@.orbit/STYLE.md

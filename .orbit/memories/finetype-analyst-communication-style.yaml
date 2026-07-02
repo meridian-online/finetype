@@ -1,5 +1,0 @@
-key: finetype-analyst-communication-style
-body: 'For FineType session summaries / finding reports / status writeups, write at user/analyst level not engineer level. Lead with headline as user experience not a stat (''8 in 100 tables round-trip cleanly'' > ''gate_score=0.0819''). Translate each measurement into what the user actually lives (''28% fail criterion B'' becomes ''FineType says these are emails, then validation rejects 5% of them — which is right?''). Connect findings to the four Meridian pillars. End with what we don''t know yet. Plain words; jargon must earn its place. One-line for a stakeholder at the end. Why: the author is project owner — technically deep, reads fast, wants to know what shifted and what to do, not how the sausage was made. How to apply: any synthesis output. Engineering-internal detail stays engineering-internal unless it reframes the product-level story. Codified in CLAUDE.md''s ''Communicating with the analyst'' section after the user confirmed an example summary at this level was ''meaningfully more useful''.'
-timestamp: 2026-05-22T05:26:38.499483Z
-labels:
-- feedback

@@ -1,4 +1,0 @@
-key: mining-factory-numeric-collapse-broke
-body: 'The additive-blend reference-data route is NOT dead as ac-05 concluded (0-for-3 ''numeric prior collapses to decimal 0.29%''). The locale-format re-run (currency amount-format + datetime weekday/long-month variants, 34 types vs the original 21) HELD the numeric prior: decimal_number 31.46% (+0.17pp), integer_number 12.63% (-0.32pp) on the destination-drift proxy. The fix was structural dilution — spreading manufactured mass across more text/formatted-string-shaped types so geography is a smaller blend fraction, not a dose knob (dose was identical light-dose 50/type). The locale-format proxy is still NO-GO but on TWO small NEW boundaries (container.object.json_array 0->2.48% off a zero base; identity.commerce.isbn +0.63pp), not the wholesale text-collapse. Diagnose-and-retry, not dead end. Evidence: output/mining-factory/locale-format/ac05_proxy_precheck.md'
-timestamp: 2026-06-12T13:52:41.591212Z
-labels: []

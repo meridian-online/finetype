@@ -1,4 +1,0 @@
-key: corpus-honest-gate-batching
-body: 'EFFICIENCY (2026-06-15): the corpus-honest gate (scripts/eval_rule.sh --default) is a ~25-30 min BLOCKING serial step (33k stratified-sample corpus pass + gate). Ran it 5x sequentially this session (~2.5h) for 5 independent surgical vetoes. For INDEPENDENT, gold-clean, low-risk vetoes that each pass gold with zero regressions, BATCH them into one binary + one gate run to amortise the 30-min cost. Tradeoff: a batched NO-GO doesn''t isolate which rule caused it — so batch only rules you''re individually confident in (gold-verified, value-shape vetoes), and keep risky/novel rules solo. One-at-a-time is right when the author wants per-rule visibility/verdicts.'
-timestamp: 2026-06-15T04:22:37.665221Z
-labels: []

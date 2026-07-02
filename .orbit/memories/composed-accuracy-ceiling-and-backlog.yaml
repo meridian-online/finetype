@@ -1,9 +1,0 @@
-key: composed-accuracy-ceiling-and-backlog
-body: 'Composed gold accuracy has a deterministic-Sharpen + gold-curation ceiling of ~0.94 on the curated-HARD gold corpus; 0.98 is below the irreducible tail (0.98 = only 18 errors allowed of 927). A 2026-06-27 per-column audit of the 174 composed errors (output/composed-accuracy-roadmap/BACKLOG.md) buckets them: 55 BANKABLE (value-determinable, low over-emission risk) vs 119 CEILING — 50 gold-debatable, 19 gold-mislabeled (engine already right), 31 unscoreable for lack of on-disk values; 148/174 sit on contested lens/llm tiers. STAGED ROADMAP: re-score live (~8 phantom already-correct -> true baseline ~0.821) + Tier-A swap-proof value rules (checksums/closed-sets/URL/format, demote-decline-only) -> ~0.88; med-risk header-corroboration (country/region/IATA/TLD, expect ~1-in-4 NO-GO) -> ~0.90; gold re-adjudication (+14 clean, a CURATION change not accuracy) -> ~0.93; wall ~0.94. KEY INSIGHT (stress-test-verified vs live code): the safe levers (schema_fail_demotion value_sharpen.rs, CORROBORATION_SCOPE mod.rs:1736) are DEMOTE/DECLINE-only and gated to a closed label set, so by construction they cannot relocate error like an additive retrain — this is WHY deterministic Sharpen is the path the 0-for-6 retrain history points to. Composed is rule-bound; a retrain''s only composed role is the geo/entity over-emission attractors (task t-000133e418), gated by relocation-review not corpus-honest. Spec 2026-06-27-composed-accuracy-roadmap. Links [[composed-is-rule-bound]] [[cardinality-boundary-error-is-real]] [[determinability-probe-gold-is-the-ceiling]] [[ceiling-discovery-both-levers-dead]] [[decisive-stat-skip-is-no-go]].'
-timestamp: 2026-06-26T20:59:40.048925Z
-labels:
-- composed-accuracy
-- sharpen
-- eval
-cites:
-- path: output/composed-accuracy-roadmap/BACKLOG.md

@@ -1,5 +1,0 @@
-key: ydf-specialist-models-future
-body: After the gittables full-corpus pass surfaces weak spots, the YDF lens design has flexibility to spawn specialist models (per-domain or per-type) targeting specific gap categories. The current YDF lens (stats + char-bigram TF-IDF, single classifier across all 240 types) is a generalist baseline. Once we know which (criterion × mechanism) cells are underperforming, training a YDF specialist on that cell's data — e.g. one model for finance.* types, one for datetime.* types, or one targeting validator_widening cases — could materially improve corroboration quality. The spec does not require this; it is a deliberate follow-up lever the author flagged 2026-05-21 while starting Chunk 3a.
-timestamp: 2026-05-20T22:05:46.436508Z
-labels:
-- topology

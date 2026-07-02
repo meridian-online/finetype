@@ -1,4 +1,0 @@
-key: workflow-git-mv-rewrite-verify
-body: 'GOTCHA (2026-06-15): committing a ''git mv X Y'' + rewrite of Y can silently capture the OLD blob. Cause: ''git add -A X Y/'' where X was already renamed away errors on the nonexistent path X and, especially under ''2>/dev/null'', can leave Y''s rewrite UNSTAGED — so the commit keeps the pre-rewrite content. This shipped a broken HEAD (un-split column.rs + the new module files = duplicate definitions; caught by luck before push). FIX: after any git mv + rewrite, run ''git diff --cached --stat'' and CONFIRM the moved file shows the expected change (not ''0'' / not the old size). Never ''2>/dev/null'' a git add. Add explicit paths, then verify staged content before committing.'
-timestamp: 2026-06-15T04:22:37.623571Z
-labels: []
