@@ -469,6 +469,7 @@ finance.securities.figi:
   validation:
     type: string
     pattern: "^[BCDFGHJKLMNPQRSTVWXYZ]{2}G[BCDFGHJKLMNPQRSTVWXYZ0-9]{8}\\d$"
+  checksum: figi
   tier: [VARCHAR, payment]
   release_priority: 3
   aliases: [bloomberg_id, open_figi]

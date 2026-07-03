@@ -259,8 +259,14 @@ impl Generator {
                             as char
                     })
                     .collect();
-                let check = self.rng.gen_range(0..10u8);
-                Ok(format!("{}G{}{}", prefix, body, check))
+                // First 11 chars = provider + 'G' + body; the 12th is the real
+                // check digit (OMG FIGI Modulus-10). Shared with the validator
+                // so generated FIGIs pass their own `checksum: figi` guard.
+                let body11 = format!("{}G{}", prefix, body);
+                let first11: Vec<char> = body11.chars().collect();
+                let check = crate::checksum::figi_check_digit(&first11)
+                    .expect("FIGI body is alphanumeric by construction");
+                Ok(format!("{}{}", body11, check))
             }
 
             // ── banking (aba_routing, bsb) ────────────────────────────────

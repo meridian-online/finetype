@@ -306,6 +306,56 @@ pub fn iban(value: &str) -> bool {
     mod97(&rearranged) == Some(1)
 }
 
+/// Compute the FIGI check digit for the first 11 characters (OMG FIGI /
+/// OpenFIGI "Modulus 10 Double Add Double").
+///
+/// Digits map to their value and letters to A=10..Z=35. Working right-to-left,
+/// every second value (0-based odd index over the eleven) is doubled; the
+/// decimal digits of *every* result — including the two-digit letter values —
+/// are summed; the check digit is `(10 - sum mod 10) mod 10`. Because the
+/// doubling and digit-sum happen at the *character* level (not over a letters-
+/// expanded digit string, as ISIN does), FIGI deliberately yields a different
+/// digit than an ISIN-style Luhn. Returns `None` unless given exactly 11
+/// `[A-Z0-9]` characters. Shared by [`figi`] and the FIGI generator so the two
+/// can never drift.
+pub(crate) fn figi_check_digit(first11: &[char]) -> Option<u8> {
+    if first11.len() != 11 {
+        return None;
+    }
+    let mut sum = 0u32;
+    for (i, &c) in first11.iter().enumerate() {
+        let mut v = alnum36(c)?;
+        if i % 2 == 1 {
+            v *= 2;
+        }
+        // v < 100 (max 35*2 = 70), so this sums its decimal digits.
+        sum += v / 10 + v % 10;
+    }
+    Some(((10 - sum % 10) % 10) as u8)
+}
+
+/// Validate a 12-character FIGI by its check digit (OMG FIGI / OpenFIGI).
+///
+/// Positions 1–11 are the identifier (`BB` provider + `G` + no-vowel body), the
+/// 12th a numeric check digit computed by [`figi_check_digit`]. The taxonomy
+/// pattern checks shape but not the check digit; letters are upper-cased for
+/// leniency. Any other length, a non-digit check position, or a non-`[A-Z0-9]`
+/// identifier character fails.
+pub fn figi(value: &str) -> bool {
+    let chars: Vec<char> = value
+        .trim()
+        .chars()
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+    if chars.len() != 12 {
+        return false;
+    }
+    let Some(check) = chars[11].to_digit(10) else {
+        return false;
+    };
+    figi_check_digit(&chars[..11]) == Some(check as u8)
+}
+
 /// Resolve a `checksum:` directive name to its validating function.
 ///
 /// Returns `None` for an unknown name so the caller can surface the typo
@@ -321,6 +371,7 @@ pub fn resolve(name: &str) -> Option<fn(&str) -> bool> {
         "isin" => Some(isin),
         "lei" => Some(lei),
         "iban" => Some(iban),
+        "figi" => Some(figi),
         _ => None,
     }
 }
@@ -484,6 +535,36 @@ mod tests {
     }
 
     #[test]
+    fn figi_check_digit_matches_spec_example() {
+        // The OpenFIGI worked example: BBG000BLNQ1 -> check digit 6.
+        let first11: Vec<char> = "BBG000BLNQ1".chars().collect();
+        assert_eq!(figi_check_digit(&first11), Some(6));
+    }
+
+    #[test]
+    fn figi_accepts_taxonomy_samples() {
+        // The finance.securities.figi `samples:` are curated valid FIGIs.
+        for v in [
+            "BBG000BLNQ16",
+            "BBG000B9XRY4",
+            "BBG000BVPV84",
+            "BBG000BPH459",
+            "BBG000GZQ728",
+        ] {
+            assert!(figi(v), "should be a valid FIGI: {v}");
+        }
+    }
+
+    #[test]
+    fn figi_rejects_lookalikes() {
+        assert!(!figi("BBG000BLNQ15")); // check digit bumped
+        assert!(!figi("BBG000B9XRY5"));
+        assert!(!figi("BBG000BLNQ1")); // 11 chars
+        assert!(!figi("BBG000BLNQ160")); // 13 chars
+        assert!(!figi("BBG000BLNQ1X")); // check position not a digit
+    }
+
+    #[test]
     fn resolve_known_and_unknown() {
         assert!(resolve("isbn").is_some());
         assert!(resolve("aba").is_some());
@@ -493,6 +574,7 @@ mod tests {
         assert!(resolve("isin").is_some());
         assert!(resolve("lei").is_some());
         assert!(resolve("iban").is_some());
+        assert!(resolve("figi").is_some());
         assert!(resolve("not_a_scheme").is_none());
     }
 }
