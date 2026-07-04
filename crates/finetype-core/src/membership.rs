@@ -25,9 +25,9 @@
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
-const ICAO_AIRPORTS_RAW: &str = include_str!("../../../labels/sets/icao_airport_codes.txt");
-const IATA_AIRPORTS_RAW: &str = include_str!("../../../labels/sets/iata_airport_codes.txt");
-const NAICS_CODES_RAW: &str = include_str!("../../../labels/sets/naics_codes.txt");
+const ICAO_AIRPORTS_RAW: &str = include_str!("../data/sets/icao_airport_codes.txt");
+const IATA_AIRPORTS_RAW: &str = include_str!("../data/sets/iata_airport_codes.txt");
+const NAICS_CODES_RAW: &str = include_str!("../data/sets/naics_codes.txt");
 
 fn parse_set(raw: &'static str) -> HashSet<&'static str> {
     raw.lines()
