@@ -6,7 +6,10 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "Training infrastructure for FineType — Sense, Entity, and Model2Vec training via Candle"
-publish = false
+# Published as a dependency carrier: finetype-cli lists it as an optional dep
+# (the `train` feature) and cargo requires every listed dep, optional or not,
+# to exist on the registry. Internal support crate — no API stability promises.
+readme = "README.md"
 
 [dependencies]
 # ML framework (Candle 0.8 + half pin for dependency resolution)

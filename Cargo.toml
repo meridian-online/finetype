@@ -87,7 +87,7 @@ libduckdb-sys = "=1.10503.1"
 # Internal crates
 finetype-core = { version = "0.6.0", path = "crates/finetype-core" }
 finetype-model = { version = "0.6.0", path = "crates/finetype-model" }
-finetype-train = { path = "crates/finetype-train" }
+finetype-train = { version = "0.6.39", path = "crates/finetype-train" }
 
 [profile.release]
 lto = true

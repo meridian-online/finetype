@@ -44,7 +44,7 @@ train = ["dep:finetype-train", "finetype-train/tui"]
 finetype-core = { workspace = true }
 finetype-model = { workspace = true }
 finetype-train = { workspace = true, optional = true }
-finetype-mcp = { path = "../finetype-mcp" }
+finetype-mcp = { version = "0.6.39", path = "../finetype-mcp" }
 clap = { workspace = true }
 csv = { workspace = true }
 serde = { workspace = true }

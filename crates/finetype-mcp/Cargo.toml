@@ -6,6 +6,7 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "MCP server for FineType semantic type classification"
+readme = "README.md"
 
 [dependencies]
 finetype-core = { workspace = true }
