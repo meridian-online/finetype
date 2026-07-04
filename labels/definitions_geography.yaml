@@ -1430,6 +1430,15 @@ geography.transportation.iata_code:
   validation:
     type: string
     pattern: "^[A-Z]{3}$"
+  # Closed-set substance: the shape pattern confirms ANY three uppercase
+  # letters (currency codes, US state codes, tickers — 100% each, measured).
+  # Membership against the published airport list narrows that (Precision
+  # Principle; company-reference audit W2) — with a documented limit: the set
+  # covers ~52% of the 3-letter space, so dense collisions (major currency
+  # codes: GBP/JPY/CHF/AUD are real airports) stay above the guard's ≥50%
+  # keep bar and are left alone. Demote-only, so never worse than shape-only.
+  # Set: labels/sets/iata_airport_codes.txt (OurAirports, PD).
+  membership: iata_airports
   tier: [VARCHAR, transportation]
   release_priority: 4
   aliases: null
@@ -1463,6 +1472,13 @@ geography.transportation.icao_code:
   validation:
     type: string
     pattern: "^[A-Z]{4}$"
+  # Closed-set substance: the shape pattern confirms ANY four uppercase
+  # letters — every 4-letter stock ticker validated 100% and thereby DISARMED
+  # the attractor demotion (validation_confirmed), the reproduced ticker→icao
+  # failure. Membership against the published airport list is the substance
+  # (Precision Principle; company-reference audit W2). Set:
+  # labels/sets/icao_airport_codes.txt (OurAirports, PD).
+  membership: icao_airports
   tier: [VARCHAR, transportation]
   release_priority: 3
   aliases: null

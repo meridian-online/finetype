@@ -6802,6 +6802,131 @@ geography.transportation.unlocode:
     assert_eq!(r.label, "geography.transportation.unlocode");
 }
 
+// ── membership_substance_guard (company-reference audit W2) ──
+
+#[test]
+fn membership_substance_guard_is_default_on() {
+    assert!(!rhh::is_disabled("membership_substance_guard"));
+}
+
+#[test]
+fn membership_guard_demotes_tickers_off_icao() {
+    // The reproduced ticker→icao failure: 4-letter stock tickers pass the
+    // shape pattern ^[A-Z]{4}$ 100% (validation CONFIRMS the wrong label and
+    // disarms the attractor demotion), but they are not in the published ICAO
+    // airport list — membership is the substance the shape cannot supply.
+    let yaml = r#"
+geography.transportation.icao_code:
+  title: ICAO Airport Code
+  designation: universal
+  tier: [VARCHAR, transportation]
+  samples: ["KJFK"]
+  validation:
+    type: string
+    pattern: '^[A-Z]{4}$'
+  membership: icao_airports
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    let tickers: Vec<String> = vec![
+        "AAPL", "MSFT", "TSLA", "NVDA", "AMZN", "META", "NFLX", "ORCL", "ADBE", "INTC",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense(
+            "symbol",
+            &tickers,
+            "geography.transportation.icao_code",
+            0.93,
+        )
+        .unwrap();
+    assert_ne!(
+        r.label, "geography.transportation.icao_code",
+        "non-member tickers must demote the icao overcall"
+    );
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("membership_substance_guard:geography.transportation.icao_code")
+    );
+}
+
+#[test]
+fn membership_guard_keeps_real_airport_codes() {
+    // Genuine ICAO columns are list members → untouched.
+    let yaml = r#"
+geography.transportation.icao_code:
+  title: ICAO Airport Code
+  designation: universal
+  tier: [VARCHAR, transportation]
+  samples: ["KJFK"]
+  validation:
+    type: string
+    pattern: '^[A-Z]{4}$'
+  membership: icao_airports
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    let codes: Vec<String> = vec!["KJFK", "KLAX", "LFPG", "EGLL", "RJTT", "YSSY"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "airport",
+            &codes,
+            "geography.transportation.icao_code",
+            0.93,
+        )
+        .unwrap();
+    assert_eq!(r.label, "geography.transportation.icao_code");
+}
+
+#[test]
+fn membership_guard_demotes_nonmember_codes_off_iata() {
+    // iata's set covers ~52% of the 3-letter space, so unlike icao the guard
+    // only decides columns that skew non-member (a major-currency column is
+    // ~65% real airports — GBP/JPY/CHF/AUD — and is deliberately KEPT by the
+    // ≥50% bar; demote-only means that is no worse than the shape-only status
+    // quo). These are verified non-members: the guard must act.
+    let yaml = r#"
+geography.transportation.iata_code:
+  title: IATA Airport Code
+  designation: universal
+  tier: [VARCHAR, transportation]
+  samples: ["JFK"]
+  validation:
+    type: string
+    pattern: '^[A-Z]{3}$'
+  membership: iata_airports
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    let codes: Vec<String> = vec![
+        "USD", "EUR", "NZD", "INR", "RUB", "NKE", "PFE", "CVX", "XOM",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("code", &codes, "geography.transportation.iata_code", 0.9)
+        .unwrap();
+    assert_ne!(
+        r.label, "geography.transportation.iata_code",
+        "non-member codes must demote the iata overcall"
+    );
+}
+
 // ── structured_string_refinement (spec 2026-06-19-plain-text-type-discovery) ──
 
 #[test]

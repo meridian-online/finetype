@@ -16,6 +16,7 @@ pub mod generator;
 pub mod infer;
 pub mod json_reader;
 pub mod locale_data;
+pub mod membership;
 pub mod quality;
 pub mod table_validator;
 pub mod taxonomy;

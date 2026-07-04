@@ -2199,6 +2199,7 @@ impl ColumnClassifier {
         self.url_bare_number_veto(result, header, sample);
         self.utc_bare_number_veto(result, header, sample);
         self.checksum_substance_guard(result, header, sample);
+        self.membership_substance_guard(result, header, sample);
         self.isbn_header_recovery(result, header, sample);
         self.binary_vocab_veto(result, header, sample, values);
         self.increment_substance_veto(result, values);
@@ -2708,6 +2709,77 @@ impl ColumnClassifier {
         result.confidence = result.confidence.min(0.6);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!("checksum_substance_guard:{demoted_from}"));
+        result.detected_locale = detect_locale_from_validation(sample, &result.label, taxonomy);
+    }
+
+    /// `membership_substance_guard` (default ON). Twin of
+    /// `checksum_substance_guard` for types whose substance is CLOSED-SET
+    /// membership rather than a check digit (the taxonomy `membership:`
+    /// directive — icao_airports, iata_airports today; see
+    /// `finetype_core::membership` and labels/sets/). The taxonomy's shape
+    /// pattern (`^[A-Z]{4}$` / `^[A-Z]{3}$`) confirms every same-shape token —
+    /// a 4-letter stock-ticker column validates 100% as icao_code, which not
+    /// only survives the veto but disarms the attractor demotion
+    /// (`validation_confirmed`). Membership is what distinguishes "is this
+    /// type" from "is not": a column whose values are mostly OUTSIDE the
+    /// published code list is not that type — demote by value shape exactly as
+    /// the checksum guard does. Genuine airport-code columns are list members
+    /// and untouched. Company-reference audit W2
+    /// (output/company-reference-audit/findings_and_action_plan.md).
+    fn membership_substance_guard(
+        &self,
+        result: &mut ColumnResult,
+        _header: &str,
+        sample: &[String],
+    ) {
+        if rhh::is_disabled("membership_substance_guard") {
+            return;
+        }
+        let Some(taxonomy) = self.taxonomy.as_ref() else {
+            return;
+        };
+        // Only act on labels carrying a `membership:` directive; resolve its
+        // canonical set from crate::membership.
+        let Some(is_member) = taxonomy
+            .get(&result.label)
+            .and_then(|def| def.membership.as_deref())
+            .and_then(finetype_core::membership::resolve)
+        else {
+            return;
+        };
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let members = non_empty.iter().filter(|v| is_member(v)).count();
+        // Majority in the published set → genuine code column, keep. Otherwise
+        // these values are wearing the wrong label.
+        if members * 2 >= non_empty.len() {
+            return;
+        }
+        // Demote by value shape (same discipline as checksum_substance_guard):
+        // bare-number columns to the numeric family, everything else to
+        // alphanumeric_id — every membership-bearing type is itself an
+        // identifier, so a non-member lookalike is overwhelmingly another
+        // identifier (tickers, currency/state codes) rather than prose.
+        let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
+        let demoted_from = result.label.clone();
+        result.label = if is_bare {
+            if any_decimal {
+                "representation.numeric.decimal_number".to_string()
+            } else {
+                "representation.numeric.integer_number".to_string()
+            }
+        } else {
+            "representation.identifier.alphanumeric_id".to_string()
+        };
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("membership_substance_guard:{demoted_from}"));
         result.detected_locale = detect_locale_from_validation(sample, &result.label, taxonomy);
     }
 

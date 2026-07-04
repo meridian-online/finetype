@@ -314,6 +314,16 @@ pub struct Definition {
     /// type, not of the JSON Schema fragment.
     #[serde(default)]
     pub checksum: Option<String>,
+    /// Closed-set membership scheme for enumerable identifier types
+    /// (Precision Principle). Names a set in [`crate::membership`] (e.g.
+    /// `icao_airports`). The model's `membership_substance_guard` reads this
+    /// directive to scope itself and re-checks a column's values against the
+    /// published code list — a value of the right *shape* but outside the set
+    /// is not that type (`^[A-Z]{4}$` confirms every 4-letter stock ticker;
+    /// the ICAO list does not). Same deliberate non-folding into the compiled
+    /// `validation` validator as `checksum`, and for the same reason.
+    #[serde(default)]
+    pub membership: Option<String>,
     /// Per-locale validation schemas for locale-specific types.
     /// When present, attractor demotion can validate values against
     /// locale-specific patterns (e.g., US ZIP code vs UK postcode)
