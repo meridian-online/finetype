@@ -268,3 +268,125 @@ blocking; drift proxy for anything touching training).
 instruments can see — the fixes are mostly deterministic (closed-set validators, veto scope, two
 new types via the established no-retrain playbook), truncation is not the answer, and the first
 move is to turn those datasets into gold so every fix is scoreable.
+
+---
+
+# Execution log — 2026-07-04 (same day)
+
+## Shipped (branch figi-checksum, gate-tested)
+
+**W1 (f726040):** R32 `schema_fail_demotion` widened to the veto-blind strict-validator tail —
+`wkt`, `user_agent`, `mgrs`, `plus_code`, `dms`, `iso6346`, `inchi` — plus the phantom
+`representation.alphanumeric.alphanumeric_id` fallback label fixed to the real taxonomy key
+(5 code sites; demoted columns now get enrichment and are veto-eligible). 1004 tests green.
+**Gold gate: 806/931 = 0.866 vs 804 baseline (+2, no regression); representative 183/260 =
+0.704 vs 0.691.** Corpus-honest gate: see below.
+
+**W2a (e474993):** the `membership:` taxonomy directive — closed-set sibling of `checksum:`
+(deliberately guard-owned, not validator-folded, same rationale) — with
+`membership_substance_guard` and embedded OurAirports sets (`labels/sets/`).
+`icao_code → icao_airports` (10,249 codes, 2.2% of the 4-letter space: decisive) and
+`iata_code → iata_airports` (9,056 codes with a DOCUMENTED limit: 52% of the 3-letter space is
+a real airport — GBP/JPY/CHF/AUD included — so major-currency columns stay above the ≥50% keep
+bar; demote-only, never worse than shape-only). Needs its own gate run.
+
+## Measurements (three parallel agents)
+
+**user_agent payoff (per-column, the exact 1,000-file drift-snapshot sample):** 355 columns
+carry the user_agent label; **355/355 fail the prefix validator below 50% (353 at 0.0)**;
+genuine UA columns in-sample: **zero**. 81% are prose under a `content` header. The W1 R32
+demotion therefore removes the shipped default's largest single over-emission wart entirely,
+with zero measured collateral. The lone corpus wkt over-emission (a malformed-CSV artifact
+column) is likewise removed. Data: session scratchpad `ua-measure/target_passrates.tsv`.
+
+**Real external datasets (the actual failing repo, profiled on 0.6.38):**
+- ticker→icao REPRODUCES exactly as analysed: SEC EDGAR ticker column → icao_code at conf
+  0.978, pass rate 0.476, `validation_advisory_low` — ships anyway (pre-W2 binary).
+- NAICS REPRODUCES: 6-digit codes → integer_number via `feature_no_leading_zero`.
+- org→person does NOT reproduce on this data: every org-name column → entity_name (0.58–1.0).
+  The person-boundary failure is real but specific to founder-style names under bare `name`
+  headers (synthetic repro) — not this product's columns.
+- description→WKT does NOT reproduce and NO WKT-shaped data exists in the repo: the only
+  description column is ICD-10 diagnosis text → entity_name (0.93). The originally reported
+  WKT miss is unconfirmable on committed data; the structural veto hole it pointed at is real
+  and now closed (W1).
+- NEW misses (free eval, all gold-invisible): pipe-compound codes (`ICD-10|B34.9`) →
+  postal_code (vpr 0.5); GLEIF `category` enum → region (conf 0.31); `reg_status` →
+  state_code at vpr 0.0 (and a DIFFERENT answer on the resorted twin file); normalized-name
+  column → swift_bic at vpr 0.007 (swift_bic is veto-blind — R32/veto-safe candidate, same
+  class as W1); ELF legal-form codes and ISO 3166-2 subdivisions have no type (subdivision
+  currently lands unknown via the unlocode veto).
+- ROBUSTNESS: the same 3.36M-row table in two sort orders gets different types on three
+  columns — profiling samples the first 100 rows, so sorted production files make
+  low-confidence columns non-deterministic. Sampling strategy is a real follow-up.
+
+**Volume bar (ticker/NAICS/MIC vs the ≥1,000-distinct-dataset admission bar):**
+- Ticker: 1,586 guarded files — but 84% is ONE per-ticker dump (one file per stock, constant
+  symbol column); diversity-honest count 261 files / 185 genuine multi-ticker columns.
+  **Passes the bar's letter, fails its intent.**
+- NAICS/SIC: 258 (word-boundary-guarded; unguarded `sic` substring is ~99% junk). **Clear
+  fail** (~4× short).
+- MIC exchange codes: 2. **Clear fail.**
+
+## Decision needed (author): ticker + NAICS leaves despite the volume bar
+
+The plan made the volume bar the arbiter, and on its intent neither type clears it. But the
+bar measures the gittables corpus — general web tables — and these types are the target domain
+of the company-lookup product surface; the failing datasets are the product's own. Options:
+(a) hold the line: no new leaves; W1+W2 make the failures honest (ticker → unknown instead of
+airport; NAICS stays integer_number) and the residual homes are documented; or (b) author-waive
+the bar on product-strategy grounds and ship both as header-gated Sharpen-recovery leaves
+(timezone_abbreviation pattern; NAICS list is public domain, SEC ticker file is US-gov public
+domain; near-zero over-emission risk when header-gated). **Recommendation: (b) for NAICS only
+— its value validator is tight (set membership + sector range), the header gate is unambiguous
+(`naics`/`sic`), and the product need is concrete; hold ticker at (a) until the MIC/exchange
+context question is settled, since a ticker leaf without exchange scoping invites its own
+over-emission.** Either way the residual-home documentation ships.
+
+## Instrument finding: the corpus-honest gate's rule mode broke at the model swap
+
+The W1 gate run returned NO-GO — but the movers are the categorical retirement (39,014→0,
+choice 0102), the numeric_code and isbn deltas, and the rest of the cumulative v19→0.6.38
+history. Cause: `eval_rule.sh --default` never passes `--baseline`, so
+`corpus_honest_gate.py` defaults its TRANSITION baseline to
+`output/ydf-validation-gate/v19_gated.parquet` — the retired v19's predictions. Every gate GO
+in history is from June 15–16, pre-swap, when candidate-vs-v19 measured exactly the rule delta;
+**no rule change has run this gate since m2v8m became the default** (the only post-swap runs
+are the two structurally-unpassable model-swap NO-GOs). W1 is the first, and the verdict
+measures two weeks of already-shipped history, not W1. Per the standing rule ("all new work
+gates fresh-vs-fresh… NEVER against the retired v19") the NO-GO is not a valid decision input.
+
+Resolution: a fresh-vs-fresh gate — the same 33k stratified pass re-run with the pre-W1
+binary (worktree at b4919ab, same model), oracle (`ydf_prediction_gated`, column-intrinsic)
+joined from the v19 pass, then `corpus_honest_gate.py --baseline <pre-W1 pass> --candidate
+<W1 pass>`. **Verdict: GO, zero band triggers**
+(`eval_w1_hardno/corpus_honest_gate_freshbase.txt`). The comparison is not vacuous — 5,500+
+column transitions, all W1-shaped: user_agent → unknown/word/alphanumeric_id (3,849 on the
+user_agent-oversampled sample), the phantom-label columns resolving to real outcomes (1,414),
+wkt/mgrs/iso6346/dms demoting only where schema-contradicted while the sample's 296 genuine
+WKT columns keep their label. The oracle-aware bands correctly scored all of it as honest
+demotion. **W1 clears every gate: tests, gold +2 (806/931), representative +, corpus-honest
+fresh-vs-fresh GO.** Residual noted: 28 entity_name→unknown transitions (0.003%) consistent
+with the known run-to-run wobble on degenerate junk columns; the gate did not band it.
+**Harness follow-up: rule mode needs a maintained current-default baseline pass** (or an
+explicit two-pass protocol) or every future rule ship hits this same false NO-GO.
+
+## End-to-end verification on the real failing data (W1+W2a binary)
+
+The SEC EDGAR ticker column — the reproduced headline failure, icao_code at conf 0.978 —
+now returns `unknown` via `membership_substance_guard:geography.transportation.icao_code`
+(guard demotes to alphanumeric_id, whose validator the all-alpha tickers then fail, hard-veto
+to unknown). Honest abstention until a ticker leaf exists; company `name` → entity_name 0.999
+and `cik` → integer unchanged.
+
+## Remaining follow-ups (this campaign)
+
+1. W2a gate run (corpus pass + corpus-honest) once the W1 gate frees the binary; verify the
+   real EDGAR ticker column end-to-end demotes.
+2. swift_bic into the veto-blind treatment (R32 or veto_safe exception) — measured shipping at
+   vpr 0.007 on real data.
+3. Sampling determinism: sort-order-dependent types on low-confidence columns.
+4. Gold expansion (W0.2) seeded from the lookup datasets + the new-miss columns above.
+5. W2 continuation: TLD/BCP-47 membership sets, unit-mandatory height/weight/file_size,
+   compact-date ranges, bio length floors, remaining checksums (per plan).
+6. W4 retrain (t-000133e418) unchanged — the founder-style negative recipe stands.
