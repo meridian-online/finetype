@@ -3,6 +3,7 @@ name = "finetype-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+readme = "README.md"
 repository.workspace = true
 homepage.workspace = true
 keywords.workspace = true
