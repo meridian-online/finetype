@@ -1,0 +1,61 @@
+system,code,title
+ICD-10,B34.9,Viral infection unspecified
+ICD-10,C50.911,Malignant neoplasm of unspecified site of right female breast
+ICD-10,E11.65,Type 2 diabetes mellitus with hyperglycemia
+ICD-10,E11.9,Type 2 diabetes mellitus without complications
+ICD-10,E66.9,Obesity unspecified
+ICD-10,E78.5,Hyperlipidemia unspecified
+ICD-10,F10.10,Alcohol abuse uncomplicated
+ICD-10,F10.20,Alcohol dependence uncomplicated
+ICD-10,F17.210,Nicotine dependence cigarettes uncomplicated
+ICD-10,F32.9,Major depressive disorder single episode unspecified
+ICD-10,F41.9,Anxiety disorder unspecified
+ICD-10,F90.9,Attention-deficit hyperactivity disorder unspecified type
+ICD-10,G30.9,Alzheimer disease unspecified
+ICD-10,G31.83,Dementia with Lewy bodies
+ICD-10,G43.909,Migraine unspecified not intractable without status migrainosus
+ICD-10,I10,Essential primary hypertension
+ICD-10,I25.10,Atherosclerotic heart disease of native coronary artery without angina pectoris
+ICD-10,I50.9,Heart failure unspecified
+ICD-10,J02.9,Acute pharyngitis unspecified
+ICD-10,J18.9,Pneumonia unspecified organism
+ICD-10,J44.9,Chronic obstructive pulmonary disease unspecified
+ICD-10,J45.909,Unspecified asthma uncomplicated
+ICD-10,K21.9,Gastro-esophageal reflux disease without esophagitis
+ICD-10,M17.9,Osteoarthritis of knee unspecified
+ICD-10,M54.50,Low back pain unspecified
+ICD-10,N39.0,Urinary tract infection site not specified
+ICD-10,R05.9,Cough unspecified
+ICD-10,R10.9,Unspecified abdominal pain
+ICD-10,R51.9,Headache unspecified
+ICD-10,Z00.00,Encounter for general adult medical examination without abnormal findings
+NAICS,111110,Soybean Farming
+NAICS,236220,Commercial and Institutional Building Construction
+NAICS,238210,Electrical Contractors and Other Wiring Installation Contractors
+NAICS,311111,Dog and Cat Food Manufacturing
+NAICS,311811,Retail Bakeries
+NAICS,423430,Computer and Computer Peripheral Equipment and Software Merchant Wholesalers
+NAICS,445110,Supermarkets and Other Grocery Retailers
+NAICS,518210,Data Processing Hosting and Related Services
+NAICS,522110,Commercial Banking
+NAICS,523110,Investment Banking and Securities Dealing
+NAICS,524113,Direct Life Insurance Carriers
+NAICS,541110,Offices of Lawyers
+NAICS,541211,Offices of Certified Public Accountants
+NAICS,541330,Engineering Services
+NAICS,541511,Custom Computer Programming Services
+NAICS,541512,Computer Systems Design Services
+NAICS,541519,Other Computer Related Services
+NAICS,541611,Administrative Management and General Management Consulting Services
+NAICS,541713,Research and Development in Nanotechnology
+NAICS,541921,Photography Studios Portrait
+NAICS,561730,Landscaping Services
+NAICS,621111,Offices of Physicians except Mental Health Specialists
+NAICS,621210,Offices of Dentists
+NAICS,622110,General Medical and Surgical Hospitals
+NAICS,711130,Musical Groups and Artists
+NAICS,722511,Full-Service Restaurants
+NAICS,722513,Limited-Service Restaurants
+NAICS,722515,Snack and Nonalcoholic Beverage Bars
+NAICS,811111,General Automotive Repair
+NAICS,812112,Beauty Salons
