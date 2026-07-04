@@ -2302,8 +2302,8 @@ impl ColumnClassifier {
         let mut lens: Vec<usize> = non_empty.iter().map(|v| v.len()).collect();
         lens.sort_unstable();
         let median_len = lens[lens.len() / 2];
-        if !header_corroborates_naics(header)
-            && !(header_corroborates_numeric_code(header) && median_len >= 4)
+        if !(header_corroborates_naics(header)
+            || (header_corroborates_numeric_code(header) && median_len >= 4))
         {
             return;
         }
