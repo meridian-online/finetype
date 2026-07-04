@@ -2001,15 +2001,15 @@ fn test_header_hint_survival_columns() {
 fn test_header_hint_ticket_cabin() {
     assert_eq!(
         header_hint("Ticket"),
-        Some("representation.alphanumeric.alphanumeric_id")
+        Some("representation.identifier.alphanumeric_id")
     );
     assert_eq!(
         header_hint("Cabin"),
-        Some("representation.alphanumeric.alphanumeric_id")
+        Some("representation.identifier.alphanumeric_id")
     );
     assert_eq!(
         header_hint("seat"),
-        Some("representation.alphanumeric.alphanumeric_id")
+        Some("representation.identifier.alphanumeric_id")
     );
 }
 
@@ -2821,7 +2821,7 @@ fn test_attractor_validation_confirmed_skips_signal2() {
         .collect();
     let votes = vec![
         ("geography.transportation.icao_code".to_string(), 6),
-        ("representation.alphanumeric.alphanumeric_id".to_string(), 4),
+        ("representation.identifier.alphanumeric_id".to_string(), 4),
     ];
 
     let yaml = r#"
@@ -3111,6 +3111,141 @@ technology.internet.url:
     assert!(
         result.is_none(),
         "real URL values must not be demoted off technology.internet.url"
+    );
+}
+
+#[test]
+fn test_schema_fail_demotion_prose_off_wkt() {
+    // Free-text descriptions the Sense stage over-emits as geography.format.wkt
+    // (company-reference audit W1a). wkt is absent from veto_safe.txt (rare-type
+    // starvation) so before this widening a contradicted wkt assertion shipped
+    // with only an advisory flag. Prose fails the leading-geometry-keyword
+    // pattern ~100% → demote (high cardinality → alphanumeric_id, which the
+    // validation veto then adjudicates honestly downstream).
+    let values: Vec<String> = (0..30)
+        .map(|i| format!("Provides consulting and advisory services to sector {}", i))
+        .collect();
+    let yaml = r#"
+geography.format.wkt:
+  title: "Well-Known Text Geometry"
+  validation:
+    type: string
+    pattern: "^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\\s*(Z|M|ZM)?\\s*(\\(|EMPTY)"
+  tier: [VARCHAR, format]
+  release_priority: 3
+  samples: ["POINT (30 10)"]
+"#;
+    let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+    let result = value_sharpen(&values, "geography.format.wkt", 0.9, Some(&taxonomy));
+    let (label, rule) = result.expect("prose should demote off geography.format.wkt");
+    assert_eq!(label, "representation.identifier.alphanumeric_id");
+    assert!(rule.starts_with("schema_fail_demotion:"));
+}
+
+#[test]
+fn test_schema_fail_demotion_keeps_real_wkt() {
+    // A genuine WKT column (all values lead with a geometry keyword) must NOT
+    // be demoted — the regression guard for widening the allowlist to wkt.
+    let values: Vec<String> = vec![
+        "POINT (30 10)",
+        "LINESTRING (30 10, 10 30, 40 40)",
+        "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))",
+        "MULTIPOINT ((10 40), (40 30))",
+        "POINT Z (1 2 3)",
+        "GEOMETRYCOLLECTION EMPTY",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let yaml = r#"
+geography.format.wkt:
+  title: "Well-Known Text Geometry"
+  validation:
+    type: string
+    pattern: "^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\\s*(Z|M|ZM)?\\s*(\\(|EMPTY)"
+  tier: [VARCHAR, format]
+  release_priority: 3
+  samples: ["POINT (30 10)"]
+"#;
+    let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+    let result = value_sharpen(&values, "geography.format.wkt", 0.9, Some(&taxonomy));
+    assert!(
+        result.is_none(),
+        "real WKT values must not be demoted off geography.format.wkt"
+    );
+}
+
+#[test]
+fn test_schema_fail_demotion_junk_off_user_agent() {
+    // Generic id/version columns the shipped default over-emits as
+    // technology.internet.user_agent (the model's largest single over-emit,
+    // 359/13,478 corpus columns — company-reference audit W1a). None carries a
+    // known client prefix → 100% fail → demote (high cardinality →
+    // alphanumeric_id).
+    let values: Vec<String> = (0..30)
+        .map(|i| format!("app-build-{:04}.release", i))
+        .collect();
+    let yaml = r#"
+technology.internet.user_agent:
+  title: "User Agent String"
+  validation:
+    type: string
+    pattern: "^(Mozilla/|curl/|python-requests/|Wget/|Go-http-client/|axios/|PostmanRuntime/|kube-probe/|Java/|okhttp/|Apache-HttpClient/|libcurl/|node-fetch/|Dalvik/|CFNetwork/|Lynx/|Links |Scrapy/|Googlebot/|Bingbot/|Slackbot|Twitterbot/|facebookexternalhit/|LinkedInBot/|Prometheus/|Datadog/|Ruby/|Dart/|grpc-|HTTPie/|bot|spider|crawl)"
+    minLength: 10
+    maxLength: 500
+  tier: [VARCHAR, internet]
+  release_priority: 3
+  samples: ["curl/7.64.1"]
+"#;
+    let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+    let result = value_sharpen(
+        &values,
+        "technology.internet.user_agent",
+        0.9,
+        Some(&taxonomy),
+    );
+    let (label, rule) = result.expect("bare build ids should demote off user_agent");
+    assert_eq!(label, "representation.identifier.alphanumeric_id");
+    assert!(rule.starts_with("schema_fail_demotion:"));
+}
+
+#[test]
+fn test_schema_fail_demotion_keeps_real_user_agent() {
+    // A genuine user-agent column (known client prefixes) must NOT be demoted —
+    // the regression guard for widening the allowlist to user_agent.
+    let values: Vec<String> = vec![
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)",
+        "curl/7.64.1",
+        "python-requests/2.28.1",
+        "Googlebot/2.1 (+http://www.google.com/bot.html)",
+        "okhttp/4.9.3 android-client",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let yaml = r#"
+technology.internet.user_agent:
+  title: "User Agent String"
+  validation:
+    type: string
+    pattern: "^(Mozilla/|curl/|python-requests/|Wget/|Go-http-client/|axios/|PostmanRuntime/|kube-probe/|Java/|okhttp/|Apache-HttpClient/|libcurl/|node-fetch/|Dalvik/|CFNetwork/|Lynx/|Links |Scrapy/|Googlebot/|Bingbot/|Slackbot|Twitterbot/|facebookexternalhit/|LinkedInBot/|Prometheus/|Datadog/|Ruby/|Dart/|grpc-|HTTPie/|bot|spider|crawl)"
+    minLength: 10
+    maxLength: 500
+  tier: [VARCHAR, internet]
+  release_priority: 3
+  samples: ["curl/7.64.1"]
+"#;
+    let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+    let result = value_sharpen(
+        &values,
+        "technology.internet.user_agent",
+        0.9,
+        Some(&taxonomy),
+    );
+    assert!(
+        result.is_none(),
+        "real user-agent values must not be demoted off technology.internet.user_agent"
     );
 }
 

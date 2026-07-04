@@ -431,6 +431,18 @@ pub(crate) fn value_sharpen(
     // for high-card ids, word for small status vocabularies). Same schema-contradicted
     // demote discipline as utc/url above; the additive hard-negative retrain's job done
     // with a value-based rule (the over-emit retrains were 0-for-6).
+    // Veto-blind strict-validator additions (company-reference audit, W1a —
+    // output/company-reference-audit/findings_and_action_plan.md): these labels
+    // carry strict validators (anchored keyword/prefix/grid patterns a genuine
+    // column passes ~100%) but are OMITTED from labels/veto_safe.txt by
+    // rare-type starvation, so a schema-contradicted assertion previously
+    // shipped with only an advisory flag — verified live via label injection
+    // (a prose column asserted wkt kept the label at pass_rate 0.0). Admitting
+    // them here gives the hard-NO the veto cannot: wkt (leading geometry
+    // keyword), user_agent (known-client prefix alternation; the shipped
+    // default's largest single over-emit, 359/13,478 corpus columns), and the
+    // strict coordinate/container/chemistry tail (mgrs / plus_code / dms /
+    // iso6346 / inchi). Same schema-contradicted discipline as utc/url above.
     if result_label == "representation.scientific.measurement_unit"
         || result_label == "geography.coordinate.geohash"
         || result_label == "datetime.offset.utc"
@@ -442,6 +454,13 @@ pub(crate) fn value_sharpen(
         || result_label == "identity.medical.cpt"
         || result_label == "technology.internet.http_method"
         || result_label == "representation.boolean.terms"
+        || result_label == "geography.format.wkt"
+        || result_label == "technology.internet.user_agent"
+        || result_label == "geography.coordinate.mgrs"
+        || result_label == "geography.coordinate.plus_code"
+        || result_label == "geography.coordinate.dms"
+        || result_label == "geography.transportation.iso6346"
+        || result_label == "representation.scientific.inchi"
     {
         if let Some(taxonomy) = taxonomy {
             if let Some((label, rule)) = schema_fail_demotion(values, result_label, taxonomy) {
@@ -687,7 +706,7 @@ pub(crate) fn sharpen_select_fallback(
     } else if is_text {
         "representation.text.word".to_string()
     } else if is_code {
-        "representation.alphanumeric.alphanumeric_id".to_string()
+        "representation.identifier.alphanumeric_id".to_string()
     } else {
         "representation.text.word".to_string()
     }
@@ -2129,7 +2148,7 @@ pub(crate) fn select_fallback(
     } else if is_text {
         "representation.text.word".to_string()
     } else if is_code {
-        "representation.alphanumeric.alphanumeric_id".to_string()
+        "representation.identifier.alphanumeric_id".to_string()
     } else {
         "representation.text.word".to_string()
     }

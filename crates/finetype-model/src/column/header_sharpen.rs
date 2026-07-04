@@ -458,10 +458,10 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
             }
             // Ticket / cabin — alphanumeric identifiers
             "ticket" | "ticket number" | "ticketno" => {
-                return Some("representation.alphanumeric.alphanumeric_id");
+                return Some("representation.identifier.alphanumeric_id");
             }
             "cabin" | "room" | "compartment" | "berth" | "seat" => {
-                return Some("representation.alphanumeric.alphanumeric_id");
+                return Some("representation.identifier.alphanumeric_id");
             }
             // Fare / fee columns (→ finance.currency.amount)
             "fare" | "fee" | "toll" | "charge" => {
@@ -661,7 +661,7 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
     if !disable_representation
         && (h.contains("ticket") || h.contains("cabin") || h.contains("seat") || h.contains("room"))
     {
-        return Some("representation.alphanumeric.alphanumeric_id");
+        return Some("representation.identifier.alphanumeric_id");
     }
     if !disable_finance
         && (h.contains("fare") || h.contains("fee") || h.contains("charge") || h.contains("toll"))
