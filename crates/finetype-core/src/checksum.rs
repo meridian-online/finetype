@@ -302,7 +302,11 @@ pub fn iban(value: &str) -> bool {
         return false;
     }
     // Rearranged = BBAN + country code + check digits (first four moved to end).
-    let rearranged: Vec<char> = chars[4..].iter().chain(chars[..4].iter()).copied().collect();
+    let rearranged: Vec<char> = chars[4..]
+        .iter()
+        .chain(chars[..4].iter())
+        .copied()
+        .collect();
     mod97(&rearranged) == Some(1)
 }
 
@@ -472,7 +476,12 @@ mod tests {
     #[test]
     fn isin_accepts_taxonomy_samples() {
         // The finance.securities.isin `samples:` are curated valid ISINs.
-        for v in ["US0378331005", "GB0002634946", "JP3633400001", "DE0007164600"] {
+        for v in [
+            "US0378331005",
+            "GB0002634946",
+            "JP3633400001",
+            "DE0007164600",
+        ] {
             assert!(isin(v), "should be a valid ISIN: {v}");
         }
     }
