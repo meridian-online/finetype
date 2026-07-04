@@ -38,12 +38,25 @@
 #   --default           rule-eval mode: binary + models/default
 #   --model   <prefix>  model-eval mode: pick best seed among models/<prefix>-s<seed>
 #   --seeds   a,b,c     seeds to consider in model mode (default 42,43,44)
+#   --gate-baseline <parquet>
+#                       FRESH transition baseline for the corpus-honest gate:
+#                       a columns.parquet from the SAME 33k sample run with the
+#                       PRE-change binary, with ydf_prediction_gated joined on
+#                       from output/ydf-validation-gate/v19_gated.parquet (the
+#                       oracle is column-intrinsic, so the v19-era join is
+#                       correct even though v19's PREDICTIONS are retired).
+#                       REQUIRED for a valid rule-mode verdict since the m2v8m
+#                       swap (2026-06-24): without it the gate defaults its
+#                       transition baseline to the retired v19's predictions
+#                       and the verdict measures cumulative post-swap history,
+#                       not your change — a guaranteed false NO-GO (first hit:
+#                       W1 of output/company-reference-audit/, 2026-07-04).
 #   -h | --help         print this usage and exit 0
 
 set -uo pipefail
 
 usage() {
-    sed -n '2,41p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,54p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 # ── Argument parsing ────────────────────────────────────────────────────────
@@ -52,6 +65,7 @@ OUT=""
 MODEL_PREFIX=""
 USE_DEFAULT=0
 SEEDS_CSV="42,43,44"
+GATE_BASELINE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -60,6 +74,7 @@ while [[ $# -gt 0 ]]; do
         --model)   MODEL_PREFIX="${2:-}"; shift 2 ;;
         --seeds)   SEEDS_CSV="${2:-}"; shift 2 ;;
         --default) USE_DEFAULT=1; shift ;;
+        --gate-baseline) GATE_BASELINE="${2:-}"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "ERROR: unknown argument: $1" >&2; echo >&2; usage >&2; exit 64 ;;
     esac
@@ -193,8 +208,22 @@ FINETYPE_MODEL="$MODEL" python3 scripts/gittables_corpus_pass.py \
 # ── 4. Corpus-honest gate (H05, BLOCKING — this is the verdict) ──────────────
 echo ""; echo "── Corpus-honest gate (H05, BLOCKING) ──"
 CAND_PARQUET="$OUT/sample_pass/corpus_pass/columns.parquet"
+BASELINE_ARGS=()
+if [[ -n "$GATE_BASELINE" ]]; then
+    BASELINE_ARGS=(--baseline "$GATE_BASELINE")
+elif [[ "$MODE" == "rule" ]]; then
+    cat >&2 <<'EOWARN'
+  ⚠️  WARNING: no --gate-baseline supplied. The gate's transition baseline
+  defaults to the RETIRED v19's predictions, so in rule mode this verdict
+  measures the cumulative post-swap history, NOT your rule change — a
+  guaranteed false NO-GO since 2026-06-24 (see --help for the fresh-baseline
+  protocol; first hit: company-reference audit W1). Treat the verdict below
+  as INVALID for ship decisions until re-run with --gate-baseline.
+EOWARN
+fi
 python3 scripts/corpus_honest_gate.py \
     --candidate "$CAND_PARQUET" \
+    ${BASELINE_ARGS[@]+"${BASELINE_ARGS[@]}"} \
     --label "${LABEL}${SEED_TAG}" \
     | tee "$OUT/corpus_honest_gate.txt"
 

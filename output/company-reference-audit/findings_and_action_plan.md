@@ -379,6 +379,24 @@ now returns `unknown` via `membership_substance_guard:geography.transportation.i
 to unknown). Honest abstention until a ticker leaf exists; company `name` → entity_name 0.999
 and `cik` → integer unchanged.
 
+## W2a gate results
+
+Gold **807/931 = 0.867** (+1 over W1, +3 over the 804 baseline; representative held 0.704).
+Corpus-honest fresh-vs-fresh (baseline = the W1 pass): **GO, zero band triggers**
+(`eval_w2a_membership/corpus_honest_gate_freshbase.txt`). The delta is surgical: 405
+icao_code and 115 iata_code demotions (→ word/unknown), nothing else moved. End-to-end on
+the real failing data: the SEC EDGAR ticker column returns honest `unknown` via
+`membership_substance_guard` instead of icao_code@0.978.
+
+`eval_rule.sh` now takes `--gate-baseline <parquet>` and rule mode WARNS loudly when the
+gate would default to the retired-v19 transition baseline — the false-NO-GO trap this
+campaign hit is documented in the script's help.
+
+**Campaign scoreboard (2026-07-04):** gold 804 → **807** (+3); the shipped default's largest
+over-emission wart (user_agent, 2.66% of corpus columns) eliminated with measured-zero
+collateral; wkt/icao/iata/strict-tail assertions now honest; phantom label fixed; two gate-GO
+rule ships on the branch awaiting merge.
+
 ## Remaining follow-ups (this campaign)
 
 1. W2a gate run (corpus pass + corpus-honest) once the W1 gate frees the binary; verify the
