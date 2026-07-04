@@ -461,10 +461,65 @@ pub(crate) fn value_sharpen(
         || result_label == "geography.coordinate.dms"
         || result_label == "geography.transportation.iso6346"
         || result_label == "representation.scientific.inchi"
+        // swift_bic joined 2026-07-04 (company-reference audit follow-up 2):
+        // measured shipping on real GLEIF data at pass_rate 0.007 — a
+        // normalized-name column wearing the BIC label with only an advisory
+        // flag. Positional structure (^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}...) passes
+        // genuine BIC columns ~100%; prose/name columns fail overwhelmingly.
+        || result_label == "finance.banking.swift_bic"
     {
         if let Some(taxonomy) = taxonomy {
             if let Some((label, rule)) = schema_fail_demotion(values, result_label, taxonomy) {
                 return Some((label, rule));
+            }
+        }
+    }
+
+    // R33: entity_name prose override (company-reference audit, gold-priced).
+    // entity_name over-emits onto free-text prose (titles, descriptions,
+    // sentence fragments) — 25 of the expanded gold's entity_name assertions
+    // sit on plain_text/word truth, and entity_name carries no validator to
+    // contradict them. Value-shape separation, measured on gold both-sides
+    // (16 true entity columns incl. connector-word org names like "Bank of
+    // America Corporation" and species binomials: ZERO false fires; synthetic
+    // prose: fires): a value is prose-like when it carries >=2 lowercase
+    // alphabetic words of length >=4 (connectors "of"/"and" are shorter; org
+    // names are Title-Case/ALL-CAPS), and the column demotes when the median
+    // token count is >=3 AND >=50% of values are prose-like. Single-token
+    // vocabularies (status enums) are deliberately NOT covered — gold holds
+    // genuine single-token entity_name columns and no value shape separates
+    // them. Value-based per 0048; demote-only.
+    if result_label == "representation.text.entity_name" {
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() >= 4 {
+            let is_prose = |v: &str| {
+                v.split_whitespace()
+                    .filter(|w| {
+                        w.len() >= 4 && w.chars().all(|c| c.is_alphabetic() && c.is_lowercase())
+                    })
+                    .count()
+                    >= 2
+            };
+            let mut tok_counts: Vec<usize> = non_empty
+                .iter()
+                .map(|v| v.split_whitespace().count())
+                .collect();
+            tok_counts.sort_unstable();
+            let median_tokens = tok_counts[tok_counts.len() / 2];
+            let prose_n = non_empty.iter().filter(|v| is_prose(v)).count();
+            if median_tokens >= 3 && prose_n * 2 >= non_empty.len() {
+                return Some((
+                    "representation.text.plain_text".to_string(),
+                    format!(
+                        "entity_prose_override:prose={}/{}",
+                        prose_n,
+                        non_empty.len()
+                    ),
+                ));
             }
         }
     }

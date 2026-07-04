@@ -6927,6 +6927,326 @@ geography.transportation.iata_code:
     );
 }
 
+// ── R33 entity_prose_override + numeric_code_header_recovery + swift_bic R32
+//    (company-reference audit, gold-priced batch) ──
+
+#[test]
+fn entity_prose_override_demotes_prose_to_plain_text() {
+    // Sentence-like description prose asserted as entity_name → plain_text.
+    let values: Vec<String> = vec![
+        "Type 2 diabetes mellitus without complications",
+        "Provides consulting and advisory services to businesses",
+        "Chronic obstructive pulmonary disease unspecified",
+        "Offers cloud software for enterprise resource planning",
+        "Alcohol dependence uncomplicated with related disorders",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let result = value_sharpen(&values, "representation.text.entity_name", 0.93, None);
+    let (label, rule) = result.expect("prose should demote off entity_name");
+    assert_eq!(label, "representation.text.plain_text");
+    assert!(rule.starts_with("entity_prose_override:"));
+}
+
+#[test]
+fn entity_prose_override_keeps_org_names_with_connectors() {
+    // Genuine org names — including connector-word and long Title-Case names —
+    // must NOT demote (the measured zero-false-fire bar).
+    let values: Vec<String> = vec![
+        "Bank of America Corporation",
+        "McKinsey & Company",
+        "Fidelity Advisor Leveraged Company Stock Fund",
+        "University of California Press",
+        "Museum of Modern Art",
+        "Procter & Gamble Co",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let result = value_sharpen(&values, "representation.text.entity_name", 0.93, None);
+    assert!(
+        result.is_none(),
+        "org names with lowercase connectors must not demote off entity_name"
+    );
+}
+
+#[test]
+fn entity_prose_override_keeps_species_binomials() {
+    // Two-token species names carry one lowercase content word — below both
+    // the median-token and prose-value bars.
+    let values: Vec<String> = vec![
+        "Homo sapiens",
+        "Mus musculus",
+        "Rattus norvegicus",
+        "Danio rerio",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let result = value_sharpen(&values, "representation.text.entity_name", 0.93, None);
+    assert!(result.is_none(), "species binomials must stay entity_name");
+}
+
+#[test]
+fn numeric_code_recovery_restores_naics_and_cik() {
+    // F5 demotes no-leading-zero numeric_code to integer_number; a code-ish
+    // header restores it (0094 corroboration). NAICS + CIK shapes.
+    let yaml = r#"
+representation.identifier.numeric_code:
+  title: "Numeric Code"
+  validation:
+    type: string
+    pattern: '^[0-9]+$'
+  tier: [VARCHAR, identifier]
+  release_priority: 4
+  samples: ["00120"]
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    // Realistic CIK column (SEC registrant ids): repeated values keep the
+    // numeric_sequential_detection promotion from grabbing the column as
+    // `increment` before this guard can see it. (A naics-headed column
+    // continues past numeric_code to the identity.industry.naics leaf via
+    // naics_industry_recovery — covered by its own tests.)
+    let ciks: Vec<String> = vec![
+        "320193", "1652044", "789019", "1018724", "1318605", "320193", "789019", "1067983",
+        "1652044", "1318605", "320193", "104169",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("cik", &ciks, "representation.numeric.integer_number", 0.8)
+        .unwrap();
+    assert_eq!(
+        r.label, "representation.identifier.numeric_code",
+        "rule was {:?}",
+        r.disambiguation_rule
+    );
+    assert!(r
+        .disambiguation_rule
+        .as_deref()
+        .unwrap_or("")
+        .starts_with("numeric_code_header_recovery:"));
+}
+
+#[test]
+fn numeric_code_recovery_leaves_quantities_and_postal_alone() {
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    // Quantity header: no code token → untouched.
+    let counts: Vec<String> = vec!["1200", "845", "23000", "410"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "employees",
+            &counts,
+            "representation.numeric.integer_number",
+            0.8,
+        )
+        .unwrap();
+    assert_eq!(r.label, "representation.numeric.integer_number");
+    // Postal header: `zip_code` tokenises to a bare `code` but the postal
+    // token vetoes the match — this guard must NOT claim the column (other
+    // postal machinery may legitimately relabel it).
+    let zips: Vec<String> = vec!["90210", "10001", "60601", "94102"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "zip_code",
+            &zips,
+            "representation.numeric.integer_number",
+            0.8,
+        )
+        .unwrap();
+    assert_ne!(r.label, "representation.identifier.numeric_code");
+    assert!(!r
+        .disambiguation_rule
+        .as_deref()
+        .unwrap_or("")
+        .starts_with("numeric_code_header_recovery:"));
+}
+
+#[test]
+fn test_schema_fail_demotion_names_off_swift_bic() {
+    // Normalized-name columns the model wears swift_bic on (measured on real
+    // GLEIF data at pass_rate 0.007) → demote via R32.
+    let values: Vec<String> = (0..30)
+        .map(|i| format!("ACME HOLDINGS INTERNATIONAL {}", i))
+        .collect();
+    let yaml = r#"
+finance.banking.swift_bic:
+  title: "SWIFT/BIC"
+  validation:
+    type: string
+    pattern: "^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$"
+  tier: [VARCHAR, banking]
+  release_priority: 3
+  samples: ["DEUTDEFF"]
+"#;
+    let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+    let result = value_sharpen(&values, "finance.banking.swift_bic", 0.9, Some(&taxonomy));
+    let (label, rule) = result.expect("name strings should demote off swift_bic");
+    assert_eq!(label, "representation.identifier.alphanumeric_id");
+    assert!(rule.starts_with("schema_fail_demotion:"));
+}
+
+#[test]
+fn test_schema_fail_demotion_keeps_real_swift_bic() {
+    let values: Vec<String> = vec![
+        "DEUTDEFF",
+        "CHASUS33",
+        "BARCGB22",
+        "BNPAFRPP",
+        "CITIUS33XXX",
+        "HSBCHKHH",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let yaml = r#"
+finance.banking.swift_bic:
+  title: "SWIFT/BIC"
+  validation:
+    type: string
+    pattern: "^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$"
+  tier: [VARCHAR, banking]
+  release_priority: 3
+  samples: ["DEUTDEFF"]
+"#;
+    let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+    let result = value_sharpen(&values, "finance.banking.swift_bic", 0.9, Some(&taxonomy));
+    assert!(
+        result.is_none(),
+        "real BIC values must not be demoted off swift_bic"
+    );
+}
+
+// ── naics_industry_recovery (company-reference audit W3) ──
+
+#[test]
+fn naics_recovery_is_default_on() {
+    assert!(!rhh::is_disabled("naics_industry_recovery"));
+}
+
+#[test]
+fn naics_recovery_promotes_naics_headed_member_columns() {
+    // A NAICS column arrives here as integer_number (F5) or numeric_code
+    // (header recovery); the leaf guard promotes on naics header + >=90%
+    // membership in the published Census list.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let naics: Vec<String> = vec![
+        "541511", "236220", "722511", "621111", "445110", "541511", "722511", "236220", "541512",
+        "928120",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense(
+            "NAICS Code",
+            &naics,
+            "representation.numeric.integer_number",
+            0.7,
+        )
+        .unwrap();
+    assert_eq!(
+        r.label, "identity.industry.naics",
+        "rule was {:?}",
+        r.disambiguation_rule
+    );
+}
+
+#[test]
+fn naics_recovery_requires_the_header_gate() {
+    // Same member values under a quantity header must NOT promote — sector
+    // codes are value-identical with small integers; the header is load-bearing.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let vals: Vec<String> = vec!["11", "21", "23", "31", "42", "44", "11", "21"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "team_size",
+            &vals,
+            "representation.numeric.integer_number",
+            0.7,
+        )
+        .unwrap();
+    assert_ne!(r.label, "identity.industry.naics");
+}
+
+#[test]
+fn naics_recovery_requires_membership() {
+    // naics-headed column whose values are NOT in the published list (bad
+    // sector prefixes) must not promote.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let vals: Vec<String> = vec!["100000", "999999", "050000", "130000", "990000"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "naics_code",
+            &vals,
+            "representation.numeric.integer_number",
+            0.7,
+        )
+        .unwrap();
+    assert_ne!(r.label, "identity.industry.naics");
+}
+
+#[test]
+fn naics_recovery_admits_bare_code_header_for_long_codes() {
+    // The real product surface: a 6-digit NAICS column under a bare `code`
+    // header. Membership at 6 digits is decisive; the generic-code tier admits it.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let vals: Vec<String> = vec![
+        "541511", "236220", "722511", "621111", "445110", "541512", "722511", "236220",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("code", &vals, "representation.numeric.integer_number", 0.7)
+        .unwrap();
+    assert_eq!(
+        r.label, "identity.industry.naics",
+        "rule was {:?}",
+        r.disambiguation_rule
+    );
+}
+
+#[test]
+fn naics_recovery_rejects_bare_code_header_for_sector_length_values() {
+    // 2-digit values 11-92 are ALL valid sectors — a rating-like column headed
+    // `code` must not promote; only the distinctive `naics` token admits
+    // sector-level codes.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let vals: Vec<String> = vec!["11", "22", "31", "44", "55", "62", "72", "81", "11", "44"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("code", &vals, "representation.numeric.integer_number", 0.7)
+        .unwrap();
+    assert_ne!(r.label, "identity.industry.naics");
+}
+
 // ── structured_string_refinement (spec 2026-06-19-plain-text-type-discovery) ──
 
 #[test]

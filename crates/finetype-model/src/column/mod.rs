@@ -2203,10 +2203,16 @@ impl ColumnClassifier {
         self.isbn_header_recovery(result, header, sample);
         self.binary_vocab_veto(result, header, sample, values);
         self.increment_substance_veto(result, values);
+        // AFTER increment_substance_veto: the sequential-detection promotion
+        // routes code columns through `increment`, and the veto lands them on
+        // integer_number — this recovery must see that final integer, not the
+        // intermediate increment.
+        self.numeric_code_header_recovery(result, header, sample);
         self.unlocode_format_veto(result, sample);
         self.city_region_header_corroboration(result, header, sample);
         self.country_code_corroboration(result, header, sample);
         self.timezone_abbreviation_recovery(result, header, sample);
+        self.naics_industry_recovery(result, header, sample);
         self.ceded_leaf_recovery(result, sample);
     }
 
@@ -2256,6 +2262,65 @@ impl ColumnClassifier {
             }
             _ => {}
         }
+    }
+
+    /// `naics_industry_recovery` (default ON). Recovers the
+    /// `identity.industry.naics` leaf (company-reference audit W3). The shipped
+    /// 244-dim model cannot predict this leaf, and even its residual home
+    /// (`numeric_code`) needs header rescue from the F5 leading-zero demotion —
+    /// so a NAICS column reaches this guard as integer_number or numeric_code.
+    /// Promote when the header names a NAICS column (`header_corroborates_naics`
+    /// — the distinctive `naics` token; `sic` and bare `industry` deliberately
+    /// excluded) AND ≥90% of values are members of the published Census code
+    /// list (`membership::naics_codes`, labels/sets/naics_codes.txt). The
+    /// two-gate discipline mirrors `timezone_abbreviation_recovery`: sector
+    /// codes are value-identical with small integers, so the header gate is
+    /// load-bearing; a quantity column fails the header gate, a naics-headed
+    /// text column fails membership. Value-based (0048), RHH-disableable.
+    fn naics_industry_recovery(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("naics_industry_recovery") {
+            return;
+        }
+        const LEAF: &str = "identity.industry.naics";
+        if result.label == LEAF {
+            return;
+        }
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        // Header gate, two tiers: the distinctive `naics` token admits any code
+        // level, while a generic code-ish header (`code`, the real product
+        // surface's bare header) is admitted only for >=4-digit codes — the
+        // 2,129-code set makes 6-digit coincidence ~0.1%, but 2-digit sectors
+        // span 11-92, which a rating/age-like column headed `code` could
+        // fully occupy by accident.
+        let mut lens: Vec<usize> = non_empty.iter().map(|v| v.len()).collect();
+        lens.sort_unstable();
+        let median_len = lens[lens.len() / 2];
+        if !header_corroborates_naics(header)
+            && !(header_corroborates_numeric_code(header) && median_len >= 4)
+        {
+            return;
+        }
+        let members = non_empty
+            .iter()
+            .filter(|v| finetype_core::membership::naics_codes(v))
+            .count();
+        // >=90% in the published code list (members*10 >= len*9).
+        if members * 10 < non_empty.len() * 9 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.95);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule =
+            Some(format!("naics_industry_recovery:{}", header.to_lowercase()));
+        result.detected_locale = None;
     }
 
     /// `unlocode_format_veto` (default ON). UN/LOCODE is a closed 5-char shape
@@ -2337,6 +2402,65 @@ impl ColumnClassifier {
         result.disambiguation_applied = true;
         result.disambiguation_rule =
             Some(format!("isbn_header_recovery:{}", header.to_lowercase()));
+        result.detected_locale = None;
+    }
+
+    /// `numeric_code_header_recovery` (default ON). Feature rule F5 demotes
+    /// `numeric_code` to `integer_number` whenever a column has no leading
+    /// zeros — which structurally locks every no-leading-zero code system
+    /// (NAICS sectors run 11–92, EDGAR CIKs never start with 0) out of its
+    /// intended type: the model predicts numeric_code and the deterministic
+    /// layer erases it (company-reference audit, gold rows compref:naics /
+    /// compref:sec_edgar). Values alone cannot separate "digits that identify"
+    /// from "digits that quantify", so this is a 0094 header-corroboration
+    /// boundary: restore numeric_code when the header names a code column
+    /// (`header_corroborates_numeric_code` — token-aware, postal tokens veto)
+    /// AND ≥90% of values are all-digit with median length ≥2 (bare 0/1 flag
+    /// columns stay integers). Recovery-only: quantity columns (`employees`,
+    /// `founded`) carry no code token and are untouched. Value-based veto
+    /// discipline + header corroboration per 0094; RHH-disableable.
+    fn numeric_code_header_recovery(
+        &self,
+        result: &mut ColumnResult,
+        header: &str,
+        sample: &[String],
+    ) {
+        if rhh::is_disabled("numeric_code_header_recovery") {
+            return;
+        }
+        const LEAF: &str = "representation.identifier.numeric_code";
+        if result.label != "representation.numeric.integer_number"
+            || !header_corroborates_numeric_code(header)
+        {
+            return;
+        }
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let all_digit = non_empty
+            .iter()
+            .filter(|v| !v.is_empty() && v.chars().all(|c| c.is_ascii_digit()))
+            .count();
+        if all_digit * 10 < non_empty.len() * 9 {
+            return;
+        }
+        let mut lens: Vec<usize> = non_empty.iter().map(|v| v.len()).collect();
+        lens.sort_unstable();
+        if lens[lens.len() / 2] < 2 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.85);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!(
+            "numeric_code_header_recovery:{}",
+            header.to_lowercase()
+        ));
         result.detected_locale = None;
     }
 

@@ -572,6 +572,21 @@ impl Generator {
                 Ok(format!("{}{:04}", letter, code))
             }
 
+            // ── industry (1 type) ────────────────────────────────────────
+            ("industry", "naics") => {
+                // Real NAICS 2022 codes across levels (sector → national
+                // industry); the closed set lives in labels/sets/naics_codes.txt
+                // (membership directive) — the generator samples genuine codes
+                // so generated columns pass their own membership guard.
+                let codes = [
+                    "11", "21", "23", "31", "42", "44", "48", "52", "54", "62", "72", "92", "111",
+                    "236", "541", "722", "1111", "2362", "5415", "7225", "11111", "23622", "54151",
+                    "72251", "111110", "236220", "445110", "541511", "541512", "621111", "722511",
+                    "928120",
+                ];
+                Ok(codes[self.rng.gen_range(0..codes.len())].to_string())
+            }
+
             // ── government (6 types) ─────────────────────────────────────
             ("government", "vin") => {
                 let vin_chars = b"ABCDEFGHJKLMNPRSTUVWXYZ0123456789";

@@ -27,6 +27,7 @@ use std::sync::OnceLock;
 
 const ICAO_AIRPORTS_RAW: &str = include_str!("../../../labels/sets/icao_airport_codes.txt");
 const IATA_AIRPORTS_RAW: &str = include_str!("../../../labels/sets/iata_airport_codes.txt");
+const NAICS_CODES_RAW: &str = include_str!("../../../labels/sets/naics_codes.txt");
 
 fn parse_set(raw: &'static str) -> HashSet<&'static str> {
     raw.lines()
@@ -45,6 +46,11 @@ fn iata_airports_set() -> &'static HashSet<&'static str> {
     SET.get_or_init(|| parse_set(IATA_AIRPORTS_RAW))
 }
 
+fn naics_codes_set() -> &'static HashSet<&'static str> {
+    static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
+    SET.get_or_init(|| parse_set(NAICS_CODES_RAW))
+}
+
 /// `true` when the value (trimmed, case-folded to uppercase) is a published
 /// ICAO airport code.
 pub fn icao_airports(value: &str) -> bool {
@@ -57,6 +63,12 @@ pub fn iata_airports(value: &str) -> bool {
     iata_airports_set().contains(value.trim().to_uppercase().as_str())
 }
 
+/// `true` when the value (trimmed) is a published NAICS 2022 code at any
+/// level (2-digit sector through 6-digit national industry).
+pub fn naics_codes(value: &str) -> bool {
+    naics_codes_set().contains(value.trim())
+}
+
 /// Resolve a `membership:` directive name to its membership function.
 ///
 /// Returns `None` for an unknown name so the caller can surface the typo.
@@ -65,6 +77,7 @@ pub fn resolve(name: &str) -> Option<fn(&str) -> bool> {
     match name {
         "icao_airports" => Some(icao_airports),
         "iata_airports" => Some(iata_airports),
+        "naics_codes" => Some(naics_codes),
         _ => None,
     }
 }
@@ -127,6 +140,19 @@ mod tests {
     fn resolve_known_and_unknown() {
         assert!(resolve("icao_airports").is_some());
         assert!(resolve("iata_airports").is_some());
+        assert!(resolve("naics_codes").is_some());
         assert!(resolve("no_such_set").is_none());
+    }
+
+    #[test]
+    fn naics_set_matches_real_codes_and_rejects_lookalikes() {
+        for code in ["11", "92", "541511", "236220", "722511"] {
+            assert!(naics_codes(code), "{code} should be a NAICS code");
+        }
+        // Same digit-shape, not NAICS: sector prefix 10/93-99 or unassigned
+        // 6-digit combinations.
+        for code in ["100000", "999999", "541599999", "05", "541510"] {
+            assert!(!naics_codes(code), "{code} must not validate as NAICS");
+        }
     }
 }

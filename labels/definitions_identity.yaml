@@ -1470,3 +1470,56 @@ identity.academic.orcid:
   notes: >
     ORCID uses ISO 27729 (ISNI) format. Check digit calculated
     using ISO/IEC 7064:2003 MOD 11-2. X represents check digit 10.
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: industry
+#
+# Industry / business classification codes (NAICS; future: SIC, ISIC,
+# ANZSIC). Added 2026-07-04 (company-reference audit W3): these codes
+# were previously absorbed by representation.identifier.numeric_code and
+# then stripped to integer_number by the leading-zero heuristic — a
+# structural lockout for sector-prefixed code systems.
+# ═════════════════════════════════════════════════════════════════════
+
+identity.industry.naics:
+  title: "NAICS Industry Code"
+  description: >
+    North American Industry Classification System code (2-digit sector
+    through 6-digit national industry, sectors 11-92). Used in company
+    reference data, business registries, and government filings.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^(11|2[1-3]|3[1-3]|42|4[4-5]|4[8-9]|5[1-6]|6[1-2]|7[1-2]|8[1-2]|92)[0-9]{0,4}$"
+  # Closed-set substance: the shape pattern accepts any sector-prefixed
+  # 2-6 digit number; membership against the published Census list is
+  # what distinguishes a real NAICS code (Precision Principle). Set:
+  # labels/sets/naics_codes.txt (US Census Bureau, public domain).
+  membership: naics_codes
+  tier: [VARCHAR, industry]
+  release_priority: 3
+  aliases: [naics_code, industry_code]
+  samples:
+    - "541511"
+    - "236220"
+    - "722511"
+    - "621111"
+    - "445110"
+  references:
+    - "https://www.census.gov/naics/"
+  notes: >
+    New in v0.6.39 (company-reference audit W3). Model-invisible (the
+    shipped 244-dim default cannot predict it); recovered at profile
+    time by the deterministic naics_industry_recovery Sharpen guard
+    (naics header token + >=90% set membership), the
+    timezone_abbreviation pattern. Sector ranges: 11 Agriculture ...
+    92 Public Administration; 31-33 Manufacturing, 44-45 Retail,
+    48-49 Transportation share split sector blocks.

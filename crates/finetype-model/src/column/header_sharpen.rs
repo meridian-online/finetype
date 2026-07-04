@@ -76,6 +76,40 @@ pub(crate) fn header_corroborates_isbn(header: &str) -> bool {
     header.to_lowercase().contains("isbn")
 }
 
+/// True if the header names a NAICS column (`naics_code`, `NAICS`, `naics2022`).
+/// Token-aware on the distinctive `naics` stem; deliberately excludes `sic`
+/// (a different classification system whose 4-digit codes collide with NAICS
+/// industry groups) and bare `industry` (usually a name column).
+pub(crate) fn header_corroborates_naics(header: &str) -> bool {
+    header
+        .to_lowercase()
+        .split(|c: char| !c.is_alphabetic())
+        .any(|tok| tok == "naics")
+}
+
+/// True if the header names a numeric CODE column (`naics_code`, `Industry Code`,
+/// `cik`, `fips`) — the disambiguator for the value-identical numeric_code /
+/// integer_number boundary that feature rule F5 collapses (a no-leading-zero
+/// code system like NAICS can never survive F5 on values alone; the header is
+/// the only signal that digits identify rather than quantify — 0094 pattern).
+/// Token-aware; postal tokens veto the match because `zip_code`/`postal code`
+/// tokenise to a bare `code` yet belong to the postal family, not numeric_code.
+pub(crate) fn header_corroborates_numeric_code(header: &str) -> bool {
+    let lower = header.to_lowercase();
+    let mut code_tok = false;
+    let mut postal_tok = false;
+    for tok in lower.split(|c: char| !c.is_alphanumeric()) {
+        match tok {
+            "code" | "codes" | "naics" | "sic" | "cik" | "fips" => code_tok = true,
+            "zip" | "postal" | "postcode" | "zipcode" | "pin" | "pincode" | "plz" | "cep" => {
+                postal_tok = true
+            }
+            _ => {}
+        }
+    }
+    code_tok && !postal_tok
+}
+
 /// True if the header names an administrative division ABOVE city level — the
 /// disambiguator that separates the value-identical `region`/`city` siblings.
 /// Token-aware so `region`/`county`/`district`/`borough`/`province` match but
