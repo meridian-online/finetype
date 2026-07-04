@@ -7,17 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.39] - 2026-07-05
+
+Company-reference accuracy release: an external eval on company/financial lookup
+datasets exposed four misclassification families; every fix below shipped through
+gold no-regression + a fresh-baseline corpus-honest gate GO. Gold headline
+843/986 = 0.855 on the expanded fixture (+55 company-reference columns).
+
 ### Added
 
+- **`identity.industry.naics` (taxonomy 245 → 246).** NAICS 2022 industry codes get a first-class
+  type, validated by closed-set membership against the published US Census list (2,129 codes,
+  2-digit sector through 6-digit national industry; `labels/sets/naics_codes.txt`). Recovered
+  deterministically at `profile` time by the `naics_industry_recovery` guard — a `naics` header
+  admits any code level, a generic code-ish header admits ≥4-digit codes only — no retrain.
+- **The `membership:` taxonomy directive** — closed-set sibling of `checksum:` for types whose
+  substance is a published code list. `membership_substance_guard` re-checks a column's values
+  against the real list and demotes non-member columns by value shape. First tenants:
+  `icao_code` (10,249 published airports) and `iata_code` (9,056), plus NAICS above.
+- **Real check-digit validation for FIGI, ISIN, LEI, and IBAN** (`checksum:` directives wired to
+  the canonical algorithms, incl. the real FIGI check digit) — a value of the right shape but
+  wrong check digit is no longer "valid".
 - **`x-finetype-unknown-reason` on every profile surface.** When a column stays `unknown`,
   `profile` now explains why — e.g. *"validation rejected 'email': only 0% of values matched its
   format"*, *"too few non-null values to classify"*, or *"no type matched with sufficient
   confidence"*. Previously only `-o json-schema` carried the reason; it now also appears on
   `-o json` (verbose) and across the MCP `profile` tool. The MCP surfaces emit the two non-veto
   reasons (no veto signal there); the CLI additionally surfaces the *"validation rejected …"* case.
+- **Gold corpus: +55 company-reference columns** (tickers, industry codes, org names, GLEIF
+  registry fields, compound codes; blind 3-panel adjudicated) — the previously unmeasured data
+  family is now on the scoreboard (931 → 986 rows).
 
 ### Fixed
 
+- **Stock tickers are no longer "ICAO airport codes".** `^[A-Z]{4}$` confirmed every 4-letter
+  ticker and thereby disarmed the attractor demotion; membership against the real airport list
+  now demotes non-airport columns (honest `unknown` until a ticker type exists).
+- **`user_agent` over-emission eliminated.** The shipped model's largest single wart (2.66% of
+  corpus columns labelled user-agent, measured 355/355 junk with zero genuine columns) — the
+  schema-fail demotion now covers `user_agent`, so prose stops shipping under that label.
+- **The veto-blind strict-validator tail closed.** `wkt`, `mgrs`, `plus_code`, `dms`, `iso6346`,
+  `inchi`, and `swift_bic` carried strict validators that could never hard-veto (absent from the
+  audited-safe allowlist); a schema-contradicted assertion of any of them now demotes instead of
+  shipping with an advisory flag.
+- **Industry/registrant code columns are no longer stripped to plain integers.** The
+  leading-zero heuristic structurally locked no-leading-zero code systems (NAICS, SEC CIK) out
+  of `numeric_code`; a code-corroborating header now restores them.
+- **Organisation-name over-reach on prose.** `entity_name` asserted on sentence-like free text
+  (titles, descriptions) demotes to `plain_text` — measured zero false fires on genuine
+  organisation-name columns, including connector-word names ("Bank of America Corporation").
+- **Phantom fallback label.** Code-attractor demotions emitted the non-existent key
+  `representation.alphanumeric.alphanumeric_id`, which skipped taxonomy enrichment and was
+  invisible to the validation veto; they now emit the real `representation.identifier.alphanumeric_id`.
 - **`cargo install finetype-cli` from crates.io.** The `embed-models` build fallback (taken when no
   local `models/` symlink is present, as in the crates.io source tarball) still fetched the retired
   `char-cnn-v11` as the default and then panicked — it is not a multi-branch model — so a clean
