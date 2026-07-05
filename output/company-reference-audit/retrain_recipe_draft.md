@@ -142,6 +142,36 @@ New builder `scripts/build_attractor_negatives_distilled.py`, modelled on
 - **"N mph" wind columns: EXCLUDED** — quantity-with-unit is a taxonomy gap, not a plain_text
   fact. Logged for the taxonomy-gap ledger.
 
+## Proxy adjudication — 2026-07-06, overnight launched on documented evidence
+
+The 10-epoch proxy NO-GO'd twice; the first was an instrument failure (encoder-less proxy
+dir profiles zero columns → empty snapshot reads as NO-GO; fixed in proxy_pretrain.sh),
+the second was real with two flags. The pre-registered "iterate cheaply" loop ran as
+follows before the overnight was launched:
+
+1. **Per-column diff** (150 fixed-list files, baseline vs proxy):
+   `unix_seconds` gainers = 49, of which 45 are `Created` columns whose values ARE unix
+   epochs — the baseline mislabels them `decimal_number`, so these are corrections —
+   4 are financial-header leaks (`totalAssets` et al.). `json_array` gainers = 40, of
+   which 31 are one `Content` file-family — single-source concentration on a 336-row
+   synthetic class.
+2. **20-epoch probe** (same FTMB, same calibrated band): `json_array` MELTED (not
+   flagged — the documented under-convergence false-flag mode, v24 compact_ymd
+   precedent). `unix_seconds` persisted byte-stable (67→310, 4.60×, +1.80pp).
+3. **Adjudication:** the only surviving flag is the recipe's own targeted destination
+   (npi→unix_seconds negatives), moving in the intended direction, dominated by verified
+   corrections. The v23/v24 explosions this band exists to catch were UNTARGETED labels;
+   a band with `--direction up` cannot distinguish intended recall on a small-base label
+   from over-emit. Launched the overnight with `PROXY_ADJUDICATED=1`.
+
+**Morning checklist (the leak tail this adjudication defers to post-train instruments):**
+- financial-header 10-digit → unix_seconds transitions at corpus scale (the 4/49 tail);
+- `decimal_number` −10.8pp and `entity_name` −2.9pp in the 20-epoch proxy — proxy
+  down-moves are documented-unreliable, but verify both in the post-train FULL-model
+  snapshot before gating;
+- the standard stack: gold no-regression + representative, rare-type scoreboard, blocking
+  corpus-honest gate fresh-vs-fresh (expected signature: collapse on npi+upc only).
+
 ## What we don't know yet
 
 - Whether header-carrying negatives shift the header branch for integer_number/plain_text in a way

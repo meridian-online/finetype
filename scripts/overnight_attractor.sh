@@ -37,7 +37,13 @@ grep -E "records|label types|npi|upc|integer_number|plain_text|unix_seconds|deci
   output/distillation-attneg/ftmb_stats.txt || true
 
 echo "--- STEP B: destination-drift proxy precheck (BLOCKING) ---"
-if scripts/proxy_pretrain.sh --name attneg-proxy --ftmb "$FTMB" \
+if [[ "${PROXY_ADJUDICATED:-0}" == "1" ]]; then
+  echo "PROXY SKIPPED — NO-GO adjudicated 2026-07-06 (see retrain_recipe_draft.md §adjudication):"
+  echo "  the only surviving 20-epoch flag is datetime.epoch.unix_seconds, the recipe's own"
+  echo "  targeted destination, ~92% verified corrections ('Created' epoch columns) on the"
+  echo "  per-column diff; json_array melted at 20 epochs (under-convergence false flag)."
+  echo "  Post-train instruments (sense check, gold, blocking corpus-honest gate) still stand."
+elif scripts/proxy_pretrain.sh --name attneg-proxy --ftmb "$FTMB" \
      --baseline "$BASE_SNAP" --config "$CONFIG"; then
   echo "PROXY GO — launching the 3-seed overnight run"
 else
