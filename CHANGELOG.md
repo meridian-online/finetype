@@ -35,10 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **`npi` and `upc` checksum guards are correct but gate-blocked (held).** The model over-emits
   both as pure numeric attractors (~42k `npi` / ~13k `upc` columns in the 33k-file corpus-honest
   sample — financial figures like `ebit`/`marketCap` for npi, `particleId` runs for upc). The
-  checksum guards demote ~87–95% of these correctly, but the demotion collapses the over-emitted
-  label past the corpus-honest gate's blocking threshold, and gated-YDF co-signs the shape-match.
-  The directives are held (algorithms retained) until the over-emission is fixed at source (retrain)
-  or the guards gain header corroboration. See `output/company-reference-audit/` W2b log.
+  checksum guards demote ~87–95% of these correctly (and are +2 on the gold corpus — they fix
+  `longTermDebt`/`TEAM_ID`, real 10-digit columns that fail the check digit), but the demotion
+  collapses the over-emitted label past the corpus-honest gate's blocking threshold, and gated-YDF
+  co-signs the shape-match. The directives are held (algorithms retained) until the over-emission is
+  fixed at source (retrain) or the guards gain header corroboration. See
+  `output/company-reference-audit/` W2b log.
 
 ## [0.6.39] - 2026-07-05
 

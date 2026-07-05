@@ -403,9 +403,11 @@ rule ships on the branch awaiting merge.
 
 ## Shipped (branch figi-checksum, gate GO)
 
-**W2b substance checks — 4 types, gate GO, gold 843 → 846/986 = 0.858 (+3, no regression):**
+**W2b substance checks — 4 types, gate GO, gold 843 → 844/986 = 0.856 (+1, no regression):**
 wired every *shape-only* algorithmic/closed-set validator to its real substance check where the
-gate allows.
+gate allows. (Correction 2026-07-05: the shipped 4-type headline is **844 (+1)**, the TLD
+precision fix. The earlier "846 (+3)" was the *6-type* run with npi/upc active — holding npi/upc
+gave back its +2, see below.)
 
 - **Checksums** (`checksum:` directive → `checksum_substance_guard`, demote-only): `credit_card_number`
   (Luhn), `ean` (GS1 mod-10), `abn` (ATO modulus-89). New `gs1`/`npi`/`abn` fns in
@@ -449,12 +451,16 @@ and `upc`. Diagnosis with the candidate/baseline parquets:
 **DECISION (author, 2026-07-05): fold npi/upc into the retrain (t-000133e418), do NOT override the
 gate.** Rationale — the Sharpen checksum guard is the wrong fix for these two:
 
-1. **Gold +0.** Gold has 0 npi/upc rows, so the guard cannot add any correct npi/upc prediction. The
-   ONE gold column the model predicts npi is a single-value NBA team ID (`1610612750`) that passes
-   the NPI check digit *by coincidence*, so the guard can't even demote it — it stays a miss vs gold's
-   `integer_number`. The fix is invisible to every blocking instrument (the audit's original point).
+1. **Gold +2 (CORRECTED 2026-07-05 — earlier read as +0).** Three gold columns are model-predicted
+   `npi`: `longTermDebt` and `TEAM_ID` (gold `integer_number`) and `utc` (gold `unix_seconds`). With
+   the npi guard on, `longTermDebt` and `TEAM_ID` demote to `integer_number` = gold-correct (+2);
+   `utc` demotes to `integer_number` but gold is `unix_seconds`, so +0 there. The earlier "+0"
+   verdict eyeballed only `TEAM_ID`'s *truncated* sample (one coincidental Luhn-passing value) and
+   missed that the guard scores the fuller sample, where these mostly fail. So holding npi COST
+   these 2 gold columns — the shipped 4-type is 844, the npi-active 6-type was 846. The corpus-scale
+   value is still the main story; but the gold upside is +2, not zero.
 2. **Leaky by construction.** A 10-digit number passes NPI-Luhn ~10% of the time by chance, so the
-   guard demotes ~90% and leaves the coincidental-pass ~10% mislabelled (the TEAM_ID case exactly).
+   guard demotes ~90% and leaves a coincidental-pass tail mislabelled.
 3. **The referee is proven blind here.** gated-YDF is a shape-matcher for numeric checksum types —
    it asserts npi correctly 9.6% of the time, upc 2.7%, ean 0%, credit_card 1.5%, aba 5.5%, isbn
    16.8%; only isin (structured) is reliable at 100%. Root cause: gating NULLs a prediction only on
