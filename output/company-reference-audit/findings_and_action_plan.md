@@ -485,6 +485,37 @@ integer_number/alphanumeric_id). npi/upc **left HELD** in the tree (directives c
 `checksum::npi`/`gs1` retained, `gs1` live on `ean`) — do not wire until the retrain removes the
 over-emission; a wired guard would re-trip the gate for no gold gain. **W2b CLOSED.**
 
+---
+
+# Execution log — 2026-07-05 (item 9: shape-only validators stop disarming the attractor guard)
+
+## Shipped (branch figi-checksum, gate GO, gold-neutral)
+
+**item 9 — `is_precise()` now requires literal structure; the attractor `validation_confirmed`
+short-circuit is gated on it.** The engine's precision test counted any anchored character-class
+pattern (`^[A-Z]{4}$`) as precise, so a shape-only pattern *confirmed* a column and disarmed the
+attractor-demotion guard — a stock ticker passing `^[A-Z]{4}$` stayed `icao_code` even at low
+confidence. Rewrote `is_precise()` to require that every top-level alternation branch carries a
+literal character (a pure character-class/quantifier body is not precise; substance for those types
+lives in a checksum/membership/enum, not the shape). Wired it into both attractor-demotion sites
+(`sharpen_attractor_demotion`, `disambiguate_attractor_demotion`).
+
+- **Blast radius contained:** `is_precise()` had ZERO production callers (tests + `precise_audit`
+  only), so the entire production change is the new attractor wiring — the 9 curated attractor types.
+  The reclassification (`tests/fixtures/precise_audit.tsv`: 171 precise / 75 imprecise) flips ~64
+  shape-only types; of the attractors only `icao`/`cusip` (already backstopped by their substance
+  guards) and `ndc`/`first_name`/`username` (the real fixes) change; `phone`/`tld` keep precision.
+- **Gate GO, zero triggers; gold-neutral.** Corpus scale: `icao_code` 1,084→217, `cusip` 1,415→1,061,
+  `username` 4,655→3,772 — ~2,100 shape-only over-emissions correctly demoted, with ~zero
+  oracle-confirmed collateral (username lost 3, icao/cusip 0). Clean because these text/code
+  attractors are NOT gated-YDF-confirmed (unlike npi/upc) — no `collapse`. Gold 844 (neutral, no
+  regression); representative 185/260 = 0.712 (+1, no advisory flag).
+- Supersedes the MADR 0059 leniency that made `^[A-Z]{2}$` precise (the one flipped unit test).
+
+**W2c** (BCP-47 subtag check, H3 bit-structure — need a structural-validator surface — plus the
+height/weight/file_size unit policy) remains open; assessed low-upside (mostly gold-invisible,
+gate-uncreditable over-emission attractors best fixed in the retrain — see the W2c volume note).
+
 ## Remaining follow-ups (this campaign)
 
 1. ~~Author call: `npi`/`upc`~~ **RESOLVED 2026-07-05: folded into the retrain (t-000133e418), held

@@ -101,39 +101,41 @@ impl Validation {
         serde_json::Value::Object(schema)
     }
 
-    /// Returns `true` when this validation is "precise" enough to be used
-    /// as evidence for a demotion guard.
+    /// Returns `true` when this validation is "precise" enough to be used as
+    /// positive evidence that a column really is this type — strong enough to
+    /// disarm an attractor-demotion guard.
     ///
-    /// A validation is precise when EITHER:
-    /// - `enum_values` is present and non-empty (enum-constrained), OR
-    /// - `pattern` is present, anchored (starts with `^` and ends with `$`),
-    ///   and its body is NOT in the rejected permissive-pattern set.
+    /// Precise when EITHER:
+    /// - `enum_values` is present and non-empty (a closed set), OR
+    /// - `pattern` is anchored (`^…$`) and EVERY top-level alternation branch
+    ///   requires at least one literal character — a specific byte that must
+    ///   appear, as opposed to matching by shape alone.
     ///
-    /// The rejected set contains patterns that accept ~any short string:
-    /// `.+`, `.*`, `\S+`, `\S*`, `\w+`, `\w*`, `[A-Za-z0-9]+`,
-    /// `[A-Za-z0-9_]+`, `[A-Za-z0-9 ]+`, `[A-Za-z0-9_\-\.]+`,
-    /// `[\w\s]+`, `[\w]+`, `[\s]+`, and any `.{0,N}` / `.{1,N}` form.
+    /// A pattern built only from character classes, class escapes (`\d`, `\w`,
+    /// `\s`), and quantifiers — `^[A-Z]{4}$`, `^\d{11}$`, `^[A-Za-z0-9_]+$` —
+    /// matches every string of its shape, so it is NOT precise: it "confirms
+    /// 90% of random input" and cannot tell a stock ticker from an ICAO code.
+    /// A single shape-only *branch* sinks the whole pattern (a value could match
+    /// via it), so `^\d{4}-\d{2}$|^\d{11}$` is imprecise.
     ///
-    /// See MADR 0059 (`.orbit/choices/0059-demotion-guard-over-promotion.md`)
-    /// and the Precision Principle in `CLAUDE.md`: *"A validation that
-    /// confirms 90% of random input is not a validation."*
+    /// Substance for shape-only identifier types lives elsewhere — a `checksum:`
+    /// or `membership:` directive and its post-sharpen guard — not in this
+    /// pattern test. See the Precision Principle in `CLAUDE.md`. This supersedes
+    /// the earlier leniency that counted any anchored char-class body (e.g.
+    /// `^[A-Z]{2}$`) as precise (company-reference audit W2 item 9, 2026-07-05).
     pub fn is_precise(&self) -> bool {
-        // Branch (a): enum-constrained.
         if let Some(vals) = &self.enum_values {
             if !vals.is_empty() {
                 return true;
             }
         }
-
-        // Branch (b): anchored regex with a non-permissive body.
         if let Some(pattern) = &self.pattern {
             if let Some(body) = anchored_body(pattern) {
-                if !is_rejected_body(body) {
-                    return true;
-                }
+                return split_top_alternation(body)
+                    .iter()
+                    .all(|branch| branch_has_literal(branch));
             }
         }
-
         false
     }
 }
@@ -145,46 +147,118 @@ fn anchored_body(pattern: &str) -> Option<&str> {
     Some(stripped)
 }
 
-/// Rejected permissive-pattern bodies (between `^` and `$`).
-///
-/// This set is the authoritative blacklist used by `Validation::is_precise`.
-/// See MADR 0059 for rationale; ac-01b's integration test audits the real
-/// taxonomy against this list and emits `precise_audit.tsv` for review.
-const REJECTED_PERMISSIVE_BODIES: &[&str] = &[
-    ".+",
-    ".*",
-    r"\S+",
-    r"\S*",
-    r"\w+",
-    r"\w*",
-    "[A-Za-z0-9]+",
-    "[A-Za-z0-9_]+",
-    "[A-Za-z0-9 ]+",
-    r"[A-Za-z0-9_\-\.]+",
-    r"[\w\s]+",
-    r"[\w]+",
-    r"[\s]+",
-];
-
-/// Returns `true` if `body` is in the rejected-permissive set, either as a
-/// literal entry in `REJECTED_PERMISSIVE_BODIES` or as a `.{M,N}` /
-/// `.{0,N}` / `.{1,N}` length-only constraint.
-fn is_rejected_body(body: &str) -> bool {
-    if REJECTED_PERMISSIVE_BODIES.contains(&body) {
-        return true;
-    }
-    // Reject `.{M,N}`, `.{N}`, `.{M,}` forms — these constrain length
-    // only, not content.
-    if let Some(rest) = body.strip_prefix(".{") {
-        if let Some(inner) = rest.strip_suffix('}') {
-            // Accept any comma-separated or single-number body containing
-            // only digits and at most one comma.
-            let is_length_only = !inner.is_empty()
-                && inner.chars().all(|c| c.is_ascii_digit() || c == ',')
-                && inner.chars().filter(|c| *c == ',').count() <= 1;
-            if is_length_only {
-                return true;
+/// Split a regex body on TOP-LEVEL `|` alternation only — a `|` inside a
+/// character class `[…]` or a group `(…)` does not split. Stray `^`/`$` left by
+/// a per-branch-anchored pattern (`^a$|^b$`, body `a$|^b`) stay attached to
+/// their branch and are ignored by [`branch_has_literal`] as metacharacters.
+/// Patterns are ASCII, so byte indices are char boundaries.
+fn split_top_alternation(body: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut depth: i32 = 0;
+    let mut in_class = false;
+    let mut start = 0;
+    let bytes = body.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' => i += 1, // skip the escaped char
+            b'[' if !in_class => in_class = true,
+            b']' if in_class => in_class = false,
+            b'(' if !in_class => depth += 1,
+            b')' if !in_class => depth -= 1,
+            b'|' if !in_class && depth == 0 => {
+                parts.push(&body[start..i]);
+                start = i + 1;
             }
+            _ => {}
+        }
+        i += 1;
+    }
+    parts.push(&body[start..]);
+    parts
+}
+
+/// Does this alternation branch require at least one literal character — a
+/// specific byte that must appear — as opposed to matching purely by shape
+/// (character classes, class escapes, quantifiers)? A branch with no required
+/// literal (`[A-Z]{4}`, `\d{11}`) matches every string of its shape.
+///
+/// Character-class contents, class escapes (`\d`/`\w`/`\s`/`\p{…}`), `{…}`
+/// quantifiers, group syntax (`(`, `(?:`, `(?i`, …), and the metacharacters
+/// `. ^ $ | ? * +` are shape, not literals. Any other bare character, or a
+/// literal escape (`\.`, `\-`, `\/`), is a required literal. A literal inside an
+/// optional group counts too — this errs toward "precise", the safe direction
+/// for a guard that would otherwise over-demote.
+fn branch_has_literal(branch: &str) -> bool {
+    let bytes = branch.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'[' => {
+                // Character class: skip to the matching ']'.
+                i += 1;
+                if i < bytes.len() && bytes[i] == b'^' {
+                    i += 1;
+                }
+                if i < bytes.len() && bytes[i] == b']' {
+                    i += 1; // a leading ']' is a class member, not the terminator
+                }
+                while i < bytes.len() && bytes[i] != b']' {
+                    if bytes[i] == b'\\' {
+                        i += 1;
+                    }
+                    i += 1;
+                }
+                i += 1; // past ']'
+            }
+            b'{' => {
+                while i < bytes.len() && bytes[i] != b'}' {
+                    i += 1;
+                }
+                i += 1;
+            }
+            b'(' => {
+                i += 1;
+                // Skip a group prefix: (?:  (?i  (?=  (?!  (?<  …
+                if i < bytes.len() && bytes[i] == b'?' {
+                    i += 1;
+                    if i < bytes.len()
+                        && matches!(
+                            bytes[i],
+                            b':' | b'=' | b'!' | b'<' | b'i' | b'm' | b's' | b'x'
+                        )
+                    {
+                        i += 1;
+                    }
+                }
+            }
+            b')' | b'.' | b'^' | b'$' | b'|' | b'?' | b'*' | b'+' => i += 1,
+            b'\\' => {
+                i += 1;
+                if i < bytes.len() {
+                    // Class escapes match by shape; any other escape is a literal.
+                    if !matches!(
+                        bytes[i],
+                        b'd' | b'w'
+                            | b's'
+                            | b'D'
+                            | b'W'
+                            | b'S'
+                            | b'b'
+                            | b'B'
+                            | b'A'
+                            | b'z'
+                            | b'Z'
+                            | b'G'
+                            | b'p'
+                            | b'P'
+                    ) {
+                        return true;
+                    }
+                    i += 1;
+                }
+            }
+            _ => return true, // a bare literal character
         }
     }
     false
@@ -1360,12 +1434,54 @@ representation.discrete.categorical:
     }
 
     #[test]
-    fn dgd_ac01_precise_when_anchored_char_class() {
-        // Real-world case: country_code regex `^[A-Z]{2}$`.
-        let v = validation_with_pattern(r"^[A-Z]{2}$");
+    fn w2i9_imprecise_when_anchored_char_class_only() {
+        // A pure character-class + quantifier body matches every string of its
+        // shape — `^[A-Z]{2}$` (country_code), `^[A-Z]{4}$` (icao_code),
+        // `^[A-Z0-9]{8}[0-9]$` (cusip), `^\d{11}$` all confirm any same-shape
+        // token. NOT precise (company-reference audit W2 item 9; supersedes the
+        // earlier MADR 0059 leniency). Substance for these lives in an enum /
+        // checksum: / membership: directive, not the shape pattern.
+        for p in [
+            r"^[A-Z]{2}$",
+            r"^[A-Z]{4}$",
+            r"^[A-Z0-9]{8}[0-9]$",
+            r"^\d{11}$",
+            r"^[a-zA-Z0-9_\-.]{3,32}$",
+        ] {
+            let v = validation_with_pattern(p);
+            assert!(
+                !v.is_precise(),
+                "shape-only pattern must NOT be precise: {p}"
+            );
+        }
+    }
+
+    #[test]
+    fn w2i9_precise_when_pattern_requires_literals() {
+        // Required literals (separators, prefixes) make a pattern precise — a
+        // random string of the shape rarely has the literal in the right place.
+        for p in [
+            r"^\d{4}-\d{2}-\d{2}$",                     // date: literal '-'
+            r"^BBG[A-Z0-9]{8}[0-9]$",                   // literal 'BBG' prefix
+            r"^\d{2}:\d{2}:\d{2}$",                     // time: literal ':'
+            r"^\d{4}-\d{4}-\d{2}$|^\d{5}-\d{3}-\d{2}$", // both branches have '-'
+        ] {
+            let v = validation_with_pattern(p);
+            assert!(
+                v.is_precise(),
+                "literal-anchored pattern must be precise: {p}"
+            );
+        }
+    }
+
+    #[test]
+    fn w2i9_imprecise_when_any_branch_is_shape_only() {
+        // ndc: `^\d{4}-\d{4}-\d{2}$|…|^\d{11}$` — the `\d{11}` branch matches
+        // any 11-digit number, so a value could pass with no literal. Imprecise.
+        let v = validation_with_pattern(r"^\d{4}-\d{4}-\d{2}$|^\d{11}$");
         assert!(
-            v.is_precise(),
-            "anchored regex with non-permissive body must be precise"
+            !v.is_precise(),
+            "a pattern with any shape-only branch must NOT be precise"
         );
     }
 

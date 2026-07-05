@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Shape-only validators no longer disarm the attractor-demotion guard** (`is_precise` now requires
+  literal structure). A pattern built only from character classes and quantifiers — `^[A-Z]{4}$`
+  (icao_code), `^[a-zA-Z0-9_\-.]{3,32}$` (username), `^\d{11}$` — matches every string of its shape,
+  so it no longer counts as confirmation that a column really is that type. Previously such a pattern
+  "confirmed" the column and skipped the demotion (a stock ticker passing `^[A-Z]{4}$` stayed
+  `icao_code`). At corpus scale this correctly demotes ~2,100 shape-only over-emissions
+  (icao/cusip/username) a shape pattern had been protecting; gold-neutral, representative +1,
+  corpus-honest gate GO. Substance for these types lives in a checksum/membership/enum, not the
+  shape. (Supersedes the earlier leniency that counted any anchored char-class body as precise.)
+
 ### Added
 
 - **Real check-digit validation for three more identifier types** (`checksum:` directives wired to

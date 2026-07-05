@@ -397,3 +397,5 @@ output/**/corpus_pass/
 # W2b gate baseline/candidate (large derived parquets, regenerable)
 output/company-reference-audit/w3_baseline_with_oracle.parquet
 output/company-reference-audit/eval_w2b_substance/candidate_4type.parquet
+output/company-reference-audit/item9_baseline_with_oracle.parquet
+output/company-reference-audit/eval_item9/sample_pass/

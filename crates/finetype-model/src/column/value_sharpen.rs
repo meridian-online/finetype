@@ -648,11 +648,16 @@ pub(crate) fn sharpen_attractor_demotion(
     let mut validation_confirmed = false;
     let mut has_locale_validators = false;
     if let Some(taxonomy) = taxonomy {
-        let has_pattern = taxonomy
+        // A shape-only pattern (e.g. icao's `^[A-Z]{4}$`) confirms every
+        // same-shape token, so it must NOT count as confirmation that disarms
+        // the demotion below (company-reference audit W2 item 9). Only a
+        // genuinely precise validator — enum, or a pattern requiring literal
+        // structure — is positive evidence.
+        let has_precise_validation = taxonomy
             .get(result_label)
             .and_then(|d| d.validation.as_ref())
-            .and_then(|v| v.pattern.as_ref())
-            .is_some();
+            .map(|v| v.is_precise())
+            .unwrap_or(false);
 
         let non_empty: Vec<&str> = values
             .iter()
@@ -704,7 +709,7 @@ pub(crate) fn sharpen_attractor_demotion(
                         format!("attractor_demotion_validation:{}", result_label),
                     ));
                 }
-                if has_pattern && fail_rate <= 0.3 {
+                if has_precise_validation && fail_rate <= 0.3 {
                     validation_confirmed = true;
                 }
             }
@@ -1981,11 +1986,14 @@ pub(crate) fn disambiguate_attractor_demotion(
     if let Some(taxonomy) = taxonomy {
         // Use pre-compiled validator from taxonomy cache.
         // Falls back to compile-per-call if cache not populated.
-        let has_pattern = taxonomy
+        // Only a genuinely precise validator (enum, or a pattern requiring
+        // literal structure) is positive evidence; a shape-only pattern confirms
+        // any same-shape token and must not disarm the demotion (W2 item 9).
+        let has_precise_validation = taxonomy
             .get(top_label)
             .and_then(|d| d.validation.as_ref())
-            .and_then(|v| v.pattern.as_ref())
-            .is_some();
+            .map(|v| v.is_precise())
+            .unwrap_or(false);
 
         let non_empty: Vec<&str> = values
             .iter()
@@ -2047,7 +2055,7 @@ pub(crate) fn disambiguate_attractor_demotion(
                 // (≤30% fail), that's positive evidence FOR the type.
                 // NOTE: For locale-specific types this is "format-compatible but
                 // unconfirmed" — it does NOT gate Signals 2/3 (see below).
-                if has_pattern && fail_rate <= 0.3 {
+                if has_precise_validation && fail_rate <= 0.3 {
                     validation_confirmed = true;
                 }
             }

@@ -2812,9 +2812,13 @@ fn test_attractor_cardinality_single_value() {
 }
 
 #[test]
-fn test_attractor_validation_confirmed_skips_signal2() {
-    // ICAO code at low confidence (0.6) but values pass validation → no demotion
-    // This tests that validation confirmation gates Signal 2.
+fn test_attractor_shape_only_pattern_does_not_confirm() {
+    // company-reference audit W2 item 9: a shape-only pattern (`^[A-Z]{4}$`)
+    // confirms every 4-letter token, so it must NOT disarm the attractor
+    // demotion. Real ICAO codes at low confidence (0.6 < 0.85) with only the
+    // shape pattern to vouch for them are now demoted via Signal 2 — in
+    // production the `membership: icao_airports` guard is what keeps genuine
+    // airport columns, not this shape pattern.
     let values: Vec<String> = vec!["EGLL", "KJFK", "LFPG", "EDDF", "RJTT", "VHHH"]
         .into_iter()
         .map(String::from)
@@ -2838,12 +2842,49 @@ geography.transportation.icao_code:
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
 
-    // Confidence 0.6 < 0.85 → Signal 2 would fire, BUT validation
-    // pattern passes → validation_confirmed = true → Signal 2 skipped
+    let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
+    assert!(
+        result.is_some(),
+        "a shape-only pattern must not protect a low-confidence attractor"
+    );
+    assert!(
+        result.unwrap().1.contains("icao_code"),
+        "the demotion should record the attractor label it fired on"
+    );
+}
+
+#[test]
+fn test_attractor_precise_validator_confirms_skips_signal2() {
+    // The confirmation short-circuit survives for GENUINELY precise validators:
+    // a closed enum is positive evidence and still gates Signal 2. Only
+    // shape-only patterns lost their power to confirm (W2 item 9).
+    let values: Vec<String> = vec!["EGLL", "KJFK", "LFPG", "EDDF", "RJTT", "VHHH"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let votes = vec![
+        ("geography.transportation.icao_code".to_string(), 6),
+        ("representation.identifier.alphanumeric_id".to_string(), 4),
+    ];
+
+    let yaml = r#"
+geography.transportation.icao_code:
+  title: "ICAO Code"
+  validation:
+    type: string
+    enum: ["EGLL", "KJFK", "LFPG", "EDDF", "RJTT", "VHHH"]
+  tier: [VARCHAR, geography, transportation]
+  release_priority: 5
+  samples: ["EGLL"]
+"#;
+    let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+
+    // Confidence 0.6 < 0.85 → Signal 2 would fire, BUT the enum validator is
+    // precise and passes → validation_confirmed = true → Signal 2 skipped.
     let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
     assert!(
         result.is_none(),
-        "Should NOT demote ICAO codes when validation confirms them"
+        "a precise enum validator must still confirm and skip demotion"
     );
 }
 
