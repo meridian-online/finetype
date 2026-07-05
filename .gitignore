@@ -393,3 +393,7 @@ output/**/corpus_pass/
 # Scratch memory dumps at repo root (knowledge already saved as orbit
 # memories; kept on disk, never tracked).
 /scratch_*.txt
+
+# W2b gate baseline/candidate (large derived parquets, regenerable)
+output/company-reference-audit/w3_baseline_with_oracle.parquet
+output/company-reference-audit/eval_w2b_substance/candidate_4type.parquet

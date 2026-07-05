@@ -240,6 +240,10 @@ technology.internet.top_level_domain:
   validation:
     type: string
     pattern: "^(?:[a-z]{2,}|xn--[a-z0-9]+)(?:\\.[a-z]{2,})?$"
+  # The shape pattern confirms any lowercase word ≥2 chars (`hello`, `data`) as
+  # a TLD; the closed IANA list is what distinguishes "is a TLD" from "is a
+  # word" (Precision Principle). Guard-owned via `membership_substance_guard`.
+  membership: tld
   tier: [VARCHAR, internet]
   release_priority: 4
   aliases: [tld]

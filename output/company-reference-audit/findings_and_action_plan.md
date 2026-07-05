@@ -397,14 +397,72 @@ over-emission wart (user_agent, 2.66% of corpus columns) eliminated with measure
 collateral; wkt/icao/iata/strict-tail assertions now honest; phantom label fixed; two gate-GO
 rule ships on the branch awaiting merge.
 
+---
+
+# Execution log — 2026-07-05 (W2b, the substance-check batch)
+
+## Shipped (branch figi-checksum, gate GO)
+
+**W2b substance checks — 4 types, gate GO, gold 843 → 846/986 = 0.858 (+3, no regression):**
+wired every *shape-only* algorithmic/closed-set validator to its real substance check where the
+gate allows.
+
+- **Checksums** (`checksum:` directive → `checksum_substance_guard`, demote-only): `credit_card_number`
+  (Luhn), `ean` (GS1 mod-10), `abn` (ATO modulus-89). New `gs1`/`npi`/`abn` fns in
+  `finetype-core::checksum`; proven end-to-end (a 16-digit Luhn-fail column demotes to
+  `integer_number` via the guard; a Luhn-pass column stays credit_card).
+- **IANA TLD closed set**: `membership: tld` on `technology.internet.top_level_domain`,
+  `labels/sets/tld_codes.txt` (1,437 delegated TLDs incl. punycode IDNs). Density: only 0.24% of
+  dictionary words are delegated TLDs (2.2% of short words) — a strong discriminator despite the
+  new-gTLD program delegating dictionary words (`.data`, `.app`). **Gold: `top_level_domain`
+  precision 0.667 → 1.000, recall held (the guard removed one FP).**
+- **Generator fixes (latent bugs surfaced by wiring the validators):** the NPI generator used the
+  wrong Luhn parity; `ean_check_digit` was left-anchored (correct only for even-length payloads →
+  EAN-8's 7 digits were wrong); the ABN generator emitted 11 *random* digits with no mod-89 check.
+  All three now emit genuine check-digit-valid instances, pinned by a generator↔validator agreement
+  test across every `checksum:` type. Sharpen-only (no effect on the shipped model), but it stops a
+  future retrain training on fakes the guard would demote.
+
+Local: 291 core + 499 model tests green, taxonomy alignment 100% (12,300/12,300 samples), clippy
+`-D warnings` + fmt clean. Gate: `eval_w2b_substance/` (fresh baseline
+`w3_baseline_with_oracle.parquet`); 4-type candidate `gate_w2b-4type.json` = **GO, zero triggers**.
+
+## Held for author adjudication: `npi` + `upc` checksum guards (correct but gate-blocked)
+
+The 6-type gate run (all five checksums + TLD) returned **NO-GO**, two `collapse` triggers: `npi`
+and `upc`. Diagnosis with the candidate/baseline parquets:
+
+- **The model over-emits both as pure numeric attractors.** `npi` marginal 42,675 and `upc` 12,873
+  in the 33k-file gate sample — any 10-digit number → npi, any 12-digit → upc. The checksum guards
+  demote ~87% (npi) / ~95% (upc) of them.
+- **Every demoted "oracle-confirmed" column is a shape-match, not a real identifier.** 20/20 sampled
+  demoted-npi columns are financial figures (`ebit`, `grossProfit`, `marketCap`, `totalAssets`,
+  `longTermInvestments` — 10-digit billions); demoted-upc columns are `particleId`/product-id runs.
+  The keep rate (npi 13%, upc 5%) tracks the ~10% random-Luhn-pass rate, confirming these are random
+  numbers, not identifiers (a real NPI/UPC passes its check by construction and is kept).
+- **So the guards are per-column CORRECT, but the demotion collapses the over-emitted label past the
+  gate's blocking threshold, and gated-YDF co-signs the shape-match** (the instrument-audit's "wrong
+  42% on contested ground" — here the *contested ground* is 10/12-digit numeric columns). This is a
+  new instance of the gate's oracle-trust blind spot: not the *fixed* honest-abstention case (oracle
+  refuted), but oracle-CONFIRMED shape-matches the checksum correctly rejects.
+
+**Decision for the author:** the demotions are real precision wins the gate can't credit. Two paths:
+(a) override the npi/upc NO-GO with the financial-figure evidence (a gold/evidence-adjudicated
+relocation review, à la choice 0104), or (b) hold until the over-emission is fixed at source (retrain
+t-000133e418) or the guards gain header corroboration. **Shipped as HELD** (directives commented out,
+`checksum::npi`/`gs1` retained, `gs1` still live on `ean`) pending that call.
+
 ## Remaining follow-ups (this campaign)
 
-1. W2a gate run (corpus pass + corpus-honest) once the W1 gate frees the binary; verify the
-   real EDGAR ticker column end-to-end demotes.
+1. **Author call: `npi`/`upc` — override the gate with evidence, or hold for retrain** (above).
 2. swift_bic into the veto-blind treatment (R32 or veto_safe exception) — measured shipping at
    vpr 0.007 on real data.
 3. Sampling determinism: sort-order-dependent types on low-confidence columns.
-4. Gold expansion (W0.2) seeded from the lookup datasets + the new-miss columns above.
-5. W2 continuation: TLD/BCP-47 membership sets, unit-mandatory height/weight/file_size,
-   compact-date ranges, bio length floors, remaining checksums (per plan).
-6. W4 retrain (t-000133e418) unchanged — the founder-style negative recipe stands.
+4. **W2c structural validators** (need a new structural-validator surface — demotion target isn't
+   numeric/alphanumeric_id): BCP-47 subtag check, H3 bit-structure. Plus the height/weight/file_size
+   unit policy (a decision, not a mechanic — bare byte-counts are legitimately valid file sizes).
+   Bio-sequence length floors were **dropped**: the repr gate's real `dna_sequence` row
+   (`effect_allele.exposure`) is single-base GWAS alleles a floor would demote — recall risk for
+   unmeasurable benefit.
+5. W4 retrain (t-000133e418) unchanged — the founder-style negative recipe stands; now also the
+   home for the npi/upc over-emission fix.

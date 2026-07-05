@@ -321,6 +321,7 @@ finance.payment.credit_card_number:
   validation:
     type: string
     pattern: "^[0-9]{13,19}$"
+  checksum: luhn
   pii: true
   tier: [VARCHAR, payment]
   release_priority: 4

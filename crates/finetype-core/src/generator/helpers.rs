@@ -28,18 +28,24 @@ impl Generator {
         ((10 - (sum % 10)) % 10) as u8
     }
 
-    /// Compute EAN check digit (weighted sum with alternating weights 1 and 3).
-    /// Works for both EAN-13 (12 input digits) and EAN-8 (7 input digits).
+    /// Compute GS1 mod-10 check digit (alternating weights 1 and 3).
+    /// Works for any payload length — EAN-13 (12 input digits) and EAN-8 (7).
+    /// GS1 defines the weights from the RIGHT (the digit adjacent to the check
+    /// has weight 3), so the alternation is anchored at the right end. For
+    /// even-length payloads this coincides with a left-anchored alternation, so
+    /// EAN-13/ISBN-13 output is unchanged; for EAN-8's odd 7 digits the
+    /// right-anchoring is what makes it match the `gs1` validator.
     pub(crate) fn ean_check_digit(&self, digits: &str) -> u8 {
         let sum: u32 = digits
             .bytes()
+            .rev()
             .enumerate()
             .map(|(i, b)| {
                 let d = (b - b'0') as u32;
                 if i % 2 == 0 {
-                    d
-                } else {
                     d * 3
+                } else {
+                    d
                 }
             })
             .sum();

@@ -82,6 +82,41 @@ fn test_representation_integer() {
     let _: i64 = val.parse().unwrap();
 }
 
+/// Every type carrying a `checksum:` directive must GENERATE values that pass
+/// that checksum — otherwise a retrain trains the model on fake instances the
+/// `checksum_substance_guard` then demotes at inference (train/infer conflict).
+/// This pins the generator to the validator across all five W2b checksum types.
+#[test]
+fn generated_checksum_types_pass_their_validators() {
+    let mut gen = Generator::with_seed(test_taxonomy(), 42);
+    for _ in 0..300 {
+        let cc = gen
+            .generate_value("finance.payment.credit_card_number")
+            .unwrap();
+        assert!(
+            crate::checksum::luhn(&cc),
+            "credit card must pass Luhn: {cc}"
+        );
+        let ean = gen.generate_value("identity.commerce.ean").unwrap();
+        assert!(
+            crate::checksum::gs1(&ean),
+            "EAN must pass GS1 mod-10: {ean}"
+        );
+        let upc = gen.generate_value("identity.commerce.upc").unwrap();
+        assert!(
+            crate::checksum::gs1(&upc),
+            "UPC must pass GS1 mod-10: {upc}"
+        );
+        let npi = gen.generate_value("identity.medical.npi").unwrap();
+        assert!(
+            crate::checksum::npi(&npi),
+            "NPI must pass 80840-Luhn: {npi}"
+        );
+        let abn = gen.generate_value("identity.government.abn").unwrap();
+        assert!(crate::checksum::abn(&abn), "ABN must pass mod-89: {abn}");
+    }
+}
+
 #[test]
 fn test_representation_hex_color() {
     let mut gen = Generator::with_seed(test_taxonomy(), 42);
@@ -180,28 +215,12 @@ fn test_ean_check_digit_valid() {
             val.len(),
             val
         );
-        // Verify EAN check digit
-        let (body, check_str) = val.split_at(val.len() - 1);
-        let expected_check = {
-            let sum: u32 = body
-                .bytes()
-                .enumerate()
-                .map(|(i, b)| {
-                    let d = (b - b'0') as u32;
-                    if i % 2 == 0 {
-                        d
-                    } else {
-                        d * 3
-                    }
-                })
-                .sum();
-            ((10 - (sum % 10)) % 10) as u8
-        };
-        let actual_check = check_str.bytes().next().unwrap() - b'0';
-        assert_eq!(
-            actual_check, expected_check,
-            "EAN {} has invalid check digit (expected {}, got {})",
-            val, expected_check, actual_check
+        // Check the digit against the authoritative GS1 validator rather than
+        // re-deriving the formula here (the earlier inline re-derivation was
+        // left-anchored and silently wrong for EAN-8).
+        assert!(
+            crate::checksum::gs1(&val),
+            "EAN {val} has an invalid GS1 check digit"
         );
     }
 }

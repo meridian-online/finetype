@@ -28,6 +28,7 @@ use std::sync::OnceLock;
 const ICAO_AIRPORTS_RAW: &str = include_str!("../data/sets/icao_airport_codes.txt");
 const IATA_AIRPORTS_RAW: &str = include_str!("../data/sets/iata_airport_codes.txt");
 const NAICS_CODES_RAW: &str = include_str!("../data/sets/naics_codes.txt");
+const TLD_CODES_RAW: &str = include_str!("../data/sets/tld_codes.txt");
 
 fn parse_set(raw: &'static str) -> HashSet<&'static str> {
     raw.lines()
@@ -51,6 +52,11 @@ fn naics_codes_set() -> &'static HashSet<&'static str> {
     SET.get_or_init(|| parse_set(NAICS_CODES_RAW))
 }
 
+fn tld_codes_set() -> &'static HashSet<&'static str> {
+    static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
+    SET.get_or_init(|| parse_set(TLD_CODES_RAW))
+}
+
 /// `true` when the value (trimmed, case-folded to uppercase) is a published
 /// ICAO airport code.
 pub fn icao_airports(value: &str) -> bool {
@@ -69,6 +75,14 @@ pub fn naics_codes(value: &str) -> bool {
     naics_codes_set().contains(value.trim())
 }
 
+/// `true` when the value (trimmed, case-folded to lowercase) is an IANA
+/// delegated top-level domain. TLDs are conventionally lowercase and the set
+/// is stored lowercase (unlike the airport sets, which fold to uppercase);
+/// punycode IDN TLDs (`xn--…`) are members, Unicode IDN forms are not.
+pub fn tld_codes(value: &str) -> bool {
+    tld_codes_set().contains(value.trim().to_lowercase().as_str())
+}
+
 /// Resolve a `membership:` directive name to its membership function.
 ///
 /// Returns `None` for an unknown name so the caller can surface the typo.
@@ -78,6 +92,7 @@ pub fn resolve(name: &str) -> Option<fn(&str) -> bool> {
         "icao_airports" => Some(icao_airports),
         "iata_airports" => Some(iata_airports),
         "naics_codes" => Some(naics_codes),
+        "tld" => Some(tld_codes),
         _ => None,
     }
 }
@@ -141,7 +156,23 @@ mod tests {
         assert!(resolve("icao_airports").is_some());
         assert!(resolve("iata_airports").is_some());
         assert!(resolve("naics_codes").is_some());
+        assert!(resolve("tld").is_some());
         assert!(resolve("no_such_set").is_none());
+    }
+
+    #[test]
+    fn tld_set_matches_real_domains_and_rejects_words() {
+        // Real delegated TLDs (case-insensitive) including a punycode IDN.
+        for code in ["com", "org", "UK", "io", " net ", "xn--p1ai"] {
+            assert!(tld_codes(code), "{code} should be an IANA TLD");
+        }
+        // Same lowercase-word shape the `^[a-z]{2,}$` pattern confirms, but not
+        // delegated TLDs — the collision this set breaks. (The new-gTLD program
+        // delegated many dictionary words — `.data`, `.app`, `.blog` — so the
+        // probes are verified non-members, not just "looks like a word".)
+        for word in ["notatld", "zzzz", "qwerty", "foobar", "xyzzy"] {
+            assert!(!tld_codes(word), "{word} must not validate as a TLD");
+        }
     }
 
     #[test]

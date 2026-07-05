@@ -444,19 +444,10 @@ impl Generator {
                 let prefix: u64 = if self.rng.gen_bool(0.7) { 1 } else { 2 };
                 let middle: u64 = self.rng.gen_range(0..100_000_000);
                 let partial = prefix * 100_000_000 + middle; // 9 digits
-                                                             // Calculate Luhn check digit: prepend 80840, append 0 as placeholder
-                let test_str = format!("80840{}0", partial);
-                let digits: Vec<u32> = test_str.chars().map(|c| c.to_digit(10).unwrap()).collect();
-                let mut sum: u32 = 0;
-                for (i, &d) in digits.iter().rev().enumerate() {
-                    if i % 2 == 0 {
-                        let doubled = d * 2;
-                        sum += if doubled > 9 { doubled - 9 } else { doubled };
-                    } else {
-                        sum += d;
-                    }
-                }
-                let check = (10 - (sum % 10)) % 10;
+                                                             // Luhn check digit over the 80840-prefixed identifier (ISO issuer
+                                                             // prefix for US healthcare), via the shared primitive so the
+                                                             // generator and the `npi` validator can never drift.
+                let check = self.luhn_check_digit(&format!("80840{}", partial));
                 Ok(format!("{}{}", partial, check))
             }
             ("medical", "dea_number") => {
@@ -669,7 +660,27 @@ impl Generator {
                 ))
             }
             ("government", "abn") => {
-                let digits: Vec<u8> = (0..11).map(|_| self.rng.gen_range(0..10u8)).collect();
+                // Valid ABN: 11 digits passing the ATO modulus-89 check
+                // (weights 10,1,3,5,7,9,11,13,15,17,19 with 1 subtracted from
+                // the first digit). Fix the last ten digits, then solve for the
+                // first (weight 10) so the weighted sum is ≡ 0 mod 89; the
+                // modular inverse of 10 mod 89 is 9. Only ~9/89 of tails admit a
+                // single-digit first digit (1–9), so regenerate the tail until
+                // one does.
+                const W: [u32; 11] = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+                let mut digits = [0u8; 11];
+                loop {
+                    for d in digits.iter_mut().skip(1) {
+                        *d = self.rng.gen_range(0..10u8);
+                    }
+                    let rest: u32 = (1..11).map(|i| W[i] * digits[i] as u32).sum();
+                    // 10·(d0−1) + rest ≡ 0 (mod 89) → d0−1 ≡ −rest·9 (mod 89).
+                    let first_minus_one = (((89 - (rest % 89)) % 89) * 9) % 89;
+                    if first_minus_one <= 8 {
+                        digits[0] = (first_minus_one + 1) as u8; // d0 ∈ 1..=9
+                        break;
+                    }
+                }
                 if self.rng.gen_bool(0.6) {
                     Ok(format!(
                         "{}{} {}{}{} {}{}{} {}{}{}",

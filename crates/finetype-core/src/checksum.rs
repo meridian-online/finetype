@@ -232,6 +232,86 @@ pub fn luhn(value: &str) -> bool {
     sum.is_multiple_of(10)
 }
 
+/// Validate a GS1 GTIN (EAN-8, UPC-A, EAN-13, GTIN-14) by its check digit.
+///
+/// From the rightmost digit, weights alternate 1 (the check digit itself),
+/// 3, 1, 3, …; the total is divisible by 10. Only the four GS1 lengths are
+/// admitted — an arbitrary digit run of another length is not a barcode.
+/// Spaces and hyphens are stripped; a leading sign or a non-digit fails.
+pub fn gs1(value: &str) -> bool {
+    let t = value.trim();
+    if t.starts_with('-') || t.starts_with('+') {
+        return false;
+    }
+    let Some(digits) = t
+        .chars()
+        .filter(|c| *c != '-' && *c != ' ')
+        .map(|c| c.to_digit(10))
+        .collect::<Option<Vec<u32>>>()
+    else {
+        return false;
+    };
+    if !matches!(digits.len(), 8 | 12 | 13 | 14) {
+        return false;
+    }
+    let mut sum = 0u32;
+    for (i, &d) in digits.iter().rev().enumerate() {
+        sum += if i % 2 == 1 { 3 * d } else { d };
+    }
+    sum.is_multiple_of(10)
+}
+
+/// Validate a 10-digit US National Provider Identifier by its check digit.
+///
+/// The NPI check digit is Luhn computed over the 9-digit base prefixed with
+/// the ISO issuer prefix `80840` (healthcare, US) — so the full 15-digit
+/// string `80840` + NPI must pass Luhn. A bare 10-digit number that passes
+/// plain Luhn is NOT necessarily a valid NPI and vice versa. Spaces and
+/// hyphens are stripped; any other length, a leading sign, or a non-digit
+/// fails.
+pub fn npi(value: &str) -> bool {
+    let t = value.trim();
+    if t.starts_with('-') || t.starts_with('+') {
+        return false;
+    }
+    let digits: String = t.chars().filter(|c| *c != '-' && *c != ' ').collect();
+    if digits.len() != 10 || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    luhn(&format!("80840{digits}"))
+}
+
+/// Validate an 11-digit Australian Business Number by its ATO modulus-89 check.
+///
+/// Subtract 1 from the first digit, apply weights 10,1,3,5,7,9,11,13,15,17,19
+/// and confirm the weighted sum is divisible by 89. ABNs print as
+/// `NN NNN NNN NNN`; spaces are stripped. Any other length, a leading sign,
+/// a first digit of 0 (would go negative), or a non-digit fails.
+pub fn abn(value: &str) -> bool {
+    let t = value.trim();
+    if t.starts_with('-') || t.starts_with('+') {
+        return false;
+    }
+    let Some(digits) = t
+        .chars()
+        .filter(|c| *c != ' ')
+        .map(|c| c.to_digit(10))
+        .collect::<Option<Vec<u32>>>()
+    else {
+        return false;
+    };
+    if digits.len() != 11 || digits[0] == 0 {
+        return false;
+    }
+    const WEIGHTS: [u32; 11] = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+    let mut sum = 0u32;
+    for (i, &d) in digits.iter().enumerate() {
+        let d = if i == 0 { d - 1 } else { d };
+        sum += WEIGHTS[i] * d;
+    }
+    sum.is_multiple_of(89)
+}
+
 /// Validate a 12-character ISIN by its Luhn check digit (ISO 6166).
 ///
 /// Two-letter country code + 9-char NSIN + 1 check digit. Every character is
@@ -376,6 +456,9 @@ pub fn resolve(name: &str) -> Option<fn(&str) -> bool> {
         "lei" => Some(lei),
         "iban" => Some(iban),
         "figi" => Some(figi),
+        "gs1" => Some(gs1),
+        "npi" => Some(npi),
+        "abn" => Some(abn),
         _ => None,
     }
 }
@@ -574,6 +657,58 @@ mod tests {
     }
 
     #[test]
+    fn gs1_accepts_all_four_lengths() {
+        assert!(gs1("73513537")); // EAN-8
+        assert!(gs1("036000291452")); // UPC-A
+        assert!(gs1("4006381333931")); // EAN-13
+        assert!(gs1("00036000291452")); // GTIN-14 (zero-padded UPC-A)
+    }
+
+    #[test]
+    fn gs1_rejects_lookalikes() {
+        assert!(!gs1("4006381333932")); // check digit bumped
+        assert!(!gs1("036000291453"));
+        assert!(!gs1("73513538"));
+        assert!(!gs1("400638133393")); // 12 digits but not a valid UPC
+        assert!(!gs1("40063813339")); // 11 digits — not a GS1 length
+        assert!(!gs1("4006381333")); // 10 digits — not a GS1 length
+        assert!(!gs1("-4006381333931")); // signed
+        assert!(!gs1("400638133393a")); // non-digit
+    }
+
+    #[test]
+    fn npi_accepts_and_rejects() {
+        // 1234567893: Luhn over 80840123456789 yields check digit 3.
+        assert!(npi("1234567893"));
+        assert!(!npi("1234567894")); // check digit bumped
+                                     // Passes plain Luhn (79927398713) but is 11 digits — not an NPI.
+        assert!(!npi("79927398713"));
+        assert!(!npi("123456789")); // 9 digits
+        assert!(!npi("-1234567893")); // signed
+        assert!(!npi("123456789X")); // non-digit
+    }
+
+    #[test]
+    fn abn_accepts_genuine_numbers() {
+        // The ATO's own ABN and Telstra's — canonical published examples.
+        assert!(abn("51824753556"));
+        assert!(abn("33051775556"));
+        // Printed grouping NN NNN NNN NNN.
+        assert!(abn("51 824 753 556"));
+    }
+
+    #[test]
+    fn abn_rejects_lookalikes() {
+        assert!(!abn("51824753557")); // check broken
+        assert!(!abn("33051775557"));
+        assert!(!abn("5182475355")); // 10 digits
+        assert!(!abn("518247535561")); // 12 digits
+        assert!(!abn("01824753556")); // first digit 0 — no valid ABN starts with 0
+        assert!(!abn("-51824753556")); // signed
+        assert!(!abn("5182475355X")); // non-digit
+    }
+
+    #[test]
     fn resolve_known_and_unknown() {
         assert!(resolve("isbn").is_some());
         assert!(resolve("aba").is_some());
@@ -584,6 +719,9 @@ mod tests {
         assert!(resolve("lei").is_some());
         assert!(resolve("iban").is_some());
         assert!(resolve("figi").is_some());
+        assert!(resolve("gs1").is_some());
+        assert!(resolve("npi").is_some());
+        assert!(resolve("abn").is_some());
         assert!(resolve("not_a_scheme").is_none());
     }
 }

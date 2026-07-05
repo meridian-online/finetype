@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Real check-digit validation for three more identifier types** (`checksum:` directives wired to
+  the canonical algorithms, demote-only via `checksum_substance_guard`): `credit_card_number`
+  (Luhn), `ean` (GS1 mod-10), and `abn` (Australian Business Number — ATO modulus-89). A value of
+  the right shape but wrong check digit is demoted off the type — a 16-digit number that fails Luhn
+  is not a credit card. New `gs1`, `npi`, and `abn` functions in `finetype-core::checksum`.
+- **IANA top-level-domain closed set** (`membership: tld`, `labels/sets/tld_codes.txt`, 1,437
+  delegated TLDs incl. punycode IDNs). The shape pattern confirms any lowercase word ≥2 chars as a
+  TLD; the closed list is what distinguishes a TLD from a word (only 0.24% of dictionary words are
+  delegated TLDs). `membership_substance_guard` demotes columns that are mostly non-TLDs; on the
+  gold corpus this lifted `top_level_domain` precision 0.667 → 1.000 with recall held.
+
+### Fixed
+
+- **Synthetic generator emitted invalid check digits for NPI, EAN-8, and ABN.** The NPI generator
+  used the wrong Luhn parity, `ean_check_digit` was left-anchored (correct only for even-length
+  payloads, so EAN-8's 7 digits were wrong), and the ABN generator emitted 11 random digits with no
+  modulus-89 check. All three now produce genuine check-digit-valid instances, pinned by a
+  generator↔validator agreement test across every `checksum:` type. (Latent since the types were
+  added; surfaced by wiring the validators. No effect on the shipped model — Sharpen-only — but it
+  stops a future retrain training on fake instances the guard would then demote.)
+
+### Discovery
+
+- **`npi` and `upc` checksum guards are correct but gate-blocked (held).** The model over-emits
+  both as pure numeric attractors (~42k `npi` / ~13k `upc` columns in the 33k-file corpus-honest
+  sample — financial figures like `ebit`/`marketCap` for npi, `particleId` runs for upc). The
+  checksum guards demote ~87–95% of these correctly, but the demotion collapses the over-emitted
+  label past the corpus-honest gate's blocking threshold, and gated-YDF co-signs the shape-match.
+  The directives are held (algorithms retained) until the over-emission is fixed at source (retrain)
+  or the guards gain header corroboration. See `output/company-reference-audit/` W2b log.
+
 ## [0.6.39] - 2026-07-05
 
 Company-reference accuracy release: an external eval on company/financial lookup
