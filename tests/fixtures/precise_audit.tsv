@@ -8,6 +8,7 @@ container.object.csv	false	^[^,]+(,[^,]+)*$	true
 container.object.html	false	^.*<(p|div|span|a|br|img|h[1-6]|ul|ol|li|table|tr|td|th|strong|em|b|i|form|input|button|select|textarea|header|footer|nav|section|article|main|aside|figure|figcaption|blockquote|pre|code|script|style|link|meta|head|body|html)[\s>/ ].*$	true
 container.object.json	false	^\{.*\}$	true
 container.object.json_array	false	^\[.*\]$	true
+container.object.s_expression	false	^\s*\(.*\)\s*$	true
 container.object.xml	false	^<.*>.*</.*>$	true
 container.object.yaml	false	^[a-zA-Z_][a-zA-Z0-9_]*:\s*.*	false
 datetime.component.day_of_week	true		true

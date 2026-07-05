@@ -2213,6 +2213,7 @@ impl ColumnClassifier {
         self.country_code_corroboration(result, header, sample);
         self.timezone_abbreviation_recovery(result, header, sample);
         self.naics_industry_recovery(result, header, sample);
+        self.s_expression_recovery(result, sample);
         self.ceded_leaf_recovery(result, sample);
     }
 
@@ -2320,6 +2321,50 @@ impl ColumnClassifier {
         result.disambiguation_applied = true;
         result.disambiguation_rule =
             Some(format!("naics_industry_recovery:{}", header.to_lowercase()));
+        result.detected_locale = None;
+    }
+
+    /// `s_expression_recovery` (default ON). Recovers the
+    /// `container.object.s_expression` leaf (company-reference audit; author-
+    /// approved 2026-07-05 as a general S-expression type over a narrow
+    /// parse_tree leaf). A parse tree's Penn comma-tokens `(, ,)` fool the
+    /// delimiter detector into reading a CSV array, so 1,292 corpus columns of
+    /// constituency parses / code ASTs (`trees`/`parse_tree`/`ast`) land on
+    /// `container.array.comma_separated`. The 244-dim model cannot predict the
+    /// leaf. Promote when >=90% of values pass the balanced-nested-paren
+    /// structural check (`finetype_core::structure::is_s_expression`). NO header
+    /// gate — the structural signature is self-precise (measured corpus
+    /// over-recovery: zero, 1,292/1,292 were genuine S-expressions), unlike the
+    /// value-ambiguous checksum/membership recoveries. Value-based (0048),
+    /// RHH-disableable.
+    fn s_expression_recovery(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("s_expression_recovery") {
+            return;
+        }
+        const LEAF: &str = "container.object.s_expression";
+        if result.label == LEAF {
+            return;
+        }
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let valid = non_empty
+            .iter()
+            .filter(|v| finetype_core::structure::is_s_expression(v))
+            .count();
+        // >=90% pass the balanced-nested-paren structural check.
+        if valid * 10 < non_empty.len() * 9 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.95);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("s_expression_recovery".to_string());
         result.detected_locale = None;
     }
 

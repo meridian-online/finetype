@@ -4,7 +4,7 @@ use super::*;
 
 impl Generator {
     // ═══════════════════════════════════════════════════════════════════════════
-    // DOMAIN: container (11 types)
+    // DOMAIN: container (12 types)
     // ═══════════════════════════════════════════════════════════════════════════
 
     pub(crate) fn gen_container(
@@ -13,7 +13,7 @@ impl Generator {
         type_name: &str,
     ) -> Result<String, GeneratorError> {
         match (category, type_name) {
-            // ── object (5 types) ─────────────────────────────────────────
+            // ── object (6 types) ─────────────────────────────────────────
             ("object", "json") => {
                 let templates = [
                     format!(
@@ -156,6 +156,20 @@ impl Generator {
                         self.rng.gen_range(1..1000),
                         ["USD", "EUR", "GBP"][self.rng.gen_range(0..3)]
                     ),
+                ];
+                Ok(templates[self.rng.gen_range(0..templates.len())].clone())
+            }
+            ("object", "s_expression") => {
+                let (w1, w2, w3) = (self.random_word(), self.random_word(), self.random_word());
+                let templates = [
+                    format!("(ROOT (S (NP (NN {w1})) (VP (VBZ {w2}) (NP (NN {w3})))))"),
+                    format!("(program (call (id {w1}) (string {w2})))"),
+                    format!(
+                        "(expr (op +) (num {}) (num {}))",
+                        self.rng.gen_range(1..100),
+                        self.rng.gen_range(1..100)
+                    ),
+                    format!("(node ({w1} {w2}) (child ({w3} leaf)))"),
                 ];
                 Ok(templates[self.rng.gen_range(0..templates.len())].clone())
             }

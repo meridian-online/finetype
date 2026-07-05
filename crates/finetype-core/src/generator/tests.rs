@@ -135,6 +135,20 @@ fn test_container_json() {
 }
 
 #[test]
+fn generated_s_expressions_pass_the_structural_check() {
+    // The generator must produce values the s_expression_recovery guard would
+    // accept, not just ones that match the shape regex.
+    let mut gen = Generator::with_seed(test_taxonomy(), 42);
+    for _ in 0..200 {
+        let val = gen.generate_value("container.object.s_expression").unwrap();
+        assert!(
+            crate::structure::is_s_expression(&val),
+            "generated s_expression must pass is_s_expression: {val}"
+        );
+    }
+}
+
+#[test]
 fn test_container_query_string() {
     let mut gen = Generator::with_seed(test_taxonomy(), 42);
     let val = gen

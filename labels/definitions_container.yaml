@@ -266,6 +266,54 @@ container.object.csv:
     but may appear as individual records in some contexts.
     Release priority 1. Parsing requires explicit schema.
 
+container.object.s_expression:
+  title: "S-Expression"
+  description: >
+    Balanced nested parenthetical serialization — the S-expression family:
+    Lisp/Scheme source, linguistic constituency/dependency parse trees
+    (Penn Treebank, OntoNotes: "(ROOT (S (NP (NN cat)) (VP (VBZ sits))))"),
+    and code ASTs ("(program (call (id print) (string hi)))"). A nested
+    structure of the form (head child child ...), distinguished from a
+    comma/whitespace list by its balanced, recursively-nested parentheses.
+
+    This is NOT container.array.comma_separated: parse trees carry Penn
+    comma-tokens "(, ,)" that fool a delimiter detector into reading a CSV
+    array, but the value is a single nested tree, not a delimited list.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\s*\\(.*\\)\\s*$"
+    minLength: 5
+  tier: [VARCHAR, object]
+  release_priority: 2
+  aliases: [sexp, s_expr, parse_tree, lisp]
+  samples:
+    - "(ROOT (S (NP (NN cat)) (VP (VBZ sits))))"
+    - "(program (call (id print) (string hello)))"
+    - "(+ (* 2 3) (- 4 1))"
+    - "(a (b c) (d (e f)))"
+    - "(S (INTJ (UH Uh)) (, ,) (NP-SBJ (PRP I)) (VP (VBP think)))"
+  references: null
+  notes: >
+    New 2026-07-05 (company-reference audit; author-approved as a general
+    S-expression type over a narrow parse_tree leaf). Mined from 1,292 corpus
+    columns — `trees`/`parse_tree`/`ast` — every one mislabelled
+    container.array.comma_separated by the delimiter detector. The 244-dim
+    model cannot predict this leaf; it is recovered at profile time by the
+    deterministic `s_expression_recovery` Sharpen guard when >=90% of a
+    column's values pass the balanced-nested-paren structural check
+    (finetype_core::structure::is_s_expression). Value-based (0048),
+    no header gate — the structural signature is self-precise (corpus
+    over-recovery: zero). NO retrain (0096; value-determinable → Sharpen).
+
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: array
 #

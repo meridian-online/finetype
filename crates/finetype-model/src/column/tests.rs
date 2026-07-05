@@ -7250,6 +7250,77 @@ fn naics_recovery_requires_membership() {
 }
 
 #[test]
+fn s_expression_recovery_is_default_on() {
+    assert!(!rhh::is_disabled("s_expression_recovery"));
+}
+
+#[test]
+fn s_expression_recovery_promotes_parse_trees() {
+    // Parse trees reach the guard as container.array.comma_separated (the Penn
+    // comma-tokens `(, ,)` fool the delimiter detector). No header gate — the
+    // balanced-nested-paren structure is self-precise.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let trees: Vec<String> = vec![
+        "(ROOT (S (NP (NN dog)) (VP (VBZ runs))))",
+        "(ROOT (FRAG (INTJ (UH uh)) (, ,) (NP (NN yeah))))",
+        "(S (NP (PRP I)) (VP (VBP think) (SBAR (S (NP (PRP it))))))",
+        "(ROOT (SINV (ADVP (RB so)) (, ,) (SBARQ (WHNP (WP what)))))",
+        "(program (call (id print) (string hi)))",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("parse_tree", &trees, "container.array.comma_separated", 0.8)
+        .unwrap();
+    assert_eq!(
+        r.label, "container.object.s_expression",
+        "rule was {:?}",
+        r.disambiguation_rule
+    );
+}
+
+#[test]
+fn s_expression_recovery_declines_genuine_comma_lists() {
+    // A real comma-separated list must NOT be pulled into s_expression.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let lists: Vec<String> = vec!["apple,banana,cherry", "red,green,blue", "1,2,3,4"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("tags", &lists, "container.array.comma_separated", 0.8)
+        .unwrap();
+    assert_ne!(r.label, "container.object.s_expression");
+}
+
+#[test]
+fn s_expression_recovery_tolerates_truncated_trees() {
+    // Long parse trees may reach the guard clipped mid-tree (open, unbalanced);
+    // the truncation-tolerant structural check still promotes them.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let trees: Vec<String> = vec![
+        "(ROOT (SINV (ADVP (RB so)) (, ,) (SBARQ (INTJ (UH uh",
+        "(ROOT (S (NP (NP (DT the) (NN cat)) (PP (IN on) (NP (DT the",
+        "(S (INTJ (UH Uh)) (, ,) (NP-SBJ (PRP I)) (VP (VBP think) (SBAR",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("trees", &trees, "container.array.comma_separated", 0.8)
+        .unwrap();
+    assert_eq!(
+        r.label, "container.object.s_expression",
+        "rule was {:?}",
+        r.disambiguation_rule
+    );
+}
+
+#[test]
 fn naics_recovery_admits_bare_code_header_for_long_codes() {
     // The real product surface: a 6-digit NAICS column under a bare `code`
     // header. Membership at 6 digits is decisive; the generic-code tier admits it.
