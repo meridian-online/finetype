@@ -5,7 +5,7 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.40] - 2026-07-05
 
 ### Changed
 
@@ -31,6 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   TLD; the closed list is what distinguishes a TLD from a word (only 0.24% of dictionary words are
   delegated TLDs). `membership_substance_guard` demotes columns that are mostly non-TLDs; on the
   gold corpus this lifted `top_level_domain` precision 0.667 → 1.000 with recall held.
+- **New type `container.object.s_expression`** — a general S-expression / balanced-nested-paren
+  type (constituency parse trees, code ASTs, Lisp/Scheme). Mined from 1,292 corpus columns
+  (`trees`/`parse_tree`/`ast`) that were mislabelled `container.array.comma_separated` because a
+  parse tree's Penn comma-tokens `(, ,)` fool the delimiter detector into reading a CSV array.
+  Recovered at `profile` time by the deterministic `s_expression_recovery` Sharpen guard when ≥90%
+  of a column's values pass the balanced-nested-paren structural check
+  (`finetype-core::structure::is_s_expression`, truncation-tolerant) — value-only, no header gate,
+  because the structure is self-precise (corpus over-recovery: zero). No retrain; corpus-honest gate
+  GO, gold +1.
 
 ### Fixed
 
