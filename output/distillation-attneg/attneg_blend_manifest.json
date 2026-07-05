@@ -1,0 +1,62 @@
+{
+  "task": "t-000133e418",
+  "recipe": "output/company-reference-audit/retrain_recipe_draft.md",
+  "base": "/Users/hugh/github/meridian-online/finetype/output/distillation-v3/sherlock_distilled.csv.gz",
+  "base_rows": 102461,
+  "mined_rows": 3015,
+  "leaked_excluded": 1,
+  "per_family": {
+    "ua": 1314,
+    "locale": 245,
+    "height": 180,
+    "npi": 760,
+    "weight": 301,
+    "upc": 215
+  },
+  "per_label_rows": {
+    "representation.text.plain_text": 1450,
+    "representation.text.word": 345,
+    "representation.numeric.integer_number": 902,
+    "representation.numeric.decimal_number": 168,
+    "datetime.epoch.unix_seconds": 150
+  },
+  "per_source": {
+    "sample": 2247,
+    "corpus": 768
+  },
+  "per_bucket": {
+    "ua->representation.text.plain_text": 1314,
+    "locale->representation.text.word": 245,
+    "height->representation.text.word": 53,
+    "npi->representation.numeric.integer_number": 610,
+    "weight->representation.numeric.integer_number": 52,
+    "weight->representation.text.word": 47,
+    "height->representation.text.plain_text": 60,
+    "weight->representation.numeric.decimal_number": 126,
+    "weight->representation.text.plain_text": 76,
+    "height->representation.numeric.decimal_number": 42,
+    "upc->representation.numeric.integer_number": 215,
+    "height->representation.numeric.integer_number": 25,
+    "npi->datetime.epoch.unix_seconds": 150
+  },
+  "caps": {
+    "per_header": 50,
+    "mined_keep": {
+      "npi->representation.numeric.integer_number": 610,
+      "npi->datetime.epoch.unix_seconds": 150,
+      "upc->representation.numeric.integer_number": 215,
+      "ua->representation.text.plain_text": 1500,
+      "height->representation.numeric.decimal_number": 60,
+      "height->representation.numeric.integer_number": 35,
+      "height->representation.text.plain_text": 160,
+      "height->representation.text.word": 60,
+      "weight->representation.numeric.decimal_number": 200,
+      "weight->representation.numeric.integer_number": 60,
+      "weight->representation.text.plain_text": 120,
+      "weight->representation.text.word": 50,
+      "locale->representation.text.word": 400
+    }
+  },
+  "min_values": 5,
+  "max_values": 32
+}

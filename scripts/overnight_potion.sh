@@ -70,6 +70,9 @@ mkdir -p output/embed-frontier output/multibranch-training
 exec > >(tee -a "$LOG") 2>&1
 
 EXPECT_EMBED=$("$PY" -c "import json;print(json.load(open('$CONFIG'))['embed_dim'])")
+# Taxonomy width comes from the config (244 for the shipped m2v8m era, 247 from the
+# 2026-07 recovery-leaf additions onward) so the gates track the recipe, not a constant.
+EXPECT_VALID=$("$PY" -c "import json;print(json.load(open('$CONFIG'))['valid_dim'])")
 TV_ARG=(); [[ -n "$TWO_VIEW" ]] && TV_ARG=(--two-view "$TWO_VIEW")
 
 echo "================ POTION OVERNIGHT [$TAG] — $(date) ================"
@@ -81,7 +84,7 @@ echo "--- STEP 0: build metal binaries ---"
 cargo build --bin finetype -p finetype-cli --no-default-features --features metal --release
 cargo build --bin predict_multibranch -p finetype-train --no-default-features --features metal --release
 LIVE_TAX=$("$BIN" taxonomy 2>/dev/null | grep -cE "^[a-z]")
-[[ "$LIVE_TAX" == "244" ]] || { echo "FAIL: live taxonomy $LIVE_TAX != 244"; exit 1; }
+[[ "$LIVE_TAX" == "$EXPECT_VALID" ]] || { echo "FAIL: live taxonomy $LIVE_TAX != config valid_dim $EXPECT_VALID"; exit 1; }
 for f in "$CONFIG" "$GOLD" "$COLS"; do [[ -e "$f" ]] || { echo "FAIL: missing $f"; exit 1; }; done
 
 if [[ "$SCORE_ONLY" != "true" ]]; then
@@ -94,9 +97,10 @@ if [[ "$SCORE_ONLY" != "true" ]]; then
   # GATE: dims + truncation. A misaligned binary doesn't crash training — it wastes the night.
   VERIFY_OUT=$("$PY" scripts/read_ftmb.py "$FTMB" --stats --verify 2>&1) || { echo "$VERIFY_OUT"; echo "FAIL: read_ftmb verify"; exit 1; }
   echo "$VERIFY_OUT" | grep -q "WARNING: EOF" && { echo "FAIL: FTMB truncated (EOF)"; exit 1; }
-  "$PY" - "$FTMB" "$EXPECT_EMBED" "$STORE_VALUES" <<'PYGATE'
+  "$PY" - "$FTMB" "$EXPECT_EMBED" "$STORE_VALUES" "$EXPECT_VALID" <<'PYGATE'
 import struct, sys
 path, expect, store_values = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+expect_valid = int(sys.argv[4])
 with open(path, "rb") as f:
     assert f.read(4) == b"FTMB"
     ver, = struct.unpack("<I", f.read(4)); n, = struct.unpack("<Q", f.read(8))
@@ -104,7 +108,7 @@ with open(path, "rb") as f:
 print(f"[gate] v{ver} records={n} char={cd} embed={ed} stats={sd} header={hd} valid={vd}")
 assert ed == expect, f"FAIL embed={ed} != config {expect} (truncation?)"
 assert sd == 27, f"FAIL stats={sd} != 27"
-assert vd == 244, f"FAIL valid={vd} != 244"
+assert vd == expect_valid, f"FAIL valid={vd} != config valid_dim {expect_valid}"
 # per-value attention (choice 0106): a v6 build MUST report stored values, else
 # the night trains a value-attention model on empty value lists.
 if store_values > 0:
