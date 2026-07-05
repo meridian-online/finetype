@@ -51,6 +51,22 @@ echo "--- STEP C: overnight 3-seed train + gold score (overnight_potion.sh) ---"
 ./scripts/overnight_potion.sh --tag "$TAG" --config "$CONFIG"
 
 echo "--- STEP D: post-train Sense-distribution check (mandatory; adjudicated, not fatal) ---"
+# Dual-encoder profile-time dependency: train-multi-branch does not save the value
+# encoder, but profile-time loading (snapshot / corpus passes) requires it co-located
+# in the model dir. The proxy hit exactly this: an encoder-less dir profiles ZERO
+# columns and the drift gate reads an empty snapshot as NO-GO.
+for D in models/attneg-s*; do
+  if [[ -f "$D/model.safetensors" && ! -d "$D/value_model2vec" ]]; then
+    cp -R models/m2v8m-s43/value_model2vec "$D/"
+    "$PY" - "$D/config.json" <<'PYVE'
+import json, sys
+p = sys.argv[1]; c = json.load(open(p))
+c.setdefault("value_embed_model", "value_model2vec")
+json.dump(c, open(p, "w"), indent=2); open(p, "a").write("\n")
+PYVE
+    echo "co-located value encoder into $D"
+  fi
+done
 BEST=$("$PY" - <<'PYBEST'
 import json, glob
 c = []
