@@ -55,6 +55,13 @@ flowchart TB
 
 ### Pipeline Stages
 
+> **Stale — pending rewrite.** The table below describes the *pre-consolidation* value-level flow
+> (Flat CharCNN voting, masked vote aggregation, hardcoded header hints). Those value-level paths were
+> **removed (choice 0107)** — multi-branch is now the only inference path, and hardcoded regex header
+> hints are deprecated in favour of learned approaches (decision 0042). Read the **Multi-Branch**
+> section below and CLAUDE.md for the shipped architecture; treat this table as historical until it is
+> rewritten.
+
 | Stage | What it does |
 |---|---|
 | **Model2Vec encoding** | Encodes column header and sample values into 128-dim embeddings using potion-base-4M. |
@@ -118,20 +125,16 @@ finetype-train (depends on core + model — training pipelines)
 ```
 finetype/
 ├── crates/                         # Rust workspace members (see Crates above)
-├── labels/                         # Taxonomy definitions (250 types, 7 domains, YAML)
+├── labels/                         # Taxonomy definitions (247 types, 7 domains, YAML)
 ├── models/                         # Pre-trained models (Sense, CharCNN, Model2Vec, Entity)
-├── eval/                           # Evaluation infrastructure (GitTables, SOTAB, profile)
-├── orbit/                          # Workflow artefacts (Card → Design → Spec → Ship)
-│   ├── cards/                      # Feature cards
-│   ├── specs/                      # Spike findings and research
-│   └── decisions/                  # Architectural decision records (MADR format)
+├── eval/                           # Evaluation infrastructure (gold corpus, GitTables, SOTAB)
 ├── docs/                           # Architecture and development guides
 └── .github/workflows/              # CI/CD: fmt, clippy, test, check; release cross-compile
 ```
 
 ## Taxonomy Definitions
 
-Each of the 250 types is defined in YAML under `labels/`:
+Each of the 247 types is defined in YAML under `labels/`:
 
 ```yaml
 datetime.timestamp.iso_8601:
@@ -154,13 +157,15 @@ Key fields: `broad_type` (target DuckDB type), `transform` (DuckDB SQL expressio
 
 ## Decision Register
 
-30 architectural decisions in `.orbit/choices/` (MADR format). Browse with `ls .orbit/choices/`.
+Architectural decisions (MADR format) live in the team's private planning repo, not in this
+repository — the `orbit`/`beads` PM tooling was retired. CLAUDE.md cites decisions inline by
+number/name (e.g. "choice 0104", "decision 0041"); resolve them there.
 
 ---
 
-## Sense Stage Implementation — Multi-Branch (v0.6.19)
+## Sense Stage Implementation — Multi-Branch
 
-The Sense→Sharpen architecture has two stages: **Sense** (broad classification) and **Sharpen** (rule-based post-processing on top of the Sense output). The Sense stage is currently implemented by the **multi-branch model** (sherlock-v19-relu-s42) as of v0.6.19; historically it was implemented by the original Sense model (Model2Vec cross-attention). Multi-branch is the default at the CLI / MCP / DuckDB call sites — the original Sense implementation remains in code but is not the default.
+The Sense→Sharpen architecture has two stages: **Sense** (broad classification) and **Sharpen** (rule-based post-processing on top of the Sense output). The Sense stage is implemented by the **multi-branch model**; the default is **`m2v8m-s43`** (potion-8M dual-encoder, 244-label, shipped v0.6.36 — `sherlock-v19-relu-s42` was retired as the default on 2026-06-24 and remains only as the prior baseline). Multi-branch is the only inference path at the CLI / MCP / DuckDB call sites; the legacy Sense→Sharpen / late-fusion / CharCNN value-level paths were removed (choice 0107). See CLAUDE.md for the current default and gating policy.
 
 The Sharpen stage is unchanged across implementations: the rules, header hints, and disambiguation logic that follow Sense are shared infrastructure.
 
@@ -194,7 +199,7 @@ Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
 
 ### Current taxonomy
 
-240 definitions across 7 domains (container: 11, datetime: 84, finance: 28, geography: 25, identity: 33, representation: 33, technology: 26). Labels: `domain.category.type`. Definitions in `labels/definitions_*.yaml`.
+247 definitions across 7 domains (container: 12, datetime: 87, finance: 28, geography: 25, identity: 34, representation: 32, technology: 29). Labels: `domain.category.type`. Definitions in `labels/definitions_*.yaml`. (The shipped model predicts 244 labels; leaves added after the last retrain — e.g. `identity.industry.naics`, `container.object.s_expression` — are taxonomy-live and recovered at `profile` time by deterministic Sharpen guards.)
 
 ## DuckDB Extension
 
@@ -235,7 +240,7 @@ Uses multi-branch model downloaded at runtime via hf_hub (cached after first dow
 - **`TuiRenderer`** — ratatui alternate-screen dashboard (live loss/accuracy charts, epoch table, progress bar). Feature-gated behind `tui` (default on). No `enable_raw_mode()` — safe for unattended overnight runs.
 - **`LogRenderer`** — `tracing::info!` fallback. Used when TUI init fails or `--no-tui` is passed.
 
-**`results.json`** is the canonical source of training metrics — written **incrementally** (atomic temp+rename after each epoch) to the model output directory (e.g., `models/sherlock-v19-relu-s42/results.json`). Contains a JSON array of `EpochMetrics`.
+**`results.json`** is the canonical source of training metrics — written **incrementally** (atomic temp+rename after each epoch) to the model output directory (e.g., `models/m2v8m-s43/results.json`). Contains a JSON array of `EpochMetrics`.
 
 **`epochs.jsonl`** — one compact JSON line per epoch, appended during training. Survives `tee` capture (unlike TUI escape codes). Use this for `tail -f` monitoring.
 
@@ -245,7 +250,7 @@ Read `results.json` or `epochs.jsonl` directly — overnight scripts, comparison
 
 ## Evaluation Infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v19-relu-s42: **369/448 (82.4% label)** on the post-eval-expansion 448-row manifest (m-19; spec `.orbit/specs/2026-04-21-eval-expansion/`). Manifest schema: 7 columns (`dataset, file_path, column_name, gt_label, source_url, licence, fetched_date`). 240-type taxonomy. Timestamp interchangeability tightened to format-compatible families (ISO, SQL, RFC 2822, MDY, DMY, YMD).
+**Gold corpus — canonical headline eval (choice 0095).** `eval/gold/gold_corpus.tsv` (~988 human-or-calibrated-verified columns, leakage-firewalled via `make leakage-guard`, per-row provenance) scored by `scripts/score_gold_anchor.py` (`build-gold` → `predict` → `score`; per-type precision/recall with Wilson CIs plus one headline number). The full promotion order (choice 0095): gold-anchor efficacy → destination-drift proxy precheck → **gold corpus + rare-type scoreboard** (headline) → representative band (`eval/repr/representative_corpus.tsv`, advisory) → **corpus-honest gate** (`scripts/corpus_honest_gate.py`, the blocking relocation detector, run fresh-vs-fresh via `--gate-baseline`) → swap. The legacy `eval/profile_eval.sh` + m-19 manifest (448 curated columns, 7-col schema) remains as a curated-breadth instrument, not the headline.
 
 The CLI uses `FINETYPE_MODEL` env var (default: `models/default`); the eval script respects it (passed as `--model`). Note: `FINETYPE_MODEL_DIR` is a separate env var for the DuckDB extension only — see `DEVELOPMENT.md`.
 
