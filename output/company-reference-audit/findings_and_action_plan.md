@@ -446,15 +446,44 @@ and `upc`. Diagnosis with the candidate/baseline parquets:
   new instance of the gate's oracle-trust blind spot: not the *fixed* honest-abstention case (oracle
   refuted), but oracle-CONFIRMED shape-matches the checksum correctly rejects.
 
-**Decision for the author:** the demotions are real precision wins the gate can't credit. Two paths:
-(a) override the npi/upc NO-GO with the financial-figure evidence (a gold/evidence-adjudicated
-relocation review, à la choice 0104), or (b) hold until the over-emission is fixed at source (retrain
-t-000133e418) or the guards gain header corroboration. **Shipped as HELD** (directives commented out,
-`checksum::npi`/`gs1` retained, `gs1` still live on `ean`) pending that call.
+**DECISION (author, 2026-07-05): fold npi/upc into the retrain (t-000133e418), do NOT override the
+gate.** Rationale — the Sharpen checksum guard is the wrong fix for these two:
+
+1. **Gold +0.** Gold has 0 npi/upc rows, so the guard cannot add any correct npi/upc prediction. The
+   ONE gold column the model predicts npi is a single-value NBA team ID (`1610612750`) that passes
+   the NPI check digit *by coincidence*, so the guard can't even demote it — it stays a miss vs gold's
+   `integer_number`. The fix is invisible to every blocking instrument (the audit's original point).
+2. **Leaky by construction.** A 10-digit number passes NPI-Luhn ~10% of the time by chance, so the
+   guard demotes ~90% and leaves the coincidental-pass ~10% mislabelled (the TEAM_ID case exactly).
+3. **The referee is proven blind here.** gated-YDF is a shape-matcher for numeric checksum types —
+   it asserts npi correctly 9.6% of the time, upc 2.7%, ean 0%, credit_card 1.5%, aba 5.5%, isbn
+   16.8%; only isin (structured) is reliable at 100%. Root cause: gating NULLs a prediction only on
+   *shape*-validation failure, so it can never filter a shape-match for a checksum type. Full table:
+   `output/company-reference-audit/gated_ydf_checksum_reliability.md`. This confirms the npi/upc
+   NO-GO is a false alarm — but it also means no current instrument can *credit* the fix, so shipping
+   it via Sharpen buys unmeasurable precision at the cost of a blocking-gate override. Not worth it.
+
+The over-emission is a raw-MODEL wart; fix it at source. **Retrain recipe (t-000133e418):** mine hard
+negatives from the exact columns the checksum guard demoted — they are a ready-made, labelled set:
+```sql
+-- financial-figure 10-digit columns the model calls npi; train as integer_number
+SELECT file_path, column_name, sample_values_truncated
+FROM read_parquet('.../eval_w2b_substance/sample_pass/corpus_pass/columns.parquet')
+WHERE sense_prediction='representation.numeric.integer_number'  -- guard already demoted these
+  AND column_name RLIKE '(?i)(ebit|revenue|profit|assets|equity|cap|debt|income|cash)';
+```
+Teach the model that a 10-digit number under a financial header is `integer_number`, under a
+provider/healthcare header may be npi — header context is the discriminator the checksum can't be
+(checksums are post-hoc, not a training signal). Same for upc (12-digit product/particle IDs →
+integer_number/alphanumeric_id). npi/upc **left HELD** in the tree (directives commented out,
+`checksum::npi`/`gs1` retained, `gs1` live on `ean`) — do not wire until the retrain removes the
+over-emission; a wired guard would re-trip the gate for no gold gain. **W2b CLOSED.**
 
 ## Remaining follow-ups (this campaign)
 
-1. **Author call: `npi`/`upc` — override the gate with evidence, or hold for retrain** (above).
+1. ~~Author call: `npi`/`upc`~~ **RESOLVED 2026-07-05: folded into the retrain (t-000133e418), held
+   in-tree, do not wire. gated-YDF proven a shape-matcher on numeric checksum types (reliability
+   table above). W2b CLOSED.**
 2. swift_bic into the veto-blind treatment (R32 or veto_safe exception) — measured shipping at
    vpr 0.007 on real data.
 3. Sampling determinism: sort-order-dependent types on low-confidence columns.
