@@ -128,6 +128,21 @@ TRAIN_END=$(date +%s)
 TRAIN_MIN=$(( (TRAIN_END - TRAIN_START) / 60 ))
 echo "  proxy train wall-clock: ${TRAIN_MIN} min (single seed, $EPOCHS epochs)"
 
+# Dual-encoder era: train-multi-branch does not persist the value encoder, but
+# profile-time loading needs it co-located or the snapshot profiles ZERO columns
+# and the gate reads the empty snapshot as NO-GO (hit twice, 2026-07-06). Borrow
+# it from the current default when the proxy dir lacks one.
+if [[ ! -d "$MODEL_DIR/value_model2vec" && -d "models/default/value_model2vec" ]]; then
+    cp -R "models/default/value_model2vec" "$MODEL_DIR/"
+    python3 - "$MODEL_DIR/config.json" <<'PYVE'
+import json, sys
+p = sys.argv[1]; c = json.load(open(p))
+c.setdefault("value_embed_model", "value_model2vec")
+json.dump(c, open(p, "w"), indent=2); open(p, "a").write("\n")
+PYVE
+    echo "  co-located value encoder from models/default into $MODEL_DIR"
+fi
+
 echo "[3/4] Snapshotting proxy Sense distribution on the fixed file list..."
 FINETYPE_BIN="$BIN" FINETYPE_MODEL="$MODEL_DIR" \
     python3 scripts/snapshot_sense_distribution.py \
