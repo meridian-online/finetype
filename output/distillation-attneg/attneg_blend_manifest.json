@@ -3,32 +3,37 @@
   "recipe": "output/company-reference-audit/retrain_recipe_draft.md",
   "base": "/Users/hugh/github/meridian-online/finetype/output/distillation-v3/sherlock_distilled.csv.gz",
   "base_rows": 102461,
-  "mined_rows": 3015,
+  "mined_rows": 3805,
   "leaked_excluded": 1,
   "per_family": {
+    "decfix": 597,
     "ua": 1314,
     "locale": 245,
     "height": 180,
     "npi": 760,
+    "ymdfix": 193,
     "weight": 301,
     "upc": 215
   },
   "per_label_rows": {
+    "representation.numeric.decimal_number": 765,
     "representation.text.plain_text": 1450,
     "representation.text.word": 345,
     "representation.numeric.integer_number": 902,
-    "representation.numeric.decimal_number": 168,
+    "datetime.date.compact_ymd": 193,
     "datetime.epoch.unix_seconds": 150
   },
   "per_source": {
-    "sample": 2247,
+    "sample": 3037,
     "corpus": 768
   },
   "per_bucket": {
+    "decfix->representation.numeric.decimal_number": 597,
     "ua->representation.text.plain_text": 1314,
     "locale->representation.text.word": 245,
     "height->representation.text.word": 53,
     "npi->representation.numeric.integer_number": 610,
+    "ymdfix->datetime.date.compact_ymd": 193,
     "weight->representation.numeric.integer_number": 52,
     "weight->representation.text.word": 47,
     "height->representation.text.plain_text": 60,
@@ -42,6 +47,9 @@
   "caps": {
     "per_header": 50,
     "mined_keep": {
+      "decfix->representation.numeric.decimal_number": 600,
+      "unixfix->representation.numeric.integer_number": 500,
+      "ymdfix->datetime.date.compact_ymd": 200,
       "npi->representation.numeric.integer_number": 610,
       "npi->datetime.epoch.unix_seconds": 150,
       "upc->representation.numeric.integer_number": 215,

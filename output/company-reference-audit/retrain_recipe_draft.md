@@ -231,6 +231,15 @@ inflow sits under financial-ish headers = the leak tail is material, not noise.
 4. Rebuild blend → FTMB → proxy (expect the unix flag again — pre-adjudicated) →
    overnight → full gate stack.
 
+**Round-2 blend BUILT and audited (2026-07-06 afternoon, awaiting launch go):** 3,805
+mined rows = round-1 families unchanged + `decfix` 597 (corpus-mined financial float
+columns → decimal_number positives; the 37,784-column damage set itself lives in <5-value
+per-ticker files the loader can't train on, so the signal comes from the corpus's larger
+financial tables) + `ymdfix` 193 (month/day-valid YYYYMMDD columns → compact_ymd).
+**`unixfix` was dropped as structurally empty**: every corpus candidate for
+financial-header epoch-range 10-digit lives in <5-value files (300/300 measured) — the
+financial→unix leak stays a documented residual for now.
+
 Round-1 artifacts stay: models/attneg-s42..44, output/attneg-retrain/ (passes + gate),
 output/distillation-attneg/. Nothing was swapped; models/default untouched.
 

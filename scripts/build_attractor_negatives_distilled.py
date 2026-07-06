@@ -74,8 +74,22 @@ MAX_VALUES = 32
 MAX_VALUE_CHARS = 400  # base blend fields max ~11.6k total; the csv loader caps fields at 128k
 PER_HEADER_CAP = 50
 
+YMD = "datetime.date.compact_ymd"
+
+# Round-2 repair sources (gate NO-GO 2026-07-06): the round-1 candidate's damage sets,
+# mined directly from the fresh gate passes. See retrain_recipe_draft.md §round 2.
+R1_BASELINE = REPO / "output/attneg-retrain/baseline_with_oracle.parquet"
+R1_CAND = REPO / "output/attneg-retrain/cand_pass/corpus_pass/columns.parquet"
+YMD_RE = re.compile(r"^(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$")
+FIN_TAIL_RE = re.compile(
+    r"(sellinggeneral|totalliab|netreceivable|^nav$|goodwill|retainedearnings|minorityinterest"
+    r"|propertyplant|inventory|sharesoutstanding|surplus|stockholder|intangible|^wc$)", re.I)
+
 # (family, target) -> keep cap, per the recipe draft table
 MINED_KEEP = {
+    ("decfix", DEC): 600,
+    ("unixfix", INT): 500,
+    ("ymdfix", YMD): 200,
     ("npi", INT): 610,
     ("npi", UNIX): 150,
     ("upc", INT): 215,
@@ -93,7 +107,12 @@ MINED_KEEP = {
 
 # Floors detect corruption (a family silently zeroed), not aspiration: height/locale
 # lose ~25-40% of selected columns to the >=5-value fetch floor (tiny source files).
-AUDIT_FAMILY_FLOORS = {"npi": 600, "upc": 180, "ua": 1200, "height": 150, "weight": 250, "locale": 200}
+AUDIT_FAMILY_FLOORS = {"npi": 600, "upc": 180, "ua": 1200, "height": 150, "weight": 250, "locale": 200,
+                       "decfix": 300, "ymdfix": 80}
+# unixfix (financial epoch-range 10-digit -> integer, teach-both-ways) is structurally
+# EMPTY at the loader's min_values>=5 floor: all 300 corpus candidates live in <5-value
+# per-ticker files (measured 2026-07-06). The financial->unix leak stays a documented
+# residual; its selection query is kept below for the log.
 
 FIN_RE = re.compile(
     r"(ebit|revenue|profit|asset|equity|marketcap|debt|income|cash|liabilit|invest"
@@ -365,6 +384,104 @@ def main() -> int:
             multi = sum(1 for v in vals if len(v.split()) >= 2)
             target = PLAIN if multi >= len(vals) / 2 else WORD
             candidates.append(dict(family=fam, target=target, fp=fp, col=hdr, sha=sha))
+
+    # ---- round-2 repairs: mine the round-1 candidate's damage sets ---------------------
+    if R1_BASELINE.exists() and R1_CAND.exists():
+        r1 = con.execute(f"""
+            SELECT b.sense_prediction AS frm, c.sense_prediction AS dst,
+                   b.file_path, b.column_name, c.file_content_sha256 AS sha,
+                   c.sample_values_truncated AS tvals
+            FROM read_parquet('{R1_BASELINE}') b
+            JOIN read_parquet('{R1_CAND}') c USING (file_path, column_name)
+            WHERE b.sense_prediction != c.sense_prediction
+              AND (
+                (b.sense_prediction = '{DEC}' AND c.sense_prediction = 'unknown')
+                OR (b.sense_prediction = '{YMD}' AND c.sense_prediction IN ('{INT}', 'unknown'))
+                OR (c.sense_prediction = '{UNIX}')
+              )
+        """).fetchall()
+        n_r1 = {"decfix": 0, "unixfix": 0, "ymdfix": 0}
+        for frm, dst, fp, col, sha, tvals in r1:
+            hdr = (col or "").strip()
+            vals = [v for v in (tvals or "").split("│") if v.strip()]
+            if not vals:
+                continue
+            if frm == DEC and dst == "unknown":
+                # damage set counted for the log only — it lives in ~4-row files that fail
+                # the min_values floor and would crowd out trainable corpus rows in the
+                # md5-ordered cap selection (measured: 600 selected -> 128 survived)
+                if re.match(r"^-?[0-9]+\.[0-9]+$", vals[0].strip()):
+                    n_r1["decfix"] += 1
+            elif frm == YMD:
+                # genuine YYYYMMDD columns the round-1 model broke -> compact_ymd positives
+                ok = sum(bool(YMD_RE.match(v.strip())) for v in vals)
+                if ok >= max(1, int(0.8 * len(vals))):
+                    candidates.append(dict(family="ymdfix", target=YMD, fp=fp, col=hdr, sha=sha))
+                    n_r1["ymdfix"] += 1
+            elif dst == UNIX:
+                # damage set counted for the log only (same tiny-file problem as decfix)
+                if (FIN_RE.search(hdr) or FIN_TAIL_RE.search(hdr)) and vals[0].strip().isdigit() \
+                        and len(vals[0].strip()) == 10:
+                    n_r1["unixfix"] += 1
+        print(f"  round-2 repair candidates (damage sets): {n_r1}", flush=True)
+
+        # The damage concentrates in ~4-row per-ticker files that fail the loader's
+        # min_values floor, so the trainable repair signal must come from the corpus's
+        # LARGER tables: same value+header rules, sourced from the full corpus pass
+        # (v19 lens as the source filter; value shape re-verified; fetch enforces >=5).
+        # NOTE: the corpus pass marks plain numeric columns is_trivial=true (1.9M decimal
+        # rows) — do NOT filter on it here; the value+header rules carry the selection.
+        fin_sql = ("(?i)(ebit|revenue|profit|asset|equity|marketcap|debt|income|cash|liabilit"
+                   "|invest|balance|amount|value|price|cost|expense|sales|fund|capital"
+                   "|sellinggeneral|goodwill|retainedearnings|minorityinterest|propertyplant"
+                   "|inventory|sharesoutstanding|surplus|stockholder|intangible|receivable)")
+        n_r2c = {"decfix": 0, "unixfix": 0, "ymdfix": 0}
+        q = {
+            "decfix": f"""SELECT file_path, column_name, file_content_sha256
+                FROM read_parquet('{CORPUS_PASS}')
+                WHERE sense_prediction = '{DEC}'
+                  AND regexp_matches(column_name, '{fin_sql}')
+                  AND regexp_matches(split_part(sample_values_truncated, '│', 1),
+                                     '^-?[0-9]+\\.[0-9]+$')
+                  AND len(string_split(sample_values_truncated, '│')) >= 5""",
+            "unixfix": f"""SELECT file_path, column_name, file_content_sha256
+                FROM read_parquet('{CORPUS_PASS}')
+                WHERE sense_prediction IN ('identity.medical.npi',
+                                           'representation.numeric.integer_number')
+                  AND regexp_matches(column_name, '{fin_sql}')
+                  AND regexp_matches(split_part(sample_values_truncated, '│', 1), '^[0-9]{{10}}$')
+                  AND TRY_CAST(split_part(sample_values_truncated, '│', 1) AS BIGINT)
+                      BETWEEN 900000000 AND 2200000000
+                  AND len(string_split(sample_values_truncated, '│')) >= 5""",
+        }
+        tgt = {"decfix": DEC, "unixfix": INT}
+        for fam, sql in q.items():
+            for fp, col, sha in con.execute(sql).fetchall():
+                candidates.append(dict(family=fam, target=tgt[fam], fp=fp,
+                                       col=(col or "").strip(), sha=sha))
+                n_r2c[fam] += 1
+        for fp, col, sha, tvals in con.execute(f"""
+                SELECT file_path, column_name, file_content_sha256, sample_values_truncated
+                FROM read_parquet('{CORPUS_PASS}')
+                WHERE sense_prediction = '{YMD}'
+                  AND len(string_split(sample_values_truncated, '│')) >= 5""").fetchall():
+            vals = [v for v in (tvals or "").split("│") if v.strip()]
+            ok = sum(bool(YMD_RE.match(v.strip())) for v in vals)
+            if vals and ok >= max(1, int(0.8 * len(vals))):
+                candidates.append(dict(family="ymdfix", target=YMD, fp=fp,
+                                       col=(col or "").strip(), sha=sha))
+                n_r2c["ymdfix"] += 1
+        print(f"  round-2 repair candidates (corpus, >=5 tvals): {n_r2c}", flush=True)
+
+    # dedupe candidate identities (damage-set and corpus selections can overlap)
+    seen_ids = set()
+    deduped = []
+    for c in candidates:
+        k = (c["fp"], c["col"], c["family"])
+        if k not in seen_ids:
+            seen_ids.add(k)
+            deduped.append(c)
+    candidates = deduped
 
     # ---- leakage firewall -------------------------------------------------------------
     gold_ids = load_gold_identities()
