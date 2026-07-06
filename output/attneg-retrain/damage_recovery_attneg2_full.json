@@ -1,0 +1,114 @@
+{
+  "model": "models/attneg2-s44",
+  "sets": {
+    "decimal_unknown": {
+      "columns_scored": 199,
+      "recovery_rate": 0.879,
+      "threshold": 0.5,
+      "pass": true,
+      "top_outcomes": [
+        [
+          "representation.numeric.decimal_number",
+          175
+        ],
+        [
+          "unknown",
+          24
+        ]
+      ]
+    },
+    "decimal_word": {
+      "columns_scored": 201,
+      "recovery_rate": 0.975,
+      "threshold": 0.5,
+      "pass": true,
+      "top_outcomes": [
+        [
+          "representation.numeric.decimal_number",
+          196
+        ],
+        [
+          "representation.file.excel_format",
+          2
+        ],
+        [
+          "representation.text.word",
+          1
+        ],
+        [
+          "representation.discrete.ordinal",
+          1
+        ],
+        [
+          "representation.format.color_hex",
+          1
+        ]
+      ]
+    },
+    "ymd_broken": {
+      "columns_scored": 40,
+      "recovery_rate": 1.0,
+      "threshold": 0.5,
+      "pass": true,
+      "top_outcomes": [
+        [
+          "datetime.date.compact_ymd",
+          40
+        ]
+      ]
+    },
+    "ws_gainers": {
+      "columns_scored": 45,
+      "recovery_rate": 1.0,
+      "threshold": 0.5,
+      "pass": true,
+      "top_outcomes": [
+        [
+          "representation.text.entity_name",
+          32
+        ],
+        [
+          "representation.text.plain_text",
+          12
+        ],
+        [
+          "representation.text.word",
+          1
+        ]
+      ]
+    },
+    "npi_demoted": {
+      "columns_scored": 52,
+      "recovery_rate": 1.0,
+      "threshold": 0.9,
+      "pass": true,
+      "top_outcomes": [
+        [
+          "representation.numeric.integer_number",
+          44
+        ],
+        [
+          "datetime.epoch.unix_seconds",
+          8
+        ]
+      ]
+    },
+    "upc_demoted": {
+      "columns_scored": 39,
+      "recovery_rate": 1.0,
+      "threshold": 0.9,
+      "pass": true,
+      "top_outcomes": [
+        [
+          "representation.numeric.integer_number",
+          33
+        ],
+        [
+          "unknown",
+          6
+        ]
+      ]
+    }
+  },
+  "failed": []
+}

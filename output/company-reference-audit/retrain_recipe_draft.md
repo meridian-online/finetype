@@ -302,6 +302,46 @@ main. Residuals that stay open regardless: financial→unix leak (untrainable at
 min_values floor), whitespace validator tightening (next campaign, gate-creditable),
 W4 founder-style + short-code round-2 mining.
 
+## Round-3 (attneg2) results vs the pre-registered bar — 2026-07-07 04:00, THREE OF FOUR PASS
+
+Best seed attneg2-s44 (35/44/47-epoch seeds; gold table s42 0.854 / s43 0.858 / s44 0.870
+on the overnight scorer). Same-day, both models, current fixtures:
+
+| bar condition | result | verdict |
+|---|---|---|
+| 1. gold (same-day) | candidate **847/988 = 0.857** vs default 845/988 = 0.855 | **PASS** (+2) |
+| 2. representative | candidate **186/260 = 0.715** vs default 185/260 = 0.712 | **PASS** (+1) |
+| 3. gate triggers ⊆ table | npi/upc/aba collapse ✓ (npi 42,675→793, cleaner than round 1) BUT four unlisted labels banded | **FAIL** |
+| 4. damage recovery at convergence | all six sets green (decimal 87.9/97.5%, ymd/ws 100%, npi/upc stay-dead 100%) | **PASS** |
+
+**Per the author's all-or-stop authorisation: NO swap, NO release, NO third blend.**
+
+The four unlisted triggers, characterised per-column:
+- **compact_ymd oracle_fp — the real one.** Marginal 1,987→21,173; 1,758 in-sample
+  integer→ymd inflow is 8-digit FINANCIAL figures (`ebit 15800000`, `goodWill 90000000`,
+  `otherCurrentAssets 41308000`) plus GAME_ID constants — the reverse "constant 8-digit →
+  date" shortcut the literature review predicted; the 54 datecw counterweights were too
+  small against 198 constant-date positives. Note oracle-confirmed ymd support DOUBLED
+  (1,733→3,340): the repair also worked; it over-shot. **Root enabler: the compact_ymd
+  validator is still SHAPE-ONLY (`^\d{8}$`)** — `41308000` = month 80 keeps the label, so
+  the veto can't strip the junk. Month/day range validation is W2 item 7 from the original
+  audit, never shipped.
+- **amount_accounting over_emit** 2,776→11,575 (4.2×) — decfix's financial floats
+  neighbourhood; needs the same per-column look before any fix.
+- **cpt oracle_fp** 922→1,749 — the "any 5-digit" attractor, small.
+- **isbn collapse** 8,024→1,717 — 13-digit GS1 checksum class; gated-YDF asserts isbn
+  correctly 16.8% of the time (reliability table), so this is almost certainly the same
+  shape-matcher false alarm as npi/upc/aba — but it was not pre-registered, so it does not
+  self-adjudicate.
+
+**Recommendation (author decision):** a deterministic trim round, not a fourth training
+run — wire compact_ymd/compact_mdy/compact_dmy month/day range validation (the
+never-shipped W2.7; converts the ymd junk into veto-strippable assertions), assess
+amount_accounting/cpt the same way, then re-gate CHEAPLY via the rule-mode fast path with
+attneg2-s44 held constant. If the trimmed gate's trigger set collapses to the checksum
+class (npi/upc/aba/isbn), re-present the bar with isbn's reliability evidence. attneg2
+stays banked and unswapped until then; models/default untouched.
+
 ## What we don't know yet
 
 - Whether header-carrying negatives shift the header branch for integer_number/plain_text in a way
