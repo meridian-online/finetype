@@ -172,6 +172,26 @@ follows before the overnight was launched:
 - the standard stack: gold no-regression + representative, rare-type scoreboard, blocking
   corpus-honest gate fresh-vs-fresh (expected signature: collapse on npi+upc only).
 
+## Results — 2026-07-06 (overnight complete; corpus-honest gate pending)
+
+Three seeds trained (s42 best: 64 epochs). Scoreboard vs the shipped default m2v8m-s43:
+
+| instrument | shipped | attneg-s42 | read |
+|---|---|---|---|
+| gold composed | 0.856 (844/986) | **0.855** | parity — no curated-ground regression |
+| gold raw Sense | 0.522 | **0.580** | +5.8pp — the attractor layer itself improved |
+| representative (260 random cols) | 0.712 | **0.746** | +9 cols; no advisory flag |
+| npi on fixed 13.5k-col sample | 84 | **3** | the 10-digit attractor is dead raw |
+| upc on same | 16 | **4** | same |
+| post-train sense check | — | 1 flag | unix_seconds 67→284, the adjudicated Created-epoch correction |
+| json_array (proxy scare) | 19 | 12 | confirmed under-convergence artifact, gone at convergence |
+
+**Open before any swap talk:** (1) corpus-honest gate (running) — expected collapse on
+npi+upc (pre-adjudicated); a band on ANY other label — watch `decimal_number`, which
+redistributed −10.7pp to unknown/plain_text/word/unix at convergence, and `entity_name`
+−2.6pp — is a genuine relocation signal. (2) rare-type scoreboard. (3) The swap itself is
+the author's call (gold parity + gold-adjudicated relocation review, choice 0104).
+
 ## What we don't know yet
 
 - Whether header-carrying negatives shift the header branch for integer_number/plain_text in a way
