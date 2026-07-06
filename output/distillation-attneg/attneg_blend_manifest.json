@@ -2,38 +2,45 @@
   "task": "t-000133e418",
   "recipe": "output/company-reference-audit/retrain_recipe_draft.md",
   "base": "/Users/hugh/github/meridian-online/finetype/output/distillation-v3/sherlock_distilled.csv.gz",
-  "base_rows": 102461,
-  "mined_rows": 3805,
-  "leaked_excluded": 1,
+  "base_rows": 102451,
+  "mined_rows": 5244,
+  "leaked_excluded": 8,
   "per_family": {
-    "decfix": 597,
+    "decfix": 1195,
+    "ymdfix": 198,
+    "txtpres": 782,
     "ua": 1314,
+    "datecw": 54,
     "locale": 245,
     "height": 180,
     "npi": 760,
-    "ymdfix": 193,
     "weight": 301,
     "upc": 215
   },
   "per_label_rows": {
-    "representation.numeric.decimal_number": 765,
-    "representation.text.plain_text": 1450,
+    "representation.numeric.decimal_number": 1363,
+    "datetime.date.compact_ymd": 198,
+    "representation.text.entity_name": 501,
+    "representation.text.plain_text": 1731,
+    "datetime.date.iso": 54,
     "representation.text.word": 345,
     "representation.numeric.integer_number": 902,
-    "datetime.date.compact_ymd": 193,
     "datetime.epoch.unix_seconds": 150
   },
   "per_source": {
-    "sample": 3037,
+    "sample": 4476,
     "corpus": 768
   },
   "per_bucket": {
-    "decfix->representation.numeric.decimal_number": 597,
+    "decfix->representation.numeric.decimal_number": 1195,
+    "ymdfix->datetime.date.compact_ymd": 198,
+    "txtpres->representation.text.entity_name": 501,
+    "txtpres->representation.text.plain_text": 281,
     "ua->representation.text.plain_text": 1314,
+    "datecw->datetime.date.iso": 54,
     "locale->representation.text.word": 245,
     "height->representation.text.word": 53,
     "npi->representation.numeric.integer_number": 610,
-    "ymdfix->datetime.date.compact_ymd": 193,
     "weight->representation.numeric.integer_number": 52,
     "weight->representation.text.word": 47,
     "height->representation.text.plain_text": 60,
@@ -47,9 +54,11 @@
   "caps": {
     "per_header": 50,
     "mined_keep": {
-      "decfix->representation.numeric.decimal_number": 600,
-      "unixfix->representation.numeric.integer_number": 500,
+      "decfix->representation.numeric.decimal_number": 1200,
       "ymdfix->datetime.date.compact_ymd": 200,
+      "txtpres->representation.text.entity_name": 900,
+      "txtpres->representation.text.plain_text": 600,
+      "datecw->datetime.date.iso": 150,
       "npi->representation.numeric.integer_number": 610,
       "npi->datetime.epoch.unix_seconds": 150,
       "upc->representation.numeric.integer_number": 215,
@@ -66,5 +75,208 @@
     }
   },
   "min_values": 5,
-  "max_values": 32
+  "max_values": 32,
+  "base_poison_dropped": 10,
+  "one_sided_headers": [
+    {
+      "header": "id",
+      "label": "representation.numeric.integer_number",
+      "rows": 52
+    },
+    {
+      "header": "conditions",
+      "label": "representation.text.entity_name",
+      "rows": 51
+    },
+    {
+      "header": "reference text",
+      "label": "representation.text.plain_text",
+      "rows": 50
+    },
+    {
+      "header": "cause",
+      "label": "representation.text.plain_text",
+      "rows": 50
+    },
+    {
+      "header": "text",
+      "label": "representation.text.plain_text",
+      "rows": 50
+    },
+    {
+      "header": "model name",
+      "label": "representation.text.plain_text",
+      "rows": 50
+    },
+    {
+      "header": "design smell",
+      "label": "representation.text.entity_name",
+      "rows": 50
+    },
+    {
+      "header": "'core_body'",
+      "label": "representation.text.plain_text",
+      "rows": 50
+    },
+    {
+      "header": "'core_state'",
+      "label": "representation.text.plain_text",
+      "rows": 50
+    },
+    {
+      "header": "game_date",
+      "label": "datetime.date.compact_ymd",
+      "rows": 50
+    },
+    {
+      "header": "comments",
+      "label": "representation.text.plain_text",
+      "rows": 50
+    },
+    {
+      "header": "body",
+      "label": "representation.text.plain_text",
+      "rows": 50
+    },
+    {
+      "header": "request description",
+      "label": "representation.text.plain_text",
+      "rows": 50
+    },
+    {
+      "header": "particleid",
+      "label": "representation.numeric.integer_number",
+      "rows": 50
+    },
+    {
+      "header": "trees",
+      "label": "representation.text.plain_text",
+      "rows": 50
+    },
+    {
+      "header": "parse_tree",
+      "label": "representation.text.plain_text",
+      "rows": 50
+    },
+    {
+      "header": "theoretical flops",
+      "label": "representation.numeric.integer_number",
+      "rows": 50
+    },
+    {
+      "header": "content",
+      "label": "representation.text.plain_text",
+      "rows": 49
+    },
+    {
+      "header": "abstract",
+      "label": "representation.text.plain_text",
+      "rows": 49
+    },
+    {
+      "header": "team_id",
+      "label": "representation.numeric.integer_number",
+      "rows": 48
+    },
+    {
+      "header": "code",
+      "label": "representation.text.plain_text",
+      "rows": 46
+    },
+    {
+      "header": "v25",
+      "label": "representation.text.word",
+      "rows": 46
+    },
+    {
+      "header": "penalty",
+      "label": "representation.numeric.decimal_number",
+      "rows": 45
+    },
+    {
+      "header": "v8",
+      "label": "representation.text.word",
+      "rows": 43
+    },
+    {
+      "header": "'access'",
+      "label": "representation.text.word",
+      "rows": 42
+    },
+    {
+      "header": "uvindextime",
+      "label": "datetime.epoch.unix_seconds",
+      "rows": 42
+    },
+    {
+      "header": "created",
+      "label": "representation.numeric.integer_number",
+      "rows": 42
+    },
+    {
+      "header": "questiontextformat",
+      "label": "representation.numeric.decimal_number",
+      "rows": 40
+    },
+    {
+      "header": "assoc",
+      "label": "representation.text.entity_name",
+      "rows": 40
+    },
+    {
+      "header": "defaultgrade",
+      "label": "representation.numeric.decimal_number",
+      "rows": 38
+    },
+    {
+      "header": "createdby",
+      "label": "representation.numeric.decimal_number",
+      "rows": 37
+    },
+    {
+      "header": "hidden",
+      "label": "representation.numeric.decimal_number",
+      "rows": 36
+    },
+    {
+      "header": "maxmark",
+      "label": "representation.numeric.decimal_number",
+      "rows": 35
+    },
+    {
+      "header": "notes",
+      "label": "representation.text.plain_text",
+      "rows": 35
+    },
+    {
+      "header": "tax_sign",
+      "label": "representation.numeric.decimal_number",
+      "rows": 34
+    },
+    {
+      "header": "event_name",
+      "label": "representation.text.plain_text",
+      "rows": 34
+    },
+    {
+      "header": "v5",
+      "label": "representation.text.word",
+      "rows": 34
+    },
+    {
+      "header": "data_ricevimento_tampone",
+      "label": "datetime.date.compact_ymd",
+      "rows": 32
+    },
+    {
+      "header": "precipintensitymaxtime",
+      "label": "datetime.epoch.unix_seconds",
+      "rows": 32
+    },
+    {
+      "header": "ref_base_sign",
+      "label": "representation.numeric.decimal_number",
+      "rows": 30
+    }
+  ]
 }

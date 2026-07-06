@@ -85,11 +85,20 @@ FIN_TAIL_RE = re.compile(
     r"(sellinggeneral|totalliab|netreceivable|^nav$|goodwill|retainedearnings|minorityinterest"
     r"|propertyplant|inventory|sharesoutstanding|surplus|stockholder|intangible|^wc$)", re.I)
 
-# (family, target) -> keep cap, per the recipe draft table
+ENT = "representation.text.entity_name"
+ISO_DATE = "datetime.date.iso"
+
+# (family, target) -> keep cap. Round-3 revision (derisk review 2026-07-06): decfix is
+# re-mined from the damage transitions constant-first (the verified attractor is
+# constant/near-constant numeric columns, NOT financial headers); txtpres preserves the
+# text family against the whitespace_separated over-emit; datecw counterweights the
+# 'date' header so ymdfix cannot mint a new date->compact_ymd shortcut.
 MINED_KEEP = {
-    ("decfix", DEC): 600,
-    ("unixfix", INT): 500,
+    ("decfix", DEC): 1200,
     ("ymdfix", YMD): 200,
+    ("txtpres", ENT): 900,
+    ("txtpres", PLAIN): 600,
+    ("datecw", ISO_DATE): 150,
     ("npi", INT): 610,
     ("npi", UNIX): 150,
     ("upc", INT): 215,
@@ -108,7 +117,7 @@ MINED_KEEP = {
 # Floors detect corruption (a family silently zeroed), not aspiration: height/locale
 # lose ~25-40% of selected columns to the >=5-value fetch floor (tiny source files).
 AUDIT_FAMILY_FLOORS = {"npi": 600, "upc": 180, "ua": 1200, "height": 150, "weight": 250, "locale": 200,
-                       "decfix": 300, "ymdfix": 80}
+                       "decfix": 600, "ymdfix": 80, "txtpres": 600, "datecw": 40}
 # unixfix (financial epoch-range 10-digit -> integer, teach-both-ways) is structurally
 # EMPTY at the loader's min_values>=5 floor: all 300 corpus candidates live in <5-value
 # per-ticker files (measured 2026-07-06). The financial->unix leak stays a documented
@@ -395,35 +404,53 @@ def main() -> int:
             JOIN read_parquet('{R1_CAND}') c USING (file_path, column_name)
             WHERE b.sense_prediction != c.sense_prediction
               AND (
-                (b.sense_prediction = '{DEC}' AND c.sense_prediction = 'unknown')
+                (b.sense_prediction = '{DEC}'
+                 AND c.sense_prediction IN ('unknown', '{WORD}'))
                 OR (b.sense_prediction = '{YMD}' AND c.sense_prediction IN ('{INT}', 'unknown'))
                 OR (c.sense_prediction = '{UNIX}')
+                OR (b.sense_prediction IN ('{ENT}', '{PLAIN}')
+                    AND c.sense_prediction = 'container.array.whitespace_separated')
               )
         """).fetchall()
-        n_r1 = {"decfix": 0, "unixfix": 0, "ymdfix": 0}
+        n_r1 = {"decfix": 0, "decfix_const": 0, "unixfix": 0, "ymdfix": 0, "txtpres": 0}
+
+        def near_constant(vs):
+            return len(set(v.strip() for v in vs)) <= max(2, int(0.34 * len(vs)))
+
         for frm, dst, fp, col, sha, tvals in r1:
             hdr = (col or "").strip()
             vals = [v for v in (tvals or "").split("│") if v.strip()]
-            if not vals:
+            if len(vals) < 5:   # below the loader's trainability floor — cannot repair from it
                 continue
-            if frm == DEC and dst == "unknown":
-                # damage set counted for the log only — it lives in ~4-row files that fail
-                # the min_values floor and would crowd out trainable corpus rows in the
-                # md5-ordered cap selection (measured: 600 selected -> 128 survived)
+            if frm == DEC and dst in ("unknown", WORD):
+                # the verified attractor: constant/near-constant float columns asserted
+                # integer/scientific and vetoed (94% of the damage is constant-like) —
+                # mine the damage itself, constants filling the bucket FIRST (prio 0)
                 if re.match(r"^-?[0-9]+\.[0-9]+$", vals[0].strip()):
+                    const = near_constant(vals)
+                    candidates.append(dict(family="decfix", target=DEC, fp=fp, col=hdr,
+                                           sha=sha, prio=0 if const else 1))
                     n_r1["decfix"] += 1
+                    n_r1["decfix_const"] += int(const)
             elif frm == YMD:
-                # genuine YYYYMMDD columns the round-1 model broke -> compact_ymd positives
+                # genuine YYYYMMDD columns the round-1 model broke — the true-damage route
+                # is CONSTANT repeated dates (asserted iso_8601, vetoed), so constants first
                 ok = sum(bool(YMD_RE.match(v.strip())) for v in vals)
                 if ok >= max(1, int(0.8 * len(vals))):
-                    candidates.append(dict(family="ymdfix", target=YMD, fp=fp, col=hdr, sha=sha))
+                    candidates.append(dict(family="ymdfix", target=YMD, fp=fp, col=hdr,
+                                           sha=sha, prio=0 if near_constant(vals) else 1))
                     n_r1["ymdfix"] += 1
             elif dst == UNIX:
-                # damage set counted for the log only (same tiny-file problem as decfix)
+                # log only — structurally untrainable (tiny files), documented residual
                 if (FIN_RE.search(hdr) or FIN_TAIL_RE.search(hdr)) and vals[0].strip().isdigit() \
                         and len(vals[0].strip()) == 10:
                     n_r1["unixfix"] += 1
-        print(f"  round-2 repair candidates (damage sets): {n_r1}", flush=True)
+            elif dst == "container.array.whitespace_separated":
+                # text-preservation positives: the ws over-emit inflow is small-vocab
+                # multi-word phrase columns — keep them at their baseline text label
+                candidates.append(dict(family="txtpres", target=frm, fp=fp, col=hdr, sha=sha))
+                n_r1["txtpres"] += 1
+        print(f"  round-2 repair candidates (damage sets, >=5 tvals): {n_r1}", flush=True)
 
         # The damage concentrates in ~4-row per-ticker files that fail the loader's
         # min_values floor, so the trainable repair signal must come from the corpus's
@@ -435,7 +462,7 @@ def main() -> int:
                    "|invest|balance|amount|value|price|cost|expense|sales|fund|capital"
                    "|sellinggeneral|goodwill|retainedearnings|minorityinterest|propertyplant"
                    "|inventory|sharesoutstanding|surplus|stockholder|intangible|receivable)")
-        n_r2c = {"decfix": 0, "unixfix": 0, "ymdfix": 0}
+        n_r2c = {"decfix": 0, "unixfix": 0, "ymdfix": 0, "datecw": 0}
         q = {
             "decfix": f"""SELECT file_path, column_name, file_content_sha256
                 FROM read_parquet('{CORPUS_PASS}')
@@ -454,7 +481,14 @@ def main() -> int:
                       BETWEEN 900000000 AND 2200000000
                   AND len(string_split(sample_values_truncated, '│')) >= 5""",
         }
-        tgt = {"decfix": DEC, "unixfix": INT}
+        # datecw: counterweight so the 'date' header keeps its dominant corpus label and
+        # ymdfix cannot mint a reverse 'date -> compact_ymd' shortcut (balance audit rec)
+        q["datecw"] = f"""SELECT file_path, column_name, file_content_sha256
+            FROM read_parquet('{CORPUS_PASS}')
+            WHERE sense_prediction = '{ISO_DATE}'
+              AND lower(trim(column_name)) IN ('date', 'dates', 'game_date', 'gamedate')
+              AND len(string_split(sample_values_truncated, '│')) >= 5"""
+        tgt = {"decfix": DEC, "unixfix": INT, "datecw": ISO_DATE}
         for fam, sql in q.items():
             for fp, col, sha in con.execute(sql).fetchall():
                 candidates.append(dict(family=fam, target=tgt[fam], fp=fp,
@@ -496,8 +530,9 @@ def main() -> int:
     candidates = [c for c in candidates if (c["sha"], c["col"]) not in gold_ids]
     leaked = before - len(candidates)
 
-    # ---- caps: per-header, then per-(family,target), deterministic md5 order ----------
-    candidates.sort(key=lambda c: h(c["target"], c["col"], c["sha"] or c["fp"]))
+    # ---- caps: per-header, then per-(family,target); constants (prio 0) fill first,
+    # ---- then deterministic md5 order --------------------------------------------------
+    candidates.sort(key=lambda c: (c.get("prio", 1), h(c["target"], c["col"], c["sha"] or c["fp"])))
     per_header: Counter = Counter()
     per_bucket: Counter = Counter()
     kept = []
@@ -525,6 +560,19 @@ def main() -> int:
     kept_keys = {(c["fp"], c["col"]) for c in kept}
     kept += corpus_supplement(con, gold_ids, per_header, per_bucket_fetched, kept_keys)
 
+    # ---- denoise the integer negatives (hard-negative contamination, lit review) -------
+    # An integer negative whose values are really dates re-teaches the compact_ymd drag;
+    # EXCEPT under financial headers, where 8-digit amounts the baseline mislabelled as
+    # dates are CORRECT negatives (challenge-agent verified: grossProfit=20100500).
+    before_dn = len(kept)
+    kept = [c for c in kept if not (
+        c["target"] == INT
+        and not (FIN_RE.search(c["col"]) or FIN_TAIL_RE.search(c["col"]))
+        and c["values"]
+        and sum(bool(YMD_RE.match(str(v).strip())) for v in c["values"]) >= 0.8 * len(c["values"])
+    )]
+    print(f"  denoise: dropped {before_dn - len(kept)} date-shaped integer negatives", flush=True)
+
     # ---- label-remap / column-level-types invariant ------------------------------------
     remap = json.loads(LABEL_REMAP.read_text()) if LABEL_REMAP.exists() else {}
     bad = [c for c in kept if remap.get(c["target"], c["target"]) in COLUMN_LEVEL_TYPES]
@@ -536,11 +584,27 @@ def main() -> int:
         w = csv.writer(out)
         w.writerow(["final_label", "sample_values", "column_name"])
         n_base = 0
+        n_poison = 0
         with gzip.open(BASE_BLEND, "rt", newline="") as fh:
             for r in csv.DictReader(fh):
-                w.writerow([r.get("final_label", ""), r.get("sample_values", ""),
+                lbl = r.get("final_label", "")
+                # base-blend poison: headerless whitespace_separated rows that are really
+                # short phrases (artist names, titles) — direct 'phrase = array' supervision.
+                # Genuine token lists (median >= 3 tokens/value) are kept.
+                if lbl == "container.array.whitespace_separated":
+                    try:
+                        vs = json.loads(r.get("sample_values", "") or "[]")
+                        toks = sorted(len(str(v).split()) for v in vs) if vs else [0]
+                        if toks[len(toks) // 2] < 3:
+                            n_poison += 1
+                            continue
+                    except (ValueError, TypeError):
+                        pass
+                w.writerow([lbl, r.get("sample_values", ""),
                             r.get("column_name", "") or ""])
                 n_base += 1
+        print(f"  base poison drop: {n_poison} phrase-valued whitespace_separated rows removed",
+              flush=True)
         for c in kept:
             w.writerow([c["target"], json.dumps(c["values"]), c["col"]])
             per_label_rows[c["target"]] += 1
@@ -555,6 +619,21 @@ def main() -> int:
                          c["col"], c["sha"], len(c["values"])])
 
     per_bucket_final = Counter((c["family"], c["target"]) for c in kept)
+
+    # per-header label entropy: the one-sided-header report the round-1 blend lacked
+    hdr_labels: dict = defaultdict(Counter)
+    for c in kept:
+        hdr_labels[c["col"].lower()][c["target"]] += 1
+    one_sided = []
+    for hk, lc in hdr_labels.items():
+        tot = sum(lc.values())
+        top_label, top_n = lc.most_common(1)[0]
+        if tot >= 5 and top_n / tot >= 0.9:
+            one_sided.append({"header": hk, "label": top_label, "rows": tot})
+    one_sided.sort(key=lambda x: -x["rows"])
+    print(f"  one-sided headers (>=5 rows, >=90% single label): {len(one_sided)}; "
+          f"top: {[(o['header'], o['rows']) for o in one_sided[:8]]}", flush=True)
+
     manifest = {
         "task": "t-000133e418", "recipe": "output/company-reference-audit/retrain_recipe_draft.md",
         "base": str(BASE_BLEND), "base_rows": n_base,
@@ -565,6 +644,8 @@ def main() -> int:
         "caps": {"per_header": PER_HEADER_CAP,
                  "mined_keep": {f"{k[0]}->{k[1]}": v for k, v in MINED_KEEP.items()}},
         "min_values": MIN_VALUES, "max_values": MAX_VALUES,
+        "base_poison_dropped": n_poison,
+        "one_sided_headers": one_sided[:40],
     }
     OUT_MANIFEST.write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps(manifest, indent=2))
@@ -581,6 +662,10 @@ def main() -> int:
     short = [c for c in kept if len(c["values"]) < MIN_VALUES]
     if short:
         errs.append(f"{len(short)} mined rows below min_values={MIN_VALUES}")
+    for bk, cap in MINED_KEEP.items():
+        if per_bucket_final.get(bk, 0) == 0:
+            errs.append(f"bucket {bk[0]}->{bk[1]} delivered ZERO rows (cap {cap}) — "
+                        "empty buckets must be explicit, not silent")
     if errs:
         print("AUDIT GATE FAILED:\n  " + "\n  ".join(errs), file=sys.stderr)
         return 3

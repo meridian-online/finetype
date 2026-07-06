@@ -243,6 +243,38 @@ financial→unix leak stays a documented residual for now.
 Round-1 artifacts stay: models/attneg-s42..44, output/attneg-retrain/ (passes + gate),
 output/distillation-attneg/. Nothing was swapped; models/default untouched.
 
+## Derisk review — 2026-07-06 evening (6 agents; verdict: round 2 as staged would have NO-GO'd again)
+
+Live-model verification overturned the round-1 diagnosis: the learned shortcut is
+**constant/near-constant numeric column → integer_number** (94% of the decimal damage is
+constant-like; only 20% financial-headed; synthetic probes flip on constancy, not
+header). decfix-as-staged covered 0.2% of the damage population. compact_ymd's true
+damage route is constant repeated dates asserted iso_8601 → vetoed; part of its headline
+loss is baseline-error CORRECTION (8-digit financials wrongly called dates). The ws
+inflow is small-vocab multi-word phrase columns. The see-saw risk (decimal positives
+re-opening npi) is REFUTED (no 10-digit floats exist; all round-1 negatives retained).
+Literature validated counterfactual balancing + contributed the negative-denoise rule
+and worst-slice eval. Substrate: this session's r2_*.json scratchpad files + the
+workflow journal.
+
+**Blend v3 (BUILT, audited 2026-07-06 evening): 102,451 base (10 poison ws rows
+removed) + 5,244 mined.** Changes vs v2: decfix re-mined from the damage transitions
+themselves, constant-first (1,195 rows; 6,906 constant candidates found at ≥5 values —
+the earlier "damage is untrainable" finding was an artifact of sampling only tiny
+files); txtpres 782 entity/plain preservation positives from the ws-gainer transitions;
+datecw 54 'date'-header→iso counterweights; integer negatives denoised (date-shaped
+non-financial dropped); builder now reports per-header label entropy + fails on silent
+zero buckets.
+
+**Round-3 launch package (one command):** `TAG=attneg2 ./scripts/overnight_attractor.sh`
+→ FTMB → 20-epoch proxy (a NO-GO flagging EXACTLY {unix_seconds} is pre-adjudicated and
+continues; anything else stops) → **damage-recovery precheck** (new instrument,
+`scripts/damage_recovery_check.py`: profiles the six named damage/stay-dead sets with
+the proxy model; pre-registered thresholds decimal/ymd/ws ≥50% recovery, npi/upc ≥90%
+stay-dead; BLOCKING) → 3-seed overnight → post-train checks. Release bar pre-registered
+per the review's trigger table; release tooling needs two patches before /release
+(5-file dual-encoder HF upload list; stale hardcoded taxonomy count).
+
 ## What we don't know yet
 
 - Whether header-carrying negatives shift the header branch for integer_number/plain_text in a way
