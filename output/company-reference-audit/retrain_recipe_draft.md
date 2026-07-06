@@ -342,6 +342,65 @@ attneg2-s44 held constant. If the trimmed gate's trigger set collapses to the ch
 class (npi/upc/aba/isbn), re-present the bar with isbn's reliability evidence. attneg2
 stays banked and unswapped until then; models/default untouched.
 
+## Trim re-gate results vs the bar — 2026-07-07 09:20, STILL 3 OF 4 (gate NO-GO), STOP
+
+Both models re-passed on the range-validated binary (`scripts/attneg2_trim_regate.sh`,
+`results/attneg2_trim_regate.log`), then same-binary gate + gold + repr.
+
+| bar condition | result | verdict |
+|---|---|---|
+| 1. gold (same-day, trim binary) | candidate **849/988 = 0.859** vs default 845/988 = 0.855 | **PASS** (+4) |
+| 2. representative (trim binary) | candidate **186/260 = 0.715** vs default 185/260 = 0.712 | **PASS** (+1, no flag) |
+| 3. gate triggers ⊆ table (`gate_attneg2-trim.json`) | compact_ymd CLEARED ✓, but 3 non-table labels still band | **FAIL** |
+| 4. damage recovery (round-3 full-model) | six sets green | **PASS** |
+
+**The trim fixed its target and unmasked a hidden one.** compact_ymd left the trigger
+set (the range validator routes the 8-digit financial/ID junk to integer; `20171231`
+keeps the label, `15800000`/`10102373` fail). The remaining 7 triggers:
+
+- **npi 42,675→793, upc, aba_routing** — in the pre-registered checksum table (gated-YDF
+  shape-matcher false alarms). ACCEPTABLE.
+- **isbn** collapse — same checksum class (gated-YDF 16.8% reliable). Blessable per the
+  re-presentation note; not the blocker.
+- **compact_mdy** collapse (base_correct 1088 → cand 79) — NEW, **exposed not created by
+  the trim**. With the shape-only `^\d{8}$` gone, the candidate's pre-existing mdy recall
+  hole is visible: it demotes genuine constant-repeated MMDDYYYY dates (`BOOKING DATE`,
+  `ARREST DATE` = `10262016`) to word/unknown — the round-1 constant-numeric→not-a-type
+  shortcut, repaired for ymd (blend v3 `ymdfix`) but never for mdy. NARROW: 29 in-sample
+  cols, 2 header names, ~5 criminal-justice datasets. NOT trim-fixable (Sense-stage loss,
+  lands on word/unknown before Sharpen). Fixable only by a word/unknown→compact_mdy
+  recovery guard (no-retrain playbook) or a 4th blend with mdy repair negatives (ruled out).
+- **cpt** oracle_fp (922→1,738) — salaries/percentiles/hertz → medical codes
+  (`Median`=50000, `sample_rate_hertz`=22050); baseline AND oracle both say
+  integer_number (247 in-sample FPs, 30 names, 9 earnings/survey datasets). **The
+  numeric-attractor disease RELOCATED**: squeezing npi(10-digit)/upc(12-digit) pushed
+  5-digit mass onto cpt (negatives were constant-numeric→integer; salaries vary, so they
+  weren't covered). NO cheap fix — CPT has no checksum and salaries fall inside its numeric
+  range; only a retrain mining 5-digit cpt negatives closes it. NOT in table.
+- **amount_accounting** over_emit 4.2× — benign: 355 empty pandas index columns
+  (`__index_level_N__`, `Unnamed: 0`) + 243 within-family `amount→amount_accounting`
+  sibling reshuffle + 326 stable; only 5 real FPs (color_rgb). Low harm; not in table.
+
+**Decisive fact: gold is structurally blind to the whole trade.** compact_mdy, cpt,
+amount_accounting, npi, upc are ALL absent from the 988-col gold fixture — so the +4 gold /
++1 repr come from elsewhere and cannot see the relocation. The corpus-honest gate is the
+only instrument that sees it, and it is BLOCKING (H05): **no headline overrides a blocking
+NO-GO.**
+
+**Recommendation (author decision): NO-GO — stop and bank, per the all-or-stop
+pre-authorisation.** The retrain killed the npi/upc attractor broadly (34+6 datasets) but
+could not clear the gate without (a) relocating the attractor to cpt and (b) exposing an
+unrepaired mdy date-recall hole — neither cheaply/deterministically fixable for THIS
+candidate (compact_mdy needs a new recovery guard AND cpt still blocks; cpt needs the
+ruled-out 4th blend). Shipping it would relocate error, the one thing the campaign is
+committed not to do. **Round-4 recipe seed (future campaign):** one retrain mining hard
+negatives across ALL numeric-code attractors simultaneously — npi/upc (constant + varying),
+**cpt 5-digit salaries/hertz**, aba — plus **compact_mdy constant-date repair** (mirror the
+ymdfix family). attneg2-s44 stays banked as the round-4 base (value encoder co-located,
+release-ready if the author instead elects to WAIVE cpt+compact_mdy — a deliberate H05
+override, not recommended). models/default untouched; no artifact cleanup until the author
+rules (candidate lives among the banked dirs).
+
 ## What we don't know yet
 
 - Whether header-carrying negatives shift the header branch for integer_number/plain_text in a way
