@@ -707,7 +707,9 @@ datetime.date.compact_ymd:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{8}$"
+    # Range-carrying, not shape-only (audit W2.7): an 8-digit financial figure like
+    # 15800000 must not validate as a date — month/day/year windows are the substance.
+    pattern: "^(19|20)\\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\\d|3[01])$"
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
@@ -735,7 +737,8 @@ datetime.date.compact_dmy:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{8}$"
+    # Range-carrying (audit W2.7), day-first ordering.
+    pattern: "^(0[1-9]|[12]\\d|3[01])(0[1-9]|1[0-2])(19|20)\\d{2}$"
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
@@ -765,7 +768,8 @@ datetime.date.compact_mdy:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{8}$"
+    # Range-carrying (audit W2.7), month-first (US) ordering.
+    pattern: "^(0[1-9]|1[0-2])(0[1-9]|[12]\\d|3[01])(19|20)\\d{2}$"
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
