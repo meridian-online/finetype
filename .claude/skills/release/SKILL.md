@@ -35,15 +35,19 @@ Run these checks and **stop on any failure**:
 
 1. **Model artifacts exist** — verify `<model_dir>` contains:
    - `model.safetensors` (required — the weights)
-   - `config.json` (required — architecture config)
+   - `config.json` (required — architecture config; for dual-encoder models it must
+     carry `value_embed_model` and `type_index_keys`)
    - `label_map.json` (required — class index mapping)
+   - `value_model2vec/` (required for dual-encoder models — the co-located value
+     encoder; profile-time loading fails without it, an empty snapshot masquerades as
+     a model failure)
    - `results.json` (optional — training metrics)
 
 2. **Tests pass** — `cargo test -p finetype-model` must pass with zero failures.
 
 3. **Zero warnings** — `cargo build --workspace 2>&1 | grep "^warning\[" | head -1` must be empty (build.rs info lines are fine).
 
-4. **Config sanity** — read `config.json` and print key fields: `n_classes`, `activation`, `head_type`. Confirm `n_classes` matches the taxonomy count (`239` as of current taxonomy).
+4. **Config sanity** — read `config.json` and print key fields: `n_classes`, `activation`, `head_type`. Confirm `n_classes` matches the live taxonomy count from `./target/release/finetype taxonomy | grep -cE "^[a-z]"` — never a hardcoded number (a stale `239` here once outlived three taxonomy expansions). Recovery-only leaves are model-invisible by design, so an intentional gap must be stated in the release notes, not silently accepted.
 
 5. **Current default** — read `models/default` symlink and show what's being replaced.
 
@@ -57,7 +61,14 @@ Upload the three required files to `meridian-online/finetype-model`:
 from huggingface_hub import HfApi
 api = HfApi()
 
-for file in ["model.safetensors", "config.json", "label_map.json"]:
+files = ["model.safetensors", "config.json", "label_map.json"]
+# Dual-encoder models additionally ship the co-located value encoder:
+from pathlib import Path
+ve = Path(model_dir) / "value_model2vec"
+if ve.is_dir():
+    files += [f"value_model2vec/{p.name}" for p in ve.iterdir() if p.is_file()]
+
+for file in files:
     api.upload_file(
         path_or_fileobj=f"{model_dir}/{file}",
         path_in_repo=f"{model_name}/{file}",
@@ -69,9 +80,12 @@ for file in ["model.safetensors", "config.json", "label_map.json"]:
 
 Where `model_name` is the directory basename (e.g. `sherlock-v11`).
 
-After upload, verify the files are accessible:
+After upload, verify the files are accessible (include one value_model2vec file for
+dual-encoder models — `download-model.sh` fetches them and a partial upload 404s at
+install time, not at release time):
 ```bash
 curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/{model_name}/model.safetensors"
+curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/{model_name}/value_model2vec/model.safetensors"  # dual-encoder only
 ```
 
 ### 3. Update Default Symlink
@@ -149,6 +163,11 @@ Run these and **stop on any failure** — a binary release that fails build ship
    ```bash
    curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/$DEFAULT/model.safetensors" >/dev/null \
      && echo "$DEFAULT published" || echo "MISSING — run /release model first"
+   # Dual-encoder defaults: the value encoder must be fetchable too, or
+   # download-model.sh installs a model that cannot load at profile time.
+   [ -d "models/$DEFAULT/value_model2vec" ] && \
+     { curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/$DEFAULT/value_model2vec/model.safetensors" >/dev/null \
+       && echo "$DEFAULT value encoder published" || echo "VALUE ENCODER MISSING — rerun /release model"; }
    ```
 
    If it 404s, the model has not been released — run the **Model Release** flow first.

@@ -275,6 +275,33 @@ stay-dead; BLOCKING) → 3-seed overnight → post-train checks. Release bar pre
 per the review's trigger table; release tooling needs two patches before /release
 (5-file dual-encoder HF upload list; stale hardcoded taxonomy count).
 
+## Pre-registered swap + release bar — author-approved 2026-07-06 evening, BEFORE round-3 results
+
+Author authorisation ("proceed with your recommendations"): if ALL FOUR conditions below
+hold on the round-3 (attneg2) results, the swap and full release proceed same-day without
+a further ask; if ANY misses, stop — no third blend iteration, bank the work.
+
+1. **Gold, same-day regenerated for BOTH models:** candidate ≥ the current default on
+   the current fixture (default reads 845/988-era; regenerate both at decision time —
+   never compare to a stale snapshot).
+2. **Representative band:** candidate ≥ 0.712 (the shipped default's current reading);
+   no advisory flag.
+3. **Corpus-honest gate (fresh-vs-fresh):** triggered labels ⊆ the pre-registered table —
+   ACCEPTABLE: npi / upc / aba_routing collapse (gated-YDF checksum shape-matcher false
+   alarms; residual npi marginal ≤ ~2× genuine mass per the round-1 criterion),
+   unix_seconds oracle_fp with oracle-confirmed support RISING. BLOCKING: decimal_number,
+   compact_ymd, whitespace_separated, word/unknown net-confirmed-loss beyond the
+   composition-aware netting, or ANY label not named here.
+4. **Damage-recovery at convergence:** the six named sets green on the best seed
+   (decimal/ymd/ws ≥50% recovered, npi/upc ≥90% stay-dead), re-scored with the full
+   model, not just the proxy.
+
+On pass: apply swap (`ln -sfn attneg2-s<best> models/default`), `/release` (model + patch
+binary; release-skill dual-encoder patches applied 2026-07-06), merge `figi-checksum` to
+main. Residuals that stay open regardless: financial→unix leak (untrainable at the
+min_values floor), whitespace validator tightening (next campaign, gate-creditable),
+W4 founder-style + short-code round-2 mining.
+
 ## What we don't know yet
 
 - Whether header-carrying negatives shift the header branch for integer_number/plain_text in a way
