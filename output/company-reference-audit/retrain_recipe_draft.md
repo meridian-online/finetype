@@ -192,6 +192,48 @@ redistributed −10.7pp to unknown/plain_text/word/unix at convergence, and `ent
 −2.6pp — is a genuine relocation signal. (2) rare-type scoreboard. (3) The swap itself is
 the author's call (gold parity + gold-adjudicated relocation review, choice 0104).
 
+## Corpus-honest gate — 2026-07-06 13:20, NO-GO, candidate NOT promotable as-is
+
+`gate_attneg.json` (fresh-vs-fresh, default bands): NO-GO, nine triggers. Reading them
+against the pre-registration:
+
+**Pre-adjudicated (the fix landing):** npi collapse 42,675→842 (cand ≈2× genuine mass —
+inside the success criterion); upc collapse 12,873→2,492 (every survivor oracle-co-signed
+12-digit shape); aba_routing collapse 7,522→374 — same checksum-shape-matcher class
+(gated-YDF asserts aba correctly 5.5%), not pre-registered by name but same adjudication
+basis. unix_seconds oracle_fp: growth 39.8k→65k with oracle-confirmed support GROWING
+(38.6k→44.2k) — mostly the Created-family correction, BUT 921/2,707 (34%) of in-sample
+inflow sits under financial-ish headers = the leak tail is material, not noise.
+
+**Genuine regressions (do NOT ride the adjudication):**
+- **decimal_number → unknown: 39,911 in-sample columns, 95% float-shaped, 3,049 distinct
+  headers** (`bookValue -0.138` → unknown). Mechanism (inferred, fits all evidence): the
+  financial-header integer negatives taught "yfinance-family header → integer_number";
+  the model now asserts integer on the FLOAT-valued siblings of those headers; the integer
+  validator rejects decimals; the veto nulls to unknown. Gold/repr couldn't see it (repr
+  went UP anyway); the gate could. Third instance of the additive-retrain pattern
+  (v23 categorical, v24 latitude, attneg decimal).
+- **compact_ymd collapse 1,987→430**: genuine YYYYMMDD date columns (`CLM_FROM_DT
+  20080707…`) now integer_number/unknown — the 10/12-digit→integer signal dragged the
+  8-digit neighbour.
+- whitespace_separated over_emit 2,707→14,133 (entity_name/plain_text inflow) and
+  docker_ref 1.5× — smaller, same bucket.
+
+## Recommended round 2 (one more overnight cycle)
+
+1. **Shape-split the financial family**: mine the float-valued columns of the same
+   yfinance headers as decimal_number POSITIVES (a few hundred, capped) so the header
+   signal stops implying integer; keep integer-valued → integer_number.
+2. **Teach the unix boundary both ways**: financial-header epoch-range 10-digit columns
+   (the ~300 clearly-financial rows of the round-1 EXCLUDE bucket) → integer_number.
+3. **compact_ymd preservation positives**: 8-digit month/day-valid columns under date-ish
+   headers → compact_ymd (capped ~200).
+4. Rebuild blend → FTMB → proxy (expect the unix flag again — pre-adjudicated) →
+   overnight → full gate stack.
+
+Round-1 artifacts stay: models/attneg-s42..44, output/attneg-retrain/ (passes + gate),
+output/distillation-attneg/. Nothing was swapped; models/default untouched.
+
 ## What we don't know yet
 
 - Whether header-carrying negatives shift the header branch for integer_number/plain_text in a way
