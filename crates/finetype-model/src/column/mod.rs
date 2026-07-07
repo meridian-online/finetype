@@ -2884,8 +2884,8 @@ impl ColumnClassifier {
     /// `membership_substance_guard` (default ON). Twin of
     /// `checksum_substance_guard` for types whose substance is CLOSED-SET
     /// membership rather than a check digit (the taxonomy `membership:`
-    /// directive — icao_airports, iata_airports today; see
-    /// `finetype_core::membership` and labels/sets/). The taxonomy's shape
+    /// directive — icao_airports, iata_airports, naics_codes, tld, unlocode
+    /// today; see `finetype_core::membership` and labels/sets/). The taxonomy's shape
     /// pattern (`^[A-Z]{4}$` / `^[A-Z]{3}$`) confirms every same-shape token —
     /// a 4-letter stock-ticker column validates 100% as icao_code, which not
     /// only survives the veto but disarms the attractor demotion

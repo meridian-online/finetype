@@ -6931,6 +6931,83 @@ geography.transportation.icao_code:
 }
 
 #[test]
+fn membership_guard_demotes_tickers_off_unlocode() {
+    // dataset-descriptor audit (EDGAR `ticker`): stock tickers clear the
+    // UN/LOCODE shape `^[A-Z]{2}[A-Z2-9]{3}$` (and the model calls the column
+    // unlocode at 0.90), but they are not in the published UNECE list. The
+    // 5-char shape is why the shape-only validator fix never touched it;
+    // membership is the substance that demotes the overcall.
+    let yaml = r#"
+geography.transportation.unlocode:
+  title: UN/LOCODE
+  designation: universal
+  tier: [VARCHAR, transportation]
+  samples: ["USLAX"]
+  validation:
+    type: string
+    pattern: '^[A-Z]{2}[A-Z2-9]{3}$'
+  membership: unlocode
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    // Real 5-char tickers / fund symbols, all verified non-members of the set.
+    let tickers: Vec<String> = vec![
+        "GOOGL", "BRKAX", "AMZNX", "ZVZZT", "VTSAX", "FXAIX", "SWPPX", "VFIAX", "VBIAX", "QQQQY",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense(
+            "ticker",
+            &tickers,
+            "geography.transportation.unlocode",
+            0.90,
+        )
+        .unwrap();
+    assert_ne!(
+        r.label, "geography.transportation.unlocode",
+        "non-member tickers must demote the unlocode overcall"
+    );
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("membership_substance_guard:geography.transportation.unlocode")
+    );
+}
+
+#[test]
+fn membership_guard_keeps_real_unlocodes() {
+    // Genuine UN/LOCODE columns are list members → untouched.
+    let yaml = r#"
+geography.transportation.unlocode:
+  title: UN/LOCODE
+  designation: universal
+  tier: [VARCHAR, transportation]
+  samples: ["USLAX"]
+  validation:
+    type: string
+    pattern: '^[A-Z]{2}[A-Z2-9]{3}$'
+  membership: unlocode
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    let codes: Vec<String> = vec!["USLAX", "GBLON", "DEHAM", "SGSIN", "NLRTM", "USNYC"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("port", &codes, "geography.transportation.unlocode", 0.93)
+        .unwrap();
+    assert_eq!(r.label, "geography.transportation.unlocode");
+}
+
+#[test]
 fn membership_guard_demotes_nonmember_codes_off_iata() {
     // iata's set covers ~52% of the 3-letter space, so unlike icao the guard
     // only decides columns that skew non-member (a major-currency column is

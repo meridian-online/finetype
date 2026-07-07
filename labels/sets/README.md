@@ -30,6 +30,14 @@ licence, snapshot date, and extraction rule in its header.
   `https://data.iana.org/TLD/tlds-alpha-by-domain.txt`, drop the leading
   `# Version` comment, lower-case, sort. Refresh opportunistically; new gTLD
   delegations land a few times a year.
+- `unlocode_codes.txt` — from UNECE Recommendation 16 (public data), via the
+  `datasets/un-locode` mirror
+  (`https://raw.githubusercontent.com/datasets/un-locode/main/data/code-list.csv`):
+  `duckdb -csv -noheader -c "SELECT DISTINCT upper(Country)||upper(Location) AS code FROM read_csv('code-list.csv', header=true, all_varchar=true) WHERE Country ~ '^[A-Za-z]{2}$' AND Location ~ '^[A-Za-z2-9]{3}$' ORDER BY code"`
+  (5-char = 2-letter country + 3-char location, the type's own shape). All
+  statuses are kept deliberately — the guard is demote-only, so an inclusive
+  set never demotes a genuine locode column over a recently-retired code.
+  ~116k codes; refresh opportunistically (UNECE publishes twice a year).
 
 Enrolling a new set: add the file here, one entry in
 `membership::resolve()`, and a one-line `membership:` directive in the type's

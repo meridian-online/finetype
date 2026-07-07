@@ -25,10 +25,14 @@
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
+/// A closed-set membership predicate: `true` when the value belongs to the set.
+type MembershipFn = fn(&str) -> bool;
+
 const ICAO_AIRPORTS_RAW: &str = include_str!("../data/sets/icao_airport_codes.txt");
 const IATA_AIRPORTS_RAW: &str = include_str!("../data/sets/iata_airport_codes.txt");
 const NAICS_CODES_RAW: &str = include_str!("../data/sets/naics_codes.txt");
 const TLD_CODES_RAW: &str = include_str!("../data/sets/tld_codes.txt");
+const UNLOCODE_CODES_RAW: &str = include_str!("../data/sets/unlocode_codes.txt");
 
 fn parse_set(raw: &'static str) -> HashSet<&'static str> {
     raw.lines()
@@ -57,6 +61,11 @@ fn tld_codes_set() -> &'static HashSet<&'static str> {
     SET.get_or_init(|| parse_set(TLD_CODES_RAW))
 }
 
+fn unlocode_codes_set() -> &'static HashSet<&'static str> {
+    static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
+    SET.get_or_init(|| parse_set(UNLOCODE_CODES_RAW))
+}
+
 /// `true` when the value (trimmed, case-folded to uppercase) is a published
 /// ICAO airport code.
 pub fn icao_airports(value: &str) -> bool {
@@ -83,18 +92,38 @@ pub fn tld_codes(value: &str) -> bool {
     tld_codes_set().contains(value.trim().to_lowercase().as_str())
 }
 
+/// `true` when the value (trimmed, case-folded to uppercase) is a published
+/// UN/LOCODE (2-letter ISO-3166-1 country + 3-char location). The shape
+/// `^[A-Z]{2}[A-Z2-9]{3}$` confirms every 5-char uppercase token — a stock
+/// ticker or arbitrary code that clears the shape is not a location; the
+/// published list is what distinguishes them (company-reference audit ticker
+/// finding).
+pub fn unlocode(value: &str) -> bool {
+    unlocode_codes_set().contains(value.trim().to_uppercase().as_str())
+}
+
+/// Every named membership set as `(directive_name, predicate)`, in a stable
+/// order. Single source of truth: [`resolve`] looks up its arm here, and
+/// diagnostics that must check a value or column against *all* sets (e.g. the
+/// multi-set collision analysis behind the set-vs-set voting question) iterate
+/// it — so the two can never drift. Enrol a new set-backed type by adding its
+/// file and one row here.
+pub fn all_sets() -> &'static [(&'static str, MembershipFn)] {
+    &[
+        ("icao_airports", icao_airports),
+        ("iata_airports", iata_airports),
+        ("naics_codes", naics_codes),
+        ("tld", tld_codes),
+        ("unlocode", unlocode),
+    ]
+}
+
 /// Resolve a `membership:` directive name to its membership function.
 ///
 /// Returns `None` for an unknown name so the caller can surface the typo.
-/// Add a match arm here (plus the set file) to enrol a new set-backed type.
-pub fn resolve(name: &str) -> Option<fn(&str) -> bool> {
-    match name {
-        "icao_airports" => Some(icao_airports),
-        "iata_airports" => Some(iata_airports),
-        "naics_codes" => Some(naics_codes),
-        "tld" => Some(tld_codes),
-        _ => None,
-    }
+/// Add a row to [`all_sets`] (plus the set file) to enrol a new set-backed type.
+pub fn resolve(name: &str) -> Option<MembershipFn> {
+    all_sets().iter().find(|(n, _)| *n == name).map(|(_, f)| *f)
 }
 
 #[cfg(test)]
@@ -157,7 +186,31 @@ mod tests {
         assert!(resolve("iata_airports").is_some());
         assert!(resolve("naics_codes").is_some());
         assert!(resolve("tld").is_some());
+        assert!(resolve("unlocode").is_some());
         assert!(resolve("no_such_set").is_none());
+    }
+
+    #[test]
+    fn resolve_covers_every_all_sets_entry() {
+        // resolve() is defined over all_sets(); guarantee they stay in lock-step
+        // so a diagnostic iterating all_sets and the guard calling resolve agree.
+        for (name, _) in all_sets() {
+            assert!(resolve(name).is_some(), "{name} must resolve");
+        }
+    }
+
+    #[test]
+    fn unlocode_set_matches_real_locodes_and_rejects_tickers() {
+        for code in ["USLAX", "GBLON", "DEHAM", "SGSIN", "NLRTM", " uslax "] {
+            assert!(unlocode(code), "{code} should be a known UN/LOCODE");
+        }
+        // 5-char uppercase tokens that clear the shape `^[A-Z]{2}[A-Z2-9]{3}$`
+        // but are stock tickers, not locations — the collision this set breaks
+        // (dataset-descriptor audit: EDGAR `ticker` → unlocode). Shorter tickers
+        // (AAPL/TXG) never match the 5-char shape; these 5-char ones do.
+        for ticker in ["GOOGL", "BRKAX", "AMZNX", "ZZZZZ"] {
+            assert!(!unlocode(ticker), "{ticker} must not validate as UN/LOCODE");
+        }
     }
 
     #[test]

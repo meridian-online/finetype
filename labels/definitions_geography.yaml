@@ -1579,6 +1579,12 @@ geography.transportation.unlocode:
   validation:
     type: string
     pattern: "^[A-Z]{2}[A-Z2-9]{3}$"
+  # Closed-set substance: the shape confirms every 5-char uppercase token
+  # (stock tickers, arbitrary codes), so `membership_substance_guard` re-checks
+  # values against the published UNECE list — a column mostly outside it (e.g.
+  # EDGAR `ticker`) is demoted by shape, not kept as unlocode. Set + regen recipe:
+  # labels/sets/unlocode_codes.txt.
+  membership: unlocode
   tier: [VARCHAR, transportation]
   release_priority: 3
   aliases: [un_locode]
