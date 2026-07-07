@@ -98,8 +98,8 @@ ln -sfn {model_name} models/default
 
 If eval results exist (check `<model_dir>/eval/` or `eval/eval_output/profile_results.json`):
 
-1. **Card 0002** (`.orbit/cards/0002-semantic-type-detection.yaml`) — update the `goal:` field with the new eval baseline
-2. **CLAUDE.md** — update the `Default model:` line and `Profile eval:` numbers in both Current State and Evaluation infrastructure sections
+1. **CLAUDE.md** — update the `Default model:` line and `Profile eval:` numbers in both Current State and Evaluation infrastructure sections
+2. **Eval baseline** — record the new baseline wherever eval goals are tracked. (Orbit is retired; per-tool cards/decisions now centralise in the `bearing` control-plane repo — update the baseline there if that tracking has moved.)
 
 If no eval results exist, note this and skip — the eval must run before CLAUDE.md can be updated.
 
@@ -107,7 +107,7 @@ If no eval results exist, note this and skip — the eval must run before CLAUDE
 
 Stage and commit:
 ```bash
-git add models/default .orbit/cards/0002-semantic-type-detection.yaml CLAUDE.md
+git add models/default CLAUDE.md
 git commit -m "Publish {model_name} to HuggingFace, update default model"
 git push
 ```
