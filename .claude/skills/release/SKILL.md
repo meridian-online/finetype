@@ -9,7 +9,7 @@ allowed-tools: Bash, Read, Edit
 
 # /release
 
-Two release types: **model** (publish trained weights to HuggingFace) and **binary** (cut a GitHub release with cross-platform binaries + Homebrew update).
+Two release types: **model** (publish trained weights to HuggingFace) and **binary** (cut a GitHub release with cross-platform binaries + Homebrew update). A binary release also **surfaces the separate DuckDB community-channel refresh** — that channel is not part of `release.yml`, so the skill prompts for it rather than letting it drift silently.
 
 ## Versioning Policy
 
@@ -236,6 +236,39 @@ The `v*` tag triggers `.github/workflows/release.yml` which:
 1. Check the [release page](https://github.com/meridian-online/finetype/releases) for the new version
 2. Verify all 5 platform builds completed
 3. Test: `brew upgrade finetype` (after Homebrew tap updates)
+
+### DuckDB community extension (separate channel — surface this every binary release)
+
+`release.yml` does **not** touch the DuckDB community channel — the extension is a distinct
+artifact, published by a manual PR to `duckdb/community-extensions`, which DuckDB's own CI
+then rebuilds (including for each new DuckDB release, at the pinned `ref`). Because it sits
+outside this automation it drifts silently, so **after every binary release, surface it and
+ask the user** — don't skip quietly:
+
+> The DuckDB community extension is on a separate channel, currently **{community_version}**
+> (this release is **{new_version}**). Refresh it now? [y/N]
+
+Read `{community_version}` from the descriptor (or the last merged upstream PR):
+
+```bash
+grep -m1 '^  version:' ../community-extensions/extensions/finetype/description.yml
+gh pr list -R duckdb/community-extensions --search finetype --state merged -L 1
+```
+
+**Resubmit only when it earns an external PR — batch, don't PR per patch:**
+- extension users should get materially newer finetype (new/renamed types or `ft_` functions), or
+- a DuckDB bump broke the pinned build and needs a new `ref` (see `weekly-duckdb-compat.yml`).
+
+If **yes** — in the `community-extensions` repo (a fork of `duckdb/community-extensions`):
+1. Edit `extensions/finetype/description.yml`: bump `version` → `{new_version}`, repoint
+   `repo.ref` to the release commit/tag, and refresh the type count + `ft_` docs if they changed.
+2. If the duckdb pin moved, confirm the `ref` builds on DuckDB's CI first (Windows MSVC is the
+   usual break — see Binary pre-flight #7).
+3. PR upstream to `duckdb/community-extensions` (branch `finetype-v{new_version}`); their CI
+   rebuilds + redistributes on merge. This is an external, reviewed, outward-facing PR.
+
+If **no** — note it and move on: CLI / Homebrew / install users are already current; extension
+users stay on {community_version} until a deliberate resubmission.
 
 ### crates.io (library crates — separate, deliberate step)
 
