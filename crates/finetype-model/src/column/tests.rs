@@ -1376,6 +1376,133 @@ fn country_code_corroboration_is_default_on() {
 }
 
 #[test]
+fn geo_code_membership_vote_is_default_on() {
+    assert!(!rhh::is_disabled("geo_code_membership_vote"));
+}
+
+/// Minimal taxonomy carrying the country_code enum + the state_code EN_US enum,
+/// with DE/IN/CA deliberately valid as BOTH (the collision the vote must survive).
+fn geo_vote_classifier() -> ColumnClassifier {
+    let yaml = r#"
+geography.location.country_code:
+  title: Country Code
+  designation: universal
+  tier: [VARCHAR, location]
+  samples: ["US"]
+  validation:
+    type: string
+    pattern: '^[A-Z]{2}$'
+    enum: ["DE", "IT", "GB", "NL", "ES", "FR", "IN", "CN", "SE", "CA", "SK", "YT"]
+geography.location.state_code:
+  title: State Code
+  designation: locale_specific
+  tier: [VARCHAR, location]
+  samples: ["CA"]
+  validation:
+    type: string
+    pattern: '^[A-Z]{2}$'
+  validation_by_locale:
+    EN_US:
+      type: string
+      enum: ["DE", "IN", "CA", "TX", "NY", "FL"]
+    EN_CA:
+      type: string
+      enum: ["NL", "SK", "YT", "QC", "ON", "BC", "MB"]
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    cc
+}
+
+#[test]
+fn geo_vote_flips_country_dominant_state_code_to_country() {
+    // GLEIF `jurisdiction`: 89% ISO countries + 11% US-DE subdivisions; the tail
+    // drags the model to state_code. country 0.9 >> us_state 0.2 -> country_code.
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = [
+        "IT", "GB", "NL", "ES", "FR", "CN", "SE", "DE", "IN", "US-DE",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("jurisdiction", &vals, "geography.location.state_code", 0.99)
+        .unwrap();
+    assert_eq!(r.label, "geography.location.country_code");
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_code_membership_vote:geography.location.state_code")
+    );
+}
+
+#[test]
+fn geo_vote_keeps_genuine_us_states() {
+    // A real US-states column: us_state 1.0, country ~0.33 (only DE/IN overlap) —
+    // below the 0.70 country bar, so it is NOT wrongly promoted to country_code.
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["CA", "TX", "NY", "FL", "DE", "IN"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("state", &vals, "geography.location.state_code", 0.90)
+        .unwrap();
+    // The vote's contract is that it must NOT promote a genuine US-states column to
+    // country_code (the 0.51-overlap density trap the margin gate exists to stop).
+    // Other pipeline rules may relabel state_code independently; that is not this rule.
+    assert_ne!(r.label, "geography.location.country_code");
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_code_membership_vote:geography.location.state_code")
+    );
+}
+
+#[test]
+fn geo_vote_leaves_ambiguous_columns_alone() {
+    // Every value valid as BOTH country and US state (DE, IN, CA): neither side
+    // clears the margin, so the model's call stands rather than a coin-flip.
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["DE", "IN", "CA", "DE", "IN", "CA"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("code", &vals, "geography.location.country_code", 0.80)
+        .unwrap();
+    assert_eq!(r.label, "geography.location.country_code");
+    assert!(
+        !r.disambiguation_applied
+            || r.disambiguation_rule.as_deref()
+                != Some("geo_code_membership_vote:geography.location.country_code")
+    );
+}
+
+#[test]
+fn geo_vote_keeps_canadian_provinces_as_state_not_country() {
+    // Regression (caught by the corpus-honest per-column trace): Canadian province
+    // codes (NL, SK, YT…) collide with country codes (Netherlands, Slovakia,
+    // Mayotte). With a US-ONLY subdivision set an NL-heavy column scores ~0.7
+    // country / 0 state and wrongly flips to country_code. Unioning EN_CA fixes it:
+    // subdivision coverage 1.0 dominates, so state_code is preserved.
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["NL", "NL", "NL", "SK", "YT", "QC", "ON"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("state", &vals, "geography.location.state_code", 0.90)
+        .unwrap();
+    assert_ne!(r.label, "geography.location.country_code");
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_code_membership_vote:geography.location.state_code")
+    );
+}
+
+#[test]
 fn binary_vocab_veto_is_default_on() {
     assert!(!rhh::is_disabled("binary_vocab_veto"));
 }

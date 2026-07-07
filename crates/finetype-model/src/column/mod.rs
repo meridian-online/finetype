@@ -2211,6 +2211,7 @@ impl ColumnClassifier {
         self.unlocode_format_veto(result, sample);
         self.city_region_header_corroboration(result, header, sample);
         self.country_code_corroboration(result, header, sample);
+        self.geo_code_membership_vote(result, header, sample);
         self.timezone_abbreviation_recovery(result, header, sample);
         self.naics_industry_recovery(result, header, sample);
         self.s_expression_recovery(result, sample);
@@ -3116,6 +3117,102 @@ impl ColumnClassifier {
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("country_code_corroboration".to_string());
         result.detected_locale = None;
+    }
+
+    /// `geo_code_membership_vote` (default ON). Dominant-member vote for the
+    /// `state_code` <-> `country_code` confusion, which `country_code_corroboration`
+    /// deliberately does NOT touch: 31 of the 56 US-state codes (AL, CA, DE, IN,
+    /// …) are ALSO ISO-3166-1 country codes, so a genuine US-states column already
+    /// scores ~0.51 country coverage — a simple >50% majority would wrongly promote
+    /// it. This is the set-vs-set case membership sets exist for (certainties, not
+    /// simulated semantics): count each value's membership in the country_code enum
+    /// vs the union of state_code's subdivision-locale enums (US/CA/AU) and assign
+    /// the winner ONLY when it clears a high bar (>=0.70) AND beats the loser by a
+    /// margin (>=0.20). A genuinely ambiguous column (all values valid as both) fails
+    /// the margin and keeps the model's label.
+    ///
+    /// Motivating case (dataset-descriptor audit): GLEIF `jurisdiction` is 89% ISO
+    /// country codes (IN, IT, DE, GB) + 11% ISO-3166-2 subdivisions (US-DE) — the
+    /// 11% tail drags the model to `state_code`; measured coverage country 0.89 vs
+    /// us_state 0.21 votes it back to `country_code`. A genuine US-states column
+    /// (state 1.0, country 0.51) votes `state_code`. Value-based (0048), RHH-disableable.
+    /// Reads existing taxonomy enums — no new set files.
+    fn geo_code_membership_vote(
+        &self,
+        result: &mut ColumnResult,
+        _header: &str,
+        sample: &[String],
+    ) {
+        if rhh::is_disabled("geo_code_membership_vote") {
+            return;
+        }
+        const COUNTRY: &str = "geography.location.country_code";
+        const STATE: &str = "geography.location.state_code";
+        if result.label != COUNTRY && result.label != STATE {
+            return;
+        }
+        let Some(taxonomy) = self.taxonomy.as_ref() else {
+            return;
+        };
+        let Some(country_v) = taxonomy.get_validator(COUNTRY) else {
+            return;
+        };
+        // Subdivision substance is the UNION of every state_code locale enum
+        // (EN_US 56 + EN_CA 13 + EN_AU 8), not the top-level `^[A-Z]{2}$` shape and
+        // not US alone: Canadian province codes (NL, SK, YT, QC…) collide with
+        // country codes (Netherlands, Slovakia, Mayotte), so a US-only set would
+        // score a Canadian-province column ~0.5 country / low state and wrongly
+        // vote it country_code. Unioning all supported locales counts it as a
+        // subdivision column (measured: CA provinces score subdiv 1.0 / country 0.5).
+        let subdivisions: std::collections::HashSet<String> = taxonomy
+            .get(STATE)
+            .and_then(|d| d.validation_by_locale.as_ref())
+            .map(|by_locale| {
+                by_locale
+                    .values()
+                    .filter_map(|v| v.enum_values.as_ref())
+                    .flatten()
+                    .map(|s| s.to_uppercase())
+                    .collect()
+            })
+            .unwrap_or_default();
+        if subdivisions.is_empty() {
+            return;
+        }
+        let non_empty: Vec<String> = sample
+            .iter()
+            .map(|v| v.trim().to_uppercase())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let n = non_empty.len() as f64;
+        let country_cov = non_empty.iter().filter(|v| country_v.is_valid(v)).count() as f64 / n;
+        let state_cov = non_empty
+            .iter()
+            .filter(|v| subdivisions.contains(*v))
+            .count() as f64
+            / n;
+        const WIN: f64 = 0.70;
+        const MARGIN: f64 = 0.20;
+        let winner = if country_cov >= WIN && country_cov >= state_cov + MARGIN {
+            COUNTRY
+        } else if state_cov >= WIN && state_cov >= country_cov + MARGIN {
+            STATE
+        } else {
+            // No clear dominant member (e.g. a column of codes valid as both) —
+            // leave the model's call rather than guess.
+            return;
+        };
+        if winner == result.label {
+            return;
+        }
+        let from = result.label.clone();
+        result.label = winner.to_string();
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("geo_code_membership_vote:{from}"));
+        result.detected_locale = detect_locale_from_validation(sample, &result.label, taxonomy);
     }
 
     /// `amount_bare_number_veto` (default ON). Runs AFTER `apply_header_sharpen`,
