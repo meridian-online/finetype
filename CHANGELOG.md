@@ -5,6 +5,24 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.41] - 2026-07-07
+
+### Fixed
+
+- **`npi` / `upc` no longer over-emitted on any 10-/12-digit number** (check-digit substance
+  guards wired). The model treated every 10-digit column as an NPI and every 12-digit column
+  as a UPC — sweeping in financial figures (`ebit`, `marketCap`, `grossProfit`,
+  `sharesOutstanding`), Unix-epoch timestamps, and product/particle-id runs (~42k npi + ~13k
+  upc columns in the 33k-file corpus sample). The `checksum: npi` (Luhn) and `checksum: gs1`
+  (GS1 mod-10) directives now demote a value of the right shape but wrong check digit to
+  `integer_number`, cutting the over-emission ~87% (npi) / ~95% (upc). Genuine NPIs/UPCs carry
+  a valid check digit and keep their type. Value-based (decision 0048); gold +2, representative
+  neutral, per-column verified (demoted columns are financial figures / epochs / product ids).
+  The corpus-honest gate's collapse NO-GO on npi/upc is the documented checksum-blind false
+  alarm — gated-YDF is 9.6% / 2.7% reliable on these and co-signs the shape-match, so it cannot
+  referee a checksum demotion — adjudicated by gold + per-column evidence per choice 0104's
+  structural-blindness carve-out.
+
 ## [0.6.40] - 2026-07-05
 
 ### Changed
