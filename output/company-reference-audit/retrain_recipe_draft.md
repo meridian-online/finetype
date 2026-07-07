@@ -436,6 +436,32 @@ for round-4: figi-checksum carries W2.7, so its compact-date handling is regress
 fixed/reverted — do not trust compact-date behaviour on this branch until then.** The gold
 845/849 comparison is unaffected (gold contains no compact_* columns; W2.7 is gold-invisible).
 
+## npi/upc checksum guards SHIPPED as 0.6.41 — 2026-07-07 (the campaign's shippable core)
+
+With the retrain banked (relocation) and W2.7 banked (date regression), the deterministic
+npi/upc checksum substance guards — HELD since W2b pending the "fix at source" retrain that
+never landed — became the shippable fix. Wired `checksum: npi` (Luhn) + `checksum: gs1`
+(GS1 mod-10), reverted W2.7 (net-zero on dates), gated in isolation
+(`scripts/cksum_gate.sh`, baseline = clean 0.6.40 preW27 pass, candidate = guards):
+
+- **npi 42,675 → 5,566 (−87%), upc 12,873 → 664 (−95%)** on the 33k gate sample.
+- Gate NO-GO with **exactly two triggers (npi + upc collapse), ZERO collateral** — the
+  documented checksum-blind false alarm (gated-YDF 9.6%/2.7% reliable, co-signs the shape).
+- Per-column verified: demoted npi cols are financial figures / epochs (`grossProfit`,
+  `depreciation`, `regularMarketTime`, `sharesOutstanding`) → integer; genuine NPIs (col
+  named `NPI`, valid check digits) KEPT.
+- **Gold 847 vs 845 (+2), repr 185 vs 185 (neutral, no flag).**
+- Residual ~13%/5% coincidental-pass tail (epochs/financials clearing the check digit by
+  chance) — status quo, NOT a regression; the known financial→unix leak.
+
+**Decision: SHIP (author go, 2026-07-07).** Overrides the gate's blocking npi/upc collapse
+as the documented checksum-blind false alarm — extends choice 0104's structural-blindness
+carve-out to checksum-guard rule changes, adjudicated by gold + per-column evidence. This is
+the campaign's real deliverable: the company-reference-audit's #1 corpus wart (npi/upc
+numeric attractor) cut 87–95% by a deterministic, gold-positive, zero-collateral guard.
+Round-4 (future) still owns: the coincidental-pass tail, cpt 5-digit attractor, compact_mdy
+repair, and a proper W2.7-style compact-date junk fix with recovery intact.
+
 ## What we don't know yet
 
 - Whether header-carrying negatives shift the header branch for integer_number/plain_text in a way
