@@ -440,6 +440,148 @@ pub fn figi(value: &str) -> bool {
     figi_check_digit(&chars[..11]) == Some(check as u8)
 }
 
+/// Validate an 8-digit ISSN by its ISO 7064 Mod 11-2 check digit.
+///
+/// The first seven digits carry weights 8,7,6,5,4,3,2; the eighth is a check
+/// digit `(11 − weighted sum mod 11) mod 11`, printed as `X` when 10. ISSNs
+/// print as `NNNN-NNNC`; the hyphen is stripped. Any other length, or a
+/// non-digit where a digit is required, fails.
+pub fn issn(value: &str) -> bool {
+    let chars: Vec<char> = value.trim().chars().filter(|c| *c != '-').collect();
+    if chars.len() != 8 {
+        return false;
+    }
+    let mut sum = 0u32;
+    for (i, &c) in chars[..7].iter().enumerate() {
+        let Some(d) = c.to_digit(10) else {
+            return false;
+        };
+        sum += (8 - i as u32) * d;
+    }
+    let check = (11 - sum % 11) % 11;
+    let given = match chars[7] {
+        'X' | 'x' => 10,
+        c => match c.to_digit(10) {
+            Some(d) => d,
+            None => return false,
+        },
+    };
+    check == given
+}
+
+/// Validate a 16-character ORCID iD by its ISO 7064 Mod 11-2 check digit.
+///
+/// The 15 leading digits fold `total = (total + digit)·2 mod 11`; the check
+/// digit is `(12 − total) mod 11`, printed as `X` when 10. ORCIDs print as
+/// `NNNN-NNNN-NNNN-NNNC`; hyphens are stripped. (Same scheme as ISNI.) Any other
+/// length, or a non-digit in the 15-digit base, fails.
+pub fn orcid(value: &str) -> bool {
+    let chars: Vec<char> = value.trim().chars().filter(|c| *c != '-').collect();
+    if chars.len() != 16 {
+        return false;
+    }
+    let mut total = 0u32;
+    for &c in &chars[..15] {
+        let Some(d) = c.to_digit(10) else {
+            return false;
+        };
+        total = ((total + d) * 2) % 11;
+    }
+    let check = (12 - total) % 11;
+    let given = match chars[15] {
+        'X' | 'x' => 10,
+        c => match c.to_digit(10) {
+            Some(d) => d,
+            None => return false,
+        },
+    };
+    check == given
+}
+
+/// Validate a CAS Registry Number by its check digit.
+///
+/// Format `N…N-NN-N` (2–7, 2, 1 digits); the final digit is a check equal to
+/// `(Σ position·digit) mod 10`, positions counting from the right of the
+/// non-check portion (rightmost = 1). Hyphens are stripped. A non-digit, or
+/// fewer than the 5 minimum digits, fails.
+pub fn cas(value: &str) -> bool {
+    let Some(digits) = value
+        .trim()
+        .chars()
+        .filter(|c| *c != '-')
+        .map(|c| c.to_digit(10))
+        .collect::<Option<Vec<u32>>>()
+    else {
+        return false;
+    };
+    if digits.len() < 5 {
+        return false;
+    }
+    let (body, check) = digits.split_at(digits.len() - 1);
+    let mut sum = 0u32;
+    for (i, &d) in body.iter().rev().enumerate() {
+        sum += (i as u32 + 1) * d;
+    }
+    sum % 10 == check[0]
+}
+
+/// Validate an 11-character ISO 6346 shipping-container code by its check digit.
+///
+/// Owner (3 letters) + category (U/J/Z) + 6-digit serial + 1 check digit. Each
+/// of the first 10 characters takes a value (digits 0–9; letters A=10..Z=38 with
+/// every multiple of 11 skipped) weighted by `2^position` (leftmost = 2^0); the
+/// check digit is `sum mod 11`, with 10 mapped to 0. Any other length, or an
+/// invalid character, fails.
+pub fn iso6346(value: &str) -> bool {
+    // A..Z letter values with multiples of 11 (11, 22, 33) skipped.
+    const LV: [u32; 26] = [
+        10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 34, 35,
+        36, 37, 38,
+    ];
+    let chars: Vec<char> = value.trim().chars().collect();
+    if chars.len() != 11 {
+        return false;
+    }
+    let mut sum = 0u32;
+    for (i, &c) in chars[..10].iter().enumerate() {
+        let v = if c.is_ascii_uppercase() {
+            LV[(c as u32 - 'A' as u32) as usize]
+        } else if let Some(d) = c.to_digit(10) {
+            d
+        } else {
+            return false;
+        };
+        sum += v * (1u32 << i);
+    }
+    let Some(check) = chars[10].to_digit(10) else {
+        return false;
+    };
+    // Check digit is `sum mod 11`; a remainder of 10 is written as 0.
+    (sum % 11) % 10 == check
+}
+
+/// Validate a DEA registration number by its check digit.
+///
+/// Two letters (registrant type + a name initial) then seven digits; the seventh
+/// digit is a check equal to `((d1+d3+d5) + 2·(d2+d4+d6)) mod 10`. Only the
+/// digits enter the checksum. Any other length, a non-letter in the first two
+/// positions, or a non-digit in the numeric part, fails.
+pub fn dea(value: &str) -> bool {
+    let chars: Vec<char> = value.trim().chars().collect();
+    if chars.len() != 9 || !chars[0].is_ascii_alphabetic() || !chars[1].is_ascii_alphabetic() {
+        return false;
+    }
+    let Some(d) = chars[2..9]
+        .iter()
+        .map(|c| c.to_digit(10))
+        .collect::<Option<Vec<u32>>>()
+    else {
+        return false;
+    };
+    let sum = (d[0] + d[2] + d[4]) + 2 * (d[1] + d[3] + d[5]);
+    sum % 10 == d[6]
+}
+
 /// Resolve a `checksum:` directive name to its validating function.
 ///
 /// Returns `None` for an unknown name so the caller can surface the typo
@@ -459,6 +601,11 @@ pub fn resolve(name: &str) -> Option<fn(&str) -> bool> {
         "gs1" => Some(gs1),
         "npi" => Some(npi),
         "abn" => Some(abn),
+        "issn" => Some(issn),
+        "orcid" => Some(orcid),
+        "cas" => Some(cas),
+        "iso6346" => Some(iso6346),
+        "dea" => Some(dea),
         _ => None,
     }
 }
@@ -709,19 +856,77 @@ mod tests {
     }
 
     #[test]
+    fn issn_accepts_and_rejects() {
+        // Canonical valid ISSNs (incl. an X check digit).
+        for v in ["0378-5955", "2049-3630", "0028-0836", "2434-561X"] {
+            assert!(issn(v), "should be a valid ISSN: {v}");
+        }
+        assert!(issn("03785955")); // hyphen optional
+        assert!(!issn("0378-5956")); // check digit bumped
+        assert!(!issn("2049-3631"));
+        assert!(!issn("0378-595")); // 7 digits
+        assert!(!issn("0378-595Y")); // bad check char
+    }
+
+    #[test]
+    fn orcid_accepts_and_rejects() {
+        // The canonical ORCID support example, and one with an X check digit.
+        for v in [
+            "0000-0002-1825-0097",
+            "0000-0001-5109-3700",
+            "0000-0002-1694-233X",
+        ] {
+            assert!(orcid(v), "should be a valid ORCID: {v}");
+        }
+        assert!(!orcid("0000-0002-1825-0098")); // check digit bumped
+        assert!(!orcid("0000-0002-1825-009")); // 15 chars
+        assert!(!orcid("0000-0002-1825-00Y7")); // non-digit base
+    }
+
+    #[test]
+    fn cas_accepts_and_rejects() {
+        // Water, formaldehyde, toluene, benzene — published CAS numbers.
+        for v in ["7732-18-5", "50-00-0", "108-88-3", "71-43-2"] {
+            assert!(cas(v), "should be a valid CAS number: {v}");
+        }
+        assert!(!cas("7732-18-6")); // check digit bumped
+        assert!(!cas("108-88-4"));
+        assert!(!cas("50-0-0")); // too short
+        assert!(!cas("7732-18-X")); // non-digit
+    }
+
+    #[test]
+    fn iso6346_accepts_and_rejects() {
+        // The ISO 6346 worked example plus other valid container numbers.
+        for v in ["CSQU3054383", "MSKU0000006", "HLXU1234561"] {
+            assert!(iso6346(v), "should be a valid ISO 6346 code: {v}");
+        }
+        assert!(!iso6346("CSQU3054384")); // check digit bumped
+        assert!(!iso6346("CSQU305438")); // 10 chars
+        assert!(!iso6346("CSQ_3054383")); // invalid char
+    }
+
+    #[test]
+    fn dea_accepts_and_rejects() {
+        // Valid DEA numbers (the check is over the 7 digits only).
+        for v in ["BB1388568", "AB1234563"] {
+            assert!(dea(v), "should be a valid DEA number: {v}");
+        }
+        assert!(!dea("BB1388569")); // check digit bumped
+        assert!(!dea("AB1234564"));
+        assert!(!dea("1B1388568")); // first position not a letter
+        assert!(!dea("BB138856")); // 8 chars
+        assert!(!dea("BB138856X")); // non-digit in numeric part
+    }
+
+    #[test]
     fn resolve_known_and_unknown() {
-        assert!(resolve("isbn").is_some());
-        assert!(resolve("aba").is_some());
-        assert!(resolve("cusip").is_some());
-        assert!(resolve("sedol").is_some());
-        assert!(resolve("luhn").is_some());
-        assert!(resolve("isin").is_some());
-        assert!(resolve("lei").is_some());
-        assert!(resolve("iban").is_some());
-        assert!(resolve("figi").is_some());
-        assert!(resolve("gs1").is_some());
-        assert!(resolve("npi").is_some());
-        assert!(resolve("abn").is_some());
+        for name in [
+            "isbn", "aba", "cusip", "sedol", "luhn", "isin", "lei", "iban", "figi", "gs1", "npi",
+            "abn", "issn", "orcid", "cas", "iso6346", "dea",
+        ] {
+            assert!(resolve(name).is_some(), "{name} should resolve");
+        }
         assert!(resolve("not_a_scheme").is_none());
     }
 }

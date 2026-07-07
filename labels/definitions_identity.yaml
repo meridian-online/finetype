@@ -903,6 +903,7 @@ identity.commerce.issn:
   validation:
     type: string
     pattern: "^[0-9]{4}-[0-9]{3}[0-9X]$"
+  checksum: issn
   tier: [VARCHAR, code]
   release_priority: 3
   aliases: null
@@ -1063,6 +1064,7 @@ identity.medical.dea_number:
     pattern: "^[ABFMPRabfmpr][A-Za-z]\\d{7}$"
     minLength: 9
     maxLength: 9
+  checksum: dea
   tier: [VARCHAR, medical]
   release_priority: 3
   aliases: [dea, dea_registration]
@@ -1479,6 +1481,7 @@ identity.academic.orcid:
     pattern: "^\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]$"
     minLength: 19
     maxLength: 19
+  checksum: orcid
   tier: [VARCHAR, code]
   release_priority: 3
   aliases: [researcher_id]

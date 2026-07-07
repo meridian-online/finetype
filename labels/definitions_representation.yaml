@@ -843,6 +843,7 @@ representation.scientific.cas_number:
   validation:
     type: string
     pattern: "^\\d{2,7}-\\d{2}-\\d$"
+  checksum: cas
   tier: [VARCHAR, scientific]
   release_priority: 3
   aliases: [cas_rn, cas_id, chemical_id]

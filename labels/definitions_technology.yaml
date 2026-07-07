@@ -439,6 +439,9 @@ technology.code.imei:
   validation:
     type: string
     pattern: "^[0-9]{15}$"
+  # IMEI check digit is standard Luhn; the shape confirms any 15-digit number, so the
+  # substance guard demotes Luhn-failing IDs/epochs to integer_number (attractor curb).
+  checksum: luhn
   tier: [VARCHAR, code]
   release_priority: 3
   aliases: null

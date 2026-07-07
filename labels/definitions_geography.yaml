@@ -1512,6 +1512,7 @@ geography.transportation.iso6346:
   validation:
     type: string
     pattern: "^[A-Z]{3}[UJZ]\\d{7}$"
+  checksum: iso6346
   tier: [VARCHAR, transportation]
   release_priority: 3
   aliases: [container_code, bic_code]
