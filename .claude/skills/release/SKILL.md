@@ -237,6 +237,41 @@ The `v*` tag triggers `.github/workflows/release.yml` which:
 2. Verify all 5 platform builds completed
 3. Test: `brew upgrade finetype` (after Homebrew tap updates)
 
+### crates.io (library crates — separate, deliberate step)
+
+The binary release above does **not** publish to crates.io. The five library crates
+(`finetype-core`, `finetype-model`, `finetype-mcp`, `finetype-train`, `finetype-cli`) are a
+distinct publish. Do it when a release changes library-visible behaviour a downstream crate
+consumer should get — e.g. taxonomy/validator changes, which are **embedded into
+`finetype-core`** at build time, so they reach consumers only via a crates.io bump (a
+`labels/*.yaml` change like the 0.6.41 checksum guards qualifies). Skip it for pure
+binary/CI/tooling changes.
+
+**Publish order — dependency order; each must be on crates.io before the crate that depends
+on it:**
+
+```
+core → model → mcp → train → cli
+```
+
+`finetype-cli` depends on `finetype-mcp` + `finetype-train`, so those publish first even
+though their READMEs mark them internal/no-stability.
+
+```bash
+for c in finetype-core finetype-model finetype-mcp finetype-train finetype-cli; do
+  cargo publish -p "$c" --dry-run   # then drop --dry-run; let the index settle between crates
+done
+```
+
+**Gotcha — `include_str!` of a `labels/` file breaks packaging.**
+`include_str!("../../../labels/…")` escapes the package root, so `cargo package`/`publish`
+fails. Any `labels/` file a crate embeds MUST be reached through an in-crate `data/` symlink
+(e.g. `crates/finetype-core/data/… → ../../../labels/…`); cargo dereferences it at packaging
+while `labels/` stays canonical. Adding a **new** `include_str!` of a `labels/` file without
+the matching `data/` symlink will break the next publish (this silently broke packaging once
+already — see memory `company-reference-audit-2026-07`). Verify with `cargo package -p
+finetype-core` before a real publish.
+
 ### Rollback
 
 **Model rollback:**
