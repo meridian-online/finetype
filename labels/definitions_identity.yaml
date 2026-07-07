@@ -934,11 +934,13 @@ identity.commerce.upc:
     pattern: "^\\d{12}$"
     minLength: 12
     maxLength: 12
-  # checksum: gs1 HELD — same story as npi (see identity.medical.npi): the model
-  # over-emits upc on any 12-digit column (~13k in the gate sample: particleId
-  # and product-id runs). The GS1 guard demotes ~95% correctly but collapses the
-  # over-emitted label past the gate threshold. Wire once the over-emission is
-  # fixed at source. gs1 stays wired on identity.commerce.ean, which is GO.
+  checksum: gs1
+  # WIRED 2026-07-07 (0.6.41), same adjudication as identity.medical.npi. The GS1 mod-10
+  # guard demotes ~95% of the upc over-emission (~13k 12-digit particleId / product-id runs
+  # to integer_number); genuine UPCs carry a valid check digit and are KEPT. The "fix at
+  # source" retrain NO-GO'd, so the deterministic guard ships. The gate's collapse NO-GO on
+  # upc is the documented checksum-blind false alarm (gated-YDF 2.7% reliable here). gs1 was
+  # already live on identity.commerce.ean. Residual: ~5% coincidental-pass tail.
   tier: [VARCHAR, code]
   release_priority: 3
   aliases: [upc_a, barcode]
@@ -1015,13 +1017,18 @@ identity.medical.npi:
     pattern: "^[12]\\d{9}$"
     minLength: 10
     maxLength: 10
-  # checksum: npi HELD — the algorithm exists (checksum::npi) and is correct, but
-  # the raw model over-emits npi on any 10-digit column (~42k in the 33k-file
-  # gate sample: ebit/marketCap/totalAssets financial figures). The Luhn guard
-  # demotes ~87% of them correctly, but that collapses the label past the
-  # corpus-honest gate's blocking threshold (gated-YDF co-signs the shape-match).
-  # Wire this once the over-emission is fixed at source (retrain t-000133e418) or
-  # via header corroboration. See output/company-reference-audit W2b log.
+  checksum: npi
+  # WIRED 2026-07-07 (0.6.41). The Luhn guard demotes ~87% of the npi over-emission
+  # (~42k 10-digit financial figures — ebit/marketCap/totalAssets — to integer_number) at
+  # high precision: a genuine NPI carries a valid check digit and is KEPT; only check-digit
+  # failures are demoted. The "fix at source" retrain (t-000133e418) NO-GO'd (attractor
+  # relocated to cpt + genuine mdy-date loss), so the deterministic guard is the shipped fix.
+  # The corpus-honest gate's collapse NO-GO on npi is the DOCUMENTED checksum-blind false
+  # alarm — gated-YDF is 9.6% reliable here and co-signs the shape-match, so it cannot
+  # referee a checksum demotion (instrument audit). Adjudicated by gold (+2) + per-column
+  # evidence, extending choice 0104's structural-blindness carve-out to checksum-guard rule
+  # changes. Residual: ~13% coincidental-pass tail (junk that clears Luhn by chance). See
+  # output/company-reference-audit W2b + retrain_recipe_draft.md.
   tier: [VARCHAR, medical]
   release_priority: 3
   aliases: [national_provider_identifier, provider_id]
