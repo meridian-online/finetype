@@ -401,6 +401,41 @@ release-ready if the author instead elects to WAIVE cpt+compact_mdy — a delibe
 override, not recommended). models/default untouched; no artifact cleanup until the author
 rules (candidate lives among the banked dirs).
 
+## W2.7 standalone-release gate — 2026-07-07, NO-GO, BANK (do not ship as 0.6.41)
+
+With the model banked, the only unreleased engine change on figi-checksum is W2.7 itself
+(the compact-date range validators). Author authorised shipping it as a binary-only 0.6.41.
+It needs a rule-change corpus-honest GO (choice 0104), which had never been run for W2.7 in
+isolation (the trim gate compared the two MODELS, both already carrying W2.7). Ran it clean:
+built a genuine pre-W2.7 binary (shape-only `^\d{8}$`), fresh 33k pass, gated pre-vs-post on
+the same model+binary (`scripts/w27_clean_gate.sh`, `gate_w27-clean.json`).
+
+**VERDICT: NO-GO.** One trigger — `datetime.date.compact_ymd` collapse, base_correct
+1733 → cand_correct 958. NOT a gated-YDF false alarm (the initial confounded gate against
+the stale `baseline_with_oracle` looked like one): 119 of ~136 in-sample stripped columns
+carry GENUINE valid dates (`date`=20151115, `CLM_FROM_DT`=20080707, `FirstAddedDate`=
+20171231); only ~17 are junk (`marketCap`=19390490 month 39, `longTermDebt`, `intangibleAssets`).
+**W2.7 regresses genuine date columns vs the shipped 0.6.40.** Live-reproduced: a constant
+valid date among financial siblings (`date`=20151115 alongside marketCap/ebit/revenue) →
+`unknown` via `multi-branch-sibling` on the W2.7 binary; the pre-W2.7 pass keeps the same
+columns as compact_ymd. Mechanism: the sibling-context model demotes a date column that sits
+among financial columns (a BROAD pattern — every financial-statement/wide business table),
+and pre-W2.7 a datetime recovery rescued it back to compact_ymd; the W2.7 range-validator
+change stops that recovery. Not yet pinned to a line (`is_precise` is wired only into the
+attractor-demotion sites + tests, NOT the recovery), so the exact interaction is unconfirmed
+— but the regression is real, systematic, and broad. Net on the default: loses ~775 weighted
+genuine dates, fixes ~17 junk = net negative.
+
+**Decision: BANK W2.7 — no 0.6.41, no merge to main, models/default + main untouched.**
+W2.7's enabling purpose (the attneg2 swap) is dead, so its only standalone value was the
+junk-stripping, which it can't deliver without breaking constant/sibling-demoted dates.
+Fold the compact-date rework into round-4 (which already revisits compact dates for the mdy
+repair): the recovery must use the range check (rescue valid-range dates, drop junk) while
+keeping the precise validator's attractor-demotion benefit — real work, must re-gate. **NOTE
+for round-4: figi-checksum carries W2.7, so its compact-date handling is regressed until
+fixed/reverted — do not trust compact-date behaviour on this branch until then.** The gold
+845/849 comparison is unaffected (gold contains no compact_* columns; W2.7 is gold-invisible).
+
 ## What we don't know yet
 
 - Whether header-carrying negatives shift the header branch for integer_number/plain_text in a way
