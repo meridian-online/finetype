@@ -2216,6 +2216,11 @@ impl ColumnClassifier {
         self.naics_industry_recovery(result, header, sample);
         self.s_expression_recovery(result, sample);
         self.ceded_leaf_recovery(result, sample);
+        // LAST: the recovery guards above get first crack at relocating a
+        // wrongly-jwt column to a real type; jwt_substance_guard then demotes to
+        // `unknown` only what remains stubbornly labelled jwt, and nothing after
+        // can re-promote it via the shape-only jwt validator (ceded_leaf_recovery).
+        self.jwt_substance_guard(result, sample);
     }
 
     /// `timezone_abbreviation_recovery` (default ON). Recovers the
@@ -2366,6 +2371,49 @@ impl ColumnClassifier {
         result.confidence = result.confidence.max(0.95);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("s_expression_recovery".to_string());
+        result.detected_locale = None;
+    }
+
+    /// `jwt_substance_guard` (default ON). Demotes `technology.cryptographic.jwt`
+    /// to `unknown` when the column's values are not real JWTs. The taxonomy
+    /// pattern checks only the three-base64url-segment SHAPE, so the model
+    /// over-emits jwt on text at corpus scale (7,920 of the 33k-sample columns —
+    /// Windows file paths, prose, entity names; the gated-YDF oracle refutes
+    /// every one, 0 confirmed jwt). A genuine JWT header base64url-decodes to a
+    /// JSON object with an `alg` key (`finetype_core::structure::is_jwt`); when
+    /// fewer than half a column's values carry that certainty the jwt assertion
+    /// is wrong. We demote to `unknown` rather than guess the text leaf —
+    /// asserting only the certainty (not-a-JWT), never simulating the semantic
+    /// finding of *which* text type (that stays the model's job). Value-based
+    /// (0048), demote-only, RHH-disableable.
+    fn jwt_substance_guard(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("jwt_substance_guard") {
+            return;
+        }
+        const LABEL: &str = "technology.cryptographic.jwt";
+        if result.label != LABEL {
+            return;
+        }
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let valid = non_empty
+            .iter()
+            .filter(|v| finetype_core::structure::is_jwt(v))
+            .count();
+        // Majority are genuine JWTs → keep. Otherwise the label is wrong.
+        if valid * 2 >= non_empty.len() {
+            return;
+        }
+        result.label = "unknown".to_string();
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("jwt_substance_guard".to_string());
         result.detected_locale = None;
     }
 

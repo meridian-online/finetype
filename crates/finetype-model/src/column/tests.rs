@@ -7023,6 +7023,84 @@ geography.transportation.icao_code:
     );
 }
 
+fn jwt_guard_taxonomy() -> Taxonomy {
+    let yaml = r#"
+technology.cryptographic.jwt:
+  title: JSON Web Token
+  designation: universal
+  tier: [VARCHAR, cryptographic]
+  samples: ["eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig"]
+  validation:
+    type: string
+    pattern: '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    tax
+}
+
+#[test]
+fn jwt_substance_guard_is_default_on() {
+    assert!(!rhh::is_disabled("jwt_substance_guard"));
+}
+
+#[test]
+fn jwt_guard_demotes_nonjwt_dotted_strings() {
+    // Three-base64url-segment strings that pass the SHAPE pattern but whose
+    // header is not JSON-with-alg — the corpus over-emission (paths/prose/tokens).
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(jwt_guard_taxonomy());
+    // Underscore tokens: pass the base64url 3-segment shape, fail is_jwt (header
+    // is not JSON-with-alg), and are NOT valid hostnames (so no downstream
+    // hostname recovery re-labels the demoted `unknown`).
+    let vals: Vec<String> = vec![
+        "tok_aaaa1.pay_bbbb2.sig_cccc3",
+        "tok_dddd4.pay_eeee5.sig_ffff6",
+        "tok_gggg7.pay_hhhh8.sig_iiii9",
+        "tok_jjjj0.pay_kkkk1.sig_llll2",
+        "tok_mmmm3.pay_nnnn4.sig_oooo5",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("token", &vals, "technology.cryptographic.jwt", 0.9)
+        .unwrap();
+    assert_ne!(
+        r.label, "technology.cryptographic.jwt",
+        "non-JWT dotted strings must demote off jwt"
+    );
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("jwt_substance_guard")
+    );
+}
+
+#[test]
+fn jwt_guard_keeps_real_tokens() {
+    // Genuine JWTs (header decodes to JSON with `alg`) → untouched.
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(jwt_guard_taxonomy());
+    let vals: Vec<String> = vec![
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdXRoLmV4YW1wbGUuY29tIn0.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIn0.aaaa",
+        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIzIn0.bbbb",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("token", &vals, "technology.cryptographic.jwt", 0.9)
+        .unwrap();
+    assert_eq!(
+        r.label, "technology.cryptographic.jwt",
+        "genuine JWTs must be kept"
+    );
+}
+
 #[test]
 fn membership_guard_keeps_real_airport_codes() {
     // Genuine ICAO columns are list members → untouched.
