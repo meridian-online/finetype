@@ -5,6 +5,37 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.42] - 2026-07-08
+
+### Added
+
+- **UN/LOCODE closed-set membership guard** (`membership: unlocode`, `labels/sets/unlocode_codes.txt`,
+  116,064 codes). The 5-char shape (`^[A-Z]{2}[A-Z2-9]{3}$`) admits any short uppercase code, so the
+  model over-emitted `unlocode` on EDGAR stock tickers and other short codes; membership in the
+  published UN/LOCODE list is the substance the shape cannot supply. `membership_substance_guard`
+  demotes columns that are mostly non-members. Corpus-honest gate GO; gold / representative neutral.
+- **Set-vs-set "voting" reconciliation for geo codes** (`geo_code_membership_vote`). When a column is
+  labelled `state_code` or `country_code`, a dominant-member vote between the country-code enum and the
+  union of subdivision-code enums (US/CA/AU) assigns the winner at ≥0.70 coverage + ≥0.20 margin —
+  fixing GLEIF `jurisdiction` (89% ISO-3166-1 countries + 11% subdivisions) that the simple-majority
+  `country_code_corroboration` could not, since 31 of 56 US-state codes are also country codes. Reads
+  existing taxonomy enums, no new set files. Gold +1; corpus-honest gate GO.
+- **Real check-digit validation for six more identifier types** (`checksum:` directives, demote-only
+  via `checksum_substance_guard`): `imei` (Luhn), `issn` (ISO 7064 Mod 11-2), `orcid` (Mod 11-2),
+  `cas_number` (weighted mod-10), `iso6346` (shipping-container check digit), and `dea_number`. A value
+  of the right shape but wrong check digit is demoted off the type — a 15-digit number that fails Luhn
+  is not an IMEI; a book/licence id that fails the DEA formula is not a DEA number. Five new algorithms
+  in `finetype-core::checksum`. Gold neutral; corpus-honest gate GO; per-column verified.
+
+### Fixed
+
+- **`jwt` no longer over-emitted on file paths, URLs, and prose** (structural substance guard). A JSON
+  Web Token is three base64url segments whose header decodes to a JSON object with an `alg` key; the
+  shape pattern checks only the three-segment form, which any dotted token satisfies. The new
+  `jwt_substance_guard` demotes a `jwt`-labelled column to `unknown` when fewer than half its values
+  carry that decodable `alg` header (`finetype-core::structure::is_jwt`). Value-based, demote-only;
+  gold / representative neutral, corpus-honest gate GO, full-pipeline per-column verified.
+
 ## [0.6.41] - 2026-07-07
 
 ### Fixed
