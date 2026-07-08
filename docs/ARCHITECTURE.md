@@ -161,6 +161,12 @@ Architectural decisions (MADR format) live in the team's private planning repo, 
 repository — the `orbit`/`beads` PM tooling was retired. CLAUDE.md cites decisions inline by
 number/name (e.g. "choice 0104", "decision 0041"); resolve them there.
 
+Historical `.orbit/` paths still appear in code comments, docs, and one-off scripts
+(`.orbit/specs/`, `.orbit/choices/`, `.orbit/contracts/`, `.orbit/memos/`, `.orbit/cards/`).
+These are provenance breadcrumbs from that retired substrate; its content migrated to the
+team's private planning repo. The paths no longer resolve inside this repository — treat them
+as historical citations, not live files.
+
 ---
 
 ## Sense Stage Implementation — Multi-Branch
