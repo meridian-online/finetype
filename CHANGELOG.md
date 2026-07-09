@@ -5,6 +5,27 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.44] - 2026-07-10
+
+### Fixed
+
+- **`locale_code` no longer over-emitted on any 2–3 letter word** (substance guard). A locale code
+  leads with a real ISO 639 language and any script/region subtag is a real ISO 15924 / ISO 3166-1
+  code; the taxonomy pattern `^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{2,4})*$` accepted any short word, so the
+  model labelled survey fragments, dialogue-act tags, and country-code columns as locale codes. The new
+  `locale_code_substance_guard` demotes a `locale_code`-labelled column to `unknown` when fewer than half
+  its values pass `finetype-core::structure::is_locale_code` (four embedded closed sets — ISO 639-1 /
+  639-2-3 / 3166-1 / 15924 — delimiter-tolerant for locale lists like `en_US:es_ES`). Value-based,
+  demote-only; the 2-letter ISO-639 collision (`na` is Nauru, `os` Ossetian) is paid as harmless
+  under-cleaning, never a false demotion. Gold / representative neutral, corpus-honest gate GO (zero
+  triggers), per-column verified (zero false demotes on 150 files).
+- **`query_string` no longer over-emitted on low-cardinality enums / short codes**. Its validator
+  `^[^=&]+=…` requires a `k=v` pair, but the label was absent from the veto allowlist by rare-type
+  starvation, so the flat softmax could label a five-value enum (`sector`, `subsector`, …) a query string
+  at full confidence. It now joins the veto-blind strict-validator demotion set: a column whose values
+  overwhelmingly fail the `=`-requiring pattern demotes to the vocabulary residual (`word`). Genuine
+  query-string columns (with `=`) are untouched (zero false demotes on the corpus-honest sample).
+
 ## [0.6.43] - 2026-07-09
 
 ### Fixed
