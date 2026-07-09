@@ -2221,6 +2221,7 @@ impl ColumnClassifier {
         // to `unknown` only what remains stubbornly labelled jwt/mime_type, and
         // nothing after can re-promote it via the shape-only validator.
         self.mime_type_substance_guard(result, sample);
+        self.locale_code_substance_guard(result, sample);
         self.jwt_substance_guard(result, sample);
     }
 
@@ -2459,6 +2460,55 @@ impl ColumnClassifier {
         result.confidence = result.confidence.min(0.6);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("mime_type_substance_guard".to_string());
+        result.detected_locale = None;
+    }
+
+    /// `locale_code_substance_guard` (default ON). Demotes `technology.code.locale_code`
+    /// to `unknown` when the column's values are not real locale codes. The taxonomy
+    /// pattern `^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{2,4})*$` accepts ANY 2–3 letter word,
+    /// so the model over-emits `locale_code` (largest tier-3 live surface, ~1,933 of
+    /// a stale 4,246) on text/code columns — survey fragments, dialogue-act tags,
+    /// single words. A genuine locale leads with a real ISO 639 language and any
+    /// script/region subtag is a real ISO 15924 / 3166-1 code
+    /// (`finetype_core::structure::is_locale_code`, delimiter-tolerant); when fewer
+    /// than half a column's values carry that certainty the assertion is wrong. We
+    /// demote to `unknown` — asserting only the certainty (not-a-locale), never
+    /// guessing which text type it is (that stays the model's job). Value-based
+    /// (0048), demote-only, RHH-disableable. Twin of `mime_type_substance_guard`;
+    /// runs alongside it, after the recovery guards.
+    ///
+    /// The keep-bar stays at the ≥50% convention (not higher): the 2-letter ISO-639
+    /// space is collision-dense, so a bare-2-letter-word column can pass the check —
+    /// but under demote-only that is a harmless false-keep (status quo), never a
+    /// false-demote. Calibration: `output/certainty-locale/findings.md`.
+    fn locale_code_substance_guard(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("locale_code_substance_guard") {
+            return;
+        }
+        const LABEL: &str = "technology.code.locale_code";
+        if result.label != LABEL {
+            return;
+        }
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let valid = non_empty
+            .iter()
+            .filter(|v| finetype_core::structure::is_locale_code(v))
+            .count();
+        // Majority are genuine locale codes → keep. Otherwise the label is wrong.
+        if valid * 2 >= non_empty.len() {
+            return;
+        }
+        result.label = "unknown".to_string();
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("locale_code_substance_guard".to_string());
         result.detected_locale = None;
     }
 

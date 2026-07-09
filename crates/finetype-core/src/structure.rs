@@ -173,6 +173,143 @@ pub fn is_mime_type(value: &str) -> bool {
     chars.all(|c| c.is_ascii_alphanumeric() || "!#$&-^_.+".contains(c))
 }
 
+/// The 184 ISO 639-1 two-letter language codes.
+const ISO639_1: &[&str] = &[
+    "aa", "ab", "ae", "af", "ak", "am", "an", "ar", "as", "av", "ay", "az", "ba", "be", "bg", "bh",
+    "bi", "bm", "bn", "bo", "br", "bs", "ca", "ce", "ch", "co", "cr", "cs", "cu", "cv", "cy", "da",
+    "de", "dv", "dz", "ee", "el", "en", "eo", "es", "et", "eu", "fa", "ff", "fi", "fj", "fo", "fr",
+    "fy", "ga", "gd", "gl", "gn", "gu", "gv", "ha", "he", "hi", "ho", "hr", "ht", "hu", "hy", "hz",
+    "ia", "id", "ie", "ig", "ii", "ik", "io", "is", "it", "iu", "ja", "jv", "ka", "kg", "ki", "kj",
+    "kk", "kl", "km", "kn", "ko", "kr", "ks", "ku", "kv", "kw", "ky", "la", "lb", "lg", "li", "ln",
+    "lo", "lt", "lu", "lv", "mg", "mh", "mi", "mk", "ml", "mn", "mr", "ms", "mt", "my", "na", "nb",
+    "nd", "ne", "ng", "nl", "nn", "no", "nr", "nv", "ny", "oc", "oj", "om", "or", "os", "pa", "pi",
+    "pl", "ps", "pt", "qu", "rm", "rn", "ro", "ru", "rw", "sa", "sc", "sd", "se", "sg", "si", "sk",
+    "sl", "sm", "sn", "so", "sq", "sr", "ss", "st", "su", "sv", "sw", "ta", "te", "tg", "th", "ti",
+    "tk", "tl", "tn", "to", "tr", "ts", "tt", "tw", "ty", "ug", "uk", "ur", "uz", "ve", "vi", "vo",
+    "wa", "wo", "xh", "yi", "yo", "za", "zh", "zu",
+];
+
+/// ISO 639-2/639-3 three-letter language codes (both /B bibliographic and /T
+/// terminological variants) for languages that appear in real locale data.
+/// Load-bearing: without this set, any 3-letter English word (`and`/`are`/`the`)
+/// would masquerade as a language, and genuine 3-letter tags (`eng`/`fra`/`ara`)
+/// could not be told apart from them.
+const ISO639_23: &[&str] = &[
+    "aar", "abk", "afr", "aka", "amh", "ara", "arg", "asm", "ava", "ave", "aym", "aze", "bak",
+    "bam", "bel", "ben", "bih", "bis", "bod", "bos", "bre", "bul", "cat", "ces", "cha", "che",
+    "chi", "chu", "chv", "cor", "cos", "cre", "cym", "cze", "dan", "deu", "div", "dut", "dzo",
+    "ell", "eng", "epo", "est", "eus", "ewe", "fao", "fas", "fij", "fin", "fra", "fre", "fry",
+    "ful", "geo", "ger", "gla", "gle", "glg", "glv", "gre", "grn", "guj", "hat", "hau", "heb",
+    "her", "hin", "hmo", "hrv", "hun", "hye", "ibo", "ice", "ido", "iii", "iku", "ile", "ina",
+    "ind", "ipk", "isl", "ita", "jav", "jpn", "kal", "kan", "kas", "kat", "kau", "kaz", "khm",
+    "kik", "kin", "kir", "kom", "kon", "kor", "kua", "kur", "lao", "lat", "lav", "lim", "lin",
+    "lit", "ltz", "lub", "lug", "mac", "mah", "mal", "mao", "mar", "may", "mkd", "mlg", "mlt",
+    "mon", "mri", "msa", "mya", "nau", "nav", "nbl", "nde", "ndo", "nep", "nld", "nno", "nob",
+    "nor", "nya", "oci", "oji", "ori", "orm", "oss", "pan", "per", "pli", "pol", "por", "prs",
+    "pus", "roh", "ron", "rum", "run", "rus", "sag", "san", "sin", "slk", "slo", "slv", "sme",
+    "smo", "sna", "snd", "som", "sot", "spa", "sqi", "srd", "srp", "ssw", "sun", "swa", "swe",
+    "tah", "tam", "tat", "tel", "tgk", "tgl", "tha", "tib", "tir", "ton", "tsn", "tso", "tuk",
+    "tur", "twi", "uig", "ukr", "urd", "uzb", "ven", "vie", "vol", "wel", "wln", "wol", "xho",
+    "yid", "yor", "zha", "zho", "zul", "fil", "ceb", "haw",
+];
+
+/// ISO 3166-1 alpha-2 region codes (mirrors the `country_code` taxonomy enum).
+/// Load-bearing for rejecting translation pairs like `pt-en`/`es-en`, whose
+/// second subtag is a language, not a region.
+const ISO3166_1: &[&str] = &[
+    "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ",
+    "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS",
+    "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN",
+    "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE",
+    "EG", "EH", "ER", "ES", "ET", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF",
+    "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM",
+    "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM",
+    "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC",
+    "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG", "MH", "MK",
+    "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA",
+    "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG",
+    "PH", "PK", "PL", "PM", "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW",
+    "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS",
+    "ST", "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK", "TL", "TM", "TN", "TO",
+    "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI",
+    "VN", "VU", "WF", "WS", "YE", "YT", "ZA", "ZM", "ZW",
+];
+
+/// Common ISO 15924 four-letter script subtags (`zh-Hans`, `sr-Cyrl`).
+const ISO15924: &[&str] = &[
+    "Latn", "Cyrl", "Grek", "Hans", "Hant", "Arab", "Hebr", "Deva", "Thai", "Jpan", "Kore", "Hang",
+    "Hani", "Kana", "Hira", "Cans", "Ethi", "Geor", "Armn", "Beng", "Guru", "Gujr", "Taml", "Telu",
+    "Knda", "Mlym", "Sinh", "Mymr", "Khmr", "Laoo", "Tibt", "Mong",
+];
+
+fn in_set(set: &[&str], s: &str) -> bool {
+    set.iter().any(|k| k.eq_ignore_ascii_case(s))
+}
+
+/// True if `tag` is a single well-formed BCP-47 language tag: a real ISO-639
+/// language primary subtag, then only valid script / region / variant subtags.
+fn is_bcp47_tag(tag: &str) -> bool {
+    let mut subs = tag.split(['-', '_']);
+    let Some(prim) = subs.next() else {
+        return false;
+    };
+    let lang_ok = match prim.len() {
+        2 => in_set(ISO639_1, prim),
+        3 => in_set(ISO639_23, prim),
+        _ => false,
+    };
+    if !lang_ok {
+        return false;
+    }
+    subs.all(|sub| {
+        (sub.len() == 4 && in_set(ISO15924, sub))                            // script
+            || (sub.len() == 2 && in_set(ISO3166_1, sub))                    // region (alpha-2)
+            || (sub.len() == 3 && sub.bytes().all(|b| b.is_ascii_digit()))   // region (M.49)
+            || (matches!(sub.len(), 5..=8) && sub.bytes().all(|b| b.is_ascii_alphanumeric()))
+        // variant
+    })
+}
+
+/// True if `value` is a well-formed BCP-47 locale tag (or a delimited list of them).
+///
+/// This is the substance check behind the `locale_code_substance_guard`. The
+/// taxonomy pattern `^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{2,4})*$` accepts ANY 2–3 letter
+/// word, so the model over-emits `locale_code` on text/code columns at corpus
+/// scale (survey fragments, dialogue-act tags, single words). The certainty the
+/// shape lacks is *closed-set* language membership: the primary subtag must be a
+/// real ISO 639 language, and any script/region subtag must be a real ISO 15924 /
+/// ISO 3166-1 code. Two calibrated refinements (see `output/certainty-locale/`):
+/// - **3-letter primary is checked against the real ISO 639-2/3 set** (not
+///   loose-accepted), else English words like `and`/`are` pass;
+/// - **delimiter-tolerant**: a cell may be a locale list (`en_US:es_ES:es_MX`),
+///   which counts only if EVERY part is a well-formed tag (so a genuine list
+///   column is not false-demoted).
+///
+/// The 2-letter ISO-639 space is collision-dense (`is`/`it`/`to`/`be` are both
+/// codes and English words), so a bare-2-letter-word column *can* pass — but such
+/// columns route to `word` in the model, and the guard is demote-only, so that is
+/// a harmless false-keep, never a false-demote (`output/certainty-locale/findings.md`).
+pub fn is_locale_code(value: &str) -> bool {
+    let t = value.trim();
+    if t.is_empty() {
+        return false;
+    }
+    // Fast path: the whole cell is a single tag.
+    if is_bcp47_tag(t) {
+        return true;
+    }
+    // Otherwise treat the cell as a delimited list of locales — genuine locale
+    // data (`subtitle_locales`), so it counts only if EVERY part is well-formed
+    // and there is more than one part. Space is deliberately NOT a delimiter
+    // (it would read prose as a locale list).
+    let parts: Vec<&str> = t
+        .split([',', ';', ':', '|'])
+        .filter(|p| !p.trim().is_empty())
+        .map(str::trim)
+        .collect();
+    parts.len() >= 2 && parts.iter().all(|p| is_bcp47_tag(p))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -283,5 +420,54 @@ mod tests {
     fn requires_nesting_not_just_many_parens() {
         // depth 1 throughout despite many opens → not an s-expression
         assert!(!is_s_expression("(a) (b) (c) (d)"));
+    }
+
+    #[test]
+    fn locale_accepts_genuine_tags() {
+        for s in [
+            "en",
+            "fr",
+            "de",
+            "pt-BR",
+            "en-US",
+            "zh-Hans",
+            "zh-Hant",
+            "de-AT",
+            "zh-Hans-CN", // language + script + region
+            "eng",
+            "fra",
+            "ara", // 3-letter ISO 639-2/3 primaries (the `lang_code` column)
+            "en_US",
+            "pt_br", // underscore separator, mixed case — BCP-47 is case-insensitive
+            "EN-US",
+            "es-419",                  // M.49 numeric region (Latin America)
+            "en_US:es_ES:es_MX:pt_BR", // subtitle_locales: a delimited list of locales
+            "de-DE;fr-FR;it-IT",       // semicolon list
+        ] {
+            assert!(is_locale_code(s), "{s} should validate as a locale code");
+        }
+    }
+
+    #[test]
+    fn locale_rejects_over_emission_lookalikes() {
+        for s in [
+            "and", // 3-letter English word, not an ISO 639-2/3 code
+            "the",
+            "are",
+            "for",
+            "sector", // NAICS `level` enum member
+            "responseOptions",
+            "decided",
+            "qy",    // dialogue-act tag, not a language code
+            "en-en", // translation pair: second subtag `en` is a language, not a region
+            "pt-en",
+            "of",             // 2-letter word that is NOT ISO 639-1
+            "recipes/quiche", // slash is not a locale separator
+            "en-",            // trailing empty subtag
+            "e",              // single letter
+            "",
+        ] {
+            assert!(!is_locale_code(s), "{s} must not validate as a locale code");
+        }
     }
 }

@@ -467,6 +467,17 @@ pub(crate) fn value_sharpen(
         // flag. Positional structure (^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}...) passes
         // genuine BIC columns ~100%; prose/name columns fail overwhelmingly.
         || result_label == "finance.banking.swift_bic"
+        // query_string joined 2026-07-09 (v0.6.42 dataset-descriptor audit,
+        // notes.md item 2): the flat softmax emits query_string @1.0 on
+        // low-cardinality enums / short-code columns (NAICS `level` =
+        // sector/subsector/…) that carry NEITHER `=` NOR `&`. Its validator
+        // `^[^=&]+=([^&]*)(&[^=&]+=[^&]*)*$` REQUIRES a `k=v` pair, so a genuine
+        // query-string column passes ~100% while these fail ~100% — but
+        // query_string is absent from veto_safe.txt (rare-type starvation), so
+        // the veto only flags it. Admitting it here gives the hard-NO the veto
+        // cannot: the >50% bar demotes to the vocabulary residual (`word` for the
+        // small enum) and never touches a real query-string column.
+        || result_label == "container.key_value.query_string"
     {
         if let Some(taxonomy) = taxonomy {
             if let Some((label, rule)) = schema_fail_demotion(values, result_label, taxonomy) {
