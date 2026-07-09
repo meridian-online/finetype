@@ -2222,6 +2222,7 @@ impl ColumnClassifier {
         // nothing after can re-promote it via the shape-only validator.
         self.mime_type_substance_guard(result, sample);
         self.locale_code_substance_guard(result, sample);
+        self.password_substance_guard(result, sample);
         self.jwt_substance_guard(result, sample);
     }
 
@@ -2509,6 +2510,61 @@ impl ColumnClassifier {
         result.confidence = result.confidence.min(0.6);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("locale_code_substance_guard".to_string());
+        result.detected_locale = None;
+    }
+
+    /// `password_substance_guard` (default ON). Demotes `identity.person.password`
+    /// to `unknown` when the column is plainly not a credential field. The taxonomy
+    /// validator is `minLength: 1, maxLength: 255` (`designation: broad_characters`) —
+    /// it certifies NOTHING, so the flat softmax scatters `password` onto free text
+    /// at corpus scale: i18n/UI strings, song/anime/artist titles, country names,
+    /// prose. On the corpus sample essentially NONE of the survivors are genuine
+    /// passwords (real credential columns are PII and barely appear), so this is a
+    /// near-pure false-positive attractor.
+    ///
+    /// Unlike mime/locale, a password has **no positive substance** — it is defined by
+    /// the *absence* of structure (a high-entropy secret), so there is no "is-a-password"
+    /// test to build (that would be simulating semantics, the certainty direction's one
+    /// forbidden move). The guard therefore keys on the single self-precise **anti-signal**:
+    /// a credential never contains internal whitespace, so a value with a space is not a
+    /// password. When fewer than half the values are credential-shaped (whitespace-free),
+    /// the column is text and the label is wrong → demote to `unknown` (asserting only the
+    /// certainty *not-a-credential*, never guessing which text type). This catches the
+    /// space-heavy bulk (phrases/titles/i18n); the whitespace-free residual (code
+    /// identifiers) stays `password` — a harmless false-keep under demote-only, since the
+    /// genuine-password population is ~empty. The rare passphrase-with-spaces column is the
+    /// only theoretical false-demote, and such columns do not occur in practice.
+    /// Value-based (0048), demote-only, RHH-disableable. Substrate: `output/certainty-password/`.
+    fn password_substance_guard(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("password_substance_guard") {
+            return;
+        }
+        const LABEL: &str = "identity.person.password";
+        if result.label != LABEL {
+            return;
+        }
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        // Credential-shaped = no internal whitespace. A password never contains a space.
+        let credential_like = non_empty
+            .iter()
+            .filter(|v| !v.chars().any(char::is_whitespace))
+            .count();
+        // Majority are whitespace-free → could be credentials, keep. Otherwise the
+        // column is text (phrases/titles/i18n) and the password label is wrong.
+        if credential_like * 2 >= non_empty.len() {
+            return;
+        }
+        result.label = "unknown".to_string();
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("password_substance_guard".to_string());
         result.detected_locale = None;
     }
 
