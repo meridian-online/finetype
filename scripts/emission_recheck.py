@@ -196,7 +196,11 @@ def main():
         print("  demoted/relocated to:")
         for dst, n in dests.most_common(8):
             print(f"      {n:>5}  {dst}")
-    print(f"  provenance JSON: {out.relative_to(REPO)}\n")
+    try:
+        shown = out.relative_to(REPO)
+    except ValueError:
+        shown = out
+    print(f"  provenance JSON: {shown}\n")
 
 
 if __name__ == "__main__":

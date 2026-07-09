@@ -2217,9 +2217,10 @@ impl ColumnClassifier {
         self.s_expression_recovery(result, sample);
         self.ceded_leaf_recovery(result, sample);
         // LAST: the recovery guards above get first crack at relocating a
-        // wrongly-jwt column to a real type; jwt_substance_guard then demotes to
-        // `unknown` only what remains stubbornly labelled jwt, and nothing after
-        // can re-promote it via the shape-only jwt validator (ceded_leaf_recovery).
+        // wrongly-jwt/mime column to a real type; these substance guards then demote
+        // to `unknown` only what remains stubbornly labelled jwt/mime_type, and
+        // nothing after can re-promote it via the shape-only validator.
+        self.mime_type_substance_guard(result, sample);
         self.jwt_substance_guard(result, sample);
     }
 
@@ -2414,6 +2415,50 @@ impl ColumnClassifier {
         result.confidence = result.confidence.min(0.6);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("jwt_substance_guard".to_string());
+        result.detected_locale = None;
+    }
+
+    /// `mime_type_substance_guard` (default ON). Demotes `representation.file.mime_type`
+    /// to `unknown` when the column's values are not real media types. The taxonomy
+    /// pattern `^[a-zA-Z]+/[a-zA-Z0-9.+\-]+(;.*)?$` accepts ANY word as the
+    /// top-level type, so the model over-emits `mime_type` on every `word/word`
+    /// string at corpus scale (~1,372 live of the stale snapshot's 3,214 — slugs
+    /// `recipes/…`, qualified paths `ccs/stc2010`/`geoId/15`, namespaces). A genuine
+    /// media type leads with one of the ten RFC 6838 top-level types
+    /// (`finetype_core::structure::is_mime_type`); when fewer than half a column's
+    /// values carry that certainty the mime_type assertion is wrong. We demote to
+    /// `unknown` rather than guess the text leaf — asserting only the certainty
+    /// (not-a-media-type), never simulating *which* text type it is (that stays the
+    /// model's job). Value-based (0048), demote-only, RHH-disableable. Twin of
+    /// `jwt_substance_guard`; runs alongside it, after the recovery guards.
+    fn mime_type_substance_guard(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("mime_type_substance_guard") {
+            return;
+        }
+        const LABEL: &str = "representation.file.mime_type";
+        if result.label != LABEL {
+            return;
+        }
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let valid = non_empty
+            .iter()
+            .filter(|v| finetype_core::structure::is_mime_type(v))
+            .count();
+        // Majority are genuine media types → keep. Otherwise the label is wrong.
+        if valid * 2 >= non_empty.len() {
+            return;
+        }
+        result.label = "unknown".to_string();
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("mime_type_substance_guard".to_string());
         result.detected_locale = None;
     }
 

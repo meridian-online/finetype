@@ -120,6 +120,59 @@ pub fn is_jwt(value: &str) -> bool {
     }
 }
 
+/// The ten registered MIME top-level types (RFC 6838 §4.2). This set is
+/// closed by the RFC — new subtypes are registered freely, but a new
+/// top-level type requires a standards-track RFC, so the head of every genuine
+/// media type is one of these.
+const MIME_TOPLEVEL: [&str; 10] = [
+    "application",
+    "audio",
+    "example",
+    "font",
+    "image",
+    "message",
+    "model",
+    "multipart",
+    "text",
+    "video",
+];
+
+/// True if `value` is a syntactically valid MIME media type: a registered
+/// RFC 6838 top-level type, `/`, a token subtype, and optional `;`-parameters.
+///
+/// This is the substance check behind the `mime_type_substance_guard`. The
+/// taxonomy pattern `^[a-zA-Z]+/[a-zA-Z0-9.+\-]+(;.*)?$` accepts ANY word as
+/// the top-level type, so the model over-emits `mime_type` on every `word/word`
+/// string at corpus scale — slugs (`recipes/deep-mediterranean-quiche`), qualified
+/// paths (`ccs/stc2010`, `geoId/15`), namespaces. The certainty the shape lacks
+/// is the *closed* top-level-type set: `recipes`/`ccs`/`geoId` are not media types.
+/// A full IANA-registry list is deliberately NOT used — it cannot enumerate the
+/// open `x-`/`vnd.`/`prs.` subtype trees, so it would false-demote genuine MIME
+/// (`application/x-www-form-urlencoded`, `application/vnd.mycorp.thing`).
+///
+/// Requirements:
+/// - exactly one `/` separating a non-empty top-level and a non-empty subtype
+///   (parameters after the first `;` are ignored)
+/// - the top-level (case-folded) is one of [`MIME_TOPLEVEL`]
+/// - the subtype begins with an alphanumeric and is otherwise RFC 6838
+///   restricted-name token chars (`A-Za-z0-9` and `!#$&-^_.+`)
+pub fn is_mime_type(value: &str) -> bool {
+    // Strip parameters: `type/subtype;charset=…` → `type/subtype`.
+    let essence = value.trim().split(';').next().unwrap_or("").trim();
+    let Some((toplevel, subtype)) = essence.split_once('/') else {
+        return false;
+    };
+    if !MIME_TOPLEVEL.contains(&toplevel.to_ascii_lowercase().as_str()) {
+        return false;
+    }
+    let mut chars = subtype.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphanumeric() => {}
+        _ => return false, // empty subtype, or a non-alphanumeric lead
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || "!#$&-^_.+".contains(c))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,6 +204,49 @@ mod tests {
         // Wrong segment count.
         assert!(!is_jwt("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0")); // two segments
         assert!(!is_jwt("")); // empty
+    }
+
+    #[test]
+    fn mime_accepts_genuine_media_types() {
+        // Taxonomy samples + the real MIME the model correctly labels.
+        for m in [
+            "text/plain",
+            "application/json",
+            "image/png",
+            "text/html; charset=utf-8",
+            "application/vnd.ms-excel",
+            "video/3gpp",
+            "audio/mpeg",
+            "application/x-www-form-urlencoded", // x- tree — a registry list would miss it
+            "application/vnd.api+json",          // +suffix
+            "IMAGE/JPEG",                        // case-insensitive top-level
+            "multipart/form-data",
+            "font/woff2",
+            "model/gltf-binary",
+        ] {
+            assert!(is_mime_type(m), "{m} should be a MIME type");
+        }
+    }
+
+    #[test]
+    fn mime_rejects_word_slash_word_lookalikes() {
+        // The corpus over-emission: `word/word` strings the permissive pattern
+        // confirms but whose top-level is not a registered media type.
+        for s in [
+            "recipes/deep-mediterranean-quiche",
+            "ccs/stc2010",
+            "geoId/15",
+            "compsec/compsec24",
+            "PRESERVE/scapes",
+            "public/api/conf",                            // also has a second slash
+            "com.google.javascript.jscomp.CodeGenerator", // no slash at all
+            "Abstraction",                                // single word
+            "/samples/aloha/",                            // leading slash → empty top-level
+            "text/",                                      // registered top-level but empty subtype
+            "",
+        ] {
+            assert!(!is_mime_type(s), "{s} must not validate as a MIME type");
+        }
     }
 
     #[test]

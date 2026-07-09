@@ -5,6 +5,22 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.43] - 2026-07-09
+
+### Fixed
+
+- **`mime_type` no longer over-emitted on `word/word` strings** (structural substance guard). A media
+  type leads with one of the ten top-level types RFC 6838 closes off (`application`, `audio`, `text`,
+  `video`, …); the taxonomy pattern `^[a-zA-Z]+/…` accepted any word as the top-level, so the model
+  labelled conference codes (`ccs/stc2010`), slugs (`recipes/deep-mediterranean-quiche`), company names
+  (`IAC/InterActiveCorp`), and image paths as MIME types. The new `mime_type_substance_guard` demotes a
+  `mime_type`-labelled column to `unknown` when fewer than half its values pass the structural check
+  (`finetype-core::structure::is_mime_type`). A structural check, not a registry list — the closed
+  top-level-type set carries the certainty while the open `x-`/`vnd.` subtype trees stay valid
+  (`application/x-7z-compressed` is kept). Value-based, demote-only; gold / representative neutral,
+  corpus-honest gate GO (zero triggers), full-pipeline per-column verified. ~1,200 spurious MIME labels
+  become honest `unknown` at corpus scale.
+
 ## [0.6.42] - 2026-07-08
 
 ### Added
