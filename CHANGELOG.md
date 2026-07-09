@@ -5,6 +5,21 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.45] - 2026-07-10
+
+### Fixed
+
+- **`password` no longer over-emitted on free text** (whitespace anti-guard). The
+  `identity.person.password` validator is `minLength: 1, maxLength: 255` — it certifies nothing, so
+  the model scattered `password` onto i18n/UI string tables, song/anime/movie titles, artist names,
+  and prose at corpus scale. A password has no positive substance to test (it is a high-entropy
+  secret — the *absence* of structure), so `password_substance_guard` keys on the one self-precise
+  anti-signal: a credential never contains internal whitespace. It demotes a `password`-labelled
+  column to `unknown` when fewer than half its values are whitespace-free. Value-based, demote-only;
+  deliberately partial (the whitespace-free residual stays, a harmless keep — genuine password
+  columns are PII and essentially absent from the corpus). Per-column trace: all demotes are genuine
+  non-password text, zero false demotes; corpus-honest gate GO; gold / representative flat.
+
 ## [0.6.44] - 2026-07-10
 
 ### Fixed
