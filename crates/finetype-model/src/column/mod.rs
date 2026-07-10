@@ -2390,34 +2390,13 @@ impl ColumnClassifier {
     /// finding of *which* text type (that stays the model's job). Value-based
     /// (0048), demote-only, RHH-disableable.
     fn jwt_substance_guard(&self, result: &mut ColumnResult, sample: &[String]) {
-        if rhh::is_disabled("jwt_substance_guard") {
-            return;
-        }
-        const LABEL: &str = "technology.cryptographic.jwt";
-        if result.label != LABEL {
-            return;
-        }
-        let non_empty: Vec<&str> = sample
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
-        if non_empty.len() < 3 {
-            return;
-        }
-        let valid = non_empty
-            .iter()
-            .filter(|v| finetype_core::structure::is_jwt(v))
-            .count();
-        // Majority are genuine JWTs → keep. Otherwise the label is wrong.
-        if valid * 2 >= non_empty.len() {
-            return;
-        }
-        result.label = "unknown".to_string();
-        result.confidence = result.confidence.min(0.6);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule = Some("jwt_substance_guard".to_string());
-        result.detected_locale = None;
+        demote_when_substance_fails(
+            result,
+            sample,
+            "technology.cryptographic.jwt",
+            "jwt_substance_guard",
+            finetype_core::structure::is_jwt,
+        );
     }
 
     /// `mime_type_substance_guard` (default ON). Demotes `representation.file.mime_type`
@@ -2434,34 +2413,13 @@ impl ColumnClassifier {
     /// model's job). Value-based (0048), demote-only, RHH-disableable. Twin of
     /// `jwt_substance_guard`; runs alongside it, after the recovery guards.
     fn mime_type_substance_guard(&self, result: &mut ColumnResult, sample: &[String]) {
-        if rhh::is_disabled("mime_type_substance_guard") {
-            return;
-        }
-        const LABEL: &str = "representation.file.mime_type";
-        if result.label != LABEL {
-            return;
-        }
-        let non_empty: Vec<&str> = sample
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
-        if non_empty.len() < 3 {
-            return;
-        }
-        let valid = non_empty
-            .iter()
-            .filter(|v| finetype_core::structure::is_mime_type(v))
-            .count();
-        // Majority are genuine media types → keep. Otherwise the label is wrong.
-        if valid * 2 >= non_empty.len() {
-            return;
-        }
-        result.label = "unknown".to_string();
-        result.confidence = result.confidence.min(0.6);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule = Some("mime_type_substance_guard".to_string());
-        result.detected_locale = None;
+        demote_when_substance_fails(
+            result,
+            sample,
+            "representation.file.mime_type",
+            "mime_type_substance_guard",
+            finetype_core::structure::is_mime_type,
+        );
     }
 
     /// `locale_code_substance_guard` (default ON). Demotes `technology.code.locale_code`
@@ -2483,34 +2441,13 @@ impl ColumnClassifier {
     /// but under demote-only that is a harmless false-keep (status quo), never a
     /// false-demote. Calibration: `output/certainty-locale/findings.md`.
     fn locale_code_substance_guard(&self, result: &mut ColumnResult, sample: &[String]) {
-        if rhh::is_disabled("locale_code_substance_guard") {
-            return;
-        }
-        const LABEL: &str = "technology.code.locale_code";
-        if result.label != LABEL {
-            return;
-        }
-        let non_empty: Vec<&str> = sample
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
-        if non_empty.len() < 3 {
-            return;
-        }
-        let valid = non_empty
-            .iter()
-            .filter(|v| finetype_core::structure::is_locale_code(v))
-            .count();
-        // Majority are genuine locale codes → keep. Otherwise the label is wrong.
-        if valid * 2 >= non_empty.len() {
-            return;
-        }
-        result.label = "unknown".to_string();
-        result.confidence = result.confidence.min(0.6);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule = Some("locale_code_substance_guard".to_string());
-        result.detected_locale = None;
+        demote_when_substance_fails(
+            result,
+            sample,
+            "technology.code.locale_code",
+            "locale_code_substance_guard",
+            finetype_core::structure::is_locale_code,
+        );
     }
 
     /// `password_substance_guard` (default ON). Demotes `identity.person.password`
@@ -2536,36 +2473,16 @@ impl ColumnClassifier {
     /// only theoretical false-demote, and such columns do not occur in practice.
     /// Value-based (0048), demote-only, RHH-disableable. Substrate: `output/certainty-password/`.
     fn password_substance_guard(&self, result: &mut ColumnResult, sample: &[String]) {
-        if rhh::is_disabled("password_substance_guard") {
-            return;
-        }
-        const LABEL: &str = "identity.person.password";
-        if result.label != LABEL {
-            return;
-        }
-        let non_empty: Vec<&str> = sample
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
-        if non_empty.len() < 3 {
-            return;
-        }
-        // Credential-shaped = no internal whitespace. A password never contains a space.
-        let credential_like = non_empty
-            .iter()
-            .filter(|v| !v.chars().any(char::is_whitespace))
-            .count();
-        // Majority are whitespace-free → could be credentials, keep. Otherwise the
-        // column is text (phrases/titles/i18n) and the password label is wrong.
-        if credential_like * 2 >= non_empty.len() {
-            return;
-        }
-        result.label = "unknown".to_string();
-        result.confidence = result.confidence.min(0.6);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule = Some("password_substance_guard".to_string());
-        result.detected_locale = None;
+        // Credential-shaped = no internal whitespace. A password never contains a
+        // space, so a value with one is not a password; when the majority carry
+        // whitespace the column is text (phrases/titles/i18n) and the label is wrong.
+        demote_when_substance_fails(
+            result,
+            sample,
+            "identity.person.password",
+            "password_substance_guard",
+            |v| !v.chars().any(char::is_whitespace),
+        );
     }
 
     /// `unlocode_format_veto` (default ON). UN/LOCODE is a closed 5-char shape
@@ -3455,11 +3372,13 @@ impl ColumnClassifier {
 mod feature_sharpen;
 mod header_sharpen;
 mod helpers;
+mod substance;
 mod value_sharpen;
 
 pub(crate) use feature_sharpen::*;
 pub(crate) use header_sharpen::*;
 pub(crate) use helpers::*;
+pub(crate) use substance::*;
 pub(crate) use value_sharpen::*;
 
 #[cfg(test)]
