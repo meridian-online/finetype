@@ -14,7 +14,6 @@ pub mod validate;
 use rmcp::model::{CallToolResult, Content};
 
 /// Helper to create a successful tool result with JSON + markdown summary.
-#[allow(dead_code)]
 pub(crate) fn success_with_summary(json: &serde_json::Value, summary: &str) -> CallToolResult {
     CallToolResult::success(vec![
         Content::text(serde_json::to_string_pretty(json).unwrap_or_default()),
