@@ -2,7 +2,7 @@
 //!
 //! Candle-based models for semantic type classification.
 //!
-//! Supports both flat (single model) and tiered (hierarchical model graph) inference.
+//! Inference runs a single multi-branch model per column (the Sense stage).
 
 pub mod char_cnn;
 pub mod char_distribution;
@@ -22,8 +22,6 @@ pub mod rhh;
 pub mod semantic;
 pub mod sense;
 pub mod sibling_context;
-pub mod tiered;
-pub mod tiered_training;
 pub mod training;
 pub mod validation_features;
 pub mod value_attention;
@@ -51,8 +49,6 @@ pub use multi_branch::MultiBranchClassifier;
 pub use semantic::SemanticHintClassifier;
 pub use sense::{BroadCategory, EntitySubtype, SenseClassifier, SenseResult};
 pub use sibling_context::SiblingContextAttention;
-pub use tiered::{TierTiming, TieredClassifier};
-pub use tiered_training::{TieredTrainer, TieredTrainingConfig, TieredTrainingReport};
 pub use training::{Trainer, TrainingConfig, TrainingError};
 pub use validation_features::ValidationFeatureExtractor;
 pub use value_attention::{ValueAttentionConfig, ValueAttentionPool};

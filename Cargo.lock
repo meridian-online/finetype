@@ -1612,33 +1612,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "finetype-candle-spike"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "candle-core",
- "candle-nn",
- "candle-transformers",
- "clap",
- "finetype-core",
- "half",
- "safetensors",
- "serde",
- "serde_json",
- "tempfile",
- "tokenizers",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "finetype-cli"
 version = "0.6.45"
 dependencies = [
  "anyhow",
- "candle-core",
- "candle-nn",
  "clap",
  "csv",
  "finetype-core",

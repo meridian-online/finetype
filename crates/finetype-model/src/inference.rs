@@ -34,8 +34,7 @@ pub struct ClassificationResult {
 
 /// Trait for any classifier that can classify text values.
 ///
-/// Implemented by `CharClassifier`, `TieredClassifier`, and `Classifier`.
-/// Used by `ColumnClassifier` to support both flat and tiered models.
+/// Implemented by `CharClassifier` and `Classifier`.
 pub trait ValueClassifier: Send + Sync {
     /// Classify a single text value.
     fn classify(&self, text: &str) -> Result<ClassificationResult, InferenceError>;

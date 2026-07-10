@@ -616,7 +616,7 @@ pub struct ColumnResult {
 
 /// Column-mode classifier that wraps a single-value classifier.
 ///
-/// Accepts any `ValueClassifier` implementation (CharClassifier, TieredClassifier, etc.)
+/// Accepts any `ValueClassifier` implementation (e.g. `CharClassifier`)
 /// via `Box<dyn ValueClassifier>`.
 pub struct ColumnClassifier {
     classifier: Box<dyn ValueClassifier>,

@@ -72,10 +72,6 @@ path = "src/bin/prepare_model2vec.rs"
 name = "train-sibling-context"
 path = "src/bin/train_sibling_context.rs"
 
-[[bin]]
-name = "tui-demo"
-path = "src/bin/tui_demo.rs"
-
 [lib]
 name = "finetype_train"
 path = "src/lib.rs"
