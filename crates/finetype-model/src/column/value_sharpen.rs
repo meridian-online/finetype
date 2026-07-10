@@ -1512,24 +1512,39 @@ pub(crate) fn disambiguate_numeric(
 
     let min = *parsed.iter().min().unwrap();
     let max = *parsed.iter().max().unwrap();
-    let range = max - min;
-
-    // Check for sequential/increment pattern
-    let mut sorted = parsed.clone();
-    sorted.sort();
-    sorted.dedup();
-    let is_sequential = if sorted.len() >= 3 {
-        let diffs: Vec<i64> = sorted.windows(2).map(|w| w[1] - w[0]).collect();
-        let avg_diff = diffs.iter().sum::<i64>() as f64 / diffs.len() as f64;
-        let variance = diffs
-            .iter()
-            .map(|d| (*d as f64 - avg_diff).powi(2))
-            .sum::<f64>()
-            / diffs.len() as f64;
-        // Low variance in diffs → sequential
-        variance < (avg_diff * 0.5).powi(2) && avg_diff > 0.0
+    // Span + sequential/increment detection. Both `range` and `is_sequential` are
+    // consulted only for non-negative columns — line ~1600 gates the increment
+    // branch on `min >= 0`, and the postal branch's `!is_sequential` sits behind
+    // `typical_postal_range` (which requires `min >= 100`). Only there is the i64
+    // span arithmetic overflow-free: a negative sentinel like `i64::MIN` alongside
+    // positive values makes `max - min` and the sorted diffs exceed `i64::MAX`
+    // (debug-panic; silent wrap in release). Computing them solely when `min >= 0`
+    // removes that whole overflow class and is a no-op — the values are dead when
+    // `min < 0`, and when `min >= 0` the diffs telescope to `max - min ≤ i64::MAX`,
+    // so nothing inside can overflow.
+    let (range, is_sequential) = if min >= 0 {
+        let range = max - min;
+        let mut sorted = parsed.clone();
+        sorted.sort();
+        sorted.dedup();
+        let is_sequential = if sorted.len() >= 3 {
+            let diffs: Vec<i64> = sorted.windows(2).map(|w| w[1] - w[0]).collect();
+            let avg_diff = diffs.iter().sum::<i64>() as f64 / diffs.len() as f64;
+            let variance = diffs
+                .iter()
+                .map(|d| (*d as f64 - avg_diff).powi(2))
+                .sum::<f64>()
+                / diffs.len() as f64;
+            // Low variance in diffs → sequential
+            variance < (avg_diff * 0.5).powi(2) && avg_diff > 0.0
+        } else {
+            false
+        };
+        (range, is_sequential)
     } else {
-        false
+        // Negative columns never reach either consumer (increment branch is gated
+        // on `min >= 0`; postal on `min >= 100`), so these values are dead.
+        (0i64, false)
     };
 
     // Postal code detection: typically 3-10 digits, non-sequential, bounded range

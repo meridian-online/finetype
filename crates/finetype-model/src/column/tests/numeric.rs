@@ -30,6 +30,38 @@ fn test_numeric_sequential_detection() {
 }
 
 #[test]
+fn disambiguate_numeric_no_overflow_on_min_sentinel() {
+    // Regression: a column carrying `i64::MIN` alongside positive values makes the
+    // span (`max - min`) and the sorted diffs exceed `i64::MAX`. Debug builds run
+    // with overflow-checks on, so the old unchecked arithmetic PANICKED here (in
+    // release it wrapped silently). The span/sequential result is dead behind
+    // `min >= 0`, so gating its computation on `min >= 0` is a behavioural no-op —
+    // this test just asserts it no longer panics and still falls through cleanly.
+    let values: Vec<String> = vec![
+        i64::MIN.to_string(),
+        "1".to_string(),
+        "2".to_string(),
+        "4".to_string(),
+        "8".to_string(),
+        "16".to_string(),
+    ];
+    let results: Vec<ClassificationResult> = values
+        .iter()
+        .map(|_| ClassificationResult {
+            label: "representation.numeric.integer_number".to_string(),
+            confidence: 0.8,
+            all_scores: vec![],
+        })
+        .collect();
+    let top_labels = ["representation.numeric.integer_number"];
+
+    // Negative min → never increment/postal/year → falls through to the model
+    // majority (None). The point is that this returns rather than panicking.
+    let result = disambiguate_numeric(&values, &results, &top_labels);
+    assert!(result.is_none());
+}
+
+#[test]
 fn increment_substance_veto_is_default_on() {
     assert!(!rhh::is_disabled("increment_substance_veto"));
 }
