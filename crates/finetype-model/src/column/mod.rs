@@ -2928,38 +2928,13 @@ impl ColumnClassifier {
         else {
             return;
         };
-        let non_empty = non_empty_trimmed(sample);
-        if non_empty.len() < 3 {
-            return;
-        }
-        let valid = non_empty.iter().filter(|v| checksum(v)).count();
-        // Majority pass their checksum → genuine identifiers, keep. Otherwise
-        // these values are wearing the wrong label.
-        if valid * 2 >= non_empty.len() {
-            return;
-        }
-        // Demote by value shape. Bare-number columns (ISBN/ABA lookalikes) go to
-        // the numeric family; alphanumeric columns (CUSIP/SEDOL lookalikes, and
-        // ISBN-as-alphanumeric) go to `alphanumeric_id`. Every checksum-bearing
-        // type is itself an identifier, so a checksum-failing lookalike is
-        // overwhelmingly another identifier rather than a small categorical —
-        // gold confirms (citation_id, case_number, coord_id, wfo_id all
-        // alphanumeric_id), so this branch is unconditional, not cardinality-split.
-        let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
-        let demoted_from = result.label.clone();
-        result.label = if is_bare {
-            if any_decimal {
-                "representation.numeric.decimal_number".to_string()
-            } else {
-                "representation.numeric.integer_number".to_string()
-            }
-        } else {
-            "representation.identifier.alphanumeric_id".to_string()
-        };
-        result.confidence = result.confidence.min(0.6);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule = Some(format!("checksum_substance_guard:{demoted_from}"));
-        result.detected_locale = detect_locale_from_validation(sample, &result.label, taxonomy);
+        demote_by_shape_when_substance_fails(
+            result,
+            sample,
+            taxonomy,
+            "checksum_substance_guard",
+            checksum,
+        );
     }
 
     /// `membership_substance_guard` (default ON). Twin of
@@ -2997,36 +2972,13 @@ impl ColumnClassifier {
         else {
             return;
         };
-        let non_empty = non_empty_trimmed(sample);
-        if non_empty.len() < 3 {
-            return;
-        }
-        let members = non_empty.iter().filter(|v| is_member(v)).count();
-        // Majority in the published set → genuine code column, keep. Otherwise
-        // these values are wearing the wrong label.
-        if members * 2 >= non_empty.len() {
-            return;
-        }
-        // Demote by value shape (same discipline as checksum_substance_guard):
-        // bare-number columns to the numeric family, everything else to
-        // alphanumeric_id — every membership-bearing type is itself an
-        // identifier, so a non-member lookalike is overwhelmingly another
-        // identifier (tickers, currency/state codes) rather than prose.
-        let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
-        let demoted_from = result.label.clone();
-        result.label = if is_bare {
-            if any_decimal {
-                "representation.numeric.decimal_number".to_string()
-            } else {
-                "representation.numeric.integer_number".to_string()
-            }
-        } else {
-            "representation.identifier.alphanumeric_id".to_string()
-        };
-        result.confidence = result.confidence.min(0.6);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule = Some(format!("membership_substance_guard:{demoted_from}"));
-        result.detected_locale = detect_locale_from_validation(sample, &result.label, taxonomy);
+        demote_by_shape_when_substance_fails(
+            result,
+            sample,
+            taxonomy,
+            "membership_substance_guard",
+            is_member,
+        );
     }
 
     /// `url_bare_number_veto` (default ON). Twin of `amount_bare_number_veto`.
@@ -3046,19 +2998,14 @@ impl ColumnClassifier {
         }
         let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
         if is_bare {
-            result.label = if any_decimal {
-                "representation.numeric.decimal_number".to_string()
-            } else {
-                "representation.numeric.integer_number".to_string()
-            };
-            result.confidence = result.confidence.min(0.6);
-            result.disambiguation_applied = true;
-            result.disambiguation_rule =
-                Some(format!("url_bare_number_veto:{}", header.to_lowercase()));
-            if let Some(taxonomy) = self.taxonomy.as_ref() {
-                result.detected_locale =
-                    detect_locale_from_validation(sample, &result.label, taxonomy);
-            }
+            demote_bare_to_numeric(
+                result,
+                sample,
+                self.taxonomy.as_ref(),
+                any_decimal,
+                "url_bare_number_veto",
+                header,
+            );
         }
     }
 
@@ -3092,19 +3039,14 @@ impl ColumnClassifier {
             let any_decimal = sample
                 .iter()
                 .any(|v| v.contains('.') && v.trim().parse::<f64>().is_ok());
-            result.label = if any_decimal {
-                "representation.numeric.decimal_number".to_string()
-            } else {
-                "representation.numeric.integer_number".to_string()
-            };
-            result.confidence = result.confidence.min(0.6);
-            result.disambiguation_applied = true;
-            result.disambiguation_rule =
-                Some(format!("utc_bare_number_veto:{}", header.to_lowercase()));
-            if let Some(taxonomy) = self.taxonomy.as_ref() {
-                result.detected_locale =
-                    detect_locale_from_validation(sample, &result.label, taxonomy);
-            }
+            demote_bare_to_numeric(
+                result,
+                sample,
+                self.taxonomy.as_ref(),
+                any_decimal,
+                "utc_bare_number_veto",
+                header,
+            );
         }
     }
 
@@ -3304,19 +3246,14 @@ impl ColumnClassifier {
         }
         let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
         if is_bare {
-            result.label = if any_decimal {
-                "representation.numeric.decimal_number".to_string()
-            } else {
-                "representation.numeric.integer_number".to_string()
-            };
-            result.confidence = result.confidence.min(0.6);
-            result.disambiguation_applied = true;
-            result.disambiguation_rule =
-                Some(format!("amount_bare_number_veto:{}", header.to_lowercase()));
-            if let Some(taxonomy) = self.taxonomy.as_ref() {
-                result.detected_locale =
-                    detect_locale_from_validation(sample, &result.label, taxonomy);
-            }
+            demote_bare_to_numeric(
+                result,
+                sample,
+                self.taxonomy.as_ref(),
+                any_decimal,
+                "amount_bare_number_veto",
+                header,
+            );
         }
     }
 }
