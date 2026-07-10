@@ -64,11 +64,7 @@ pub(crate) fn value_sharpen(
     // must be within [-180, 180]; if >20% of values exceed that, they're not coords.
     // Must fire BEFORE Rule 3 (coordinate disambiguation) to filter non-coordinates.
     if result_label == COORDINATE_PAIR.0 || result_label == COORDINATE_PAIR.1 {
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
         if non_empty.len() >= 3 {
             let mut parseable = 0usize;
             let mut out_of_range = 0usize;
@@ -173,11 +169,7 @@ pub(crate) fn value_sharpen(
     // HS codes are structured digit groups: 4 digits + optional dot-separated 2-digit
     // groups (e.g., "8471.30", "8471.30.00"). Plain decimals like "3.14" or "0.887" fail.
     if result_label == "geography.transportation.hs_code" {
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
         if non_empty.len() >= 3 {
             let match_count = non_empty.iter().filter(|v| is_hs_code_format(v)).count();
             let match_rate = match_count as f32 / non_empty.len() as f32;
@@ -229,11 +221,7 @@ pub(crate) fn value_sharpen(
     // ISIN format (2-letter country code + 9 alphanumeric + 1 check digit).
     // ISRC format is different: CC-XXX-YY-NNNNN with dashes.
     if result_label == "identity.commerce.isrc" {
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
         if non_empty.len() >= 3 {
             let isin_count = non_empty.iter().filter(|v| is_isin_format(v)).count();
             let isin_rate = isin_count as f32 / non_empty.len() as f32;
@@ -250,11 +238,7 @@ pub(crate) fn value_sharpen(
     // match ISSN format (DDDD-DDDD, dash at position 4) rather than EIN (DD-DDDDDDD,
     // dash at position 2).
     if result_label == "identity.government.ein" {
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
         if non_empty.len() >= 3 {
             let issn_count = non_empty.iter().filter(|v| is_issn_format(v)).count();
             let issn_rate = issn_count as f32 / non_empty.len() as f32;
@@ -321,11 +305,7 @@ pub(crate) fn value_sharpen(
     // The 30% threshold catches obvious version columns while allowing actual
     // dmy_short_dot columns with occasional malformed entries through.
     if result_label == "datetime.date.dmy_short_dot" {
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
         if non_empty.len() >= 3 {
             let invalid_date_count = non_empty
                 .iter()
@@ -360,11 +340,7 @@ pub(crate) fn value_sharpen(
     // values are years, not compact year-month. The year range check prevents
     // false positives on non-year 4-digit values (spec review finding L1).
     if result_label == "datetime.date.compact_ym" {
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
         if non_empty.len() >= 3 {
             let four_digit_count = non_empty
                 .iter()
@@ -501,11 +477,7 @@ pub(crate) fn value_sharpen(
     // genuine single-token entity_name columns and no value shape separates
     // them. Value-based per 0048; demote-only.
     if result_label == "representation.text.entity_name" {
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
         if non_empty.len() >= 4 {
             let is_prose = |v: &str| {
                 v.split_whitespace()
@@ -549,11 +521,7 @@ pub(crate) fn value_sharpen(
     // true http-method column is itself a small vocabulary. Value-based per
     // decision 0048.
     if result_label == "representation.text.word" {
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
         let n = non_empty.len();
         if n >= 4 {
             let distinct: std::collections::HashSet<&str> = non_empty.iter().copied().collect();
@@ -581,11 +549,7 @@ pub(crate) fn schema_fail_demotion(
     result_label: &str,
     taxonomy: &Taxonomy,
 ) -> Option<(String, String)> {
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(values);
     if non_empty.len() < 3 {
         return None;
     }
@@ -670,11 +634,7 @@ pub(crate) fn sharpen_attractor_demotion(
             .map(|v| v.is_precise())
             .unwrap_or(false);
 
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
 
         if non_empty.len() >= 3 {
             if let Some(locale_validators) = taxonomy.get_locale_validators(result_label) {
@@ -740,11 +700,7 @@ pub(crate) fn sharpen_attractor_demotion(
 
     // Signal 3: Cardinality mismatch (text attractors only)
     if is_text && !locale_confirmed {
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
         let mut unique: Vec<&str> = non_empty.clone();
         unique.sort();
         unique.dedup();
@@ -964,11 +920,7 @@ pub(crate) fn disambiguate_day_of_week(values: &[String]) -> Option<String> {
         "su",
     ];
 
-    let non_empty: Vec<String> = values
-        .iter()
-        .map(|v| v.trim().to_lowercase())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_lower(values);
 
     if non_empty.len() < 3 {
         return None;
@@ -1016,11 +968,7 @@ pub(crate) fn disambiguate_month_name(values: &[String]) -> Option<String> {
         "dec",
     ];
 
-    let non_empty: Vec<String> = values
-        .iter()
-        .map(|v| v.trim().to_lowercase())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_lower(values);
 
     if non_empty.len() < 3 {
         return None;
@@ -1052,11 +1000,7 @@ pub(crate) fn disambiguate_boolean_subtype(
     values: &[String],
     top_labels: &[&str],
 ) -> Option<(String, String)> {
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(values);
 
     if non_empty.len() < 3 {
         return None;
@@ -1190,11 +1134,7 @@ pub(crate) fn disambiguate_gender(values: &[String]) -> Option<String> {
         "Transgender",
     ];
 
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(values);
 
     if non_empty.len() < 3 {
         return None;
@@ -1238,11 +1178,7 @@ pub(crate) fn disambiguate_boolean_override(
         return None;
     }
 
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(values);
     if non_empty.len() < 3 {
         return None;
     }
@@ -1356,11 +1292,7 @@ pub(crate) fn detect_epoch_seconds(values: &[String]) -> Option<String> {
     const EPOCH_MS_MIN: i64 = EPOCH_MIN * 1000;
     const EPOCH_MS_MAX: i64 = EPOCH_MAX * 1000;
 
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(values);
 
     if non_empty.len() < 3 {
         return None;
@@ -1518,11 +1450,7 @@ pub(crate) fn disambiguate_coordinates(values: &[String]) -> Option<String> {
 /// This prevents the common confusion between IP addresses and version numbers
 /// (e.g., "10.0.32.113" looks like a semver to the model).
 pub(crate) fn disambiguate_ipv4(values: &[String]) -> Option<String> {
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(values);
 
     if non_empty.len() < 3 {
         return None;
@@ -1744,11 +1672,7 @@ pub(crate) fn disambiguate_si_number(values: &[String]) -> Option<(String, Strin
 /// Rule: If the top vote is SEDOL and ≥50% of non-empty values start with 'P'
 /// followed by at least one duration component letter, override to iso_8601 duration.
 pub(crate) fn disambiguate_duration_override(values: &[String]) -> Option<(String, String)> {
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(values);
 
     if non_empty.len() < 3 {
         return None;
@@ -1794,11 +1718,7 @@ pub(crate) fn disambiguate_duration_override(values: &[String]) -> Option<(Strin
 /// Rule: If the top vote is a datetime.time.* type and ≥80% of non-empty
 /// values match ^[+-]HH:MM$, override to datetime.offset.utc.
 pub(crate) fn disambiguate_utc_offset_override(values: &[String]) -> Option<(String, String)> {
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(values);
 
     if non_empty.len() < 3 {
         return None;
@@ -1909,11 +1829,7 @@ pub(crate) fn disambiguate_text_length_demotion(
 pub(crate) fn disambiguate_full_address_whitespace_guard(
     values: &[String],
 ) -> Option<(String, String)> {
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(values);
     if non_empty.len() < 4 {
         return None;
     }
@@ -2006,11 +1922,7 @@ pub(crate) fn disambiguate_attractor_demotion(
             .map(|v| v.is_precise())
             .unwrap_or(false);
 
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
 
         if non_empty.len() >= 3 {
             // Check locale-specific validators first (if available).
@@ -2102,11 +2014,7 @@ pub(crate) fn disambiguate_attractor_demotion(
     // phone numbers or postal codes — cardinality alone shouldn't override
     // locale-level format confirmation.
     if is_text && !locale_confirmed {
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
         let mut unique: Vec<&str> = non_empty.clone();
         unique.sort();
         unique.dedup();
@@ -2155,11 +2063,7 @@ pub(crate) fn schema_validation_gate(
         return;
     };
 
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(values);
     if non_empty.len() < 3 {
         return;
     }

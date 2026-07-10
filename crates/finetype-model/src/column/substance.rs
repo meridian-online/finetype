@@ -19,6 +19,16 @@ pub(crate) fn non_empty_trimmed(sample: &[String]) -> Vec<&str> {
         .collect()
 }
 
+/// Like [`non_empty_trimmed`] but each value is trimmed **and lowercased** — for
+/// the case-insensitive value scans (day/month-name detection).
+pub(crate) fn non_empty_lower(sample: &[String]) -> Vec<String> {
+    sample
+        .iter()
+        .map(|v| v.trim().to_lowercase())
+        .filter(|v| !v.is_empty())
+        .collect()
+}
+
 /// Demote `result` to `unknown` when fewer than half of the column's non-empty
 /// values satisfy `predicate`. No-op unless `result.label == label`; demote-only,
 /// RHH-disableable via `rule`. This is the shared body of the substance guards —

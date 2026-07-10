@@ -237,11 +237,7 @@ const USERNAME_MIN_DISTINCT_FRACTION: f32 = 0.9;
 /// a true positive — it only reclassifies columns full_name could never have been
 /// right about.
 fn is_username_handle_shaped(values: &[String]) -> bool {
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(values);
     // Need enough evidence to judge a column's shape.
     if non_empty.len() < 4 {
         return false;
@@ -483,11 +479,7 @@ fn sample_contradicts_label(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bo
     let Some(validator) = tax.get_validator(leaf) else {
         return false;
     };
-    let non_empty: Vec<&str> = sample
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
+    let non_empty = non_empty_trimmed(sample);
     if non_empty.len() < 3 {
         return false;
     }
@@ -2127,11 +2119,7 @@ impl ColumnClassifier {
         // hardcoded hint override which would otherwise overwrite
         // a value_sharpen correction. See spec review finding A1/F1.
         if result.label == "geography.location.country" {
-            let non_empty: Vec<&str> = sample
-                .iter()
-                .map(|v| v.trim())
-                .filter(|v| !v.is_empty())
-                .collect();
+            let non_empty = non_empty_trimmed(sample);
             if non_empty.len() >= 3 {
                 let alpha2_count = non_empty
                     .iter()
@@ -2295,11 +2283,7 @@ impl ColumnClassifier {
         if result.label == LEAF {
             return;
         }
-        let non_empty: Vec<&str> = sample
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(sample);
         if non_empty.len() < 3 {
             return;
         }
@@ -2354,11 +2338,7 @@ impl ColumnClassifier {
         if result.label == LEAF {
             return;
         }
-        let non_empty: Vec<&str> = sample
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(sample);
         if non_empty.len() < 3 {
             return;
         }
@@ -2543,11 +2523,7 @@ impl ColumnClassifier {
         if result.label == LEAF || !header_corroborates_isbn(header) {
             return;
         }
-        let non_empty: Vec<&str> = sample
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(sample);
         if non_empty.len() < 3 {
             return;
         }
@@ -2596,11 +2572,7 @@ impl ColumnClassifier {
         {
             return;
         }
-        let non_empty: Vec<&str> = sample
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(sample);
         if non_empty.len() < 3 {
             return;
         }
@@ -2880,11 +2852,7 @@ impl ColumnClassifier {
         {
             return;
         }
-        let non_empty: Vec<&str> = values
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(values);
         if non_empty.len() < 3 {
             return;
         }
@@ -2960,11 +2928,7 @@ impl ColumnClassifier {
         else {
             return;
         };
-        let non_empty: Vec<&str> = sample
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(sample);
         if non_empty.len() < 3 {
             return;
         }
@@ -3033,11 +2997,7 @@ impl ColumnClassifier {
         else {
             return;
         };
-        let non_empty: Vec<&str> = sample
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(sample);
         if non_empty.len() < 3 {
             return;
         }
@@ -3216,11 +3176,7 @@ impl ColumnClassifier {
         let Some(validator) = taxonomy.get_validator("geography.location.country_code") else {
             return;
         };
-        let non_empty: Vec<&str> = sample
-            .iter()
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect();
+        let non_empty = non_empty_trimmed(sample);
         if non_empty.len() < 3 {
             return;
         }
