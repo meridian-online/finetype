@@ -39,18 +39,18 @@
 #   --model   <prefix>  model-eval mode: pick best seed among models/<prefix>-s<seed>
 #   --seeds   a,b,c     seeds to consider in model mode (default 42,43,44)
 #   --gate-baseline <parquet>
-#                       FRESH transition baseline for the corpus-honest gate:
-#                       a columns.parquet from the SAME 33k sample run with the
-#                       PRE-change binary, with ydf_prediction_gated joined on
-#                       from output/ydf-validation-gate/v19_gated.parquet (the
-#                       oracle is column-intrinsic, so the v19-era join is
-#                       correct even though v19's PREDICTIONS are retired).
-#                       REQUIRED for a valid rule-mode verdict since the m2v8m
-#                       swap (2026-06-24): without it the gate defaults its
-#                       transition baseline to the retired v19's predictions
-#                       and the verdict measures cumulative post-swap history,
-#                       not your change — a guaranteed false NO-GO (first hit:
-#                       W1 of output/company-reference-audit/, 2026-07-04).
+#                       Transition baseline for the corpus-honest gate. OPTIONAL:
+#                       when omitted it defaults to the STANDING CURRENT-DEFAULT
+#                       reference pass (output/corpus-honest-gate/standing/
+#                       baseline_m2v8m-s43.parquet — build once with
+#                       scripts/build_standing_baseline.sh). Pass this only to
+#                       override with a MORE PRECISE PRE-change baseline of the
+#                       SAME model (e.g. the rule-OFF pass that
+#                       scripts/corpus_honest_gate_fast.sh builds) with
+#                       ydf_prediction_gated joined from the column-intrinsic
+#                       v19_gated oracle. NEVER pass v19_gated itself as the
+#                       baseline — that scores deviation-from-v19, a guaranteed
+#                       false NO-GO since the m2v8m swap (choice 0104).
 #   -h | --help         print this usage and exit 0
 
 set -uo pipefail
@@ -208,22 +208,25 @@ FINETYPE_MODEL="$MODEL" python3 scripts/gittables_corpus_pass.py \
 # ── 4. Corpus-honest gate (H05, BLOCKING — this is the verdict) ──────────────
 echo ""; echo "── Corpus-honest gate (H05, BLOCKING) ──"
 CAND_PARQUET="$OUT/sample_pass/corpus_pass/columns.parquet"
-BASELINE_ARGS=()
-if [[ -n "$GATE_BASELINE" ]]; then
-    BASELINE_ARGS=(--baseline "$GATE_BASELINE")
-elif [[ "$MODE" == "rule" ]]; then
-    cat >&2 <<'EOWARN'
-  ⚠️  WARNING: no --gate-baseline supplied. The gate's transition baseline
-  defaults to the RETIRED v19's predictions, so in rule mode this verdict
-  measures the cumulative post-swap history, NOT your rule change — a
-  guaranteed false NO-GO since 2026-06-24 (see --help for the fresh-baseline
-  protocol; first hit: company-reference audit W1). Treat the verdict below
-  as INVALID for ship decisions until re-run with --gate-baseline.
-EOWARN
+STANDING_BASELINE="output/corpus-honest-gate/standing/baseline_m2v8m-s43.parquet"
+if [[ -z "$GATE_BASELINE" ]]; then
+    if [[ -f "$STANDING_BASELINE" ]]; then
+        GATE_BASELINE="$STANDING_BASELINE"
+        echo "  (no --gate-baseline; using the standing current-default reference:" >&2
+        echo "   $STANDING_BASELINE — a new rule's transition is isolated against the" >&2
+        echo "   shipped default. For a single-rule verdict of maximal precision, prefer" >&2
+        echo "   scripts/corpus_honest_gate_fast.sh, which builds a rule-OFF baseline of" >&2
+        echo "   the SAME model.)" >&2
+    else
+        echo "  ⚠️  No --gate-baseline and the standing reference is missing." >&2
+        echo "  Build it once: scripts/build_standing_baseline.sh" >&2
+        echo "  (or pass --gate-baseline <pre-change pass>.parquet)." >&2
+        exit 2
+    fi
 fi
 python3 scripts/corpus_honest_gate.py \
+    --baseline "$GATE_BASELINE" \
     --candidate "$CAND_PARQUET" \
-    ${BASELINE_ARGS[@]+"${BASELINE_ARGS[@]}"} \
     --label "${LABEL}${SEED_TAG}" \
     | tee "$OUT/corpus_honest_gate.txt"
 
