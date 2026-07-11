@@ -932,7 +932,7 @@ datetime.date.long_full_month:
   aliases: [long_full_month_name]
   samples:
     - "January 15, 2024"
-    - "15 January 2024"
+    - "June 1, 2000"
     - "December 31, 2019"
   references: null
   notes: "v1 name: date.long_full_month_name"
@@ -999,7 +999,7 @@ datetime.date.weekday_full_month:
   aliases: [long_weekday_month_name]
   samples:
     - "Monday, January 15, 2024"
-    - "Tuesday, 31 December 2019"
+    - "Tuesday, December 31, 2019"
   references: null
   notes: "v1 name: date.long_weekday_month_name"
 

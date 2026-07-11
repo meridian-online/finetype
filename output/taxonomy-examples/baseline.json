@@ -1,7 +1,6 @@
 {
   "acknowledged_gaps": {
     "container.array.whitespace_separated": "representation.text.plain_text",
-    "datetime.date.long_full_month": "datetime.date.dmy_space_full",
     "datetime.date.weekday_full_month": "datetime.date.weekday_dmy_full",
     "datetime.timestamp.rfc_2822_ordinal": "datetime.timestamp.rfc_2822",
     "finance.securities.cusip": "representation.text.word",
@@ -63,6 +62,7 @@
     "datetime.date.jp_era_short",
     "datetime.date.julian",
     "datetime.date.korean_ymd",
+    "datetime.date.long_full_month",
     "datetime.date.mdy_dash",
     "datetime.date.mdy_short_slash",
     "datetime.date.mdy_slash",
@@ -255,5 +255,5 @@
     "technology.internet.urn",
     "technology.internet.user_agent"
   ],
-  "round_trip": "229/249"
+  "round_trip": "230/249"
 }

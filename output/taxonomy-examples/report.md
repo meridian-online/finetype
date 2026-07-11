@@ -2,7 +2,7 @@
 
 Engine: `finetype profile` (isolated single-column, full Sense+Sharpen). Header: leaf-name. Rows/column: 20. Binary: `/Users/hugh/github/meridian-online/finetype/target/release/finetype` (finetype 0.6.47).
 
-**Round-trip: 229/249 (92.0%).**
+**Round-trip: 230/249 (92.4%).**
 
 A type *round-trips* when a column of its own taxonomy examples profiles back to that type. Failures are grouped below; not all are bugs — many are types the 244-dim model cannot predict and that the Sharpen recovery guards only fire for on real column context (membership thresholds, anchored patterns), which a small synthetic example column need not satisfy.
 
@@ -10,14 +10,16 @@ A type *round-trips* when a column of its own taxonomy examples profiles back to
 
 - Regressions (were passing, now fail): **0**
 - New unacknowledged fails: **0**
-- Graduated (acknowledged gap now passes): **0**
+- Graduated (acknowledged gap now passes): **1**
+
+### Graduated (rerun --update-baseline to lock)
+- `datetime.date.long_full_month`
 
 ## All non-round-tripping types
 
 | type | profiled as |
 | --- | --- |
 | `container.array.whitespace_separated` | `representation.text.plain_text` |
-| `datetime.date.long_full_month` | `datetime.date.dmy_space_full` |
 | `datetime.date.weekday_full_month` | `datetime.date.weekday_dmy_full` |
 | `datetime.timestamp.rfc_2822_ordinal` | `datetime.timestamp.rfc_2822` |
 | `finance.securities.cusip` | `representation.text.word` |

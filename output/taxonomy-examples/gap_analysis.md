@@ -16,6 +16,20 @@ worth acting on; the rest are model-blind-by-design or residual categories.
 Adjudicated per-type against the taxonomy + guard code (workflow `wf_62d19fcb-004`,
 21 agents). `profiled_as` = what a column of the type's own examples classifies as.
 
+**Update (2026-07-12).** Two lines of follow-up landed:
+- **`infer` fast-path extended** — 24 value-self-sufficient certainty leaves (emoji,
+  uuid, jwt, wkt, aws_arn, iban, …) added to `deterministic_fast_path`, so single-value
+  `infer` now resolves them deterministically instead of guessing (`infer -i "❤️"` →
+  emoji). Profile round-trip is unaffected (fast-path is infer-only).
+- **Weak-example bucket A actioned.** `long_full_month`'s day-first sample fixed → now
+  round-trips (baseline 229→230). `weekday_full_month`'s sample was likewise corrected to
+  month-first (the example was genuinely wrong), but it still lands on sibling
+  `weekday_dmy_full` — a model sibling-confusion, not example-fixable, so it stays a gap.
+  `increment`'s samples extended to 6 contiguous integers; it round-trips on real
+  monotonic data (`1..10` → increment, 0.979) but the harness *cycles* samples to fill
+  rows, which breaks monotonicity — so it remains a harness false-negative, not a taxonomy
+  gap. Net acknowledged gaps: 20 → 19.
+
 ---
 
 ## A. Weak examples — the example VALUES are wrong (fix `labels/definitions_*.yaml`)

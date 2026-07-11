@@ -1219,6 +1219,9 @@ representation.identifier.increment:
     - "1"
     - "2"
     - "3"
+    - "4"
+    - "5"
+    - "6"
   references: null
   notes: >
     Moved from representation.numeric.increment in v0.5.1.
