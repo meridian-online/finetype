@@ -1,0 +1,134 @@
+{
+ "columns": [
+  {
+   "table": "nyc_dob_permits_sample.csv",
+   "column": "filing_date",
+   "votes": [
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.95,
+     "why": "The format distribution shows 83% (16,582/20,000) of values are ISO YYYY-MM-DD (e.g. 1996-10-04, 2004-03-01) and only 17% (3,418) are MM/DD/YYYY slash dates; a single-column label should describe the dominant format, which is ISO."
+    },
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.9,
+     "why": "The column is a mixed-format date field, but the format distribution shows 83% (16,582/20,000) values in ISO YYYY-MM-DD form versus only 17% slash MM/DD/YYYY; the representative sample confirms the ISO form dominates, so the majority-describing single-column label is datetime.date.iso."
+    },
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.95,
+     "why": "The column is a mixed-format date field: 83% (16,582/20,000) are ISO-8601 YYYY-MM-DD values and only 17% (3,418) are MM/DD/YYYY slash dates. A single-column label describes the bulk, and the dominant format is clearly ISO, matching the representative sample where the strong majority of values are YYYY-MM-DD."
+    }
+   ],
+   "tally": {
+    "datetime.date.iso": 3
+   },
+   "consensus_label": "datetime.date.iso",
+   "unanimous": true
+  },
+  {
+   "table": "nyc_dob_permits_sample.csv",
+   "column": "issuance_date",
+   "votes": [
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.95,
+     "why": "The column mixes two date formats but the dominant one is ISO YYYY-MM-DD at 83% (16470/19808), versus 17% MM/DD/YYYY slash dates; the representative sample confirms this majority. A single-column label describes the bulk, so datetime.date.iso is correct."
+    },
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.9,
+     "why": "The representative sample and format_distribution both show the bulk (16470/19808 = 83%) are ISO-8601 dates like 2008-03-27, with only 17% (3338) in MM/DD/YYYY slash form; a single-column label describes the majority, so datetime.date.iso fits."
+    },
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.9,
+     "why": "The column is a mix of two date formats, but the format_distribution shows ISO YYYY-MM-DD dominates at 83% (16470/19808) versus MM/DD/YYYY slash dates at 17% (3338/19808); the representative sample confirms this bulk of ISO values. A single-column label should describe the majority, so datetime.date.iso is best."
+    }
+   ],
+   "tally": {
+    "datetime.date.iso": 3
+   },
+   "consensus_label": "datetime.date.iso",
+   "unanimous": true
+  },
+  {
+   "table": "nyc_dob_permits_sample.csv",
+   "column": "expiration_date",
+   "votes": [
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.95,
+     "why": "The format distribution shows 83% (16,513/19,873) of values are ISO YYYY-MM-DD (e.g. 1997-01-28, 2002-01-01), versus only 17% MM/DD/YYYY slash dates. A single-column label describes the majority, and the ISO format clearly dominates."
+    },
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.95,
+     "why": "The format distribution shows 83% ISO dates (YYYY-MM-DD, e.g. 1997-01-28, 2002-01-01) versus 17% MM/DD/YYYY slash dates; the representative sample matches this mix. A single-column label describes the bulk, so the ISO majority governs."
+    },
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.95,
+     "why": "The column is a two-format mix: 83% (16,513/19,873) are YYYY-MM-DD ISO dates and only 17% (3,360) are MM/DD/YYYY slash dates. Per the majority-content rule, the dominant ISO format best describes the bulk of the column."
+    }
+   ],
+   "tally": {
+    "datetime.date.iso": 3
+   },
+   "consensus_label": "datetime.date.iso",
+   "unanimous": true
+  },
+  {
+   "table": "nyc_dob_permits_sample.csv",
+   "column": "job_start_date",
+   "votes": [
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.9,
+     "why": "The representative sample and the format distribution both show the dominant content is YYYY-MM-DD ISO dates (16582/20000 = 83%), with only 17% MM/DD/YYYY slash dates; a single-column label describes the majority, so datetime.date.iso fits best."
+    },
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.9,
+     "why": "The representative sample is dominated by YYYY-MM-DD values (e.g. 1996-10-16, 2004-03-01), and the format_distribution confirms 83% ISO (16582/20000) versus 17% slash MM/DD/YYYY (3418/20000). The single-column label describes the majority, which is ISO-8601 calendar dates."
+    },
+    {
+     "label": "datetime.date.iso",
+     "conf": 0.9,
+     "why": "The representative sample and format_distribution show the column is 83% ISO-8601 dates (YYYY-MM-DD, e.g. 1996-10-16) and only 17% MM/DD/YYYY slash dates. A single-column label describes the dominant majority format, which is ISO."
+    }
+   ],
+   "tally": {
+    "datetime.date.iso": 3
+   },
+   "consensus_label": "datetime.date.iso",
+   "unanimous": true
+  },
+  {
+   "table": "gleif_entities.csv",
+   "column": "entity_status",
+   "votes": [
+    {
+     "label": "representation.boolean.terms",
+     "conf": 0.9,
+     "why": "The non-null values are exactly ACTIVE (94%) and INACTIVE (2%), a two-term status enum that the boolean.terms definition explicitly names and that maps cleanly to a DuckDB BOOLEAN. Though ACTIVE dominates, the column's domain is the ACTIVE/INACTIVE boolean pair, not an open vocabulary of arbitrary words."
+    },
+    {
+     "label": "representation.boolean.terms",
+     "conf": 0.9,
+     "why": "The column holds exactly two non-null states, ACTIVE (94%) and INACTIVE (2%), a canonical two-valued status flag that the taxonomy explicitly cites as boolean.terms (ACTIVE/INACTIVE \u2192 DuckDB BOOLEAN). representation.text.word would be correct only for an open-vocabulary token, but here the vocabulary is a closed binary, so the boolean label better describes the content."
+    },
+    {
+     "label": "representation.boolean.terms",
+     "conf": 0.88,
+     "why": "The column has exactly two non-null states, ACTIVE (94%) and INACTIVE (2%), which is a boolean status rendered as words \u2014 the ACTIVE/INACTIVE case named explicitly in the boolean.terms definition. Though the values are single spaceless tokens (fitting word structurally), the two-state ACTIVE/INACTIVE semantics make the boolean label the more precise fit."
+    }
+   ],
+   "tally": {
+    "representation.boolean.terms": 3
+   },
+   "consensus_label": "representation.boolean.terms",
+   "unanimous": true
+  }
+ ]
+}
