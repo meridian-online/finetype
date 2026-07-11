@@ -113,6 +113,15 @@ leakage-guard:
 	python3 scripts/audit_gold_anchor_leakage.py
 	python3 scripts/eval_leakage/test_validate_corpus_firewall.py
 
+# Taxonomy examples round-trip: a column of each type's own `examples` array must
+# profile back to that type. Regression-gated against
+# output/taxonomy-examples/baseline.json (exit 1 on a regression or a new
+# unacknowledged fail). Needs the model artifact (models/default), so it is a
+# standalone target, not wired into `ci`. Refresh the baseline after an
+# intentional taxonomy/example change: append `-- --update-baseline`.
+test-examples: build-release
+	FINETYPE_BIN=target/release/finetype python3 scripts/test_taxonomy_examples.py $(ARGS)
+
 generate:
 	cargo run -- generate --localized -s 1000 -o training.ndjson
 
