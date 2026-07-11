@@ -35,6 +35,7 @@ impl ColumnClassifier {
         self.city_region_header_corroboration(result, header, sample);
         self.country_code_corroboration(result, header, sample);
         self.geo_code_membership_vote(result, header, sample);
+        self.geo_code_nonmembership_demotion(result, header, sample);
         self.timezone_abbreviation_recovery(result, header, sample);
         self.naics_industry_recovery(result, header, sample);
         self.s_expression_recovery(result, sample);
@@ -929,6 +930,139 @@ impl ColumnClassifier {
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!("geo_code_membership_vote:{from}"));
         result.detected_locale = detect_locale_from_validation(sample, &result.label, taxonomy);
+    }
+
+    /// `geo_code_nonmembership_demotion` (default ON). The set-vs-set companion to
+    /// `geo_code_membership_vote`: the vote ARBITRATES a `state_code` <-> `country_code`
+    /// column but ABSTAINS — keeps the model's label — when NEITHER set covers the
+    /// column. That abstention leaves the wrong label on a NON-geographic short-code
+    /// column the flat softmax pulled onto a 2-letter geo type: `work_type` (OT/EQ/MH),
+    /// `permit_type` (EW/FO/DM), `ticker` (NVDA). These PASS `state_code`/`country_code`'s
+    /// shape-only `^[A-Z]{2}$` validator (so `schema_fail_demotion`, which keys on
+    /// validator failure, cannot touch them) yet are not location codes. Membership is
+    /// the discriminator: measure coverage against the country enum UNION the state
+    /// subdivision enums — counting bare codes AND the ISO-3166-2 hyphenated form
+    /// (`US-MA`), because a genuine subdivision column in hyphenated form scores 0% on
+    /// the bare set and would otherwise be FALSE-demoted (the gleif `region` control).
+    /// When < 50% of values are ANY location code, demote to the cardinality residual
+    /// (`word` for a small vocabulary, `alphanumeric_id` for high-card) — matching
+    /// `schema_fail_demotion`. Measured (external band): work_type 39% / permit_type 43%
+    /// / permit_subtype 26% / ticker 9% coverage vs genuine country 100% / jurisdiction
+    /// 100% / region 100% — a 0.50 floor separates them cleanly. A SHAPE GATE fires the
+    /// guard ONLY on the 2-letter `^[A-Z]{2}$` attractor form: a genuine country column
+    /// in ALPHA-3 (`FRA`) or numeric form is a real geography type the enum doesn't list,
+    /// and demoting it is a false-positive (the gold `primaryCountry.alpha3Code` /
+    /// `Country Code` regression, caught by a gold-flat re-check). Value-based (0048),
+    /// demote-only, RHH-disableable. KNOWN LIMIT: a genuine state column from a locale
+    /// outside the US/CA/AU subdivision enums (e.g. German Bundesland codes) scores low
+    /// and would demote — expanding the subdivision roster is the fix, not relaxing this.
+    fn geo_code_nonmembership_demotion(
+        &self,
+        result: &mut ColumnResult,
+        _header: &str,
+        sample: &[String],
+    ) {
+        if rhh::is_disabled("geo_code_nonmembership_demotion") {
+            return;
+        }
+        const COUNTRY: &str = "geography.location.country_code";
+        const STATE: &str = "geography.location.state_code";
+        if result.label != COUNTRY && result.label != STATE {
+            return;
+        }
+        let Some(taxonomy) = self.taxonomy.as_ref() else {
+            return;
+        };
+        // Build the country + subdivision sets directly from the taxonomy enums —
+        // the country enum from `validation.enum_values`, the subdivision union the
+        // same way `geo_code_membership_vote` builds it. (The full taxonomy carries
+        // the complete ISO-3166-1 list; the inline test fixture a curated subset.)
+        let country_codes: std::collections::HashSet<String> = taxonomy
+            .get(COUNTRY)
+            .and_then(|d| d.validation.as_ref())
+            .and_then(|val| val.enum_values.as_ref())
+            .map(|e| e.iter().map(|s| s.to_uppercase()).collect())
+            .unwrap_or_default();
+        let subdivisions: std::collections::HashSet<String> = taxonomy
+            .get(STATE)
+            .and_then(|d| d.validation_by_locale.as_ref())
+            .map(|by_locale| {
+                by_locale
+                    .values()
+                    .filter_map(|v| v.enum_values.as_ref())
+                    .flatten()
+                    .map(|s| s.to_uppercase())
+                    .collect()
+            })
+            .unwrap_or_default();
+        if country_codes.is_empty() || subdivisions.is_empty() {
+            return;
+        }
+        let non_empty: Vec<String> = sample
+            .iter()
+            .map(|v| v.trim().to_uppercase())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        // Shape gate: only fire on the 2-letter attractor shape `^[A-Z]{2}$` — the
+        // exact form that pulls a NON-geo short code onto `state_code`/`country_code`
+        // (work_type OT/EQ, permit_type EW/FO). A genuine country column in ALPHA-3
+        // (`FRA`, `USA`) or numeric form is NOT this shape and is a real geography
+        // type the enum simply doesn't list — demoting it is a false-positive (the
+        // gold `primaryCountry.alpha3Code` / `Country Code` control). Requiring the
+        // 2-letter majority leaves those columns untouched.
+        let two_letter = non_empty
+            .iter()
+            .filter(|v| v.len() == 2 && v.chars().all(|c| c.is_ascii_uppercase()))
+            .count();
+        if two_letter * 2 < non_empty.len() {
+            return;
+        }
+        // "Any location code" = a country-enum member, a bare subdivision code, or an
+        // ISO-3166-2 hyphenated subdivision (`US-MA`) whose prefix is a real country.
+        // The hyphenated arm is load-bearing: without it a genuine `US-MA` region
+        // column scores 0% and is wrongly demoted.
+        let is_geo_code = |v: &str| -> bool {
+            if country_codes.contains(v) || subdivisions.contains(v) {
+                return true;
+            }
+            if let Some((cc, sub)) = v.split_once('-') {
+                if cc.len() == 2
+                    && !sub.is_empty()
+                    && sub.len() <= 3
+                    && sub.chars().all(|c| c.is_ascii_alphanumeric())
+                    && country_codes.contains(cc)
+                {
+                    return true;
+                }
+            }
+            false
+        };
+        let geo_cov =
+            non_empty.iter().filter(|v| is_geo_code(v)).count() as f64 / non_empty.len() as f64;
+        const FLOOR: f64 = 0.50;
+        if geo_cov >= FLOOR {
+            // Enough real location codes -> genuine geography column, leave it.
+            return;
+        }
+        // Not a location-code column. Demote to the cardinality residual, matching
+        // `schema_fail_demotion` (small vocabulary -> word; high-card -> alphanumeric_id).
+        let mut distinct: Vec<&str> = non_empty.iter().map(String::as_str).collect();
+        distinct.sort_unstable();
+        distinct.dedup();
+        let residual = if (1..=20).contains(&distinct.len()) {
+            "representation.text.word"
+        } else {
+            "representation.identifier.alphanumeric_id"
+        };
+        let from = result.label.clone();
+        result.label = residual.to_string();
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("geo_code_nonmembership_demotion:{from}"));
+        result.detected_locale = None;
     }
 
     /// `amount_bare_number_veto` (default ON). Runs AFTER `apply_header_sharpen`,

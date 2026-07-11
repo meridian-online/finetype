@@ -349,6 +349,124 @@ fn geo_vote_keeps_canadian_provinces_as_state_not_country() {
     );
 }
 
+// === geo_code_nonmembership_demotion (external-band guard batch, guard 1) ===
+
+#[test]
+fn geo_nonmembership_demotion_is_default_on() {
+    assert!(!rhh::is_disabled("geo_code_nonmembership_demotion"));
+}
+
+#[test]
+fn geo_nonmembership_demotes_nonlocation_short_codes_to_word() {
+    // NYC-DOB `work_type`: OT/EQ/MH/SP/PL — 2-letter permit codes the flat softmax
+    // pulls onto state_code (they pass ^[A-Z]{2}$). Measured geo-union coverage ~39%,
+    // below the 0.50 floor, so demote to the small-vocabulary residual `word`.
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["OT", "EQ", "MH", "SP", "PL", "OT", "EQ", "OT"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("work_type", &vals, "geography.location.state_code", 0.90)
+        .unwrap();
+    assert_eq!(r.label, "representation.text.word");
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_code_nonmembership_demotion:geography.location.state_code")
+    );
+}
+
+#[test]
+fn geo_nonmembership_keeps_hyphenated_iso3166_2_subdivisions() {
+    // gleif `region`-style ISO-3166-2 subdivisions in hyphenated form. They score 0%
+    // on the BARE subdivision set; the hyphenated arm of the membership check
+    // recognises them by their real country prefix (100% coverage), so the column is
+    // NOT demoted. This is the false-demote landmine the guard must avoid. (The test
+    // fixture's country enum carries CA/GB/DE/FR, so hyphenated codes use those
+    // prefixes; production carries the full ISO-3166-1 list incl. US.)
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["CA-ON", "CA-BC", "CA-QC", "GB-ENG", "DE-BW", "FR-75"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("region", &vals, "geography.location.state_code", 0.90)
+        .unwrap();
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_code_nonmembership_demotion:geography.location.state_code")
+    );
+    assert_eq!(r.label, "geography.location.state_code");
+}
+
+#[test]
+fn geo_nonmembership_keeps_constant_country_column() {
+    // A constant single-country column (all "GB") is a genuine — if low-cardinality —
+    // country column: 100% enum coverage, so the guard must NOT mistake its tiny
+    // vocabulary for a non-location short-code set and demote it.
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["GB", "GB", "GB", "GB", "GB", "GB", "GB"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("country", &vals, "geography.location.country_code", 0.95)
+        .unwrap();
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_code_nonmembership_demotion:geography.location.country_code")
+    );
+    assert_eq!(r.label, "geography.location.country_code");
+}
+
+#[test]
+fn geo_nonmembership_keeps_alpha3_country_column() {
+    // Regression control (gold `primaryCountry.alpha3Code` / `Country Code`): a
+    // genuine country column in ALPHA-3 form (`FRA`/`GBR`/`USA`) is a real geography
+    // type the 2-letter enum simply doesn't list. The values are NOT the 2-letter
+    // attractor shape, so the shape gate leaves the column untouched — it must NOT be
+    // demoted to a text residual.
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["FRA", "GBR", "USA", "DEU", "ITA", "ESP", "CHN", "IND"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("country", &vals, "geography.location.country_code", 0.95)
+        .unwrap();
+    // The guard's contract is that it must NOT demote this to a text residual. Other
+    // pipeline rules may relabel country_code -> country (the full leaf) on alpha-3
+    // values; that is legitimate and not this guard.
+    assert!(
+        r.label.starts_with("geography."),
+        "alpha-3 country column must stay a geography type, got {}",
+        r.label
+    );
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_code_nonmembership_demotion:geography.location.country_code")
+    );
+}
+
+#[test]
+fn geo_nonmembership_keeps_genuine_country_column() {
+    // A real multi-country column validates ~100% against the country enum -> kept.
+    // (All codes are members of the fixture's 12-code country enum.)
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["GB", "FR", "DE", "IT", "CN", "ES", "NL", "SE"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("country", &vals, "geography.location.country_code", 0.95)
+        .unwrap();
+    assert_eq!(r.label, "geography.location.country_code");
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_code_nonmembership_demotion:geography.location.country_code")
+    );
+}
+
 // === 0094 postal header-veto helpers (spec 2026-06-10-postal-header-veto) ===
 
 #[test]
