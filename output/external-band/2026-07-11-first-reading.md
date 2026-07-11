@@ -83,11 +83,11 @@ The audit shipped per-manifestation fixes (v0.6.39–0.6.44: unlocode guard, geo
 
 10 profiled trio columns have no held label yet. Seven are plausibly-correct numeric IDs (`block`, `lot`, `community_board`, `house__`, `permit_sequence__`, `gis_census_tract`, `gis_council_district` — all `integer_number`, no obvious error). The **three flagged as suspicious were adjudicated above and all confirmed wrong** (`bldg_type` `1`/`2` → 8-digit date; `permit_subtype` `OT`/`MH` → region; `site_fill` phrases → single-word). That is the failure-hunting yield: pointing the band at a real table found three more errors the headline never counted. Turning them into headline signal needs a truth tier (author call below).
 
-## Author calls I need (growth policy — none blocks the wiring above)
+## Growth policy (author-decided 2026-07-11)
 
-1. **Truth tier for triage-queue adjudications.** New adjudications from the triage queue need a tier before they can count toward a headline — panel tier (like the representative band) or author tier, or panel-proposes/author-ratifies. Until assigned, they stay triage-only.
-2. **Gold overlap.** The trio's columns are *in* the gold headline. The band reuses them and reports delta-only + a tier-mix disclosure to prevent double-counting. Confirm that's enough, or decide to move the external rows out of the gold headline into the band's exclusive scope (cleaner separation, but re-baselines gold).
-3. **Rotation source for v1.** Stay within the fixed on-disk pool, or fetch a fresh external table each quarter (network + PII screen + snapshot register). v0 is deliberately network-free.
+1. **Truth tier for triage-queue adjudications: panel proposes, author ratifies.** New over-emissions the triage queue surfaces get a blind multi-model panel proposal; the author ratifies contested calls before the label joins gold and can count toward a headline. Mirrors how the `compref:*` gold was built (llm-3panel-blind + author overrides). Until ratified, triage stays triage-only.
+2. **Gold overlap: keep external rows in both, delta-only + tier disclosure.** The band reports the candidate-vs-baseline delta and the tier-mix of scored labels, never the absolute in a blocking number — no re-baseline of the gold headline. (Shipped behaviour.)
+3. **Rotation source (v1): fixed on-disk pool for now.** Network-free and reproducible; rotate subsets with `--rotate/--seed`, grow the pool opportunistically as new tables land on disk. Quarterly fresh-fetch (network + PII screen + snapshot register) is deferred, not adopted.
 
 ## What we don't know yet
 
