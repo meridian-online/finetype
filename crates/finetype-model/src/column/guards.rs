@@ -36,6 +36,7 @@ impl ColumnClassifier {
         self.country_code_corroboration(result, header, sample);
         self.geo_code_membership_vote(result, header, sample);
         self.geo_code_nonmembership_demotion(result, header, sample);
+        self.geo_subdivision_membership_promote(result, header, sample);
         self.timezone_abbreviation_recovery(result, header, sample);
         self.naics_industry_recovery(result, header, sample);
         self.s_expression_recovery(result, sample);
@@ -1062,6 +1063,63 @@ impl ColumnClassifier {
         result.confidence = result.confidence.min(0.6);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!("geo_code_nonmembership_demotion:{from}"));
+        result.detected_locale = None;
+    }
+
+    /// `geo_subdivision_membership_promote` (default ON). The promote companion to
+    /// the geo membership guards: a column of ISO-3166-2 subdivision codes
+    /// (`US-PA`, `GB-ENG`) is a `geography.location.region`, but the flat softmax —
+    /// which never learned the hyphenated form — files it under a residual
+    /// (`alphanumeric_id`/`unknown`) or a lookalike (`last_name`, `locale_code`),
+    /// and the unlocode `membership_substance_guard` then demotes the model's
+    /// `unlocode` guess to `unknown` (external band: ourairports `iso_region`
+    /// US-PA → unknown). The `CC-SSS` shape is NOT precise — product/OS/locale
+    /// hyphen-codes share it (100 alphanumeric_id + 16 os + 13 entity columns at
+    /// corpus scale) — so this keys on published ISO-3166-2 MEMBERSHIP
+    /// (`finetype_core::membership::iso_3166_2`, labels/sets/iso_3166_2_codes.txt,
+    /// 5046 codes across 200 countries). When ≥90% of values are real subdivision
+    /// codes, promote to region. Membership at that density is self-precise (a
+    /// non-geo column is ~never 90% exact subdivision codes), so it fires on ANY
+    /// source label except an already-correct region — mirroring the naics /
+    /// s_expression recoveries. Value-based (0048), promote-only, RHH-disableable.
+    fn geo_subdivision_membership_promote(
+        &self,
+        result: &mut ColumnResult,
+        _header: &str,
+        sample: &[String],
+    ) {
+        if rhh::is_disabled("geo_subdivision_membership_promote") {
+            return;
+        }
+        const REGION: &str = "geography.location.region";
+        // Already the target — nothing to promote.
+        if result.label == REGION {
+            return;
+        }
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let members = non_empty
+            .iter()
+            .filter(|v| finetype_core::membership::iso_3166_2(v))
+            .count();
+        // ≥90% published ISO-3166-2 membership — self-precise at this density, so
+        // the source label is irrelevant (a non-geo column is ~never 90% exact
+        // subdivision codes). Shape alone would false-promote hyphenated
+        // product/OS/locale codes; membership is the discriminator.
+        if members * 10 < non_empty.len() * 9 {
+            return;
+        }
+        let from = result.label.clone();
+        result.label = REGION.to_string();
+        result.confidence = result.confidence.max(0.85);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("geo_subdivision_membership_promote:{from}"));
         result.detected_locale = None;
     }
 

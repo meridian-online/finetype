@@ -38,6 +38,14 @@ licence, snapshot date, and extraction rule in its header.
   statuses are kept deliberately — the guard is demote-only, so an inclusive
   set never demotes a genuine locode column over a recently-retired code.
   ~116k codes; refresh opportunistically (UNECE publishes twice a year).
+- `iso_3166_2_codes.txt` — ISO 3166-2 subdivision codes (`CC-SSS`), from the
+  `pycountry` package (bundles the Debian iso-codes data, derived from the ISO
+  3166 standard; the code list is factual/public):
+  `uv run --with pycountry python -c "import pycountry; print(chr(10).join(sorted(s.code for s in pycountry.subdivisions)))"`.
+  ~5046 codes / 200 countries; refresh opportunistically. Unlike the others this
+  set backs a GUARD (`geo_subdivision_membership_promote`), not a leaf
+  `membership:` directive — it promotes an ISO-3166-2 column to the generic
+  `geography.location.region`, whose shape-only validator must not be narrowed.
 
 Enrolling a new set: add the file here, one entry in
 `membership::resolve()`, and a one-line `membership:` directive in the type's

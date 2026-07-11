@@ -385,18 +385,83 @@ fn geo_nonmembership_keeps_hyphenated_iso3166_2_subdivisions() {
     // fixture's country enum carries CA/GB/DE/FR, so hyphenated codes use those
     // prefixes; production carries the full ISO-3166-1 list incl. US.)
     let cc = geo_vote_classifier();
-    let vals: Vec<String> = ["CA-ON", "CA-BC", "CA-QC", "GB-ENG", "DE-BW", "FR-75"]
+    // All six are published ISO-3166-2 codes (FR-IDF, not the deprecated FR-75 —
+    // membership is strict, which is the point).
+    let vals: Vec<String> = ["CA-ON", "CA-BC", "CA-QC", "GB-ENG", "DE-BW", "FR-IDF"]
         .into_iter()
         .map(String::from)
         .collect();
     let r = cc
         .compose_from_sense("region", &vals, "geography.location.state_code", 0.90)
         .unwrap();
+    // NOT demoted by the nonmembership guard (the false-demote landmine)...
     assert_ne!(
         r.disambiguation_rule.as_deref(),
         Some("geo_code_nonmembership_demotion:geography.location.state_code")
     );
-    assert_eq!(r.label, "geography.location.state_code");
+    // ...and now PROMOTED to its precise type: a hyphenated ISO-3166-2 column is
+    // geography.location.region, not the bare-code state_code the model guessed
+    // (geo_subdivision_membership_promote runs after the nonmembership guard).
+    assert_eq!(r.label, "geography.location.region");
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_subdivision_membership_promote:geography.location.state_code")
+    );
+}
+
+#[test]
+fn geo_subdivision_promote_is_default_on() {
+    assert!(!rhh::is_disabled("geo_subdivision_membership_promote"));
+}
+
+#[test]
+fn geo_subdivision_promote_recovers_iso3166_2_to_region() {
+    // External band: ourairports `iso_region` = US-PA/US-KS/US-AK — real ISO-3166-2
+    // subdivisions the model files under a residual (unlocode→unknown, alphanumeric_id).
+    // ≥90% published membership promotes the column to region regardless of source label.
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["US-PA", "US-KS", "US-AK", "GB-ENG", "CA-ON", "US-CA"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "iso_region",
+            &vals,
+            "representation.identifier.alphanumeric_id",
+            0.60,
+        )
+        .unwrap();
+    assert_eq!(r.label, "geography.location.region");
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_subdivision_membership_promote:representation.identifier.alphanumeric_id")
+    );
+}
+
+#[test]
+fn geo_subdivision_promote_keeps_nonmember_hyphen_codes() {
+    // The precision control: hyphenated codes that share the `CC-SSS` SHAPE but are
+    // NOT published ISO-3166-2 subdivisions (product/OS lookalikes) must NOT be
+    // promoted — membership, not shape, is the discriminator.
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["OS-10", "AB-99", "XX-01", "ZZ-ZZ", "QW-42", "OS-11"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "code",
+            &vals,
+            "representation.identifier.alphanumeric_id",
+            0.80,
+        )
+        .unwrap();
+    assert_ne!(r.label, "geography.location.region");
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_subdivision_membership_promote:representation.identifier.alphanumeric_id")
+    );
 }
 
 #[test]

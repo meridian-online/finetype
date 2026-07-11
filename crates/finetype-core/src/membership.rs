@@ -33,6 +33,7 @@ const IATA_AIRPORTS_RAW: &str = include_str!("../data/sets/iata_airport_codes.tx
 const NAICS_CODES_RAW: &str = include_str!("../data/sets/naics_codes.txt");
 const TLD_CODES_RAW: &str = include_str!("../data/sets/tld_codes.txt");
 const UNLOCODE_CODES_RAW: &str = include_str!("../data/sets/unlocode_codes.txt");
+const ISO_3166_2_CODES_RAW: &str = include_str!("../data/sets/iso_3166_2_codes.txt");
 
 fn parse_set(raw: &'static str) -> HashSet<&'static str> {
     raw.lines()
@@ -64,6 +65,11 @@ fn tld_codes_set() -> &'static HashSet<&'static str> {
 fn unlocode_codes_set() -> &'static HashSet<&'static str> {
     static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
     SET.get_or_init(|| parse_set(UNLOCODE_CODES_RAW))
+}
+
+fn iso_3166_2_set() -> &'static HashSet<&'static str> {
+    static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
+    SET.get_or_init(|| parse_set(ISO_3166_2_CODES_RAW))
 }
 
 /// `true` when the value (trimmed, case-folded to uppercase) is a published
@@ -102,6 +108,17 @@ pub fn unlocode(value: &str) -> bool {
     unlocode_codes_set().contains(value.trim().to_uppercase().as_str())
 }
 
+/// `true` when the value (trimmed, case-folded to uppercase) is a published
+/// ISO 3166-2 subdivision code (`CC-SSS`: an ISO-3166-1 country prefix and a
+/// 1-3 char subdivision suffix, e.g. `US-PA`, `GB-ENG`). The shape
+/// `^[A-Z]{2}-[A-Z0-9]{1,3}$` confirms many non-subdivision hyphenated codes
+/// (product/OS/locale tokens) — the published list is what distinguishes a
+/// real subdivision, so `geo_subdivision_membership_promote` keys on membership,
+/// not shape (external-band iso_region → unknown finding).
+pub fn iso_3166_2(value: &str) -> bool {
+    iso_3166_2_set().contains(value.trim().to_uppercase().as_str())
+}
+
 /// Every named membership set as `(directive_name, predicate)`, in a stable
 /// order. Single source of truth: [`resolve`] looks up its arm here, and
 /// diagnostics that must check a value or column against *all* sets (e.g. the
@@ -115,6 +132,7 @@ pub fn all_sets() -> &'static [(&'static str, MembershipFn)] {
         ("naics_codes", naics_codes),
         ("tld", tld_codes),
         ("unlocode", unlocode),
+        ("iso_3166_2", iso_3166_2),
     ]
 }
 
@@ -187,6 +205,7 @@ mod tests {
         assert!(resolve("naics_codes").is_some());
         assert!(resolve("tld").is_some());
         assert!(resolve("unlocode").is_some());
+        assert!(resolve("iso_3166_2").is_some());
         assert!(resolve("no_such_set").is_none());
     }
 
@@ -225,6 +244,19 @@ mod tests {
         // probes are verified non-members, not just "looks like a word".)
         for word in ["notatld", "zzzz", "qwerty", "foobar", "xyzzy"] {
             assert!(!tld_codes(word), "{word} must not validate as a TLD");
+        }
+    }
+
+    #[test]
+    fn iso_3166_2_matches_real_subdivisions_and_rejects_lookalikes() {
+        // Real ISO-3166-2 codes across several countries (case-insensitive).
+        for code in ["US-PA", "GB-ENG", "CA-ON", "AU-NSW", "DE-BW", " us-ca "] {
+            assert!(iso_3166_2(code), "{code} should be an ISO-3166-2 code");
+        }
+        // Same `CC-SSS` shape, NOT real subdivisions — the collision this set
+        // breaks (external band: product/OS/locale hyphen-codes → geography).
+        for code in ["US-ZZ", "XX-01", "AB-99", "ZZ-ZZ", "OS-10"] {
+            assert!(!iso_3166_2(code), "{code} must not validate as ISO-3166-2");
         }
     }
 

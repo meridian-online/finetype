@@ -5,6 +5,29 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.47] - 2026-07-12
+
+### Added
+
+- **ISO-3166-2 subdivision columns now resolve to `region`** (`geo_subdivision_membership_promote`
+  guard + a 5046-code roster). A column of hyphenated subdivision codes (`US-PA`, `GB-ENG`,
+  `JP-30`) is a `geography.location.region`, but the flat softmax — which never learned the
+  hyphenated form — filed it under a residual (`alphanumeric_id`) or a lookalike (a date format,
+  `last_name`), and the unlocode membership guard demoted its `unlocode` guess to `unknown`
+  (external band: ourairports `iso_region` US-PA → unknown). The `CC-SSS` shape is not precise —
+  product/OS/locale hyphen-codes share it — so the guard keys on published ISO-3166-2 membership
+  (`labels/sets/iso_3166_2_codes.txt`, 5046 codes across 200 countries, from the iso-codes
+  project): a column ≥90% real subdivision codes is promoted to region. Value-based (decision
+  0048), promote-only, no retrain. Corpus-honest gate GO (7 columns promoted — JP/BD/VN
+  subdivisions, all verified genuine; zero bands). Gold +2.
+
+### Fixed
+
+- **Gold: `gleif region` re-adjudicated `state_code` → `region`** (author-ratified). Its values
+  are 100% hyphenated ISO-3166-2 (`US-MA`/`US-DE`/`CZ-10`) — the general subdivision type, which
+  fails `state_code`'s bare-code validator; consistent with the identical-shape ourairports
+  `iso_region` gold. Surfaced by the new promote guard (the external band's gold-audit role).
+
 ## [0.6.46] - 2026-07-11
 
 ### Added
