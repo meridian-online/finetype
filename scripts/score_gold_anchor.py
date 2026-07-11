@@ -325,6 +325,22 @@ def _reframe(label: str) -> str:
     return REFRAME_RESIDUAL_LABEL if label in REFRAME_RESIDUAL else label
 
 
+# Abstention / under-emission residual: the labels the pipeline returns when it
+# DECLINES to assert a concrete semantic type. `unknown` is the hard veto/no-call;
+# word/plain_text/categorical are untyped bounded text; RESIDUAL is their reframe
+# collapse. A concrete type's true column landing here is UNDER-EMISSION — the
+# pipeline abstained instead of emitting the type. That is the signal for "where a
+# demote-only guard has capped the ceiling and only native model emission would
+# recover the column", as distinct from a mis-type (relocation to a sibling).
+ABSTAIN_LABELS = {
+    "unknown",
+    "representation.text.word",
+    "representation.text.plain_text",
+    "representation.discrete.categorical",
+    REFRAME_RESIDUAL_LABEL,
+}
+
+
 def cmd_score(args: argparse.Namespace) -> int:
     gold = load_gold(args.gold)
     reframe = getattr(args, "reframe", False)
@@ -379,6 +395,15 @@ def cmd_score(args: argparse.Namespace) -> int:
     # against a label no matter which family the column was drawn for.
     for label in sorted({c for c, _ in all_pairs}):
         tp, fp, fn, pr, rc = prf(all_pairs, label)
+        # Under-emission: of this type's true columns that the model missed (FN),
+        # how many went to the abstain residual (unknown/word/…) rather than to a
+        # concrete sibling type. High under-emit = the ceiling is a demote/abstain
+        # cap, not a relocation — native emission, not another guard, is the fix.
+        fn_abstain = sum(
+            1 for c, p in all_pairs
+            if c == label and p != label and p in ABSTAIN_LABELS
+        )
+        under = fn_abstain / (tp + fn) if (tp + fn) else float("nan")
         plo, phi = wilson(tp, tp + fp)
         rlo, rhi = wilson(tp, tp + fn)
         rows_out.append(
@@ -389,6 +414,8 @@ def cmd_score(args: argparse.Namespace) -> int:
                 "tp": tp,
                 "fp": fp,
                 "fn": fn,
+                "fn_abstain": fn_abstain,
+                "under_emit": under,
                 "precision": pr,
                 "recall": rc,
                 "precision_ci": f"{plo:.2f}-{phi:.2f}" if plo == plo else "n/a",
@@ -400,6 +427,7 @@ def cmd_score(args: argparse.Namespace) -> int:
         w = csv.DictWriter(
             fh,
             fieldnames=["family", "label", "support", "tp", "fp", "fn",
+                        "fn_abstain", "under_emit",
                         "precision", "recall", "precision_ci", "recall_ci"],
             delimiter="\t",
             lineterminator="\n",
@@ -409,6 +437,10 @@ def cmd_score(args: argparse.Namespace) -> int:
             row = dict(row)
             row["precision"] = f'{row["precision"]:.3f}'
             row["recall"] = f'{row["recall"]:.3f}'
+            row["under_emit"] = (
+                f'{row["under_emit"]:.3f}'
+                if row["under_emit"] == row["under_emit"] else "n/a"
+            )
             w.writerow(row)
 
     def fmt(x: float) -> str:
@@ -437,13 +469,14 @@ def cmd_score(args: argparse.Namespace) -> int:
         "Per-label precision/recall (the curated label is ground truth; YDF is "
         "not consulted):",
         "",
-        "| Curated label | Support | TP | FP | FN | Precision (95% CI) | Recall (95% CI) |",
-        "|---------------|--------:|---:|---:|---:|-------------------:|----------------:|",
+        "| Curated label | Support | TP | FP | FN | Under-emit (FN→abstain) | Precision (95% CI) | Recall (95% CI) |",
+        "|---------------|--------:|---:|---:|---:|------------------------:|-------------------:|----------------:|",
     ]
     for row in rows_out:
         lines.append(
             f"| {row['label']} | {row['support']} | {row['tp']} | "
-            f"{row['fp']} | {row['fn']} | {fmt(row['precision'])} ({row.get('precision_ci', 'n/a')}) "
+            f"{row['fp']} | {row['fn']} | {fmt(row['under_emit'])} ({row['fn_abstain']}) "
+            f"| {fmt(row['precision'])} ({row.get('precision_ci', 'n/a')}) "
             f"| {fmt(row['recall'])} ({row.get('recall_ci', 'n/a')}) |"
         )
     macro_p = [r["precision"] for r in rows_out if r["precision"] == r["precision"]]
@@ -491,10 +524,19 @@ def cmd_score(args: argparse.Namespace) -> int:
                 "",
             ]
 
+    # Aggregate abstention rate: the fraction of scored columns the pipeline
+    # returns as an untyped residual (unknown / word / plain_text / RESIDUAL)
+    # instead of a concrete semantic type. The single most analyst-visible
+    # quality signal — how often FineType shrugs on a column it was asked about.
+    n_abstain = sum(1 for _, p in all_pairs if p in ABSTAIN_LABELS)
+
     lines += [
         "",
         f"**Headline — column accuracy:** {n_correct}/{len(all_pairs)} = "
         f"{n_correct/len(all_pairs):.3f} (95% CI {alo:.3f}-{ahi:.3f})  ",
+        f"**Abstention rate — unknown/word/residual:** {n_abstain}/{len(all_pairs)} = "
+        f"{n_abstain/len(all_pairs):.3f} (fraction of scored columns returned as an "
+        f"untyped residual rather than a concrete type)  ",
         "",
     ]
     lines += companion_block
