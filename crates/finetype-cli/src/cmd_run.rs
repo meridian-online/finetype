@@ -389,6 +389,18 @@ pub(crate) fn cmd_infer_batch(model: PathBuf, sample_size: usize) -> Result<()> 
         wire_model2vec_only(&mut column_classifier);
     }
 
+    // Separate taxonomy handle for the headerless deterministic fast-path, so
+    // `--batch` resolves structurally-conclusive values the same way `infer -i`
+    // does (the classifier owns the first handle). Compile validators only —
+    // the fast-path is value-structural, no locale steering.
+    let fast_path_tax = {
+        let mut t = load_taxonomy(&taxonomy_path).ok();
+        if let Some(t) = t.as_mut() {
+            t.compile_validators();
+        }
+        t
+    };
+
     let load_elapsed = t_start.elapsed();
     eprintln!("Model loaded in {:.2}s", load_elapsed.as_secs_f64());
 
@@ -441,7 +453,33 @@ pub(crate) fn cmd_infer_batch(model: PathBuf, sample_size: usize) -> Result<()> 
 
         let header_str = input.get("header").and_then(|h| h.as_str()).unwrap_or("");
 
-        let result = if !header_str.is_empty() {
+        // Headerless deterministic fast-path (mirrors cmd_infer): a structurally
+        // conclusive value is value-determinable, so resolve it without the model
+        // and identically to `infer -i`. Only fires with no header (a header can
+        // legitimately steer the full pipeline) and is RHH kill-switchable.
+        let fast_leaf = if header_str.is_empty()
+            && !finetype_model::rhh::is_disabled("deterministic_fast_path")
+        {
+            fast_path_tax
+                .as_ref()
+                .and_then(|tax| finetype_core::deterministic_fast_path(tax, &values))
+        } else {
+            None
+        };
+
+        let result = if let Some(leaf) = fast_leaf {
+            finetype_model::ColumnResult {
+                label: leaf,
+                confidence: 0.99,
+                vote_distribution: Vec::new(),
+                disambiguation_applied: true,
+                disambiguation_rule: Some("deterministic_fast_path".to_string()),
+                samples_used: values.len(),
+                detected_locale: None,
+                is_generic: false,
+                column_features: None,
+            }
+        } else if !header_str.is_empty() {
             column_classifier.classify_column_with_header(&values, header_str)?
         } else {
             column_classifier.classify_column(&values)?

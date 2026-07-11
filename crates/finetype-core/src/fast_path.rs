@@ -43,8 +43,45 @@ const CONCLUSIVE_LEAVES: &[&str] = &[
     "technology.internet.message_id",     // RFC 2822 `<local@domain>`
     "technology.internet.ip_v4",
     "technology.internet.ip_v6",
+    "technology.internet.ip_v4_with_port", // valid IPv4 + `:port`
+    "technology.internet.cidr",            // valid IPv4 + `/0-32`
     "technology.internet.mac_address",
+    "technology.internet.data_uri", // `data:…,…`
     "identity.person.email",
+    "identity.person.email_display", // `Name <local@domain>`
+    "identity.person.phone_e164",    // `+` then 7–15 digits
+    // Structurally self-sufficient value leaves promoted from the model's
+    // ceded-recovery set (spec 2026-06-27-model-label-space-reshape): each
+    // validator is prefix/format/checksum-anchored, so a value passing it
+    // provably IS that type and the full Sense→Sharpen pipeline lands here too.
+    // The exactly-one-match gate below + the
+    // `fast_path_never_mislabels_any_taxonomy_samples` test are the standing
+    // exclusivity guards. Closed-set/locale leaves (day_of_week, month_name,
+    // currency_code, http_method, gender, …), short/generic-shape leaves
+    // (icd10, mime_type, si_number, ulid, vin, mgrs), and html (its `.*<tag.*`
+    // validator matches prose containing a tag, and overlaps xml on closing-tag
+    // markup) are DELIBERATELY excluded — they over-fire on non-type values
+    // ("n/a" → mime_type, "B12" → icd10, "4K" → si_number) that the tiny
+    // taxonomy sample set cannot surface.
+    "representation.text.emoji",         // unicode symbol/mark run
+    "representation.identifier.uuid",    // 8-4-4-4-12 hex
+    "representation.format.color_hsl",   // `hsl(…)` / `hsla(…)`
+    "representation.scientific.inchi",   // `InChI=1S/…` prefix
+    "container.object.json",             // `{…}`
+    "container.object.json_array",       // `[…]`
+    "container.object.xml",              // `<…>…</…>`
+    "finance.banking.iban",              // country + check digits + BBAN
+    "finance.crypto.ethereum_address",   // `0x` + 40 hex
+    "finance.currency.currency_symbol",  // pure currency-symbol run
+    "finance.rate.basis_points",         // number + `bps`/`bp`
+    "finance.securities.figi",           // BBG-style 12-char with pos-3 `G`
+    "geography.coordinate.dms",          // `12°34'56"N …` degree/minute/second
+    "geography.format.wkt",              // `POINT(…)` / `POLYGON(…)` …
+    "geography.transportation.iso6346",  // container code `ABCU1234567`
+    "technology.cloud.aws_arn",          // `arn:aws:…` prefix
+    "technology.cloud.s3_uri",           // `s3://…` prefix
+    "technology.code.doi",               // `10.NNNN/…` prefix
+    "technology.cryptographic.jwt",      // three base64url segments
 ];
 
 /// ≥90% of the sample's non-empty values must pass `leaf`'s validator. Mirrors
@@ -90,12 +127,21 @@ pub fn deterministic_fast_path(tax: &Taxonomy, sample: &[String]) -> Option<Stri
         }
     }
 
+    // Exactly-one-match gate: resolve only when the sample validates a SINGLE
+    // conclusive leaf. If two conclusive validators both pass (e.g. an ambiguous
+    // markup snippet matching both html and xml), the value is not structurally
+    // conclusive — abstain and let the model decide. This makes exclusivity a
+    // property of the gate, not just of hand-curating a non-overlapping list.
+    let mut matched: Option<&str> = None;
     for leaf in CONCLUSIVE_LEAVES {
         if validates(tax, leaf, sample) {
-            return Some((*leaf).to_string());
+            if matched.is_some() {
+                return None;
+            }
+            matched = Some(leaf);
         }
     }
-    None
+    matched.map(|l| l.to_string())
 }
 
 #[cfg(test)]
@@ -194,5 +240,82 @@ mod tests {
     fn declines_all_empty() {
         let tax = taxonomy();
         assert_eq!(deterministic_fast_path(&tax, &s(&["", "  "])), None);
+    }
+
+    fn samples_of(tax: &Taxonomy, leaf: &str) -> Vec<String> {
+        tax.get(leaf)
+            .map(|d| {
+                d.samples
+                    .iter()
+                    .filter_map(|v| {
+                        v.as_str().map(String::from).or_else(|| {
+                            serde_yaml::to_string(v).ok().map(|x| x.trim().to_string())
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Standing exclusivity guard for `CONCLUSIVE_LEAVES` (the property the module
+    /// doc calls "structurally exclusive"): for EVERY taxonomy type, the fast-path
+    /// must return either `None` or that type's own leaf on its own samples — never
+    /// a different conclusive leaf. A new conclusive leaf whose validator hijacks
+    /// another type's values trips this. Value-only (no header), so no model needed.
+    #[test]
+    fn fast_path_never_mislabels_any_taxonomy_samples() {
+        let tax = taxonomy();
+        for (leaf, _) in tax.definitions() {
+            let sample = samples_of(&tax, leaf);
+            if sample.is_empty() {
+                continue;
+            }
+            if let Some(got) = deterministic_fast_path(&tax, &sample) {
+                assert_eq!(
+                    &got, leaf,
+                    "fast-path mislabelled {leaf}'s own samples as {got} — a conclusive \
+                     leaf's validator is over-firing"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn resolves_promoted_value_leaves() {
+        let tax = taxonomy();
+        // Each is a value that provably IS its type; the model-only path was
+        // unreliable on these single values (the reason for promotion).
+        for (values, want) in [
+            (vec!["❤️", "😀", "🎉"], "representation.text.emoji"),
+            (
+                vec![
+                    "550e8400-e29b-41d4-a716-446655440000",
+                    "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+                ],
+                "representation.identifier.uuid",
+            ),
+            (vec!["InChI=1S/H2O/h1H2", "InChI=1S/CH4/h1H4"], "representation.scientific.inchi"),
+            (vec!["POINT(30 10)", "LINESTRING(30 10, 10 30)"], "geography.format.wkt"),
+            (
+                vec![
+                    "arn:aws:iam::123456789012:user/jane",
+                    "arn:aws:s3:::my-bucket/key",
+                ],
+                "technology.cloud.aws_arn",
+            ),
+            (
+                vec![
+                    "0x52908400098527886E0F7030069857D2E4169EE7",
+                    "0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe",
+                ],
+                "finance.crypto.ethereum_address",
+            ),
+        ] {
+            assert_eq!(
+                deterministic_fast_path(&tax, &s(&values)),
+                Some(want.to_string()),
+                "expected {want} for {values:?}"
+            );
+        }
     }
 }
