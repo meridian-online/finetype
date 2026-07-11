@@ -383,6 +383,101 @@ technology.internet.url:
     assert_eq!(r2.label, "representation.text.plain_text");
 }
 
+#[test]
+fn native_and_compose_run_identical_sharpen() {
+    // The native (classify_multi_branch) and composed (compose_from_sense) paths now
+    // share the extracted `run_sharpen` tail. This pins that they produce the identical
+    // LABEL for representative columns — the corpus-honest gate scores the composed
+    // path, so it must never score a different pipeline than production ships.
+    let yaml = r#"
+technology.internet.url:
+  title: URL
+  designation: universal
+  tier: [VARCHAR, internet]
+  release_priority: 3
+  samples: ["https://x.com/a"]
+  validation:
+    type: string
+    pattern: '^https?://[^\s]+$'
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+
+    // Reproduce the native seed (classify_multi_branch Steps 1-2, injecting the Sense
+    // label instead of running the neural forward) then run the SHARED tail directly.
+    let native = |header: &str, values: &[String], sense: &str, conf: f32| -> String {
+        let per_value_features: Vec<[f32; crate::features::FEATURE_DIM]> = values
+            .iter()
+            .map(|v| crate::features::extract_features(v))
+            .collect();
+        let column_features = aggregate_features(&per_value_features);
+        let mut result = ColumnResult {
+            label: sense.to_string(),
+            confidence: conf,
+            vote_distribution: vec![(sense.to_string(), conf)],
+            disambiguation_applied: false,
+            disambiguation_rule: Some("multi-branch".to_string()),
+            samples_used: values.len(),
+            detected_locale: None,
+            is_generic: false,
+            column_features: Some(column_features.clone()),
+        };
+        cc.run_sharpen(&mut result, header, values, values, &column_features);
+        result.label
+    };
+
+    let cases: Vec<(&str, Vec<String>, &str, f32)> = vec![
+        // plain_text seed that the url recovery reader must restore to url.
+        (
+            "parent_id",
+            vec![
+                "https://bitcointalk.org/index.php?topic=1".to_string(),
+                "https://bitcointalk.org/index.php?topic=2".to_string(),
+                "https://bitcointalk.org/index.php?topic=3".to_string(),
+            ],
+            "representation.text.plain_text",
+            1.0,
+        ),
+        // Genuine prose residual — stays put, no recovery.
+        (
+            "notes",
+            vec![
+                "just some prose here".to_string(),
+                "and more words today".to_string(),
+                "a third line of text".to_string(),
+            ],
+            "representation.text.plain_text",
+            1.0,
+        ),
+        // Already-correct url — Sharpen must be a no-op on the label.
+        (
+            "url",
+            vec![
+                "https://x.com/a".to_string(),
+                "https://x.com/b".to_string(),
+                "https://x.com/c".to_string(),
+            ],
+            "technology.internet.url",
+            0.9,
+        ),
+    ];
+
+    for (header, values, sense, conf) in cases {
+        let composed = cc
+            .compose_from_sense(header, &values, sense, conf)
+            .unwrap()
+            .label;
+        let native_label = native(header, &values, sense, conf);
+        assert_eq!(
+            native_label, composed,
+            "native vs compose divergence for header={header:?} sense={sense}"
+        );
+    }
+}
+
 // ── structured_string_refinement (spec 2026-06-19-plain-text-type-discovery) ──
 
 #[test]

@@ -1418,6 +1418,65 @@ impl ColumnClassifier {
         &self.config
     }
 
+    /// The shared Sharpen firing tail (Steps 3-6), extracted so the three classify
+    /// entry points run byte-identical Sharpen. The order is load-bearing:
+    /// feature_sharpen → value_sharpen → datetime/structured refinement →
+    /// sharpen_and_guard (header hints) → username veto → post-hoc locale → finalize.
+    ///
+    /// `classify_multi_branch`, `classify_multi_branch_with_enriched`, and
+    /// `compose_from_sense` all call this after seeding `result` from the Sense label.
+    /// `compose_from_sense` is what the corpus-honest gate scores (cmd_run.rs), so any
+    /// drift between it and the native paths = the gate scoring a different pipeline
+    /// than production ships. Keeping the tail here makes that drift impossible; the
+    /// `native_and_compose_run_identical_sharpen` test pins the parity.
+    fn run_sharpen(
+        &self,
+        result: &mut ColumnResult,
+        header: &str,
+        sample: &[String],
+        values: &[String],
+        column_features: &ColumnFeatures,
+    ) {
+        // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set)
+        if !self.skip_sharpen {
+            // Step 3: Feature-based Sharpen rules (F1-F6)
+            feature_sharpen(result, column_features);
+
+            // Step 4: Value-based Sharpen rules (R1-R19)
+            if let Some((resolved_label, rule_name)) = value_sharpen(
+                sample,
+                &result.label,
+                result.confidence,
+                self.taxonomy.as_ref(),
+            ) {
+                result.label = resolved_label;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(rule_name);
+            }
+
+            // Step 5: Header hints (Model2Vec semantic matching)
+            // Deterministic datetime sub-format read (value-based, over-emission-safe;
+            // runs before header hints so a delimited timestamp is read from values).
+            self.datetime_format_refinement(result, sample);
+            self.structured_string_refinement(result, sample);
+            self.sharpen_and_guard(result, header, sample, values);
+
+            // Step 5b: Username recovery veto — value-based, runs AFTER header hints
+            // so a deprecated author->full_name cross-domain hint can't resurrect a
+            // handle column (decision 0048; spec 2026-06-17-full-name-username-veto).
+            self.apply_username_veto(result, sample);
+        }
+
+        // Step 6: Post-hoc locale detection
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            if let Some(locale) = detect_locale_from_validation(sample, &result.label, taxonomy) {
+                result.detected_locale = Some(locale);
+            }
+        }
+
+        self.finalize_is_generic(result);
+    }
+
     fn classify_multi_branch(
         &self,
         mb: &MultiBranchClassifier,
@@ -1482,44 +1541,8 @@ impl ColumnClassifier {
                 }
             }
         }
-        // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set)
-        if !self.skip_sharpen {
-            // Step 3: Feature-based Sharpen rules (F1-F6)
-            feature_sharpen(&mut result, &column_features);
-
-            // Step 4: Value-based Sharpen rules (R1-R19)
-            if let Some((resolved_label, rule_name)) = value_sharpen(
-                &sample,
-                &result.label,
-                result.confidence,
-                self.taxonomy.as_ref(),
-            ) {
-                result.label = resolved_label;
-                result.disambiguation_applied = true;
-                result.disambiguation_rule = Some(rule_name);
-            }
-
-            // Step 5: Header hints (Model2Vec semantic matching)
-            // Deterministic datetime sub-format read (value-based, over-emission-safe;
-            // runs before header hints so a delimited timestamp is read from values).
-            self.datetime_format_refinement(&mut result, &sample);
-            self.structured_string_refinement(&mut result, &sample);
-            self.sharpen_and_guard(&mut result, header, &sample, values);
-
-            // Step 5b: Username recovery veto — value-based, runs AFTER header hints
-            // so a deprecated author->full_name cross-domain hint can't resurrect a
-            // handle column (decision 0048; spec 2026-06-17-full-name-username-veto).
-            self.apply_username_veto(&mut result, &sample);
-        }
-
-        // Step 6: Post-hoc locale detection
-        if let Some(taxonomy) = self.taxonomy.as_ref() {
-            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
-                result.detected_locale = Some(locale);
-            }
-        }
-
-        self.finalize_is_generic(&mut result);
+        // Steps 3-6: the shared Sharpen firing tail (see `run_sharpen`).
+        self.run_sharpen(&mut result, header, &sample, values, &column_features);
         Ok(result)
     }
 
@@ -1535,9 +1558,10 @@ impl ColumnClassifier {
     /// the Sharpen stack (header hints re-encode only the cheap header) — minutes instead
     /// of ~an hour. NOT for production inference; a diagnostic re-sharpen path.
     ///
-    /// MIRRORS the Sharpen sequence in `classify_multi_branch` (Steps 2-6); validated at
-    /// 99.4% native parity (100% on rule-affected labels). The `compose_from_sense_runs_sharpen`
-    /// test pins the behaviour — update both together if the Sharpen sequence changes.
+    /// SHARES the Sharpen firing tail with `classify_multi_branch` via `run_sharpen`
+    /// (Steps 3-6), so native parity is structural, not maintained by hand. Validated at
+    /// 99.4% native parity (100% on rule-affected labels); the `compose_from_sense_runs_sharpen`
+    /// and `native_and_compose_run_identical_sharpen` tests pin the behaviour.
     pub fn compose_from_sense(
         &self,
         header: &str,
@@ -1583,30 +1607,10 @@ impl ColumnClassifier {
             is_generic: false,
             column_features: Some(column_features.clone()),
         };
-        // Steps 3-6: the Sharpen stack — MUST mirror classify_multi_branch.
-        if !self.skip_sharpen {
-            feature_sharpen(&mut result, &column_features);
-            if let Some((resolved_label, rule_name)) = value_sharpen(
-                &sample,
-                &result.label,
-                result.confidence,
-                self.taxonomy.as_ref(),
-            ) {
-                result.label = resolved_label;
-                result.disambiguation_applied = true;
-                result.disambiguation_rule = Some(rule_name);
-            }
-            self.datetime_format_refinement(&mut result, &sample);
-            self.structured_string_refinement(&mut result, &sample);
-            self.sharpen_and_guard(&mut result, header, &sample, values);
-            self.apply_username_veto(&mut result, &sample);
-        }
-        if let Some(taxonomy) = self.taxonomy.as_ref() {
-            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
-                result.detected_locale = Some(locale);
-            }
-        }
-        self.finalize_is_generic(&mut result);
+        // Steps 3-6: the shared Sharpen firing tail — identical to the native paths.
+        // The corpus-honest gate scores THIS path, so it MUST match production; the
+        // shared `run_sharpen` makes any drift impossible.
+        self.run_sharpen(&mut result, header, &sample, values, &column_features);
         Ok(result)
     }
 
@@ -1688,44 +1692,8 @@ impl ColumnClassifier {
                 }
             }
         }
-        // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set)
-        if !self.skip_sharpen {
-            // Step 3: Feature-based Sharpen rules (F1-F6)
-            feature_sharpen(&mut result, &column_features);
-
-            // Step 4: Value-based Sharpen rules (R1-R19)
-            if let Some((resolved_label, rule_name)) = value_sharpen(
-                &sample,
-                &result.label,
-                result.confidence,
-                self.taxonomy.as_ref(),
-            ) {
-                result.label = resolved_label;
-                result.disambiguation_applied = true;
-                result.disambiguation_rule = Some(rule_name);
-            }
-
-            // Step 5: Header hints (Model2Vec semantic matching)
-            // Deterministic datetime sub-format read (value-based, over-emission-safe;
-            // runs before header hints so a delimited timestamp is read from values).
-            self.datetime_format_refinement(&mut result, &sample);
-            self.structured_string_refinement(&mut result, &sample);
-            self.sharpen_and_guard(&mut result, header, &sample, values);
-
-            // Step 5b: Username recovery veto — value-based, runs AFTER header hints
-            // so a deprecated author->full_name cross-domain hint can't resurrect a
-            // handle column (decision 0048; spec 2026-06-17-full-name-username-veto).
-            self.apply_username_veto(&mut result, &sample);
-        }
-
-        // Step 6: Post-hoc locale detection
-        if let Some(taxonomy) = self.taxonomy.as_ref() {
-            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
-                result.detected_locale = Some(locale);
-            }
-        }
-
-        self.finalize_is_generic(&mut result);
+        // Steps 3-6: the shared Sharpen firing tail (see `run_sharpen`).
+        self.run_sharpen(&mut result, header, &sample, values, &column_features);
         Ok(result)
     }
 
