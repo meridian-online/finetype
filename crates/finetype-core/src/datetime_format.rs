@@ -89,6 +89,13 @@ fn chk_ymd_hms(c: &regex::Captures) -> bool {
         && ok_minsec(n(c, 5))
         && ok_minsec(n(c, 6))
 }
+fn chk_ymd_hm(c: &regex::Captures) -> bool {
+    ok_year4(n(c, 1))
+        && ok_month(n(c, 2))
+        && ok_day(n(c, 3))
+        && ok_hour(n(c, 4))
+        && ok_minsec(n(c, 5))
+}
 fn chk_ym(c: &regex::Captures) -> bool {
     ok_year4(n(c, 1)) && ok_month(n(c, 2))
 }
@@ -116,6 +123,10 @@ fn formats() -> &'static [Format] {
         let ymd = r"(\d{4})-(\d{2})-(\d{2})";
         let ymd_t = r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})";
         let ymd_sp = r"(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})";
+        // Minute-precision (no seconds). Mutually exclusive with the seconds
+        // forms above by the anchored `$` — a `…:SS` value never matches these.
+        let ymd_t_hm = r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})";
+        let ymd_sp_hm = r"(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})";
         vec![
             // ── ISO-8601 with `T` separator (most specific suffixes first for reading;
             //    mutual exclusivity makes order non-load-bearing) ──
@@ -179,6 +190,14 @@ fn formats() -> &'static [Format] {
                 &format!(r"^{ymd_t}$"),
                 chk_ymd_hms,
             ),
+            // Zoneless ISO minute precision (no seconds) — the minute rung of
+            // the iso_seconds/_milliseconds/_microseconds ladder.
+            f(
+                "datetime.timestamp.iso_minutes",
+                true,
+                &format!(r"^{ymd_t_hm}$"),
+                chk_ymd_hm,
+            ),
             // ── SQL / space-separated ──
             f(
                 "datetime.timestamp.iso_space_zulu",
@@ -218,6 +237,14 @@ fn formats() -> &'static [Format] {
                 true,
                 &format!(r"^{ymd_sp}$"),
                 chk_ymd_hms,
+            ),
+            // Space-separated minute precision (no seconds) — DuckDB parses
+            // this natively as a TIMESTAMP; the minute sibling of sql_standard.
+            f(
+                "datetime.timestamp.sql_minutes",
+                true,
+                &format!(r"^{ymd_sp_hm}$"),
+                chk_ymd_hm,
             ),
             // ── Slash / dot YMD (year unambiguously first) ──
             f(
@@ -449,6 +476,35 @@ mod tests {
             leaf(&["2020-01-03T14:22:09.123456"]),
             Some("datetime.timestamp.iso_microseconds")
         );
+    }
+
+    #[test]
+    fn minute_precision_no_seconds_reads_minute_leaves() {
+        // Space form (date_of_transfer's shape) → sql_minutes; ISO-T → iso_minutes.
+        // The minute rung of the precision ladder; DuckDB parses both natively.
+        let d = det(&["2021-11-05 00:00", "2019-12-31 23:59"]).unwrap();
+        assert_eq!(d.leaf, "datetime.timestamp.sql_minutes");
+        assert!(d.delimited);
+        assert_eq!(
+            leaf(&["2013-06-04T01:02", "2024-01-15T10:30"]),
+            Some("datetime.timestamp.iso_minutes")
+        );
+    }
+
+    #[test]
+    fn minute_and_second_forms_are_mutually_exclusive() {
+        // A `…:SS` value must still win its seconds leaf, never the minute one
+        // (anchored `$` guarantees this — the regression guard for the new rungs).
+        assert_eq!(
+            leaf(&["2021-11-05 00:00:00"]),
+            Some("datetime.timestamp.sql_standard")
+        );
+        assert_eq!(
+            leaf(&["2013-06-04T01:02:03"]),
+            Some("datetime.timestamp.iso_seconds")
+        );
+        // Minute-precision range checks still apply (minute 61 is not a time).
+        assert_eq!(det(&["2021-11-05 00:61"]), None);
     }
 
     #[test]

@@ -5,6 +5,25 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.46] - 2026-07-11
+
+### Added
+
+- **Minute-precision timestamps no longer come back `unknown`** (`sql_minutes` +
+  `iso_minutes` leaves). A column of `2021-11-05 00:00` or `2019-08-05T16:27` — a
+  space- or `T`-separated timestamp to the minute, no seconds — is a first-class
+  DuckDB `TIMESTAMP`, but the model guessed a zoned/seconds sub-leaf (`rfc_3339`,
+  `iso_8601`) whose validator the veto then hard-rejected to `unknown`. The
+  taxonomy carried `dmy_hm` (slash/day-first minute) but not the year-first
+  ISO/SQL-standard forms. Added `datetime.timestamp.sql_minutes` (`%Y-%m-%d %H:%M`)
+  and `datetime.timestamp.iso_minutes` (`%Y-%m-%dT%H:%M`), recovered
+  deterministically by `datetime_format_refinement` — no retrain (value-determinable
+  format, decision 0096). Add-not-broaden: `sql_standard`/`iso_seconds` keep their
+  seconds-required patterns, so second-precision timestamps still resolve to their
+  own leaves. Ship gates: corpus-honest gate GO (20 columns corrected from
+  `iso_8601`/`iso_seconds`/`unknown` → the correct minute leaf, zero bands fired),
+  gold flat (no gold column is minute-precision), external band flat.
+
 ## [0.6.45] - 2026-07-10
 
 ### Fixed

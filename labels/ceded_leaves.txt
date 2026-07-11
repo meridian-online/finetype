@@ -11,7 +11,7 @@
 # needing a per-type recovery rule, and 8 bare-number epoch/compact leaves whose only recovery
 # anchor is the model itself (KEEP). See output/model-label-space-reshape/ac0_partition.md.
 #
-# Provenance: workflow wf_9a28f0ad-47a. Count: 134. One leaf per line; # comments ignored.
+# Provenance: workflow wf_9a28f0ad-47a. Count: 136. One leaf per line; # comments ignored.
 container.key_value.query_string
 container.object.html
 container.object.json
@@ -78,6 +78,7 @@ datetime.timestamp.iso_8601_milliseconds
 datetime.timestamp.iso_8601_offset
 datetime.timestamp.iso_microseconds
 datetime.timestamp.iso_milliseconds
+datetime.timestamp.iso_minutes
 datetime.timestamp.iso_seconds
 datetime.timestamp.iso_space_zulu
 datetime.timestamp.mdy_12h
@@ -90,6 +91,7 @@ datetime.timestamp.slash_ymd_24h
 datetime.timestamp.sql_microseconds
 datetime.timestamp.sql_microseconds_offset
 datetime.timestamp.sql_milliseconds
+datetime.timestamp.sql_minutes
 datetime.timestamp.sql_standard
 datetime.timestamp.syslog_bsd
 finance.banking.iban

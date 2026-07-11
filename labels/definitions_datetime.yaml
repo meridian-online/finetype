@@ -253,6 +253,45 @@ datetime.timestamp.sql_standard:
       link: "https://www.iso.org/standard/76583.html"
   notes: null
 
+datetime.timestamp.sql_minutes:
+  title: SQL Minute-Precision Datetime
+  description: >
+    Space-separated date and time to minute precision, without seconds or
+    timezone (e.g. 2024-01-15 10:30). The minute-precision sibling of
+    sql_standard; DuckDB parses it natively as a TIMESTAMP (padding :00).
+    Common in spreadsheet and database exports that drop the seconds field.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%d %H:%M"
+  format_string: "%Y-%m-%d %H:%M"
+  transform: "strptime({col}, '%Y-%m-%d %H:%M')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}$"
+    minLength: 16
+    maxLength: 16
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 5
+  aliases: []
+  samples:
+    - "2024-01-15 10:30"
+    - "2019-12-31 23:59"
+  references:
+    - title: "SQL Standard (ISO/IEC 9075)"
+      link: "https://www.iso.org/standard/76583.html"
+  notes: >
+    Added 2026-07-11 (minute-precision timestamp family completion). Add-not-
+    broaden: sql_standard keeps its seconds-required pattern so round-trip
+    transforms stay correct; this leaf owns the zoneless minute form.
+    Recovered deterministically by datetime_format_refinement (the 244-dim
+    model does not predict it). Sibling of dmy_hm (slash/day-first minute)
+    and iso_minutes (ISO-T minute).
+
 datetime.timestamp.mdy_12h:
   title: MDY 12-Hour Datetime
   description: >
@@ -401,6 +440,41 @@ datetime.timestamp.iso_seconds:
     broaden: the zoned leaves keep their Z-required patterns so round-trip
     transforms stay correct. Distinct from epoch.unix_seconds (numeric epoch,
     not an ISO string).
+
+datetime.timestamp.iso_minutes:
+  title: ISO Datetime, minute precision (no timezone)
+  description: >
+    ISO 8601-like format with minute precision (T separator) and no timezone
+    indicator (e.g. 2013-06-04T01:02). The minute-precision sibling of
+    iso_seconds; common in exports that drop the seconds field.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%dT%H:%M"
+  format_string: "%Y-%m-%dT%H:%M"
+  transform: "strptime({col}, '%Y-%m-%dT%H:%M')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$"
+    minLength: 16
+    maxLength: 16
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 3
+  aliases: []
+  samples:
+    - "2013-06-04T01:02"
+    - "2024-01-15T10:30"
+  references: null
+  notes: >
+    Added 2026-07-11 (minute-precision timestamp family completion). Zoneless
+    minute-precision sibling of iso_seconds, mirroring the seconds/millis/
+    micros ladder. Add-not-broaden: the zoned iso_8601 leaves keep their
+    Z-required patterns. Recovered deterministically by
+    datetime_format_refinement (the 244-dim model does not predict it).
 
 datetime.timestamp.iso_milliseconds:
   title: ISO Datetime with Milliseconds (no timezone)

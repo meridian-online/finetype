@@ -491,8 +491,8 @@ fn golden_taxonomy_structure() {
         .as_array()
         .expect("taxonomy should be a JSON array");
 
-    // Should have 245 types
-    assert_eq!(entries.len(), 245, "taxonomy should have 245 types");
+    // Should have 249 types
+    assert_eq!(entries.len(), 249, "taxonomy should have 249 types");
 
     // Each entry should have key, broad_type, title
     for entry in entries {

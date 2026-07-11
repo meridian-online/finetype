@@ -38,6 +38,10 @@ impl Generator {
                 .random_datetime()
                 .format("%Y-%m-%dT%H:%M:%S")
                 .to_string()),
+            // Minute precision (no seconds) — the minute rung of the ladder.
+            ("timestamp", "iso_minutes") => {
+                Ok(self.random_datetime().format("%Y-%m-%dT%H:%M").to_string())
+            }
             ("timestamp", "iso_milliseconds") => {
                 let dt = self.random_datetime();
                 let millis = self.rng.gen_range(0..1000);
@@ -105,6 +109,10 @@ impl Generator {
                 .random_datetime()
                 .format("%Y-%m-%d %H:%M:%S")
                 .to_string()),
+            // Minute precision (no seconds) — DuckDB parses this natively.
+            ("timestamp", "sql_minutes") => {
+                Ok(self.random_datetime().format("%Y-%m-%d %H:%M").to_string())
+            }
 
             // ── new timestamp types (16 types) ──────────────────────────
             ("timestamp", "sql_microseconds") => {

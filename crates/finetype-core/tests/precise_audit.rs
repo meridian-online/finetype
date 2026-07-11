@@ -89,12 +89,13 @@ fn dgd_ac01b_emit_precise_audit_tsv() {
     std::fs::write(&out_path, &contents)
         .unwrap_or_else(|e| panic!("write {}: {}", out_path.display(), e));
 
-    // Spec verification — 246 rows ± 1, non-zero on both sides (245 at spec
-    // time + identity.industry.naics, company-reference audit W3 2026-07-04).
+    // Spec verification — 249 rows ± 1, non-zero on both sides (247 prior +
+    // timestamp.sql_minutes + timestamp.iso_minutes, minute-precision timestamp
+    // family completion 2026-07-11).
     let n = keys.len();
     assert!(
-        (245..=247).contains(&n),
-        "expected 246 ± 1 taxonomy rows, got {n}"
+        (248..=250).contains(&n),
+        "expected 249 ± 1 taxonomy rows, got {n}"
     );
     assert!(
         n_precise_true >= 1,
