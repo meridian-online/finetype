@@ -60,7 +60,16 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-DEFAULT_BASELINE = REPO / "output/ydf-validation-gate/v19_gated.parquet"
+# Baseline SOURCING (de-fossilised 2026-07-11). The gate scores a candidate's
+# relocation against a REFERENCE corpus pass — and that reference MUST be the
+# STANDING CURRENT-DEFAULT model, not the retired v19 oracle. Workflow per
+# promotion round: run the current models/default over the ac-01 stratified
+# sample with --fill-ydf to emit sense_prediction + ydf_prediction_gated, then
+# pass that parquet as --baseline. There is deliberately NO default: an implicit
+# v19 baseline silently measured deviation-from-v19 (0% structural pass for any
+# retrain; choice 0104), the exact fossil this removes. RETIRED_V19_BASELINE is
+# kept ONLY as a fingerprint so main() can warn if someone points back at it.
+RETIRED_V19_BASELINE = REPO / "output/ydf-validation-gate/v19_gated.parquet"
 DEFAULT_SAMPLE = REPO / "output/corpus-honest-gate/stratified_sample.files.txt"
 DEFAULT_RES = REPO / "output/corpus-honest-gate/stratified_sample.resolution.json"
 
@@ -144,7 +153,14 @@ SELECT s19, scand, oracle_dst, oracle_src, COUNT(*) cnt FROM j GROUP BY 1,2,3,4;
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)
+    ap.add_argument("--baseline", type=Path, default=None,
+                    help="REQUIRED (no default). Parquet of the STANDING "
+                         "CURRENT-DEFAULT model's corpus pass on the stratified "
+                         "sample, carrying sense_prediction + ydf_prediction_gated. "
+                         "The gate scores the candidate's relocation against THIS "
+                         "reference. Do NOT pass the retired "
+                         "output/ydf-validation-gate/v19_gated.parquet — that scores "
+                         "deviation-from-v19 (choice 0104).")
     ap.add_argument("--candidate", type=Path, required=True)
     ap.add_argument("--label-remap", action="append", metavar="OLD=NEW",
                     help="Remap an oracle label before judging, so the referee speaks the "
@@ -178,6 +194,31 @@ def main() -> int:
     ap.add_argument("--out-dir", type=Path,
                     default=REPO / "output/corpus-honest-gate")
     args = ap.parse_args()
+
+    if args.baseline is None:
+        print(
+            "error: --baseline is REQUIRED and has no default.\n"
+            "  Pass the parquet of the STANDING CURRENT-DEFAULT model's corpus pass on the\n"
+            "  ac-01 stratified sample (its sense_prediction + ydf_prediction_gated columns).\n"
+            "  The gate must score the candidate's relocation against the CURRENT default,\n"
+            "  never the retired v19 oracle — measuring deviation-from-v19 is the fossil this\n"
+            "  removes (0% structural pass for any retrain; choice 0104).\n"
+            "  Generate the reference pass over the ac-01 sample with --fill-ydf, then:\n"
+            "    scripts/corpus_honest_gate.py --baseline <current_default>.parquet \\\n"
+            "                                  --candidate <candidate>.parquet",
+            file=sys.stderr,
+        )
+        return 2
+    blooks = str(args.baseline).lower()
+    if args.baseline.resolve() == RETIRED_V19_BASELINE.resolve() or "v19_gated" in blooks:
+        print(
+            "WARNING: --baseline looks like the RETIRED v19 oracle "
+            "(output/ydf-validation-gate/v19_gated.parquet).\n"
+            "  This gate would then score deviation-from-v19 — structurally unpassable by any\n"
+            "  model retrain (0% pass rate; choice 0104). Use the STANDING CURRENT-DEFAULT\n"
+            "  baseline unless you are deliberately reproducing a historical verdict.",
+            file=sys.stderr,
+        )
 
     remap = {}
     for pair in (args.label_remap or []):
