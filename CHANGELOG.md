@@ -46,6 +46,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   load-bearing — a pure-ccTLD column is value-identical to a country-code column.
   Deterministic, no retrain. (company-reference external band)
 
+- **`region` stops being a dumping ground for short catalog words.** A column of seismic
+  network codes (`us`/`ak`/`ci`), event types (`earthquake`), business categories
+  (`GENERAL`/`FUND`), or product tiers (`Horizon`/`OverDrive`) that the model reached
+  `geography.location.region` for now types as text when fewer than half its distinct
+  values are real places. "Real place" is checked against a 42k GeoNames gazetteer
+  (states/provinces/regions + countries + cities≥15k), ISO-3166-2 codes, bare state codes,
+  and `City, State` composites — so genuine city/county/region columns (`Austin`, `Durham
+  County, NC`, `US-TX`) are left untouched. Deterministic, no retrain. (external band,
+  tier-3 geography seam)
+
 ## [0.6.48] - 2026-07-12
 
 ### Added

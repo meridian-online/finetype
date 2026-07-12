@@ -1014,6 +1014,145 @@ fn org_name_geography_demotion_keeps_address_columns() {
     }
 }
 
+// ── region_nonmembership_veto (external band tier-3: word → region garbage-magnet) ──
+
+#[test]
+fn region_nonmembership_veto_demotes_catalog_codes() {
+    // usgs `net` — seismic network codes the model calls region. A few networks are
+    // named after states (ak/tx), but most are not (us/ci/nn/hv/uu/uw), so the column
+    // sits ~25% place membership — below the 50% bar — and is demoted.
+    let l = recovered_label(
+        "net",
+        &["us", "ci", "nn", "hv", "uu", "uw", "ak", "tx"],
+        "geography.location.region",
+    );
+    assert_eq!(
+        l, "representation.text.word",
+        "seismic net codes must not be region"
+    );
+}
+
+#[test]
+fn region_nonmembership_veto_keeps_cities_and_composites() {
+    // The 33k spot-check regression: an admin1-only gazetteer wrongly demoted real
+    // city / `City, State` / `City (County)` columns. Cities≥15k + composite matching
+    // protect them.
+    for (hdr, vals) in [
+        (
+            "addrcity",
+            &["Austin", "Georgetown", "Dallas", "Houston"][..],
+        ),
+        (
+            "placeLocation",
+            &[
+                "Myrtle Beach, South Carolina",
+                "Boston, Massachusetts",
+                "Reno, Nevada",
+            ][..],
+        ),
+        (
+            "location",
+            &[
+                "Linn County (Iowa)",
+                "Cedar Falls (Iowa)",
+                "Scott County (Iowa)",
+            ][..],
+        ),
+    ] {
+        let l = recovered_label(hdr, vals, "geography.location.region");
+        assert!(
+            l.starts_with("geography."),
+            "real place column ({hdr}) must stay geographic, got {l}"
+        );
+    }
+}
+
+#[test]
+fn region_nonmembership_veto_keeps_bare_state_codes() {
+    // A small state-code column (geoState CA/NV) is geographic — bare state codes
+    // count as places at the value level so it is not demoted.
+    let l = recovered_label(
+        "geoState",
+        &["CA", "NV", "CA", "TX"],
+        "geography.location.region",
+    );
+    assert!(
+        l.starts_with("geography."),
+        "a state-code column must stay geographic, got {l}"
+    );
+}
+
+#[test]
+fn region_nonmembership_veto_demotes_enum_words() {
+    // gleif `category` / usgs `type` / seattle `checkouttype`: short enum words the
+    // model reaches region for. None are places.
+    for (hdr, vals) in [
+        ("category", &["GENERAL", "FUND", "GENERAL", "BRANCH"][..]),
+        (
+            "checkouttype",
+            &["Horizon", "OverDrive", "Freegal", "Hoopla"][..],
+        ),
+    ] {
+        let l = recovered_label(hdr, vals, "geography.location.region");
+        assert_eq!(
+            l, "representation.text.word",
+            "{hdr} enum must not be region"
+        );
+    }
+}
+
+#[test]
+fn region_nonmembership_veto_keeps_real_region_names() {
+    // A genuine region column under a generic (non-region) header — the values are
+    // real admin1 names, so place-name membership protects it from the veto.
+    let l = recovered_label(
+        "area",
+        &[
+            "California",
+            "Texas",
+            "Florida",
+            "Ontario",
+            "Bavaria",
+            "Scotland",
+        ],
+        "geography.location.region",
+    );
+    assert_eq!(
+        l, "geography.location.region",
+        "real region names must stay region"
+    );
+}
+
+#[test]
+fn region_nonmembership_veto_keeps_iso_region_codes() {
+    // ISO-3166-2 code column (ourairports `iso_region`) — the values are hyphenated
+    // subdivision codes, protected by iso_3166_2 membership even under a plain header.
+    let l = recovered_label(
+        "code",
+        &["US-TX", "US-CA", "CA-ON", "BR-SP", "US-FL", "US-TX"],
+        "geography.location.region",
+    );
+    assert!(
+        l.starts_with("geography."),
+        "ISO-3166-2 region codes must stay geographic, got {l}"
+    );
+}
+
+#[test]
+fn region_nonmembership_veto_respects_region_header() {
+    // A strong region header protects a genuine region column even if the gazetteer
+    // misses its names — the veto must not fire under `region`/`province`/etc.
+    let l = recovered_label(
+        "province",
+        &["Zzland", "Qqvia", "Xxmark", "Yytania"],
+        "geography.location.region",
+    );
+    assert_eq!(
+        l, "geography.location.region",
+        "a strong region header must veto the veto"
+    );
+}
+
 // ── tld_geography_recovery (external band: majestic TLD → continent) ──
 
 #[test]

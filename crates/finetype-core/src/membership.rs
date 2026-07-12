@@ -35,6 +35,7 @@ const TLD_CODES_RAW: &str = include_str!("../data/sets/tld_codes.txt");
 const UNLOCODE_CODES_RAW: &str = include_str!("../data/sets/unlocode_codes.txt");
 const ISO_3166_2_CODES_RAW: &str = include_str!("../data/sets/iso_3166_2_codes.txt");
 const US_TICKERS_RAW: &str = include_str!("../data/sets/us_tickers.txt");
+const PLACE_NAMES_RAW: &str = include_str!("../data/sets/place_names.txt");
 
 fn parse_set(raw: &'static str) -> HashSet<&'static str> {
     raw.lines()
@@ -76,6 +77,11 @@ fn iso_3166_2_set() -> &'static HashSet<&'static str> {
 fn us_tickers_set() -> &'static HashSet<&'static str> {
     static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
     SET.get_or_init(|| parse_set(US_TICKERS_RAW))
+}
+
+fn place_names_set() -> &'static HashSet<&'static str> {
+    static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
+    SET.get_or_init(|| parse_set(PLACE_NAMES_RAW))
 }
 
 /// `true` when the value (trimmed, case-folded to uppercase) is a published
@@ -138,6 +144,18 @@ pub fn us_tickers(value: &str) -> bool {
     us_tickers_set().contains(value.trim().to_uppercase().as_str())
 }
 
+/// `true` when the value (trimmed, case-folded to lowercase) is a real place
+/// NAME — a first-level admin division (state/province/region) or country from
+/// GeoNames. Names only, never bare codes: the value discriminator for
+/// `region_nonmembership_veto`, which demotes a `geography.location.region`
+/// overcall when a column's distinct values are mostly NOT places. Kept name-only
+/// because bare 2-letter codes collide with the catalog codes the veto must catch
+/// (seismic `net` ak/tx/nc are US state codes) — the guard pairs this with the
+/// separate [`iso_3166_2`] hyphenated-code roster for code-valued region columns.
+pub fn place_names(value: &str) -> bool {
+    place_names_set().contains(value.trim().to_lowercase().as_str())
+}
+
 /// Every named membership set as `(directive_name, predicate)`, in a stable
 /// order. Single source of truth: [`resolve`] looks up its arm here, and
 /// diagnostics that must check a value or column against *all* sets (e.g. the
@@ -153,6 +171,7 @@ pub fn all_sets() -> &'static [(&'static str, MembershipFn)] {
         ("unlocode", unlocode),
         ("iso_3166_2", iso_3166_2),
         ("us_tickers", us_tickers),
+        ("place_names", place_names),
     ]
 }
 
@@ -227,7 +246,46 @@ mod tests {
         assert!(resolve("unlocode").is_some());
         assert!(resolve("iso_3166_2").is_some());
         assert!(resolve("us_tickers").is_some());
+        assert!(resolve("place_names").is_some());
         assert!(resolve("no_such_set").is_none());
+    }
+
+    #[test]
+    fn place_names_match_real_regions_and_reject_catalog_codes() {
+        // Real region/state/province + country names a genuine `region` column
+        // carries (case- and space-insensitive) — must be recognised so the veto
+        // leaves the column alone.
+        for name in [
+            "California",
+            "texas",
+            "Bavaria",
+            "Ontario",
+            "New South Wales",
+            "Scotland",
+            " france ",
+            "Japan",
+        ] {
+            assert!(place_names(name), "{name} should be a known place name");
+        }
+        // The catalog codes / enum words the veto exists to catch (usgs net/type,
+        // gleif category, seattle checkouttype) are NOT place names. `net` values
+        // (`us`/`ak`/`tx`) are US state CODES, deliberately excluded — the set is
+        // names-only so a code column cannot masquerade as a region here.
+        for junk in [
+            "earthquake",
+            "GENERAL",
+            "Horizon",
+            "OverDrive",
+            "us",
+            "ak",
+            "tx",
+            "ci",
+        ] {
+            assert!(
+                !place_names(junk),
+                "{junk} must not validate as a place name"
+            );
+        }
     }
 
     #[test]

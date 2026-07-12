@@ -49,6 +49,30 @@ fn org_suffix_ratio(values: &[String]) -> f32 {
         / non_empty.len() as f32
 }
 
+/// True when a value looks geographic — the value discriminator for
+/// [`ColumnClassifier::region_nonmembership_veto`]. A value is a place if it is a
+/// place NAME (`place_names`: GeoNames admin1 + countries + cities≥15k), an
+/// ISO-3166-2 subdivision code (`US-TX`), a bare US/CA/AU state code (`CA`/`NV`),
+/// or a `City, State` / `City (State)` composite whose `,`/`/`/`(`/`)`-delimited
+/// parts are place names. Bare state codes are included at the value level so a
+/// genuine state column stays, yet seismic `net` (a few state-named networks among
+/// many non-geo codes) still falls below the veto's 50% column bar.
+fn value_is_place(v: &str) -> bool {
+    let t = v.trim();
+    if t.is_empty() {
+        return false;
+    }
+    if finetype_core::membership::place_names(t)
+        || finetype_core::membership::iso_3166_2(t)
+        || STATE_CODES.contains(&t.to_ascii_uppercase().as_str())
+    {
+        return true;
+    }
+    // Composite `City, State` / `City (State)` — any delimited part is a place name.
+    t.split([',', '/', '(', ')'])
+        .any(|part| finetype_core::membership::place_names(part.trim()))
+}
+
 impl ColumnClassifier {
     /// Guards that must fire on the POST-sharpen label — including labels a
     /// header hint created via an early `return` inside `apply_header_sharpen`.
@@ -85,6 +109,11 @@ impl ColumnClassifier {
         // suffix, so it is never in scope): demote an org-name column that the
         // model mistyped as a place (gleif `name`->region) to entity_name.
         self.org_name_geography_demotion(result, sample);
+        // AFTER the geo promotes AND org-name demotion: a real ISO subdivision
+        // (US-TX) is protected by iso_3166_2 membership and a company name is
+        // already entity_name, so this veto only sees a residual `region` overcall
+        // on a non-place column (usgs net/type, gleif category).
+        self.region_nonmembership_veto(result, header, sample);
         // AFTER geo_subdivision_membership_promote: keeps the geo-membership
         // promotes grouped. UN/LOCODE (`USLAX`) is hyphenless, so the ISO-3166-2
         // promote above never claims it — no fight.
@@ -336,6 +365,74 @@ impl ColumnClassifier {
         result.label = LEAF.to_string();
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!("org_name_geography_demotion:{from}"));
+        result.detected_locale = None;
+    }
+
+    /// `region_nonmembership_veto` (default ON). Demotes a `geography.location.region`
+    /// OVERCALL to `representation.text.word` when a column's distinct values are mostly
+    /// NOT real places — the tier-3 geography seam (external band). The raw Sense model
+    /// treats `region` as a garbage-magnet for short catalog codes and enum words: usgs
+    /// `net`/`type`/`magSource`/`locationSource` (seismic network + event codes), gleif
+    /// `category` (`GENERAL`/`FUND`), seattle `checkouttype` (`Horizon`/`OverDrive`), nyc
+    /// `permit_subtype`. A value counts as a place (`value_is_place`) if it is a place NAME
+    /// (`membership::place_names` — GeoNames admin1 + countries + cities≥15k), an ISO-3166-2
+    /// subdivision code (`US-TX`, so a code-valued `iso_region` column stays), a bare state
+    /// code (`CA`/`NV`), or a `City, State` / `City (State)` composite whose parts are
+    /// places. Cities and composites are load-bearing: an admin1-only gazetteer wrongly
+    /// demoted real city/county columns (`Austin`, `Durham County, NC`) at a measured 15%
+    /// false-positive rate — the 33k spot-check that caught it is exactly the discipline the
+    /// gate (oracle-blind here) cannot provide. Demote when < 50% of distinct values are
+    /// places AND the header is not a strong region/state header. A genuine region/city/
+    /// county column clears ~0.9; the false catalog columns clear ~0.0 (seismic `net` sits
+    /// at ~0.33 — a few networks are named after states — safely below the bar). Value-based
+    /// (0048), RHH-disableable.
+    fn region_nonmembership_veto(
+        &self,
+        result: &mut ColumnResult,
+        header: &str,
+        sample: &[String],
+    ) {
+        if rhh::is_disabled("region_nonmembership_veto") {
+            return;
+        }
+        const LEAF: &str = "representation.text.word";
+        if result.label != "geography.location.region" {
+            return;
+        }
+        // A strong region/state header protects a genuine subdivision column whose
+        // names the gazetteer may miss (obscure / non-English admin1 divisions).
+        if header_corroborates_region(header) || header_corroborates_state(header) {
+            return;
+        }
+        // A bare-CODE subdivision column (state=`AB`/`NV`, which a sibling guard
+        // normalises state_code->region) is geographic but scores 0% on the
+        // names+hyphenated-codes gazetteer. `values_look_like_state_codes` (>=80%
+        // STATE_CODES) keeps it — and does NOT rescue the false columns: usgs `net`
+        // is `us`-dominated (a country code, not a state code), so it stays <80%.
+        if values_look_like_state_codes(sample) {
+            return;
+        }
+        let mut distinct: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for v in sample {
+            let t = v.trim();
+            if !t.is_empty() {
+                distinct.insert(t);
+            }
+        }
+        // >=2 distinct: a single value carries too little signal to overturn the
+        // model, and a constant real-region column (a dataset all in one state) must
+        // not be vetoed on one gazetteer miss.
+        if distinct.len() < 2 {
+            return;
+        }
+        let places = distinct.iter().filter(|v| value_is_place(v)).count();
+        if places * 2 >= distinct.len() {
+            return;
+        }
+        let from = result.label.clone();
+        result.label = LEAF.to_string();
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("region_nonmembership_veto:{from}"));
         result.detected_locale = None;
     }
 
