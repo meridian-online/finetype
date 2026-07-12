@@ -68,10 +68,17 @@ pub fn is_enum_denylisted(label: &str) -> bool {
 /// KEYWORD (a closed constraint `validate` enforces). Kept deliberately narrow —
 /// categorical + boolean — to avoid `enum_overfit` (card 0014): a closed `enum`
 /// on an open domain rejects legitimate new values. The OPEN domain goes to the
-/// descriptive `x-finetype-enum` extension instead (`detect_enum_domain`). Shared
-/// so the CLI and MCP emit the SAME conservative keyword (the MCP shadows the CLI,
-/// not a separate feature set). Moved here from the CLI's `enum_emission.rs` so
-/// both surfaces depend on one policy.
+/// descriptive `x-finetype-enum` extension instead (`detect_enum_domain`), which now
+/// surfaces by DEFAULT for any bounded column — so a controlled vocabulary is still
+/// visible even where the closed keyword does not apply. Shared so the CLI and MCP
+/// emit the SAME conservative keyword (the MCP shadows the CLI, not a separate feature
+/// set). Moved here from the CLI's `enum_emission.rs` so both surfaces depend on one
+/// policy.
+///
+/// NB `representation.discrete.categorical` is retired as an emitted leaf (choice 0102)
+/// and remapped to `word` at finalize, so it no longer reaches here in production; the
+/// arm is kept as a harmless no-op documenting the policy (its own unit tests still
+/// pin the closed-keyword shape).
 pub fn label_is_enum_keyword_eligible(label: &str) -> bool {
     matches!(
         label,

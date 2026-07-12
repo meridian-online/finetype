@@ -307,8 +307,10 @@ enum Commands {
         enum_threshold: usize,
 
         /// Attach observed-data constraints to JSON Schema output
-        /// (minLength/maxLength, minimum/maximum, enum, x-finetype-null-rate,
-        /// x-finetype-cardinality). Requires `-o json-schema`.
+        /// (minLength/maxLength, minimum/maximum, the closed `enum` keyword,
+        /// x-finetype-null-rate, x-finetype-cardinality). Requires `-o json-schema`.
+        /// NB the descriptive `x-finetype-enum` domain surfaces by DEFAULT (no flag)
+        /// for any bounded column.
         #[arg(long)]
         stats: bool,
 
@@ -447,10 +449,11 @@ enum OutputFormat {
     Markdown,
     Arrow,
     /// Table-level JSON Schema. Replaces the table-mode of the legacy
-    /// `finetype schema <file.csv>` invocation. With `--stats`, attaches
-    /// observed-data constraints (minLength/maxLength, minimum/maximum,
-    /// enum) and the `x-finetype-null-rate` / `x-finetype-cardinality`
-    /// extensions.
+    /// `finetype schema <file.csv>` invocation. The descriptive `x-finetype-enum`
+    /// value domain surfaces by DEFAULT for any bounded column. With `--stats`,
+    /// additionally attaches observed-data constraints (minLength/maxLength,
+    /// minimum/maximum, the closed `enum` keyword) and the `x-finetype-null-rate` /
+    /// `x-finetype-cardinality` extensions.
     JsonSchema,
     /// Frictionless Data Package descriptor (choice 0105) — one Data Resource
     /// wrapping a Table Schema whose `type`/`format` come from the authoritative

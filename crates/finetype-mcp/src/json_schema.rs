@@ -119,9 +119,19 @@ pub fn emit_table_schema(
             false
         };
 
-        // Verbosity contract: only label + pii.
+        // Verbosity contract: label + pii.
         prop.insert("x-finetype-label".into(), json!(col.label));
         prop.insert("x-finetype-pii".into(), json!(pii));
+
+        // x-finetype-enum surfaces by DEFAULT (not gated on --stats): a bounded value
+        // domain is a first-class analyst signal — a `level` / `status` column shows its
+        // members without a flag. `detect_enum_domain` returns None for open /
+        // high-cardinality / denylisted columns, so it emits only where a real domain
+        // exists. Descriptive only (validators ignore `x-finetype-*`), so the round-trip
+        // is unaffected. The heavier observed-data constraints stay under --stats.
+        if !col.values.is_empty() {
+            attach_enum_domain(&mut prop, col);
+        }
 
         if stats && !col.values.is_empty() {
             attach_stats(&mut prop, col, taxonomy, enum_threshold);
@@ -219,9 +229,19 @@ fn attach_stats(
         prop.insert("enum".into(), json!(enum_vals));
     }
 
-    // x-finetype-enum: the OPEN observed domain for any non-denylisted bounded
-    // column (choice 0102). Descriptive — validators ignore `x-finetype-*`, so the
-    // round-trip is unaffected. Same shared policy as the CLI profile output.
+    // x-finetype-enum moved OUT of the --stats block to the default path
+    // (`attach_enum_domain`, called by `emit_table_schema`) so a bounded domain
+    // surfaces without a flag.
+}
+
+/// `x-finetype-enum`: the OPEN observed value domain for any non-denylisted bounded
+/// column (choice 0102). Emitted by DEFAULT (not gated on --stats) — descriptive
+/// metadata analysts rely on to see a column's membership ("this is one of these N
+/// values"); validators ignore `x-finetype-*`, so the round-trip is unaffected.
+/// `detect_enum_domain` returns None for open / high-cardinality / denylisted
+/// (numeric/coordinate/datetime/identifier/url) columns, so nothing is emitted where a
+/// bounded domain does not genuinely exist.
+fn attach_enum_domain(prop: &mut serde_json::Map<String, Value>, col: &TableSchemaColumn<'_>) {
     if let Some(ed) = detect_enum_domain(col.label, col.values, &EnumConfig::default()) {
         prop.insert(
             "x-finetype-enum".into(),
@@ -377,6 +397,50 @@ mod tests {
         assert!(
             n.get("x-finetype-enum").is_none(),
             "integer_number is denylisted — no enum domain",
+        );
+    }
+
+    // The enum domain is a DEFAULT signal (not gated on --stats): a bounded column
+    // shows its members without a flag, while the heavier observed-data constraints
+    // (cardinality, null-rate, min/max) stay under --stats.
+    #[test]
+    fn table_schema_enum_domain_surfaces_without_stats() {
+        let taxonomy = Taxonomy::from_directory(labels_path()).expect("load taxonomy");
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // A NAICS-style `level` column: a small bounded numeric-looking vocabulary that
+        // the model calls `word` — exactly the enum the author wants visible by default.
+        let level = v(&["2", "3", "4", "5", "6", "2", "3", "4", "5", "6", "2", "3"]);
+        let cols = vec![TableSchemaColumn {
+            name: "level",
+            label: "representation.text.word",
+            values: &level,
+            null_count: 0,
+            unknown_reason: None,
+        }];
+        let schema = emit_table_schema(&cols, "t", "id", &taxonomy, false, 0);
+        let props = schema
+            .get("properties")
+            .and_then(|p| p.as_object())
+            .expect("properties");
+        let lvl = props.get("level").unwrap();
+
+        // The domain surfaces even with stats=false / enum_threshold=0.
+        assert_eq!(
+            lvl.get("x-finetype-enum").and_then(|e| e.get("domain")),
+            Some(&json!(["2", "3", "4", "5", "6"])),
+            "a bounded `word` column must surface its enum domain without --stats",
+        );
+        // But the --stats-only observed-data fields must NOT appear. (minLength/
+        // maxLength are excluded here deliberately — for a `word` label those come
+        // from the taxonomy validation merge, not from --stats, so they are present
+        // either way; cardinality and null-rate are set ONLY in attach_stats.)
+        assert!(
+            lvl.get("x-finetype-cardinality").is_none(),
+            "cardinality is a --stats field, absent without the flag",
+        );
+        assert!(
+            lvl.get("x-finetype-null-rate").is_none(),
+            "null-rate is a --stats field, absent without the flag",
         );
     }
 
