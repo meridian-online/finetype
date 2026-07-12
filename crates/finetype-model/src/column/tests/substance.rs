@@ -846,6 +846,23 @@ fn unlocode_membership_recovery_declines_non_members() {
 }
 
 #[test]
+fn unlocode_membership_recovery_declines_constant_column() {
+    // Regression (corpus-honest spot-check, cert-guard batch): a fund `symbol` column of
+    // one repeated ticker (`FRMUF`) — like a `city` column of `Essen` or a `Namespace`
+    // column of `Debug` — coincidentally matches a single UN/LOCODE entry, since the
+    // 110k-entry set makes 5-char collisions common, and fired the guard at 100%
+    // membership. 57 of 58 corpus promotions were such constant columns. The distinct
+    // gate rejects them: this rare location-code type needs distributional evidence, not
+    // one repeated coincidence (mirrors cusip_checksum_recovery_declines_constant_column).
+    let l = recovered_label(
+        "symbol",
+        &["FRMUF", "FRMUF", "FRMUF", "FRMUF"],
+        "representation.text.entity_name",
+    );
+    assert_ne!(l, "geography.transportation.unlocode");
+}
+
+#[test]
 fn color_rgb_recovery_promotes_anchored_rgb() {
     let l = recovered_label(
         "colour",

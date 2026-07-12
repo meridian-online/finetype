@@ -860,16 +860,28 @@ impl ColumnClassifier {
         if result.label == LEAF {
             return;
         }
-        let non_empty = non_empty_trimmed(sample);
-        if non_empty.len() < 3 {
-            return;
+        let mut checked = 0usize;
+        let mut passed = 0usize;
+        let mut distinct_pass: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for v in sample {
+            let t = v.trim();
+            if t.is_empty() {
+                continue;
+            }
+            checked += 1;
+            if finetype_core::membership::unlocode(t) {
+                passed += 1;
+                distinct_pass.insert(t);
+            }
         }
-        let members = non_empty
-            .iter()
-            .filter(|v| finetype_core::membership::unlocode(v))
-            .count();
-        // >=90% published UN/LOCODE membership (members*10 >= len*9).
-        if members * 10 < non_empty.len() * 9 {
+        // >=90% published UN/LOCODE membership AND >=3 DISTINCT passing values. The
+        // distinct gate is load-bearing: the 110k-entry set makes 5-char collisions
+        // common, so a constant / low-cardinality column (a fund `symbol` column of one
+        // repeated ticker `FRMUF`/`DELRF`, a `city` column of `Essen`, a `Namespace`
+        // column of `Debug`) matches a single UN/LOCODE entry at 100% by coincidence.
+        // A single coincidental match carries no distributional evidence and must not
+        // assert this type — mirror cusip/sedol/dea_checksum_recovery's distinct gate.
+        if checked < 3 || distinct_pass.len() < 3 || passed * 10 < checked * 9 {
             return;
         }
         let from = result.label.clone();
