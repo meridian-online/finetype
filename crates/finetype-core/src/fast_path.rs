@@ -63,25 +63,25 @@ const CONCLUSIVE_LEAVES: &[&str] = &[
     // markup) are DELIBERATELY excluded — they over-fire on non-type values
     // ("n/a" → mime_type, "B12" → icd10, "4K" → si_number) that the tiny
     // taxonomy sample set cannot surface.
-    "representation.text.emoji",         // unicode symbol/mark run
-    "representation.identifier.uuid",    // 8-4-4-4-12 hex
-    "representation.format.color_hsl",   // `hsl(…)` / `hsla(…)`
-    "representation.scientific.inchi",   // `InChI=1S/…` prefix
-    "container.object.json",             // `{…}`
-    "container.object.json_array",       // `[…]`
-    "container.object.xml",              // `<…>…</…>`
-    "finance.banking.iban",              // country + check digits + BBAN
-    "finance.crypto.ethereum_address",   // `0x` + 40 hex
-    "finance.currency.currency_symbol",  // pure currency-symbol run
-    "finance.rate.basis_points",         // number + `bps`/`bp`
-    "finance.securities.figi",           // BBG-style 12-char with pos-3 `G`
-    "geography.coordinate.dms",          // `12°34'56"N …` degree/minute/second
-    "geography.format.wkt",              // `POINT(…)` / `POLYGON(…)` …
-    "geography.transportation.iso6346",  // container code `ABCU1234567`
-    "technology.cloud.aws_arn",          // `arn:aws:…` prefix
-    "technology.cloud.s3_uri",           // `s3://…` prefix
-    "technology.code.doi",               // `10.NNNN/…` prefix
-    "technology.cryptographic.jwt",      // three base64url segments
+    "representation.text.emoji",        // unicode symbol/mark run
+    "representation.identifier.uuid",   // 8-4-4-4-12 hex
+    "representation.format.color_hsl",  // `hsl(…)` / `hsla(…)`
+    "representation.scientific.inchi",  // `InChI=1S/…` prefix
+    "container.object.json",            // `{…}`
+    "container.object.json_array",      // `[…]`
+    "container.object.xml",             // `<…>…</…>`
+    "finance.banking.iban",             // country + check digits + BBAN
+    "finance.crypto.ethereum_address",  // `0x` + 40 hex
+    "finance.currency.currency_symbol", // pure currency-symbol run
+    "finance.rate.basis_points",        // number + `bps`/`bp`
+    "finance.securities.figi",          // BBG-style 12-char with pos-3 `G`
+    "geography.coordinate.dms",         // `12°34'56"N …` degree/minute/second
+    "geography.format.wkt",             // `POINT(…)` / `POLYGON(…)` …
+    "geography.transportation.iso6346", // container code `ABCU1234567`
+    "technology.cloud.aws_arn",         // `arn:aws:…` prefix
+    "technology.cloud.s3_uri",          // `s3://…` prefix
+    "technology.code.doi",              // `10.NNNN/…` prefix
+    "technology.cryptographic.jwt",     // three base64url segments
 ];
 
 /// ≥90% of the sample's non-empty values must pass `leaf`'s validator. Mirrors
@@ -248,9 +248,9 @@ mod tests {
                 d.samples
                     .iter()
                     .filter_map(|v| {
-                        v.as_str().map(String::from).or_else(|| {
-                            serde_yaml::to_string(v).ok().map(|x| x.trim().to_string())
-                        })
+                        v.as_str()
+                            .map(String::from)
+                            .or_else(|| serde_yaml::to_string(v).ok().map(|x| x.trim().to_string()))
                     })
                     .collect()
             })
@@ -294,8 +294,14 @@ mod tests {
                 ],
                 "representation.identifier.uuid",
             ),
-            (vec!["InChI=1S/H2O/h1H2", "InChI=1S/CH4/h1H4"], "representation.scientific.inchi"),
-            (vec!["POINT(30 10)", "LINESTRING(30 10, 10 30)"], "geography.format.wkt"),
+            (
+                vec!["InChI=1S/H2O/h1H2", "InChI=1S/CH4/h1H4"],
+                "representation.scientific.inchi",
+            ),
+            (
+                vec!["POINT(30 10)", "LINESTRING(30 10, 10 30)"],
+                "geography.format.wkt",
+            ),
             (
                 vec![
                     "arn:aws:iam::123456789012:user/jane",
