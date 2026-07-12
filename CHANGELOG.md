@@ -5,6 +5,48 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.48] - 2026-07-12
+
+### Added
+
+- **Eight model-blind certainty types now round-trip to themselves instead of a lookalike.**
+  A column of CUSIPs, SEDOLs, DEA numbers, IMEIs, CPT codes, HS codes, UN/LOCODEs, or
+  `rgb(...)` colours used to come back as the value-identical attractor the 244-dim model
+  falls back to (a bare `word`, a numeric id) because none of these leaves is in the model's
+  label space. Eight deterministic recovery guards restore them at `profile` time, each keyed
+  on the scheme's own **check digit or membership set** — not shape — so a lookalike cannot
+  trip them:
+  - `cusip` / `sedol` / `dea_number` — value-only check-digit recovery (≥3 distinct passing
+    values, so a constant column that coincidentally clears the checksum cannot assert the type).
+  - `imei` — header-gated Luhn (a 15-digit Amex card is Luhn-valid by construction, so the
+    `imei` header is the discriminator).
+  - `cpt` — header-gated on a distinctive `cpt`/`procedure` token (a 5-digit CPT is
+    value-identical with a ZIP; no checksum backstop, so the header is the sole gate).
+  - `hs_code` — header-gated + median-length ≥ 6 (kills 4-digit years).
+  - `unlocode` — value-only membership in the published UN/LOCODE set, **≥3 distinct passing
+    values** (the 110k-entry set makes 5-char collisions common, so a constant `symbol`/`city`
+    column that matches one entry by coincidence is rejected).
+  - `color_rgb` — anchored `rgb(`/`rgba(` prefix (a bare comma-triple stays ambiguous by design).
+- **`infer` on a single value now resolves 31 value-determinable certainty types** — e.g.
+  `infer -i "❤️"` → `emoji`, or a UUID / JWT / WKT / IBAN / InChI → its own type, instead of the
+  model's guess. `infer` previously skipped the value-recovery layer `profile` runs; the
+  deterministic fast-path is that layer, its leaf set is now 31 (was 6), gated to
+  exactly-one-match so it abstains on ambiguity.
+
+### Fixed
+
+- **Three real label bugs surfaced by the taxonomy examples round-trip test.** An orphaned
+  `identity.credential.password` label key now maps to the real `identity.person.password`;
+  bare `street_name` / `street_suffix` values are no longer swallowed into `street_address`;
+  and a valid ISIN mislabelled `isrc` (they share a 12-char shape) is corrected by an ISIN
+  check-digit guard the shape validator cannot see.
+
+### Testing
+
+- **Taxonomy examples round-trip test** (`make test-examples`) — builds one pure column per
+  taxonomy type from its `examples` array and asserts each round-trips to its own label
+  through `profile`; regression-gated (baseline 241/249).
+
 ## [0.6.47] - 2026-07-12
 
 ### Added
