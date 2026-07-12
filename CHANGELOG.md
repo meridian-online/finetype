@@ -27,6 +27,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   output. The heavier observed-data constraints (cardinality, null-rate, min/max, the closed
   `enum` keyword) stay under `--stats`. (choice 0102)
 
+### Fixed
+
+- **Company names no longer masquerade as places.** A column of organisation names
+  (`Apple Inc`, `NIGERIAN BREWERIES PLC`, `Oakmark International Fund`) that the model
+  reached for a city/region/country now types as `representation.text.entity_name`. The
+  tell is self-precise — a company name carries an org/fund suffix (`… PLC`, `… Fund`,
+  `… LP`) and a place name never does — so the correction needs no header hint. Scoped to
+  the place-*name* leaves only: a street address is legitimately multi-word free text whose
+  tokens collide with company forms (`4th Street SE`, `Royal Trust Tower`, `Bairro Asa`), so
+  address columns are deliberately left untouched. Deterministic, no retrain.
+  (company-reference external band, seam 1c)
+
+- **Top-level-domain columns are recovered from a geography misread.** A `TLD`/`IDN_TLD`
+  column of `com`/`org`/`uk` that the model guessed as a place (the short lowercase tokens
+  look like country codes) now types as `technology.internet.top_level_domain` when the
+  header names a TLD column and ≥90% of values are IANA-delegated. The header gate is
+  load-bearing — a pure-ccTLD column is value-identical to a country-code column.
+  Deterministic, no retrain. (company-reference external band)
+
 ## [0.6.48] - 2026-07-12
 
 ### Added

@@ -141,6 +141,18 @@ pub(crate) fn header_corroborates_hs_code(header: &str) -> bool {
         })
 }
 
+/// True if the header names a top-level-domain column (`tld`, `TLD`, `IDN_TLD`).
+/// Token-exact on the `tld` stem. The header gate is load-bearing for
+/// `tld_geography_recovery`: a pure-ccTLD column (`uk`,`de`,`fr`) is >=90% TLD-set
+/// members yet is semantically a country-code column, so membership alone would
+/// over-promote — the `tld` header is what marks the column as domains, not countries.
+pub(crate) fn header_corroborates_tld(header: &str) -> bool {
+    header
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|tok| tok == "tld" || tok == "tlds")
+}
+
 /// True if the header names a stock-ticker column (`ticker`, `symbol`,
 /// `ticker_symbol`, `stock_symbol`). Token-exact on the distinctive `ticker` /
 /// `symbol` stems. The header gate is load-bearing for `ticker_membership_recovery`:

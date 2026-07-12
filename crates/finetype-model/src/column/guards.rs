@@ -5,6 +5,50 @@
 
 use super::*;
 
+/// Fraction of non-empty values carrying an organisation / investment-vehicle
+/// suffix token — the value-side signal for `org_name_geography_demotion`. A place
+/// name never carries one (US states / countries / regions / cities incl. `West
+/// Bank` → 0.00), while a company/fund column is dense with them (gleif `name` →
+/// 0.97). Deliberately DISTINCT from (and broader than) the entity classifier's
+/// `org_suffixes` regex: that one is tuned narrow for person-vs-org demotion and
+/// lacks the modern fund suffixes (`Fund`,`Capital`,`Trust`,`LP`,`Holdings`,…) that
+/// dominate registry data, and it includes place-ambiguous tokens (`Bank`,`Co`,`SA`)
+/// this guard must exclude to leave `West Bank`/`Cork` alone.
+///
+/// A match counts ONLY when the value has ≥2 whitespace tokens — i.e. the suffix is
+/// a suffix OF a longer name (`DEUTZ AG`, `Kaanapali Land, LLC`), never the whole
+/// value. This is load-bearing: several 2-letter company forms (`AB`,`AG`,`NV`,`SE`,
+/// `BV`) are also US/Canada state codes and ISO country codes, so a bare-code `state`
+/// column of `AB` (Alberta) / `country_code` of `SE` (Sweden) would otherwise match
+/// at 100% and be wrongly demoted (corpus spot-check finding, mirrors the
+/// constant-column lesson).
+fn org_suffix_ratio(values: &[String]) -> f32 {
+    use std::sync::OnceLock;
+    static RE: OnceLock<regex::Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        // `\b`-delimited (the Rust regex crate has no look-around); calibrated
+        // gleif `name` 0.97 vs every place / bare-geo-code category 0.00.
+        regex::Regex::new(concat!(
+            r"(?i)\b(Inc|Incorporated|LLC|LLP|LLLP|LP|Ltd|Limited|Corp|",
+            r"Corporation|PLC|GmbH|AG|NV|BV|SE|OYJ|ASA|AB|Company|Fund|Funds|Trust|",
+            r"Capital|Holdings|Holding|Partners|Partnership|Advisors|Advisers|",
+            r"Management|Portfolios|Portfolio|Ventures|Associates|Securities|Insurance|",
+            r"Investments|Investment|Bancorp|Bancshares|Group|Foundation|Enterprises|",
+            r"Industries|Technologies|Solutions)\b",
+        ))
+        .expect("org_suffix_ratio regex")
+    });
+    let non_empty: Vec<&String> = values.iter().filter(|v| !v.trim().is_empty()).collect();
+    if non_empty.is_empty() {
+        return 0.0;
+    }
+    non_empty
+        .iter()
+        .filter(|v| v.split_whitespace().count() >= 2 && re.is_match(v))
+        .count() as f32
+        / non_empty.len() as f32
+}
+
 impl ColumnClassifier {
     /// Guards that must fire on the POST-sharpen label — including labels a
     /// header hint created via an early `return` inside `apply_header_sharpen`.
@@ -37,6 +81,10 @@ impl ColumnClassifier {
         self.geo_code_membership_vote(result, header, sample);
         self.geo_code_nonmembership_demotion(result, header, sample);
         self.geo_subdivision_membership_promote(result, header, sample);
+        // AFTER the geo-membership promotes (a real ISO subdivision has 0% org
+        // suffix, so it is never in scope): demote an org-name column that the
+        // model mistyped as a place (gleif `name`->region) to entity_name.
+        self.org_name_geography_demotion(result, sample);
         // AFTER geo_subdivision_membership_promote: keeps the geo-membership
         // promotes grouped. UN/LOCODE (`USLAX`) is hyphenless, so the ISO-3166-2
         // promote above never claims it — no fight.
@@ -46,6 +94,9 @@ impl ColumnClassifier {
         // ticker: header-gated membership promote — recovers finance.securities.ticker
         // from the state_code / word attractor (EDGAR ticker external-band finding).
         self.ticker_membership_recovery(result, header, sample);
+        // tld: header-gated membership promote — recovers top_level_domain from the
+        // continent overcall (majestic TLD external-band finding).
+        self.tld_geography_recovery(result, header, sample);
         // Header-gated code recoveries grouped with naics: CPT and HS have no
         // check digit and their bare shapes are value-identical with ZIP / a
         // plain integer, so the header token is the sole discriminator.
@@ -198,7 +249,12 @@ impl ColumnClassifier {
     /// ≥3-distinct gate blocks a constant column matching one symbol by
     /// coincidence (the `unlocode_membership_recovery` constant-column lesson).
     /// Value-based (0048), RHH-disableable.
-    fn ticker_membership_recovery(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+    fn ticker_membership_recovery(
+        &self,
+        result: &mut ColumnResult,
+        header: &str,
+        sample: &[String],
+    ) {
         if rhh::is_disabled("ticker_membership_recovery") {
             return;
         }
@@ -229,6 +285,99 @@ impl ColumnClassifier {
         result.confidence = result.confidence.max(0.90);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!("ticker_membership_recovery:{from}"));
+        result.detected_locale = None;
+    }
+
+    /// `org_name_geography_demotion` (default ON). Demotes a geography overcall on
+    /// an organisation-name column to `representation.text.entity_name`
+    /// (company-reference external band, seam 1c: gleif `name` → region). The raw
+    /// Sense model reaches for a place when it sees proper-noun text, so an org-name
+    /// column lands on region/city/country. The value-side tell is self-precise: a
+    /// company name carries an org/fund suffix (`… PLC`, `… Fund`, `… Capital`,
+    /// `… LP`) and a place name never does — measured gleif `name` 0.97, US-state /
+    /// country / region / city columns 0.00 (incl. `West Bank`, since `Bank`/`Co`/`SA`
+    /// are deliberately excluded from the suffix set as place-ambiguous). Demote when
+    /// ≥50% of values carry an org suffix (`org_suffix_ratio`) AND the label is a
+    /// place-NAME leaf. No header gate: the suffix signal is self-precise, so it corrects
+    /// an org column even under a generic `name`/`value` header (where a header veto could
+    /// not). Value-based (0048), RHH-disableable.
+    ///
+    /// Scope is the place-NAME leaves only (`city`/`region`/`country`/`continent`) — NOT
+    /// the address leaves (`geography.address.*`). A street address is legitimately
+    /// multi-word free text carrying directional/building tokens that collide with org
+    /// suffixes: `4th Street SE` (SE = South-East, not the Societas-Europaea form),
+    /// `Royal Trust Tower` (a building, not a trust), `Bairro Asa` (a Brasília district,
+    /// not the Norwegian ASA form). Those are 100% of the observed false positives and
+    /// they live entirely in address columns; the seam itself (name → region/city) never
+    /// touches an address leaf, so gating on place-name leaves removes the whole FP class
+    /// structurally rather than by chasing false-friend tokens. Bare code leaves
+    /// (`country_code`/`state_code`) are also out of scope — a code column carries no org
+    /// suffix and must never become an entity name.
+    fn org_name_geography_demotion(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("org_name_geography_demotion") {
+            return;
+        }
+        const LEAF: &str = "representation.text.entity_name";
+        const PLACE_NAME_LEAVES: [&str; 4] = [
+            "geography.location.city",
+            "geography.location.region",
+            "geography.location.country",
+            "geography.location.continent",
+        ];
+        if !PLACE_NAME_LEAVES.contains(&result.label.as_str()) {
+            return;
+        }
+        // >=50% org-suffix — huge margin below the 0.97 org-column rate and above the
+        // 0.0 place-column rate; a geography leaf never legitimately clears it.
+        if org_suffix_ratio(sample) < 0.5 {
+            return;
+        }
+        let from = result.label.clone();
+        result.label = LEAF.to_string();
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("org_name_geography_demotion:{from}"));
+        result.detected_locale = None;
+    }
+
+    /// `tld_geography_recovery` (default ON). Recovers `technology.internet.top_level_domain`
+    /// from a `geography.location.continent` (or other geo) overcall — the company-reference
+    /// external band's TLD→continent miss (majestic-million `TLD`/`IDN_TLD`). The raw Sense
+    /// model, seeing short lowercase tokens (`com`,`org`,`uk`), reaches for a place. Promote
+    /// when the header names a TLD column (`header_corroborates_tld`) AND ≥90% of values are
+    /// IANA-delegated TLDs (`membership::tld_codes`) AND ≥3 DISTINCT pass. The header gate is
+    /// load-bearing: a pure-ccTLD column is value-identical to a country-code column, so
+    /// membership alone over-promotes; the `tld` header marks it as domains. Value-based
+    /// (0048), RHH-disableable.
+    fn tld_geography_recovery(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("tld_geography_recovery") {
+            return;
+        }
+        const LEAF: &str = "technology.internet.top_level_domain";
+        if result.label == LEAF || !header_corroborates_tld(header) {
+            return;
+        }
+        let mut checked = 0usize;
+        let mut passed = 0usize;
+        let mut distinct_pass: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for v in sample {
+            let t = v.trim();
+            if t.is_empty() {
+                continue;
+            }
+            checked += 1;
+            if finetype_core::membership::tld_codes(t) {
+                passed += 1;
+                distinct_pass.insert(t);
+            }
+        }
+        if checked < 3 || distinct_pass.len() < 3 || passed * 10 < checked * 9 {
+            return;
+        }
+        let from = result.label.clone();
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.90);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("tld_geography_recovery:{from}"));
         result.detected_locale = None;
     }
 

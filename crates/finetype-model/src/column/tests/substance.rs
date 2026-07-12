@@ -913,6 +913,131 @@ fn ticker_membership_recovery_declines_constant_column() {
     assert_ne!(l, "finance.securities.ticker");
 }
 
+// ── org_name_geography_demotion (external band seam 1c) ──
+
+#[test]
+fn org_name_geography_demotion_demotes_org_column() {
+    // gleif `name` was over-emitted as region; org/fund suffixes are the self-precise
+    // tell (a place is never named "… PLC" / "… Fund" / "… LP").
+    let l = recovered_label(
+        "name",
+        &[
+            "ICON STOCKBROKERS LIMITED",
+            "NIGERIAN BREWERIES PLC",
+            "Oakmark International Fund",
+            "Hutchin Hill Capital, LP",
+            "Vanguard Fiduciary Trust Company",
+        ],
+        "geography.location.region",
+    );
+    assert_eq!(l, "representation.text.entity_name");
+}
+
+#[test]
+fn org_name_geography_demotion_keeps_place_names() {
+    // Real region NAMES under a region header carry ZERO org suffixes — must stay
+    // geography (the precision boundary: no header/membership signal protects these,
+    // only the value-suffix ratio does).
+    let l = recovered_label(
+        "region",
+        &[
+            "California",
+            "Texas",
+            "Florida",
+            "Illinois",
+            "Ohio",
+            "Virginia",
+        ],
+        "geography.location.region",
+    );
+    assert_eq!(l, "geography.location.region");
+}
+
+#[test]
+fn org_name_geography_demotion_keeps_bare_geo_codes() {
+    // Corpus spot-check regression: `AB` (Alberta) / `NV` (Nevada) / `SE` (Sweden)
+    // are 2-letter COMPANY forms (Aktiebolag / Naamloze Vennootschap / Societas
+    // Europaea) AND geo codes. A bare-code state/country column must NOT be demoted —
+    // the ≥2-token rule (a suffix must be part of a multi-word NAME) is what excludes it.
+    // The regression is specifically "not demoted to entity_name" — the column must
+    // stay geographic (a sibling geo guard may normalise state_code<->region, which
+    // is not this guard's concern).
+    let state = recovered_label(
+        "state",
+        &["AB", "AB", "NV", "NV", "AB", "NV"],
+        "geography.location.state_code",
+    );
+    assert!(
+        state.starts_with("geography."),
+        "bare state codes must stay geographic, got {state}"
+    );
+    let country = recovered_label(
+        "country_code",
+        &["SE", "SE", "AG", "SE", "AG", "SE"],
+        "geography.location.country_code",
+    );
+    assert!(
+        country.starts_with("geography."),
+        "bare country codes must stay geographic, got {country}"
+    );
+}
+
+#[test]
+fn org_name_geography_demotion_keeps_address_columns() {
+    // 33k-gate spot-check regression: a real street-address column is legitimately
+    // multi-word free text whose tokens collide with org suffixes — `4th Street SE`
+    // (SE = South-East), `Royal Trust Tower` (a building), `Bairro Asa` (a Brasília
+    // district, not the Norwegian ASA form). These are 100% of the observed FPs and
+    // all live in `geography.address.*`. Gating the guard on place-NAME leaves means
+    // an address leaf is never demoted, regardless of the false-friend token count.
+    for base in [
+        "geography.address.full_address",
+        "geography.address.street_name",
+    ] {
+        let l = recovered_label(
+            "address1",
+            &[
+                "6143 - 4th Street SE",
+                "1331 Macleod Trail SE",
+                "Royal Trust Tower Suite 4500",
+                "725 11th Avenue Boulevard SE",
+            ],
+            base,
+        );
+        // Must stay an address leaf — not demoted to entity_name. (A sibling
+        // address-composition rule may normalise street_name<->full_address; that is
+        // not this guard's concern — the regression is specifically "not demoted".)
+        assert!(
+            l.starts_with("geography.address."),
+            "address column carrying directional/building tokens must NOT be demoted (base {base}, got {l})"
+        );
+    }
+}
+
+// ── tld_geography_recovery (external band: majestic TLD → continent) ──
+
+#[test]
+fn tld_geography_recovery_promotes_tlds() {
+    let l = recovered_label(
+        "TLD",
+        &["com", "org", "net", "edu", "gov", "uk", "io"],
+        "geography.location.continent",
+    );
+    assert_eq!(l, "technology.internet.top_level_domain");
+}
+
+#[test]
+fn tld_geography_recovery_requires_tld_header() {
+    // ccTLDs are >=90% TLD-set members but under a `country` header this is a
+    // country column, not a domain column — the header gate must block it.
+    let l = recovered_label(
+        "country",
+        &["uk", "de", "fr", "jp", "cn", "it"],
+        "geography.location.continent",
+    );
+    assert_ne!(l, "technology.internet.top_level_domain");
+}
+
 #[test]
 fn color_rgb_recovery_promotes_anchored_rgb() {
     let l = recovered_label(
