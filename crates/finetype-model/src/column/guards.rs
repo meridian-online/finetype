@@ -43,6 +43,9 @@ impl ColumnClassifier {
         self.unlocode_membership_recovery(result, sample);
         self.timezone_abbreviation_recovery(result, header, sample);
         self.naics_industry_recovery(result, header, sample);
+        // ticker: header-gated membership promote — recovers finance.securities.ticker
+        // from the state_code / word attractor (EDGAR ticker external-band finding).
+        self.ticker_membership_recovery(result, header, sample);
         // Header-gated code recoveries grouped with naics: CPT and HS have no
         // check digit and their bare shapes are value-identical with ZIP / a
         // plain integer, so the header token is the sole discriminator.
@@ -178,6 +181,54 @@ impl ColumnClassifier {
         result.disambiguation_applied = true;
         result.disambiguation_rule =
             Some(format!("naics_industry_recovery:{}", header.to_lowercase()));
+        result.detected_locale = None;
+    }
+
+    /// `ticker_membership_recovery` (default ON). Recovers the
+    /// `finance.securities.ticker` leaf (company-reference external band: EDGAR
+    /// `ticker` was over-emitted as `geography.location.state_code`). The
+    /// 244-dim model cannot predict this leaf, and a short uppercase symbol
+    /// column lands on state_code / word / alphanumeric_id. Promote when the
+    /// header names a ticker column (`header_corroborates_ticker` — `ticker` /
+    /// `symbol`) AND ≥90% of values are US-listed symbols
+    /// (`membership::us_tickers`, labels/sets/us_tickers.txt) AND ≥3 DISTINCT
+    /// pass. The header gate is load-bearing: 15 of the 50 US state codes (`MA`,
+    /// `TX`, …) are themselves real tickers, so membership alone cannot separate
+    /// a ticker column from a state column — the header is the discriminator. The
+    /// ≥3-distinct gate blocks a constant column matching one symbol by
+    /// coincidence (the `unlocode_membership_recovery` constant-column lesson).
+    /// Value-based (0048), RHH-disableable.
+    fn ticker_membership_recovery(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("ticker_membership_recovery") {
+            return;
+        }
+        const LEAF: &str = "finance.securities.ticker";
+        if result.label == LEAF || !header_corroborates_ticker(header) {
+            return;
+        }
+        let mut checked = 0usize;
+        let mut passed = 0usize;
+        let mut distinct_pass: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for v in sample {
+            let t = v.trim();
+            if t.is_empty() {
+                continue;
+            }
+            checked += 1;
+            if finetype_core::membership::us_tickers(t) {
+                passed += 1;
+                distinct_pass.insert(t);
+            }
+        }
+        // >=90% US-listed membership AND >=3 DISTINCT passing values.
+        if checked < 3 || distinct_pass.len() < 3 || passed * 10 < checked * 9 {
+            return;
+        }
+        let from = result.label.clone();
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.90);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("ticker_membership_recovery:{from}"));
         result.detected_locale = None;
     }
 

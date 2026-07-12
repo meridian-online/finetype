@@ -268,6 +268,24 @@ impl Generator {
                     .expect("FIGI body is alphanumeric by construction");
                 Ok(format!("{}{}", body11, check))
             }
+            ("securities", "ticker") => {
+                // Ticker: 1-5 uppercase letters (real symbols cluster at 3-4),
+                // ~15% with a class-share suffix (-A). Shape-valid for the
+                // `^[A-Z]{1,7}([./-][A-Z]{1,4})?$` pattern; the substance is
+                // `membership: us_tickers`, not shape, so shape-valid suffices
+                // for the taxonomy check.
+                let letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                let len = self.rng.gen_range(1..=5);
+                let base: String = (0..len)
+                    .map(|_| letters.as_bytes()[self.rng.gen_range(0..letters.len())] as char)
+                    .collect();
+                if self.rng.gen_range(0..100) < 15 {
+                    let cls = letters.as_bytes()[self.rng.gen_range(0..letters.len())] as char;
+                    Ok(format!("{}-{}", base, cls))
+                } else {
+                    Ok(base)
+                }
+            }
 
             // ── banking (aba_routing, bsb) ────────────────────────────────
             ("banking", "aba_routing") => {

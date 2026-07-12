@@ -523,6 +523,50 @@ finance.securities.lei:
     identification in financial transactions. Check digits use ISO 7064 Mod 97-10:
     convert letters to numbers (A=10..Z=35), compute mod 97, check digits = 98 - remainder.
 
+finance.securities.ticker:
+  title: "Stock Ticker"
+  description: >
+    Stock ticker symbol — the short exchange identifier for a listed security
+    (AAPL, MSFT, BRK-B). 1-7 uppercase letters, optionally with a class-share
+    suffix (BRK-B, BF.B). No check digit, and the shape confirms every short
+    uppercase token (a US state code, a currency, an arbitrary code all clear
+    it), so the published listed-symbol set is the substance (Precision
+    Principle). US-listed for now (SEC company_tickers.json); other venues
+    compose additively behind this same type.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Z]{1,7}([./-][A-Z]{1,4})?$"
+  # Shape-only pattern (any 1-7 upper token); membership against the SEC listed
+  # set is what distinguishes a real ticker. Set: labels/sets/us_tickers.txt.
+  membership: us_tickers
+  tier: [VARCHAR, payment]
+  release_priority: 4
+  aliases: [ticker, ticker_symbol, stock_symbol, symbol]
+  samples:
+    - "AAPL"
+    - "MSFT"
+    - "NVDA"
+    - "BRK-B"
+    - "TSLA"
+  references: null
+  notes: >
+    New in v0.6.49. Mined from the company-reference external band (EDGAR
+    `ticker` was over-emitted as geography.location.state_code). No checksum;
+    list membership is the substance. The 244-dim model does not predict it —
+    recovered at profile time by the header-gated `ticker_membership_recovery`
+    Sharpen guard (ticker/symbol header + >=90% set membership + >=3 distinct).
+    The 2-letter state/ticker collision (MA, TX, … are both) is why the guard
+    gates on the header, not membership alone.
+
 finance.banking.aba_routing:
   title: "ABA Routing Number"
   description: >

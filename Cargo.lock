@@ -1605,7 +1605,7 @@ checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
 
 [[package]]
 name = "finetype-build-tools"
-version = "0.6.48"
+version = "0.6.49"
 dependencies = [
  "clap",
  "tempfile",
@@ -1613,7 +1613,7 @@ dependencies = [
 
 [[package]]
 name = "finetype-cli"
-version = "0.6.48"
+version = "0.6.49"
 dependencies = [
  "anyhow",
  "clap",
@@ -1635,7 +1635,7 @@ dependencies = [
 
 [[package]]
 name = "finetype-core"
-version = "0.6.48"
+version = "0.6.49"
 dependencies = [
  "chrono",
  "glob",
@@ -1656,7 +1656,7 @@ dependencies = [
 
 [[package]]
 name = "finetype-eval"
-version = "0.6.48"
+version = "0.6.49"
 dependencies = [
  "anyhow",
  "arrow 54.3.1",
@@ -1677,7 +1677,7 @@ dependencies = [
 
 [[package]]
 name = "finetype-mcp"
-version = "0.6.48"
+version = "0.6.49"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1695,7 +1695,7 @@ dependencies = [
 
 [[package]]
 name = "finetype-model"
-version = "0.6.48"
+version = "0.6.49"
 dependencies = [
  "anyhow",
  "candle-core",
@@ -1714,7 +1714,7 @@ dependencies = [
 
 [[package]]
 name = "finetype-train"
-version = "0.6.48"
+version = "0.6.49"
 dependencies = [
  "anyhow",
  "candle-core",
@@ -1738,7 +1738,7 @@ dependencies = [
 
 [[package]]
 name = "finetype_duckdb"
-version = "0.6.48"
+version = "0.6.49"
 dependencies = [
  "duckdb",
  "finetype-core",

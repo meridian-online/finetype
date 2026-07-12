@@ -141,6 +141,19 @@ pub(crate) fn header_corroborates_hs_code(header: &str) -> bool {
         })
 }
 
+/// True if the header names a stock-ticker column (`ticker`, `symbol`,
+/// `ticker_symbol`, `stock_symbol`). Token-exact on the distinctive `ticker` /
+/// `symbol` stems. The header gate is load-bearing for `ticker_membership_recovery`:
+/// 15 of the 50 US state codes (`MA`, `TX`, …) are ALSO real tickers, so US-ticker
+/// membership alone cannot separate a ticker column from a state column — a
+/// `state`-headed column fails this gate, a `ticker`/`symbol`-headed one passes.
+pub(crate) fn header_corroborates_ticker(header: &str) -> bool {
+    header
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|tok| matches!(tok, "ticker" | "tickers" | "symbol" | "symbols"))
+}
+
 /// True if the header names a numeric CODE column (`naics_code`, `Industry Code`,
 /// `cik`, `fips`) — the disambiguator for the value-identical numeric_code /
 /// integer_number boundary that feature rule F5 collapses (a no-leading-zero

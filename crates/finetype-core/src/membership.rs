@@ -34,6 +34,7 @@ const NAICS_CODES_RAW: &str = include_str!("../data/sets/naics_codes.txt");
 const TLD_CODES_RAW: &str = include_str!("../data/sets/tld_codes.txt");
 const UNLOCODE_CODES_RAW: &str = include_str!("../data/sets/unlocode_codes.txt");
 const ISO_3166_2_CODES_RAW: &str = include_str!("../data/sets/iso_3166_2_codes.txt");
+const US_TICKERS_RAW: &str = include_str!("../data/sets/us_tickers.txt");
 
 fn parse_set(raw: &'static str) -> HashSet<&'static str> {
     raw.lines()
@@ -70,6 +71,11 @@ fn unlocode_codes_set() -> &'static HashSet<&'static str> {
 fn iso_3166_2_set() -> &'static HashSet<&'static str> {
     static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
     SET.get_or_init(|| parse_set(ISO_3166_2_CODES_RAW))
+}
+
+fn us_tickers_set() -> &'static HashSet<&'static str> {
+    static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
+    SET.get_or_init(|| parse_set(US_TICKERS_RAW))
 }
 
 /// `true` when the value (trimmed, case-folded to uppercase) is a published
@@ -119,6 +125,19 @@ pub fn iso_3166_2(value: &str) -> bool {
     iso_3166_2_set().contains(value.trim().to_uppercase().as_str())
 }
 
+/// `true` when the value (trimmed, case-folded to uppercase) is a US-listed
+/// stock ticker. A ticker has no check digit and its shape `^[A-Z]{1,7}$`
+/// confirms every short uppercase token — a US state code (`MA`, `TX`), a
+/// currency, or an arbitrary code all clear it — so the published SEC list is
+/// the substance (company-reference audit `ticker` → state_code finding). The
+/// two-letter state/ticker collision (15 of 50 state codes are also tickers)
+/// is why the promote guard also gates on a ticker-ish header, not membership
+/// alone. Set is US-only for now (SEC `company_tickers.json`); other venues
+/// compose additively behind the same `finance.securities.ticker` type.
+pub fn us_tickers(value: &str) -> bool {
+    us_tickers_set().contains(value.trim().to_uppercase().as_str())
+}
+
 /// Every named membership set as `(directive_name, predicate)`, in a stable
 /// order. Single source of truth: [`resolve`] looks up its arm here, and
 /// diagnostics that must check a value or column against *all* sets (e.g. the
@@ -133,6 +152,7 @@ pub fn all_sets() -> &'static [(&'static str, MembershipFn)] {
         ("tld", tld_codes),
         ("unlocode", unlocode),
         ("iso_3166_2", iso_3166_2),
+        ("us_tickers", us_tickers),
     ]
 }
 
@@ -206,6 +226,7 @@ mod tests {
         assert!(resolve("tld").is_some());
         assert!(resolve("unlocode").is_some());
         assert!(resolve("iso_3166_2").is_some());
+        assert!(resolve("us_tickers").is_some());
         assert!(resolve("no_such_set").is_none());
     }
 
@@ -257,6 +278,21 @@ mod tests {
         // breaks (external band: product/OS/locale hyphen-codes → geography).
         for code in ["US-ZZ", "XX-01", "AB-99", "ZZ-ZZ", "OS-10"] {
             assert!(!iso_3166_2(code), "{code} must not validate as ISO-3166-2");
+        }
+    }
+
+    #[test]
+    fn us_tickers_match_real_symbols_and_reject_nonmembers() {
+        // Real US-listed symbols (case-insensitive) incl. a dash class-share.
+        for code in ["AAPL", "NVDA", "GOOGL", "BRK-B", " msft ", "tsla"] {
+            assert!(us_tickers(code), "{code} should be a US ticker");
+        }
+        // Same short-uppercase shape, NOT listed symbols — the collisions this
+        // set exists to break: a UN/LOCODE-shaped token, an arbitrary code, and
+        // an unassigned symbol. (State codes like MA/TX genuinely ARE tickers,
+        // so the header gate — not membership — resolves the state column.)
+        for non in ["ZZZZZ", "QQQQXY", "NOTATICKER"] {
+            assert!(!us_tickers(non), "{non} must not validate as a US ticker");
         }
     }
 

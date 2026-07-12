@@ -862,6 +862,57 @@ fn unlocode_membership_recovery_declines_constant_column() {
     assert_ne!(l, "geography.transportation.unlocode");
 }
 
+// ── ticker_membership_recovery (company-reference external band) ──
+
+#[test]
+fn ticker_membership_recovery_promotes_symbols() {
+    // EDGAR `ticker` was over-emitted as state_code; a ticker-headed column of
+    // US-listed symbols promotes to the membership-backed ticker leaf.
+    let l = recovered_label(
+        "ticker",
+        &["AAPL", "MSFT", "NVDA", "TSLA", "AMZN"],
+        "geography.location.state_code",
+    );
+    assert_eq!(l, "finance.securities.ticker");
+}
+
+#[test]
+fn ticker_membership_recovery_requires_ticker_header() {
+    // Header gate is load-bearing: these ARE real tickers (>=90% membership),
+    // but under a `state` header they must NOT promote — 15 of 50 state codes
+    // are also tickers, so only the header separates a ticker from a state list.
+    let l = recovered_label(
+        "state",
+        &["AAPL", "MSFT", "NVDA", "TSLA", "AMZN"],
+        "geography.location.state_code",
+    );
+    assert_ne!(l, "finance.securities.ticker");
+}
+
+#[test]
+fn ticker_membership_recovery_declines_non_members() {
+    // Ticker-headed, but the values are not US-listed symbols (arbitrary tokens):
+    // membership, not the header alone, is the gate.
+    let l = recovered_label(
+        "ticker",
+        &["ZZZZZ", "QQQQXY", "NOTATCKR", "WResReW", "FooBarBz"],
+        "representation.text.word",
+    );
+    assert_ne!(l, "finance.securities.ticker");
+}
+
+#[test]
+fn ticker_membership_recovery_declines_constant_column() {
+    // Constant column (one repeated real ticker) matches at 100% but carries no
+    // distributional evidence — the >=3-distinct gate rejects it (unlocode lesson).
+    let l = recovered_label(
+        "symbol",
+        &["AAPL", "AAPL", "AAPL", "AAPL"],
+        "representation.text.word",
+    );
+    assert_ne!(l, "finance.securities.ticker");
+}
+
 #[test]
 fn color_rgb_recovery_promotes_anchored_rgb() {
     let l = recovered_label(
@@ -963,7 +1014,11 @@ fn membership_guard_demotes_tickers_off_icao() {
     // The reproduced ticker→icao failure: 4-letter stock tickers pass the
     // shape pattern ^[A-Z]{4}$ 100% (validation CONFIRMS the wrong label and
     // disarms the attractor demotion), but they are not in the published ICAO
-    // airport list — membership is the substance the shape cannot supply.
+    // airport list — membership is the substance the shape cannot supply. The
+    // header here is `ident` (a real airport-column name), NOT `ticker`/`symbol`:
+    // this isolates membership_substance_guard's icao demotion, since a
+    // ticker/symbol-headed column of real tickers now routes to the dedicated
+    // ticker_membership_recovery promote instead (its own tests).
     let yaml = r#"
 geography.transportation.icao_code:
   title: ICAO Airport Code
@@ -988,7 +1043,7 @@ geography.transportation.icao_code:
     .collect();
     let r = cc
         .compose_from_sense(
-            "symbol",
+            "ident",
             &tickers,
             "geography.transportation.icao_code",
             0.93,

@@ -1,0 +1,88 @@
+name: Monthly ticker-set refresh check
+
+# The us_tickers membership set (labels/sets/us_tickers.txt, backing
+# finance.securities.ticker) is a snapshot of the SEC's company_tickers.json.
+# Companies list and delist continuously, so the checked-in set drifts. This job
+# re-fetches monthly and, if the set is stale, files a tracking issue — it does
+# NOT auto-commit or open a PR (this repo is direct-push, audit-before-edit; the
+# refresh is a signal, never a gate). The >=90% column guard tolerates a month of
+# drift easily, so a stale set never breaks inference; this just keeps it fresh.
+#
+# To refresh: run `python3 scripts/fetch_us_tickers.py` locally and commit the
+# updated labels/sets/us_tickers.txt (the embedded build picks it up via
+# include_str! — no network at build time).
+
+on:
+  schedule:
+    - cron: '0 6 1 * *'       # 06:00 UTC on the 1st of each month
+  workflow_dispatch:           # run on demand (also keeps the cron from being auto-disabled)
+
+concurrency:
+  group: monthly-ticker-refresh
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      stale: ${{ steps.check.outputs.stale }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        # --check exits 1 when the on-disk set differs from a fresh SEC fetch
+        # (comparing code lines only, so the header snapshot date is ignored).
+        run: |
+          if python3 scripts/fetch_us_tickers.py --check; then
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  notify:
+    needs: check
+    if: needs.check.outputs.stale == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const label = 'ticker-set-refresh';
+            try {
+              await github.rest.issues.getLabel({ owner: context.repo.owner, repo: context.repo.repo, name: label });
+            } catch (e) {
+              await github.rest.issues.createLabel({ owner: context.repo.owner, repo: context.repo.repo, name: label, color: '1d76db' });
+            }
+            // Reuse an open issue if one exists, so we don't stack duplicates monthly.
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open', labels: label,
+            });
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              `The checked-in ticker set (\`labels/sets/us_tickers.txt\`, backing \`finance.securities.ticker\`) has drifted from the SEC's current \`company_tickers.json\`.`,
+              ``,
+              `Refresh it:`,
+              '```',
+              `python3 scripts/fetch_us_tickers.py`,
+              `git add labels/sets/us_tickers.txt && git commit -m "chore(ticker): refresh us_tickers set from SEC"`,
+              '```',
+              ``,
+              `Not urgent — the >=90% column guard tolerates the drift, so inference is unaffected.`,
+              ``,
+              `Run: ${run}`,
+            ].join('\n');
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.data[0].number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title: 'Ticker membership set is stale — refresh from SEC', body, labels: [label],
+              });
+            }

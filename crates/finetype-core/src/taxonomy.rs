@@ -1653,11 +1653,10 @@ representation.discrete.categorical:
     #[cfg(feature = "embedded-taxonomy")]
     #[test]
     fn test_embedded_taxonomy_and_frictionless_for() {
-        // Embedded taxonomy loads all 249 definitions without a labels/ dir
-        // (247 + timestamp.sql_minutes + timestamp.iso_minutes, minute-precision
-        // timestamp family completion).
+        // Embedded taxonomy loads all 250 definitions without a labels/ dir
+        // (249 + finance.securities.ticker, the SEC-membership-backed ticker type).
         let tax = Taxonomy::embedded().expect("embedded taxonomy parses");
-        assert_eq!(tax.len(), 249, "expected 249 embedded definitions");
+        assert_eq!(tax.len(), 250, "expected 250 embedded definitions");
 
         // The accessor returns the authoritative map for known labels…
         let email = super::frictionless_for("identity.person.email").unwrap();

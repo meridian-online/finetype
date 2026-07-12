@@ -5,6 +5,28 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.49] - 2026-07-12
+
+### Added
+
+- **Stock tickers are now a first-class type instead of a misread US state.** A column of
+  listed symbols (`AAPL`, `MSFT`, `BRK-B`) under a `ticker`/`symbol` header now types as
+  `finance.securities.ticker`, backed by the SEC's 9,304-symbol list — where it used to be
+  guessed as `geography.location.state_code` (the model reaches for a place when it sees a
+  short uppercase code). A ticker has no check digit and its shape confirms any short
+  uppercase token, so membership in the published list is the substance; the header gate is
+  load-bearing because 15 of the 50 US state codes (MA, TX, …) are themselves real tickers.
+  Recovered deterministically at profile time (the 244-dim model does not predict the new
+  leaf; no retrain). US-listed for now — other venues compose additively behind the same
+  type. The set refreshes via a scheduled `scripts/fetch_us_tickers.py` download into the
+  checked-in list, so the build stays offline. (company-reference external band)
+
+- **The enum value-domain (`x-finetype-enum`) now surfaces by default** on the json-schema
+  and MCP profile surfaces — a bounded column (a `status`/`level` controlled vocabulary)
+  shows its members without `--stats`, matching the CLI's default JSON and the datapackage
+  output. The heavier observed-data constraints (cardinality, null-rate, min/max, the closed
+  `enum` keyword) stay under `--stats`. (choice 0102)
+
 ## [0.6.48] - 2026-07-12
 
 ### Added
