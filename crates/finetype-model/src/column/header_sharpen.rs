@@ -87,6 +87,60 @@ pub(crate) fn header_corroborates_naics(header: &str) -> bool {
         .any(|tok| tok == "naics")
 }
 
+/// True if the header names an IMEI column (`imei`, `IMEI_number`, `device_imei`).
+/// Token-exact on the distinctive `imei` stem. A 15-digit American Express card
+/// column (`card_number`/`amex`/`cc`) is exactly-15-digit AND Luhn-valid BY
+/// CONSTRUCTION, so it clears the value gate; the `imei` token — which a payment
+/// header never yields — is the sole discriminator that keeps `imei_checksum_recovery`
+/// off live payment data.
+pub(crate) fn header_corroborates_imei(header: &str) -> bool {
+    header
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|tok| tok == "imei")
+}
+
+/// True if the header names a CPT / procedure-code column (`cpt`, `cpt_code`,
+/// `procedure_code`). SINGLE-TIER distinctive tokens only — CPT has no check
+/// digit or membership set and its `^\d{5}$` shape is value-identical with a US
+/// ZIP code, so a generic `code` token (which `header_corroborates_numeric_code`
+/// admits) would falsely promote a ZIP column. Restricting to `cpt`/`procedure`
+/// is what makes the recovery precise.
+pub(crate) fn header_corroborates_cpt(header: &str) -> bool {
+    header
+        .to_lowercase()
+        .split(|c: char| !c.is_alphabetic())
+        .any(|tok| matches!(tok, "cpt" | "procedure" | "procedures"))
+}
+
+/// True if the header names an HS / customs-tariff-code column (`hs_code`, `hts`,
+/// `tariff`, `harmonized_code`, `commodity_code`). Token-aware on distinctive
+/// customs stems; HS codes carry NO check digit and the bare form is value-identical
+/// to a plain integer/year, so the header token is the sole discriminator (the value
+/// gate `is_hs_code_format` + a median-length floor protects the short `hs`/`hts`
+/// tokens from GPA-style decimals and 4-digit year columns).
+pub(crate) fn header_corroborates_hs_code(header: &str) -> bool {
+    header
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|tok| {
+            matches!(
+                tok,
+                "hs" | "hscode"
+                    | "hscodes"
+                    | "hts"
+                    | "htsus"
+                    | "htscode"
+                    | "harmonized"
+                    | "harmonised"
+                    | "tariff"
+                    | "tariffs"
+                    | "customs"
+                    | "commodity"
+            )
+        })
+}
+
 /// True if the header names a numeric CODE column (`naics_code`, `Industry Code`,
 /// `cik`, `fips`) — the disambiguator for the value-identical numeric_code /
 /// integer_number boundary that feature rule F5 collapses (a no-leading-zero

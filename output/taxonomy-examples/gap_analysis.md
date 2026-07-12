@@ -9,9 +9,10 @@ which classifies a single value with no distribution and is deliberately weak; t
 is why `finetype infer -i "#FF0000"` returns `integer_number` while a *column* of
 hex values round-trips to `color_hex`).
 
-**Headline.** 229/249 round-trip (92.0%) on v0.6.47 with each column headed by its
-own leaf name. The 20 that do not split into five buckets below. Only ~8 are
-worth acting on; the rest are model-blind-by-design or residual categories.
+**Headline.** 241/249 round-trip (96.8%) on v0.6.47 with each column headed by its
+own leaf name (was 229/249 at first audit). The 8 that remain are the by-design
+residuals + the deferred `excel_format` guard. Bucket D — the model-blind certainty
+guards — is now 8-of-9 shipped (see the 2026-07-12 batch update below).
 
 Adjudicated per-type against the taxonomy + guard code (workflow `wf_62d19fcb-004`,
 21 agents). `profiled_as` = what a column of the type's own examples classifies as.
@@ -38,6 +39,21 @@ Adjudicated per-type against the taxonomy + guard code (workflow `wf_62d19fcb-00
   labels are ~absent from gold, so efficacy rides round-trip + unit tests). The 4th (`inchi`→
   `plain_text`) is now moot at `infer` via the fast-path; the profile-side query_string
   overlap remains. Net acknowledged gaps: 19 → 16.
+- **Bucket D certainty guards — 8 of 9 shipped.** `cusip`/`sedol`/`dea_number` (value-only
+  check-digit recovery, mirror `isin_checksum_recovery`), `imei` (header-gated Luhn — a
+  15-digit Amex card is Luhn-valid by construction, so the `imei` header token is the sole
+  discriminator), `cpt` (header-gated, distinctive `cpt`/`procedure` token only — a generic
+  `code` token would admit a 5-digit ZIP), `hs_code` (header-gated + median-length≥6 floor to
+  reject 4-digit years; promotes from ANY source since the multi-dot form reads as `word`, not
+  the numeric family), `unlocode` (value-only membership promote, the twin of the demote-only
+  `unlocode_format_veto`), `color_rgb` (value-only anchored `rgb(`/`rgba(` prefix — bare triples
+  stay ambiguous by design). Guards + unit tests in `guards.rs`/`substance.rs`, header helpers
+  in `header_sharpen.rs`. Weak-sample fixes rode along: `imei` (2 of 3 samples were Luhn-invalid)
+  and `dea_number` (2 of 3 failed the check digit) and `color_rgb` (2 of 4 were bare triples) had
+  their `samples` corrected to genuinely valid, self-classifying values. The 9th, `excel_format`,
+  is DEFERRED — its taxonomy pattern is permissive (any format-token string) and the FP surface
+  (a column literally describing a date format) is fuzzy; the adversarial design agent could not
+  land a precise spec. Net acknowledged gaps: 16 → 8.
 
 ---
 
@@ -75,6 +91,10 @@ value-identical attractor (`word` / `numeric_code` / `alphanumeric_id` / `intege
 and no Sharpen guard promotes it back. Each is a future guard (checksum / membership
 / anchored substance), gate-shipped per decision 0096 — not a quick fix. This bucket
 IS the harvest list for the certainty roadmap.
+
+**STATUS (2026-07-12): 8 of these 9 SHIPPED** (all but `excel_format`; see the batch
+update above). The table below is the as-designed record; the shipped `hs_code` guard
+promotes from any source (not just numeric) because its multi-dot form reads as `word`.
 
 | type | profiled as | proposed guard |
 | --- | --- | --- |

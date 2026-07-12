@@ -1068,10 +1068,13 @@ identity.medical.dea_number:
   tier: [VARCHAR, medical]
   release_priority: 3
   aliases: [dea, dea_registration]
+  # All samples carry a VALID DEA check digit (the shipped dea_checksum_recovery
+  # guard promotes only when >=90% pass; two of the prior samples were
+  # checksum-invalid, so a column of them did not round-trip).
   samples:
     - "AB1234563"
-    - "FA5678901"
-    - "BJ3456782"
+    - "BS4567890"
+    - "FH1357905"
   references: null
   notes: >
     DEA check digit algorithm: sum odd-position digits (1,3,5),

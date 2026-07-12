@@ -445,10 +445,13 @@ technology.code.imei:
   tier: [VARCHAR, code]
   release_priority: 3
   aliases: null
+  # All samples carry a VALID Luhn check digit (the shipped imei_checksum_recovery
+  # guard promotes a header-corroborated column only when >=90% pass Luhn; two of the
+  # prior samples were Luhn-invalid, so a column of them did not round-trip).
   samples:
     - "490154203237518"
-    - "352043068649149"
-    - "010000862422488"
+    - "352043068649148"
+    - "011245002151205"
   references: null
   notes: >
     v1 migration: Was code.imei. 15 numeric digits. Check digit (last digit)

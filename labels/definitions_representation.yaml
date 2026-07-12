@@ -384,11 +384,17 @@ representation.format.color_rgb:
   tier: [VARCHAR, text]
   release_priority: 3
   aliases: [rgb]
+  # Samples are the ANCHORED rgb()/rgba() form — the self-identifying shape a
+  # color_rgb column must carry. Bare triples ("255, 0, 0", "(128, 128, 128)")
+  # are genuinely ambiguous (a coordinate, a comma_separated array, or word) and
+  # are deliberately NOT promoted by color_rgb_recovery (Precision Principle), so
+  # they are not representative examples of a self-classifying column.
   samples:
     - "rgb(255, 0, 0)"
-    - "255, 0, 0"
-    - "(128, 128, 128)"
-    - "rgb(0,255,0)"
+    - "rgb(0, 255, 0)"
+    - "rgb(128, 128, 128)"
+    - "rgba(0, 0, 255, 0.5)"
+    - "rgb(255, 165, 0)"
   references: null
   notes: >
     v1 migration: Was text.rgb_color. Format flexible to handle

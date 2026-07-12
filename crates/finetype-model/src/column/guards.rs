@@ -37,15 +37,37 @@ impl ColumnClassifier {
         self.geo_code_membership_vote(result, header, sample);
         self.geo_code_nonmembership_demotion(result, header, sample);
         self.geo_subdivision_membership_promote(result, header, sample);
+        // AFTER geo_subdivision_membership_promote: keeps the geo-membership
+        // promotes grouped. UN/LOCODE (`USLAX`) is hyphenless, so the ISO-3166-2
+        // promote above never claims it — no fight.
+        self.unlocode_membership_recovery(result, sample);
         self.timezone_abbreviation_recovery(result, header, sample);
         self.naics_industry_recovery(result, header, sample);
+        // Header-gated code recoveries grouped with naics: CPT and HS have no
+        // check digit and their bare shapes are value-identical with ZIP / a
+        // plain integer, so the header token is the sole discriminator.
+        self.cpt_procedure_recovery(result, header, sample);
+        self.hs_code_header_recovery(result, header, sample);
+        // IMEI: 15-digit Luhn is NOT self-precise (a 15-digit Amex card is
+        // Luhn-valid by construction), so this one is header-gated too.
+        self.imei_checksum_recovery(result, header, sample);
         self.s_expression_recovery(result, sample);
+        // color_rgb: anchored `rgb(`/`rgba(` prefix, self-precise like s_expression.
+        self.color_rgb_recovery(result, sample);
         self.ceded_leaf_recovery(result, sample);
         // AFTER ceded_leaf_recovery: ISIN and ISRC share a 12-char shape, so the
         // regex-only ceded recovery mislabels digit-tailed ISINs as isrc. This
         // corrects that using the ISIN check digit (which the regex validator
         // cannot see), so it must run last to override the isrc misassertion.
         self.isin_checksum_recovery(result, sample);
+        // Value-only checksum recoveries grouped with isin: CUSIP / SEDOL / DEA
+        // each land on a value-identical id attractor (word / numeric_code /
+        // alphanumeric_id), and their scheme-specific check digit — which the
+        // regex-only ceded recovery cannot see — is the self-precise discriminator,
+        // so no header gate is needed and they round-trip headerless.
+        self.cusip_checksum_recovery(result, sample);
+        self.sedol_checksum_recovery(result, sample);
+        self.dea_checksum_recovery(result, sample);
         // LAST: the recovery guards above get first crack at relocating a
         // wrongly-jwt/mime column to a real type; these substance guards then demote
         // to `unknown` only what remains stubbornly labelled jwt/mime_type, and
@@ -540,6 +562,374 @@ impl ColumnClassifier {
         result.confidence = result.confidence.max(0.9);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("isin_checksum_recovery".to_string());
+    }
+
+    /// `cusip_checksum_recovery` (default ON). The 244-dim model cannot predict
+    /// `finance.securities.cusip` (a 9-char security id: 8 issuer/issue chars + a
+    /// check digit), so real CUSIP columns land on the word / alphanumeric_id /
+    /// integer_number attractor. The taxonomy shape `^[A-Z0-9]{8}[0-9]$` also
+    /// matches any 9-char alnum id (SKUs, 9-digit account numbers), so shape alone
+    /// is not enough. The CUSIP mod-10 check digit (`finetype_core::checksum::cusip`)
+    /// is the discriminator the attractor cannot satisfy: a non-CUSIP id's 9th char
+    /// passes that arithmetic only ~1 in 10 by chance, so a >=90% column-wide pass is
+    /// unreachable for anything but a genuine CUSIP column. Value-only — no header,
+    /// round-trips headerless. ISIN is 12 chars and SEDOL 7, so nothing else in the
+    /// finance family competes at this length. Value-based (0048); RHH-disableable.
+    fn cusip_checksum_recovery(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("cusip_checksum_recovery") {
+            return;
+        }
+        const LEAF: &str = "finance.securities.cusip";
+        if result.label == LEAF {
+            return;
+        }
+        let Some(tax) = self.taxonomy.as_ref() else {
+            return;
+        };
+        // Shape gate: `^[A-Z0-9]{8}[0-9]$`. Mirrors isin_checksum_recovery's use of
+        // the leaf's own taxonomy validator before the check-digit test.
+        if !label_validates_sample(tax, LEAF, sample) {
+            return;
+        }
+        let mut checked = 0usize;
+        let mut passed = 0usize;
+        let mut distinct_pass: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for v in sample {
+            let t = v.trim();
+            if t.is_empty() {
+                continue;
+            }
+            checked += 1;
+            if finetype_core::checksum::cusip(t) {
+                passed += 1;
+                distinct_pass.insert(t);
+            }
+        }
+        // >=3 DISTINCT passing values, not just >=90% of a repeated one: a constant /
+        // low-cardinality numeric column (gold `phkey` = one repeated 9-digit key
+        // 484158167) can pass the weak mod-10 CUSIP check at 100% by coincidence, so a
+        // single coincidental pass must not assert this rare type — require the column
+        // to carry distributional evidence.
+        if checked < 3 || distinct_pass.len() < 3 || (passed as f64) / (checked as f64) < 0.9 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.9);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("cusip_checksum_recovery".to_string());
+    }
+
+    /// `sedol_checksum_recovery` (default ON). Recovers `finance.securities.sedol`.
+    /// The 244-dim model cannot predict this leaf, so a real SEDOL column lands on
+    /// its numeric_code / alphanumeric_id attractor. The SEDOL shape (6 no-vowel
+    /// alphanumerics + a trailing check digit) is shared by bare 7-digit numeric
+    /// codes, so SHAPE alone cannot recover it — the check digit is the discriminator
+    /// a numeric code cannot satisfy. Promote when the sample passes the sedol
+    /// taxonomy shape (uppercase, no vowels, 7 chars — constraints the checksum fn's
+    /// alnum_value does NOT itself impose) AND >=90% pass the SEDOL check digit
+    /// (`finetype_core::checksum::sedol`). Value-only, like isin_checksum_recovery:
+    /// a random 7-char column passes the 1/10 check ~10% of the time, far below the
+    /// 90% bar, so it round-trips headerless. Value-based (0048); RHH-disableable.
+    fn sedol_checksum_recovery(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("sedol_checksum_recovery") {
+            return;
+        }
+        const LEAF: &str = "finance.securities.sedol";
+        if result.label == LEAF {
+            return;
+        }
+        let Some(tax) = self.taxonomy.as_ref() else {
+            return;
+        };
+        if !label_validates_sample(tax, LEAF, sample) {
+            return;
+        }
+        let mut checked = 0usize;
+        let mut passed = 0usize;
+        let mut distinct_pass: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for v in sample {
+            let t = v.trim();
+            if t.is_empty() {
+                continue;
+            }
+            checked += 1;
+            if finetype_core::checksum::sedol(t) {
+                passed += 1;
+                distinct_pass.insert(t);
+            }
+        }
+        // >=3 DISTINCT passing values: same constant-column guard as cusip — a bare
+        // 7-digit numeric code repeated across a low-cardinality column can pass the
+        // weighted SEDOL check by coincidence, so require distributional evidence.
+        if checked < 3 || distinct_pass.len() < 3 || (passed as f64) / (checked as f64) < 0.9 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.9);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("sedol_checksum_recovery".to_string());
+    }
+
+    /// `dea_checksum_recovery` (default ON). The 244-dim model cannot predict
+    /// `identity.medical.dea_number`; a real DEA column lands on the `alphanumeric_id`
+    /// attractor (2 letters + 7 digits reads as a generic letter+digit id). Promote to
+    /// dea_number when the sample matches the DEA shape
+    /// (`^[ABFMPRabfmpr][A-Za-z]\d{7}$`, which pins the first char to a registrant-type
+    /// letter the checksum fn does NOT check) AND >=90% pass the DEA check digit
+    /// (`finetype_core::checksum::dea`). The mod-10 formula is DEA-specific — no
+    /// non-target id scheme (credit cards use Luhn) is built to satisfy it, so a
+    /// same-shape alphanumeric_id column passes at ~10%, well under the bar. Self-precise
+    /// value signal → no header gate; round-trips headerless. Value-based (0048),
+    /// RHH-disableable.
+    fn dea_checksum_recovery(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("dea_checksum_recovery") {
+            return;
+        }
+        const LEAF: &str = "identity.medical.dea_number";
+        if result.label == LEAF {
+            return;
+        }
+        let Some(tax) = self.taxonomy.as_ref() else {
+            return;
+        };
+        // Shape gate: the dea_number pattern pins the first char to a registrant-type
+        // letter {A,B,F,M,P,R}, which checksum::dea alone does not enforce.
+        if !label_validates_sample(tax, LEAF, sample) {
+            return;
+        }
+        let mut checked = 0usize;
+        let mut passed = 0usize;
+        let mut distinct_pass: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for v in sample {
+            let t = v.trim();
+            if t.is_empty() {
+                continue;
+            }
+            checked += 1;
+            if finetype_core::checksum::dea(t) {
+                passed += 1;
+                distinct_pass.insert(t);
+            }
+        }
+        // >=3 DISTINCT passing values: same constant-column guard as cusip/sedol. The
+        // DEA shape needs two leading letters (an all-numeric column can never match),
+        // so the risk is lower, but the cardinality bar keeps the three uniform.
+        if checked < 3 || distinct_pass.len() < 3 || (passed as f64) / (checked as f64) < 0.9 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.9);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("dea_checksum_recovery".to_string());
+    }
+
+    /// `imei_checksum_recovery` (default ON). Recovers `technology.code.imei`. The
+    /// 244-dim model cannot predict it, so a genuine 15-digit IMEI column lands on
+    /// `integer_number`. Luhn ALONE is NOT a discriminator here — a 15-digit American
+    /// Express card column is Luhn-valid BY CONSTRUCTION — so promote requires an
+    /// `imei` header (`header_corroborates_imei`, which a payment header never yields)
+    /// AND a value gate: >=90% exactly-15-digit Luhn-valid values. The two gates are
+    /// jointly load-bearing — the header excludes the Amex collision the value gate
+    /// cannot. Value-based (0048); RHH-disableable.
+    fn imei_checksum_recovery(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("imei_checksum_recovery") {
+            return;
+        }
+        const LEAF: &str = "technology.code.imei";
+        if result.label == LEAF || !header_corroborates_imei(header) {
+            return;
+        }
+        let non_empty = non_empty_trimmed(sample);
+        if non_empty.len() < 3 {
+            return;
+        }
+        let valid = non_empty
+            .iter()
+            .filter(|v| {
+                v.len() == 15
+                    && v.bytes().all(|b| b.is_ascii_digit())
+                    && finetype_core::checksum::luhn(v)
+            })
+            .count();
+        // >=90% are exactly-15-digit Luhn-valid IMEIs (valid*10 >= len*9).
+        if valid * 10 < non_empty.len() * 9 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.95);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule =
+            Some(format!("imei_checksum_recovery:{}", header.to_lowercase()));
+        result.detected_locale = None;
+    }
+
+    /// `cpt_procedure_recovery` (default ON). Recovers `identity.medical.cpt`. The
+    /// 244-dim model cannot predict this leaf; the bare 5-digit form lands on the
+    /// numeric_code / integer / postal attractor. CPT has no check digit or membership
+    /// set, and `^\d{5}$` is value-identical with a US ZIP code, so the distinctive
+    /// `cpt`/`procedure` header token (`header_corroborates_cpt`, NO generic `code`
+    /// tier — that would admit a ZIP column headed `code`) is the SOLE discriminator.
+    /// Promote when the header corroborates AND >=90% pass the CPT taxonomy validator
+    /// (`^\d{5}$|^\d{4}[FTU]$`). Value-based (0048); RHH-disableable.
+    fn cpt_procedure_recovery(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("cpt_procedure_recovery") {
+            return;
+        }
+        const LEAF: &str = "identity.medical.cpt";
+        if result.label == LEAF || !header_corroborates_cpt(header) {
+            return;
+        }
+        let non_empty = non_empty_trimmed(sample);
+        if non_empty.len() < 3 {
+            return;
+        }
+        match self.taxonomy.as_ref() {
+            Some(tax) if label_validates_sample(tax, LEAF, sample) => {
+                result.label = LEAF.to_string();
+                result.confidence = result.confidence.max(0.95);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule =
+                    Some(format!("cpt_procedure_recovery:{}", header.to_lowercase()));
+                result.detected_locale = None;
+            }
+            _ => {}
+        }
+    }
+
+    /// `hs_code_header_recovery` (default ON). Recovers the
+    /// `geography.transportation.hs_code` leaf. The 244-dim model cannot predict it, so
+    /// a customs-tariff column lands on the numeric / `word` attractor (the multi-dot
+    /// forms like `0901.11.00.10` are not valid decimals, so the model reads `word`);
+    /// R20 `hs_code_validation_gate` in value_sharpen only DEMOTES a wrong hs_code, it
+    /// never recovers one the model never emitted. Header-gated because HS codes carry
+    /// NO check digit and the bare form is value-identical to a plain integer/year: the
+    /// header token (`header_corroborates_hs_code`) is the sole discriminator. A
+    /// median-length floor of 6 kills the bare-4-digit-year false pass that
+    /// `is_hs_code_format`'s loose no-dot branch admits. Promote when the header
+    /// corroborates AND median length >=6 AND >=90% pass `is_hs_code_format`.
+    /// Value-based (0048); RHH-disableable.
+    fn hs_code_header_recovery(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("hs_code_header_recovery") {
+            return;
+        }
+        const LEAF: &str = "geography.transportation.hs_code";
+        if result.label == LEAF || !header_corroborates_hs_code(header) {
+            return;
+        }
+        let non_empty = non_empty_trimmed(sample);
+        if non_empty.len() < 3 {
+            return;
+        }
+        // Length floor: is_hs_code_format's no-dot branch accepts bare 4-5 digit
+        // numbers (years, small ints) the taxonomy pattern (min 6 digits) rejects;
+        // require median length >= 6 so a 4-digit-year column cannot pass.
+        let mut lens: Vec<usize> = non_empty.iter().map(|v| v.len()).collect();
+        lens.sort_unstable();
+        if lens[lens.len() / 2] < 6 {
+            return;
+        }
+        let valid = non_empty.iter().filter(|v| is_hs_code_format(v)).count();
+        // >=90% match the HS digit-group format (valid*10 >= len*9).
+        if valid * 10 < non_empty.len() * 9 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.95);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule =
+            Some(format!("hs_code_header_recovery:{}", header.to_lowercase()));
+        result.detected_locale = None;
+    }
+
+    /// `unlocode_membership_recovery` (default ON). Promotes the
+    /// `geography.transportation.unlocode` leaf (the twin of the demote-only
+    /// `unlocode_format_veto`). The 244-dim model cannot predict it, so a real UN/LOCODE
+    /// column (`USLAX`/`GBLON`) lands on the `word` attractor. The 5-char `CC + 3`
+    /// shape is shared by stock tickers and SKUs, so SHAPE alone cannot recover it —
+    /// EXACT membership in the published UN/LOCODE set (`membership::unlocode`, ~0.5% of
+    /// the shape space AND each member needs a valid ISO-3166-1 country prefix) is the
+    /// discriminator a ticker/SKU column is ~never 90% inside. NO header gate — membership
+    /// at 0.90 density is self-precise, so it round-trips headerless. The demote-only
+    /// veto owns the label==unlocode case, so this promote and that veto never touch the
+    /// same column. Value-based (0048); RHH-disableable.
+    fn unlocode_membership_recovery(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("unlocode_membership_recovery") {
+            return;
+        }
+        const LEAF: &str = "geography.transportation.unlocode";
+        if result.label == LEAF {
+            return;
+        }
+        let non_empty = non_empty_trimmed(sample);
+        if non_empty.len() < 3 {
+            return;
+        }
+        let members = non_empty
+            .iter()
+            .filter(|v| finetype_core::membership::unlocode(v))
+            .count();
+        // >=90% published UN/LOCODE membership (members*10 >= len*9).
+        if members * 10 < non_empty.len() * 9 {
+            return;
+        }
+        let from = result.label.clone();
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.85);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("unlocode_membership_recovery:{from}"));
+        result.detected_locale = None;
+    }
+
+    /// `color_rgb_recovery` (default ON). Recovers `representation.format.color_rgb`
+    /// (not in the 244-dim softmax) from VALUES. The taxonomy validator
+    /// `^(?:rgb)?\(?(\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)?$` is PERMISSIVE — `rgb`,
+    /// `(` and `)` are all optional, so a bare comma triple `255,0,0` (a coordinate, a
+    /// comma_separated array, or the `word` attractor) passes; that is why color_rgb was
+    /// excluded from `ceded_leaf_recovery`. This PROMOTE guard restores recall precisely
+    /// by requiring the literal `rgb(` / `rgba(` prefix a bare triple cannot carry —
+    /// self-precise, so NO header gate (mirror of `s_expression_recovery`). Value-based
+    /// (0048); RHH-disableable.
+    fn color_rgb_recovery(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("color_rgb_recovery") {
+            return;
+        }
+        const LEAF: &str = "representation.format.color_rgb";
+        if result.label == LEAF {
+            return;
+        }
+        let non_empty = non_empty_trimmed(sample);
+        if non_empty.len() < 3 {
+            return;
+        }
+        // Anchored substance check: literal rgb(/rgba( prefix + closing ) + 3 (rgb)
+        // or 4 (rgba) comma components whose first three are integers in 0..=255.
+        let is_rgb = |raw: &str| -> bool {
+            let lower = raw.trim().to_ascii_lowercase();
+            let inner = lower
+                .strip_prefix("rgba(")
+                .or_else(|| lower.strip_prefix("rgb("));
+            let Some(inner) = inner.and_then(|s| s.strip_suffix(')')) else {
+                return false;
+            };
+            let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+            if parts.len() != 3 && parts.len() != 4 {
+                return false;
+            }
+            parts.iter().take(3).all(|p| {
+                let n = p.strip_suffix('%').unwrap_or(p);
+                n.parse::<u16>().map(|v| v <= 255).unwrap_or(false)
+            })
+        };
+        let valid = non_empty.iter().filter(|v| is_rgb(v)).count();
+        // >=90% carry the literal rgb(...) certainty.
+        if valid * 10 < non_empty.len() * 9 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.95);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("color_rgb_recovery".to_string());
+        result.detected_locale = None;
     }
 
     /// `increment_substance_veto` (default ON). The first full-column-statistics

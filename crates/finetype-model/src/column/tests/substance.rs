@@ -507,10 +507,15 @@ fn isin_checksum_recovery_reasserts_isin_over_isrc() {
         ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
     cc.set_taxonomy(tax);
 
-    let isins: Vec<String> = vec!["US0378331005", "GB0002634946", "JP3633400001", "DE0007164600"]
-        .into_iter()
-        .map(String::from)
-        .collect();
+    let isins: Vec<String> = vec![
+        "US0378331005",
+        "GB0002634946",
+        "JP3633400001",
+        "DE0007164600",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
     let r = cc
         .compose_from_sense(
             "token",
@@ -536,10 +541,15 @@ fn isin_checksum_recovery_declines_bad_checksum() {
         ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
     cc.set_taxonomy(tax);
 
-    let bad: Vec<String> = vec!["US0378331000", "GB0002634940", "JP3633400000", "DE0007164601"]
-        .into_iter()
-        .map(String::from)
-        .collect();
+    let bad: Vec<String> = vec![
+        "US0378331000",
+        "GB0002634940",
+        "JP3633400000",
+        "DE0007164601",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
     let r = cc
         .compose_from_sense(
             "token",
@@ -552,6 +562,314 @@ fn isin_checksum_recovery_declines_bad_checksum() {
         r.label, "finance.securities.isin",
         "isin_checksum_recovery must not promote checksum-invalid values"
     );
+}
+
+// ── model-blind certainty-recovery guards (cusip/sedol/dea/imei/unlocode/cpt/
+//    hs_code/color_rgb) — each recovers a leaf the 244-dim model cannot predict ──
+
+// Minimal taxonomy carrying the eight recovered leaves (patterns match the live
+// definitions so `label_validates_sample` behaves as it does in production).
+const CERTAINTY_LEAVES_YAML: &str = r#"
+finance.securities.cusip:
+  title: CUSIP
+  designation: universal
+  tier: [VARCHAR, payment]
+  checksum: cusip
+  validation:
+    type: string
+    pattern: "^[A-Z0-9]{8}[0-9]$"
+  samples: ["037833100"]
+finance.securities.sedol:
+  title: SEDOL
+  designation: universal
+  tier: [VARCHAR, payment]
+  checksum: sedol
+  validation:
+    type: string
+    pattern: "^[B-DF-HJ-NP-TV-Z0-9]{6}[0-9]$"
+  samples: ["0263494"]
+identity.medical.dea_number:
+  title: DEA
+  designation: universal
+  tier: [VARCHAR, medical]
+  checksum: dea
+  validation:
+    type: string
+    pattern: "^[ABFMPRabfmpr][A-Za-z]\\d{7}$"
+  samples: ["AB1234563"]
+identity.medical.cpt:
+  title: CPT
+  designation: universal
+  tier: [VARCHAR, medical]
+  validation:
+    type: string
+    pattern: "^\\d{5}$|^\\d{4}[FTU]$"
+  samples: ["99213"]
+technology.code.imei:
+  title: IMEI
+  designation: universal
+  tier: [VARCHAR, code]
+  checksum: luhn
+  validation:
+    type: string
+    pattern: "^[0-9]{15}$"
+  samples: ["490154203237518"]
+geography.transportation.hs_code:
+  title: HS code
+  designation: universal
+  tier: [VARCHAR, transportation]
+  validation:
+    type: string
+    pattern: "^\\d{4}\\.?\\d{2}(\\.?\\d{2}){0,2}$"
+  samples: ["8471.30"]
+geography.transportation.unlocode:
+  title: UN/LOCODE
+  designation: universal
+  tier: [VARCHAR, transportation]
+  membership: unlocode
+  validation:
+    type: string
+    pattern: "^[A-Z]{2}[A-Z2-9]{3}$"
+  samples: ["USLAX"]
+representation.format.color_rgb:
+  title: Color (RGB)
+  designation: universal
+  tier: [VARCHAR, text]
+  validation:
+    type: string
+    pattern: "^(?:rgb)?\\(?([0-9]{1,3}),\\s*([0-9]{1,3}),\\s*([0-9]{1,3})\\)?$"
+  samples: ["rgb(255, 0, 0)"]
+"#;
+
+fn certainty_cc() -> ColumnClassifier {
+    let mut tax = Taxonomy::from_yaml(CERTAINTY_LEAVES_YAML).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    cc
+}
+
+fn v(items: &[&str]) -> Vec<String> {
+    items.iter().map(|s| s.to_string()).collect()
+}
+
+fn recovered_label(header: &str, values: &[&str], sense: &str) -> String {
+    certainty_cc()
+        .compose_from_sense(header, &v(values), sense, 1.0)
+        .unwrap()
+        .label
+}
+
+#[test]
+fn cusip_checksum_recovery_promotes_valid_cusips() {
+    // Real CUSIPs land on the word/alnum attractor; the mod-10 check digit recovers.
+    let l = recovered_label(
+        "id",
+        &["037833100", "17275R102", "594918104"],
+        "representation.text.word",
+    );
+    assert_eq!(l, "finance.securities.cusip");
+}
+
+#[test]
+fn cusip_checksum_recovery_declines_bad_checksum() {
+    // 9-char alnum IDs that fit the shape but fail the check digit are not CUSIPs.
+    let l = recovered_label(
+        "id",
+        &["037833101", "17275R103", "594918105"],
+        "representation.text.word",
+    );
+    assert_ne!(l, "finance.securities.cusip");
+}
+
+#[test]
+fn cusip_checksum_recovery_declines_constant_column() {
+    // Regression: gold col `phkey` is a CONSTANT column of one repeated 9-digit key
+    // (484158167) that coincidentally passes the weak mod-10 CUSIP check, so a 100%
+    // pass rate fired the guard. The distinct-value cardinality gate rejects it — a
+    // rare checksum type needs distributional evidence, not one repeated coincidence.
+    let l = recovered_label(
+        "phkey",
+        &["484158167", "484158167", "484158167", "484158167"],
+        "datetime.epoch.unix_seconds",
+    );
+    assert_ne!(l, "finance.securities.cusip");
+}
+
+#[test]
+fn sedol_checksum_recovery_promotes_valid_sedols() {
+    let l = recovered_label(
+        "code",
+        &["0263494", "B0WNLY7", "3134865"],
+        "representation.identifier.numeric_code",
+    );
+    assert_eq!(l, "finance.securities.sedol");
+}
+
+#[test]
+fn sedol_checksum_recovery_declines_plain_numeric_codes() {
+    // Bare 7-digit numeric codes clear the shape but not the weighted check digit.
+    let l = recovered_label(
+        "code",
+        &["1234567", "7654321", "1112223"],
+        "representation.identifier.numeric_code",
+    );
+    assert_ne!(l, "finance.securities.sedol");
+}
+
+#[test]
+fn dea_checksum_recovery_promotes_valid_dea_numbers() {
+    let l = recovered_label(
+        "id",
+        &["AB1234563", "BS4567890", "FH1357905"],
+        "representation.identifier.alphanumeric_id",
+    );
+    assert_eq!(l, "identity.medical.dea_number");
+}
+
+#[test]
+fn dea_checksum_recovery_declines_bad_checksum() {
+    // Same DEA shape, wrong check digit (last digit bumped) — not real DEA numbers.
+    let l = recovered_label(
+        "id",
+        &["AB1234564", "BS4567891", "FH1357906"],
+        "representation.identifier.alphanumeric_id",
+    );
+    assert_ne!(l, "identity.medical.dea_number");
+}
+
+#[test]
+fn imei_checksum_recovery_promotes_with_header() {
+    let l = recovered_label(
+        "imei",
+        &["490154203237518", "352043068649148", "011245002151205"],
+        "representation.numeric.integer_number",
+    );
+    assert_eq!(l, "technology.code.imei");
+}
+
+#[test]
+fn imei_checksum_recovery_requires_header() {
+    // Same valid IMEIs, but a non-imei header — must NOT promote (headerless Luhn
+    // is not self-precise).
+    let l = recovered_label(
+        "device_serial",
+        &["490154203237518", "352043068649148", "011245002151205"],
+        "representation.numeric.integer_number",
+    );
+    assert_ne!(l, "technology.code.imei");
+}
+
+#[test]
+fn imei_checksum_recovery_declines_amex_card_column() {
+    // 15-digit American Express card numbers are Luhn-valid BY CONSTRUCTION; only
+    // the header gate keeps this off live payment data.
+    let l = recovered_label(
+        "card_number",
+        &["378282246310005", "371449635398431", "378734493671000"],
+        "representation.numeric.integer_number",
+    );
+    assert_ne!(l, "technology.code.imei");
+}
+
+#[test]
+fn cpt_procedure_recovery_promotes_with_header() {
+    let l = recovered_label(
+        "cpt",
+        &["99213", "29580", "2029F", "0307T", "99214"],
+        "representation.text.word",
+    );
+    assert_eq!(l, "identity.medical.cpt");
+}
+
+#[test]
+fn cpt_procedure_recovery_declines_generic_code_header() {
+    // A 5-digit ZIP column headed with a GENERIC `code` token must not be promoted
+    // — CPT admits only the distinctive `cpt`/`procedure` token, unlike naics.
+    let l = recovered_label(
+        "code",
+        &["99213", "10001", "94103", "60601", "30301"],
+        "representation.identifier.numeric_code",
+    );
+    assert_ne!(l, "identity.medical.cpt");
+}
+
+#[test]
+fn hs_code_header_recovery_promotes_with_header() {
+    let l = recovered_label(
+        "hs_code",
+        &[
+            "8471.30",
+            "6110.20.20",
+            "0901.11.00.10",
+            "8517.12",
+            "3004.90.92",
+        ],
+        "representation.text.word",
+    );
+    assert_eq!(l, "geography.transportation.hs_code");
+}
+
+#[test]
+fn hs_code_header_recovery_declines_year_column() {
+    // Bare 4-digit years pass is_hs_code_format's loose branch; the median-length
+    // floor (>=6) rejects them even under a coincidental customs header.
+    let l = recovered_label(
+        "hs",
+        &["2019", "2020", "2021", "2022", "2023"],
+        "representation.numeric.integer_number",
+    );
+    assert_ne!(l, "geography.transportation.hs_code");
+}
+
+#[test]
+fn unlocode_membership_recovery_promotes_members() {
+    let l = recovered_label(
+        "port",
+        &["USLAX", "GBLON", "DEHAM", "SGSIN", "NLRTM"],
+        "representation.text.word",
+    );
+    assert_eq!(l, "geography.transportation.unlocode");
+}
+
+#[test]
+fn unlocode_membership_recovery_declines_non_members() {
+    // 5-char uppercase tokens that are not published UN/LOCODEs (the ticker/SKU
+    // attractor) must not be promoted — membership, not shape, is the gate.
+    let l = recovered_label(
+        "code",
+        &["ZZZZZ", "QQQQQ", "XKXKX", "VWVWV", "JKJKJ"],
+        "representation.text.word",
+    );
+    assert_ne!(l, "geography.transportation.unlocode");
+}
+
+#[test]
+fn color_rgb_recovery_promotes_anchored_rgb() {
+    let l = recovered_label(
+        "colour",
+        &[
+            "rgb(255, 0, 0)",
+            "rgb(0, 255, 0)",
+            "rgba(0, 0, 255, 0.5)",
+            "rgb(128, 128, 128)",
+        ],
+        "representation.text.word",
+    );
+    assert_eq!(l, "representation.format.color_rgb");
+}
+
+#[test]
+fn color_rgb_recovery_declines_bare_triples() {
+    // Bare comma triples are genuinely ambiguous (coordinate / comma_separated /
+    // word); without the literal rgb( prefix they must not be promoted.
+    let l = recovered_label(
+        "colour",
+        &["255, 0, 0", "0, 255, 0", "128, 128, 128", "12, 45, 90"],
+        "representation.text.word",
+    );
+    assert_ne!(l, "representation.format.color_rgb");
 }
 
 // ── unlocode_format_veto (BACKLOG #11) ──
