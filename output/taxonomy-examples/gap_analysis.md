@@ -29,6 +29,15 @@ Adjudicated per-type against the taxonomy + guard code (workflow `wf_62d19fcb-00
   monotonic data (`1..10` → increment, 0.979) but the harness *cycles* samples to fill
   rows, which breaks monotonicity — so it remains a harness false-negative, not a taxonomy
   gap. Net acknowledged gaps: 20 → 19.
+- **Bucket B real bugs fixed (3 of 4).** `identity.credential.password` orphan → real key
+  `identity.person.password` (header_sharpen.rs); `street_name`/`street_suffix` headers no
+  longer swallowed into `street_address` (bare-arm split); valid ISINs no longer mislabelled
+  `isrc` — new `isin_checksum_recovery` guard uses the ISIN check digit (which the regex-only
+  `ceded_leaf_recovery` can't see) to correct the shape-overlap misassertion. All three now
+  round-trip (baseline 230→233). Gold no-regression confirmed (847/988 = 0.857; the touched
+  labels are ~absent from gold, so efficacy rides round-trip + unit tests). The 4th (`inchi`→
+  `plain_text`) is now moot at `infer` via the fast-path; the profile-side query_string
+  overlap remains. Net acknowledged gaps: 19 → 16.
 
 ---
 

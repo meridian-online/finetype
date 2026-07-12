@@ -474,6 +474,86 @@ representation.identifier.uuid:
     );
 }
 
+// ── isin_checksum_recovery ──
+
+const ISIN_ISRC_YAML: &str = r#"
+finance.securities.isin:
+  title: ISIN
+  designation: universal
+  tier: [VARCHAR, payment]
+  checksum: isin
+  validation:
+    type: string
+    pattern: "^[A-Z]{2}[A-Z0-9]{9}[0-9]$"
+  samples: ["US0378331005"]
+identity.commerce.isrc:
+  title: ISRC
+  designation: universal
+  tier: [VARCHAR, code]
+  validation:
+    type: string
+    pattern: "^[A-Z]{2}[A-Z0-9]{3}\\d{7}$"
+  samples: ["USRC17607839"]
+"#;
+
+#[test]
+fn isin_checksum_recovery_reasserts_isin_over_isrc() {
+    // A digit-tailed ISIN matches ISRC's 12-char pattern, so the regex-only
+    // ceded_leaf_recovery lands a real ISIN column on isrc. The ISIN check digit
+    // (invisible to the regex validator) is the discriminator that corrects it.
+    let mut tax = Taxonomy::from_yaml(ISIN_ISRC_YAML).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+
+    let isins: Vec<String> = vec!["US0378331005", "GB0002634946", "JP3633400001", "DE0007164600"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "token",
+            &isins,
+            "representation.identifier.alphanumeric_id",
+            1.0,
+        )
+        .unwrap();
+    assert_eq!(
+        r.label, "finance.securities.isin",
+        "isin_checksum_recovery must correct a valid-ISIN column off isrc"
+    );
+}
+
+#[test]
+fn isin_checksum_recovery_declines_bad_checksum() {
+    // ISIN-shaped values with broken check digits are not ISINs — must not
+    // promote. Real ISRCs fail the ISIN checksum identically, so their isrc
+    // recovery is preserved.
+    let mut tax = Taxonomy::from_yaml(ISIN_ISRC_YAML).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+
+    let bad: Vec<String> = vec!["US0378331000", "GB0002634940", "JP3633400000", "DE0007164601"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "token",
+            &bad,
+            "representation.identifier.alphanumeric_id",
+            1.0,
+        )
+        .unwrap();
+    assert_ne!(
+        r.label, "finance.securities.isin",
+        "isin_checksum_recovery must not promote checksum-invalid values"
+    );
+}
+
 // ── unlocode_format_veto (BACKLOG #11) ──
 
 #[test]

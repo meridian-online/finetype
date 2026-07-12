@@ -615,6 +615,16 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
         return Some("geography.address.full_address");
     }
     if !disable_geography && h.contains("street") {
+        // "street name" → the street's name; "street suffix" → the St/Ave/Blvd
+        // token; bare "street" (and "street address", handled above) → the full
+        // address line. Without this split the bare arm swallowed a "street_name"
+        // header into street_address.
+        if h.contains("suffix") {
+            return Some("geography.address.street_suffix");
+        }
+        if h.contains("name") {
+            return Some("geography.address.street_name");
+        }
         return Some("geography.address.street_address");
     }
     if !disable_datetime && (h.contains("born") || h.contains("birth") || h.contains("dob")) {
@@ -659,7 +669,7 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
         return Some("identity.person.height");
     }
     if !disable_identity && (h.contains("password") || h.contains("passwd")) {
-        return Some("identity.credential.password");
+        return Some("identity.person.password");
     }
     if !disable_technology && (h.contains("url") || h.contains("link") || h.contains("href")) {
         return Some("technology.internet.url");

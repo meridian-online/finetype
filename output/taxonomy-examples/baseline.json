@@ -4,14 +4,11 @@
     "datetime.date.weekday_full_month": "datetime.date.weekday_dmy_full",
     "datetime.timestamp.rfc_2822_ordinal": "datetime.timestamp.rfc_2822",
     "finance.securities.cusip": "representation.text.word",
-    "finance.securities.isin": "identity.commerce.isrc",
     "finance.securities.sedol": "representation.identifier.numeric_code",
-    "geography.address.street_name": "geography.address.street_address",
     "geography.transportation.hs_code": "representation.text.word",
     "geography.transportation.unlocode": "representation.text.word",
     "identity.medical.cpt": "representation.text.word",
     "identity.medical.dea_number": "representation.identifier.alphanumeric_id",
-    "identity.person.password": "identity.credential.password",
     "identity.person.username": "representation.text.word",
     "representation.discrete.ordinal": "representation.text.entity_name",
     "representation.file.excel_format": "representation.text.plain_text",
@@ -146,9 +143,11 @@
     "finance.rate.basis_points",
     "finance.rate.yield",
     "finance.securities.figi",
+    "finance.securities.isin",
     "finance.securities.lei",
     "geography.address.full_address",
     "geography.address.postal_code",
+    "geography.address.street_name",
     "geography.address.street_suffix",
     "geography.contact.calling_code",
     "geography.coordinate.coordinates",
@@ -196,6 +195,7 @@
     "identity.person.gender_code",
     "identity.person.height",
     "identity.person.last_name",
+    "identity.person.password",
     "identity.person.phone_e164",
     "identity.person.phone_number",
     "identity.person.weight",
@@ -255,5 +255,5 @@
     "technology.internet.urn",
     "technology.internet.user_agent"
   ],
-  "round_trip": "230/249"
+  "round_trip": "233/249"
 }

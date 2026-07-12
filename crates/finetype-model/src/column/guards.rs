@@ -41,6 +41,11 @@ impl ColumnClassifier {
         self.naics_industry_recovery(result, header, sample);
         self.s_expression_recovery(result, sample);
         self.ceded_leaf_recovery(result, sample);
+        // AFTER ceded_leaf_recovery: ISIN and ISRC share a 12-char shape, so the
+        // regex-only ceded recovery mislabels digit-tailed ISINs as isrc. This
+        // corrects that using the ISIN check digit (which the regex validator
+        // cannot see), so it must run last to override the isrc misassertion.
+        self.isin_checksum_recovery(result, sample);
         // LAST: the recovery guards above get first crack at relocating a
         // wrongly-jwt/mime column to a real type; these substance guards then demote
         // to `unknown` only what remains stubbornly labelled jwt/mime_type, and
@@ -488,6 +493,53 @@ impl ColumnClassifier {
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("ceded_leaf_recovery".to_string());
         result.detected_locale = detect_locale_from_validation(sample, leaf, tax);
+    }
+
+    /// `isin_checksum_recovery` (default ON). Corrects the one non-exclusive
+    /// overlap in the ceded set: `identity.commerce.isrc` (12 chars, shape-only)
+    /// and `finance.securities.isin` (12 chars + ISIN check digit) share a shape,
+    /// and a digit-tailed ISIN matches ISRC's `^[A-Z]{2}[A-Z0-9]{3}\d{7}$` pattern.
+    /// `validate_value_for_label` is regex-only, so `ceded_leaf_recovery` cannot
+    /// see the check digit and mislabels a real ISIN column as isrc. Promote to
+    /// isin when the sample matches the ISIN shape (2-letter country prefix,
+    /// excludes bare 12-digit codes) AND ≥90% pass the ISIN check digit
+    /// (`finetype_core::checksum::isin`) — the discriminator isrc cannot satisfy.
+    /// Runs after `ceded_leaf_recovery` so it has the last word over the isrc
+    /// misassertion. Value-based (decision 0048); RHH-disableable.
+    fn isin_checksum_recovery(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("isin_checksum_recovery") {
+            return;
+        }
+        if result.label == "finance.securities.isin" {
+            return;
+        }
+        let Some(tax) = self.taxonomy.as_ref() else {
+            return;
+        };
+        // Shape gate: the ISIN pattern requires a 2-letter country prefix, which
+        // excludes bare 12-digit codes that could coincidentally pass the check.
+        if !label_validates_sample(tax, "finance.securities.isin", sample) {
+            return;
+        }
+        let mut checked = 0usize;
+        let mut passed = 0usize;
+        for v in sample {
+            let t = v.trim();
+            if t.is_empty() {
+                continue;
+            }
+            checked += 1;
+            if finetype_core::checksum::isin(t) {
+                passed += 1;
+            }
+        }
+        if checked < 3 || (passed as f64) / (checked as f64) < 0.9 {
+            return;
+        }
+        result.label = "finance.securities.isin".to_string();
+        result.confidence = result.confidence.max(0.9);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("isin_checksum_recovery".to_string());
     }
 
     /// `increment_substance_veto` (default ON). The first full-column-statistics
