@@ -2130,6 +2130,55 @@ fn qualified_name_recovery_spares_genuine_hosts() {
 }
 
 #[test]
+fn url_recovery_overrides_confident_mislabels() {
+    // Reservoir-mining sweep 2026-07-14: the model confidently mislabels real URL columns
+    // (bitcoin_address/entity_name/ip_v6/…); the override-tier fire-on + url validator recover them.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let urls: Vec<String> = vec![
+        "https://www.example.com/path?q=1",
+        "http://api.github.com/repos/x/y",
+        "https://cdn.site.org/a/b/c.png",
+        "ftp://files.example.net/pub/file",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    for sense in [
+        "finance.crypto.bitcoin_address",
+        "representation.text.entity_name",
+        "container.object.xml",
+    ] {
+        let r = cc.compose_from_sense("link", &urls, sense, 0.9).unwrap();
+        assert_eq!(
+            r.label, "technology.internet.url",
+            "sense {sense} rule {:?}",
+            r.disambiguation_rule
+        );
+    }
+}
+
+#[test]
+fn url_recovery_spares_genuine_override_members() {
+    // A genuine member of an override label has no scheme://dotted-host, so the url validator
+    // rejects it and the label stands — the widened fire-on cannot misfire.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let addrs: Vec<String> = vec![
+        "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+        "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+        "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("wallet", &addrs, "finance.crypto.bitcoin_address", 0.9)
+        .unwrap();
+    assert_eq!(r.label, "finance.crypto.bitcoin_address");
+}
+
+#[test]
 fn qualified_name_recovery_declines_multipart_filenames() {
     // A residual column of multi-extension filenames must NOT be promoted — the
     // lowercase file-extension guard rejects them at any depth (`.tar.gz`, `.h5`).

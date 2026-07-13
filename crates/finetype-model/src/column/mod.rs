@@ -2230,6 +2230,28 @@ impl ColumnClassifier {
             "representation.text.word",
             "unknown",
         ];
+        // url override tier: residual + the confident-wrong labels the model reaches for on a
+        // real URL value (see the url reader comment below). The url validator gates every one.
+        const URL_FIRE_ON: &[&str] = &[
+            "representation.text.plain_text",
+            "representation.text.word",
+            "unknown",
+            "technology.internet.ip_v6",
+            "container.object.xml",
+            "technology.cloud.aws_arn",
+            "finance.crypto.bitcoin_address",
+            "technology.cryptographic.jwt",
+            "representation.text.entity_name",
+            "geography.address.full_address",
+            "representation.identifier.alphanumeric_id",
+            "identity.government.eu_vat",
+        ];
+        // RHH toggle for the override tier (gate baseline = residual-only, the prior behaviour).
+        let url_fire_on: &[&str] = if rhh::is_disabled("url_override_tier") {
+            RESIDUAL
+        } else {
+            URL_FIRE_ON
+        };
         let readers: [(&str, &[&str]); 4] = [
             (
                 "technology.filesystem.windows_path",
@@ -2256,7 +2278,16 @@ impl ColumnClassifier {
             // url validator; the scheme://host mandate self-limits, so prose and bare
             // hostnames (no scheme) never validate. Mutually exclusive with qualified_name
             // (dotted reverse-DNS has no scheme/slash). Spec 2026-06-27-composed-accuracy-roadmap.
-            ("technology.internet.url", RESIDUAL),
+            //
+            // OVERRIDE tier (reservoir-mining sweep 2026-07-14): the residual-only fire-on
+            // could not reach real URL columns the sibling-aware model labels with a CONFIDENT
+            // wrong type — ip_v6 / xml (namespace URIs) / aws_arn / bitcoin_address / jwt /
+            // entity_name / full_address / alphanumeric_id / eu_vat. A genuine member of any of
+            // those lacks a `scheme://dotted-host`, so the url validator (the real guard) rejects
+            // it; adding them to fire-on only lets the validator adjudicate. Deliberately NOT
+            // "any label": url-subtype leaves (doi/urn) where url would be a demotion are
+            // excluded. Verifier: 0 FP across 1,772 candidate recoveries.
+            ("technology.internet.url", url_fire_on),
             ("technology.code.qualified_name", RESIDUAL),
         ];
         for (leaf, fire_on) in readers {
