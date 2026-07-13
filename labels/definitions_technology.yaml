@@ -978,6 +978,47 @@ technology.filesystem.windows_path:
     Pattern fires on <1.2% of multi-word prose. POSIX-path sibling deferred
     (below volume bar + URL-route ambiguity).
 
+technology.filesystem.filename:
+  title: "Filename"
+  description: >
+    A bare file name — a stem and a file extension, with no directory
+    separators (report_final.xlsx, IMG_0042.png, archive.tar.gz). The named
+    file entity, distinct from a path (windows_path carries separators), a
+    URL (no scheme/host), a bare word (a real file extension), and the file's
+    properties (representation.file.extension/file_size/mime_type).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    stem: "REGEXP_EXTRACT({col}, '^(.*)\\.[^.]+$')"
+    extension: "REGEXP_EXTRACT({col}, '\\.([^.]+)$')"
+  validation:
+    type: string
+    pattern: '^[^\\/\r\n\t]+\.[A-Za-z0-9]{1,8}$'
+    minLength: 3
+  tier: [VARCHAR, filesystem]
+  release_priority: 3
+  aliases: [filename, file_name, fname]
+  samples:
+    - "report_final.xlsx"
+    - "IMG_0042.png"
+    - "archive.tar.gz"
+    - "atarisy2.cpp"
+  references: null
+  notes: >
+    New type (reservoir-mining sweep 2026-07-14). Sibling of windows_path —
+    the bare file NAME, no directory. Taxonomy-live but not model-predicted
+    (244-dim); recovered at profile time via the deterministic
+    filename_recovery Sharpen guard. The shape validator confirms any
+    word.word, so the curated file-extension SET (lowercase-terminal ext +
+    letter-bearing stem) is the substance, per the Precision Principle and the
+    ticker precedent. NO retrain (0096).
+
 technology.internet.message_id:
   title: "Email Message-ID"
   description: >

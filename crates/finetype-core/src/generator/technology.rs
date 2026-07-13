@@ -729,6 +729,26 @@ impl Generator {
                 }
             }
 
+            // ── bare filename (stem + real lowercase extension, no path) ──
+            ("filesystem", "filename") => {
+                let exts = [
+                    "csv", "json", "xlsx", "pdf", "png", "jpg", "txt", "xml", "py", "rs", "cpp",
+                    "md", "log", "zip", "mp4", "svg", "docx", "html",
+                ];
+                let ext = exts[self.rng.gen_range(0..exts.len())];
+                let mut stem = self.random_word();
+                match self.rng.gen_range(0..3) {
+                    0 => {}
+                    1 => stem = format!("{}_{}", stem, self.random_word()),
+                    _ => stem = format!("{}{}", stem, self.rng.gen_range(1..9999)),
+                }
+                if ext == "zip" && self.rng.gen_bool(0.3) {
+                    Ok(format!("{}.tar.gz", stem))
+                } else {
+                    Ok(format!("{}.{}", stem, ext))
+                }
+            }
+
             // ── email Message-ID ─────────────────────────────────────────
             ("internet", "message_id") => {
                 let domains = [

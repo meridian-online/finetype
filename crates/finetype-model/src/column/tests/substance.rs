@@ -2200,6 +2200,88 @@ fn qualified_name_recovery_declines_multipart_filenames() {
 }
 
 #[test]
+fn filename_recovery_is_default_on() {
+    assert!(!rhh::is_disabled("filename_recovery"));
+}
+
+#[test]
+fn filename_recovery_promotes_files() {
+    // Residual + confident-mislabel override columns of bare filenames recover to
+    // technology.filesystem.filename.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let files: Vec<String> = vec![
+        "L2M-SAS-PHX-2-21-16.pdf",
+        "L2M-OKC-DAL-3-16-15.pdf",
+        "L2M-ATL-DAL-12-9-15.pdf",
+        "L2M-HOU-CLE-3-29-16.pdf",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    for sense in [
+        "representation.text.plain_text",
+        "representation.identifier.alphanumeric_id",
+        "technology.cryptographic.token_urlsafe",
+    ] {
+        let r = cc
+            .compose_from_sense("original_pdf", &files, sense, 0.8)
+            .unwrap();
+        assert_eq!(
+            r.label, "technology.filesystem.filename",
+            "sense {sense} rule {:?}",
+            r.disambiguation_rule
+        );
+    }
+}
+
+#[test]
+fn filename_recovery_declines_namespaces() {
+    // A dotted code namespace ending in an ext-word is NOT a filename.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let ns: Vec<String> = vec!["system.data.sql", "app.config.log", "com.example.xml"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("ns", &ns, "representation.text.entity_name", 0.8)
+        .unwrap();
+    assert_ne!(r.label, "technology.filesystem.filename");
+}
+
+#[test]
+fn filename_recovery_spares_hostname_cctld() {
+    // hostname is deliberately excluded from the fire-on set — a bare ccTLD domain
+    // (gov.md) is shape-identical to a markdown file, so a confident host is not overridden.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let doms: Vec<String> = vec!["gov.md", "example.md", "paraguay.md"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("domain", &doms, "technology.internet.hostname", 0.9)
+        .unwrap();
+    assert_eq!(r.label, "technology.internet.hostname");
+}
+
+#[test]
+fn filename_recovery_needs_three_distinct() {
+    // A near-constant filename column carries too little signal to override.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let files: Vec<String> = vec!["report.pdf", "report.pdf", "report.pdf", "report.pdf"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("f", &files, "representation.text.entity_name", 0.8)
+        .unwrap();
+    assert_ne!(r.label, "technology.filesystem.filename");
+}
+
+#[test]
 fn naics_recovery_admits_bare_code_header_for_long_codes() {
     // The real product surface: a 6-digit NAICS column under a bare `code`
     // header. Membership at 6 digits is decisive; the generic-code tier admits it.

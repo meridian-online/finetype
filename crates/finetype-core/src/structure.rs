@@ -519,6 +519,56 @@ pub fn is_qualified_name_strong(value: &str) -> bool {
     has_code_signal(t) || (has_upper && n_seg >= 3)
 }
 
+/// True for a bare filename — a stem plus a real, lowercase file extension, with no
+/// directory separators (`report_final.xlsx`, `IMG_0042.png`, `archive.tar.gz`).
+///
+/// The shape `word.word` is not precise (Precision Principle), so precision comes from
+/// the curated [`FILE_EXTENSIONS`] set plus four vetoes measured on the corpus:
+/// - the terminal extension must be lowercase and a known extension (`gov.MD` / a
+///   Capitalized namespace leaf `System.Data.Xml` are excluded — see `is_qualified_name`);
+/// - the stem must carry a letter (a pure-numeric stem is not a filename);
+/// - a single-char extension (`stdio.h`) requires a >=3-char stem, so a physical-unit value
+///   (`mW.h`, `kW.h` watt-hours) is not read as a C-header file;
+/// - stem dots are allowed ONLY as a secondary known extension (`archive.tar.gz`), never an
+///   arbitrary dotted code namespace (`system.data.sql` is qualified_name territory).
+///
+/// Residual ccTLD ambiguity (`readme.md` the file vs `gov.md` the domain) is shape-identical
+/// and irreducible by value alone — handled at the guard's fire-on + spot-check, not here.
+pub fn is_filename(value: &str) -> bool {
+    let t = value.trim();
+    if t.len() < 3 || t.len() > 255 {
+        return false;
+    }
+    if t.contains('/') || t.contains('\\') || t.contains('@') || t.contains("://") {
+        return false;
+    }
+    if t.chars().any(char::is_whitespace) {
+        return false;
+    }
+    let Some(dot) = t.rfind('.') else {
+        return false;
+    };
+    let (stem, ext) = (&t[..dot], &t[dot + 1..]);
+    if stem.is_empty() || ext.is_empty() {
+        return false;
+    }
+    if ext.chars().any(|c| c.is_ascii_uppercase()) || !FILE_EXTENSIONS.contains(&ext) {
+        return false;
+    }
+    if !stem.chars().any(|c| c.is_ascii_alphabetic()) {
+        return false;
+    }
+    if ext.len() == 1 && stem.chars().filter(|c| c.is_ascii_alphanumeric()).count() < 3 {
+        return false;
+    }
+    for seg in stem.split('.').skip(1) {
+        if !FILE_EXTENSIONS.contains(&seg.to_ascii_lowercase().as_str()) {
+            return false;
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -750,6 +800,41 @@ mod tests {
                 !is_qualified_name_strong(s),
                 "{s} must NOT override a confident label"
             );
+        }
+    }
+
+    #[test]
+    fn filename_accepts_real_files() {
+        for s in [
+            "report_final.xlsx",
+            "IMG_0042.png",
+            "archive.tar.gz", // double extension
+            "atarisy2.cpp",
+            "stdio.h", // single-char ext, >=3-char stem
+            "banner1.jpg",
+            "readme.md",
+        ] {
+            assert!(is_filename(s), "{s} should be a filename");
+        }
+    }
+
+    #[test]
+    fn filename_rejects_non_files() {
+        for s in [
+            "mW.h", // watt-hour unit — single-char ext, 2-char stem
+            "kW.h",
+            "system.data.sql", // code namespace ending in an ext word (not a double-ext)
+            "com.example.xml", // namespace, not a file
+            "C:\\dir\\file.txt", // has a path separator
+            "/usr/bin/run.sh", // has a path separator
+            "user@host.png",   // has @
+            "http://x.com/a.png", // URL
+            "foo.bar",         // bar is not a known extension
+            "42.7",            // numeric stem, not an extension
+            "plainword",       // no dot
+            "",
+        ] {
+            assert!(!is_filename(s), "{s} must NOT be a filename");
         }
     }
 }

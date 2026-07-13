@@ -232,6 +232,7 @@ technology.cryptographic.token_urlsafe	false	^[A-Za-z0-9_-]{12,128}$	false
 technology.development.calver	false	^[0-9]{4}\.[0-9]{2}(?:\.[0-9]{2})?(?:\..*)?$	true
 technology.development.docker_ref	false	^(?:(?:[a-zA-Z0-9.\-]+(?::\d+)?)/)?(?:[a-z0-9._\-/]+)(?::[a-zA-Z0-9_.\-]+)?(?:@sha256:[a-fA-F0-9]{64})?$	true
 technology.development.version	false	^v?[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.]+)?(?:\+[a-zA-Z0-9.]+)?$	true
+technology.filesystem.filename	false	^[^\\/\r\n\t]+\.[A-Za-z0-9]{1,8}$	true
 technology.filesystem.windows_path	false	^([A-Za-z]:\\|\\\\)[^\r\n]*$	true
 technology.identifier.snowflake_id	false	^\d{17,20}$	false
 technology.identifier.tsid	false	^[0-9a-f]{32}$	false

@@ -141,6 +141,7 @@ impl ColumnClassifier {
         self.imei_checksum_recovery(result, header, sample);
         self.s_expression_recovery(result, sample);
         self.qualified_name_recovery(result, sample);
+        self.filename_recovery(result, sample);
         // color_rgb: anchored `rgb(`/`rgba(` prefix, self-precise like s_expression.
         self.color_rgb_recovery(result, sample);
         self.ceded_leaf_recovery(result, sample);
@@ -585,6 +586,67 @@ impl ColumnClassifier {
         result.confidence = result.confidence.max(0.95);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("qualified_name_recovery".to_string());
+        result.detected_locale = None;
+    }
+
+    /// `filename_recovery` (default ON). Recovers `technology.filesystem.filename` (a bare
+    /// file name — stem + real extension, no directory), minted 2026-07-14 as a sibling of
+    /// `windows_path` off the reservoir-mining sweep: ~850 corpus columns of filenames
+    /// (`report_final.xlsx`, `L2M-*.pdf`, MAME `.cpp` sources) sprayed across confident-wrong
+    /// buckets. The 244-dim model cannot predict the leaf; there is no prior recovery
+    /// (`structure::FILE_EXTENSIONS` existed only to EXCLUDE filenames from qualified_name).
+    ///
+    /// Fires on the RESIDUAL labels plus the measured confident-mislabel OVERRIDE set
+    /// (entity_name / alphanumeric_id / token_urlsafe / version / full_address / full_name /
+    /// bitcoin_address / jwt / isbn / username). `hostname` and `url` are DELIBERATELY EXCLUDED
+    /// — a bare ccTLD domain (`gov.md`) is shape-identical to a markdown file, so overriding a
+    /// confident locator would create false positives. Promote when >=90% of values pass
+    /// `finetype_core::structure::is_filename` AND >=3 distinct pass (a near-constant column
+    /// carries too little signal to override a foreign prediction). Value-based (0048),
+    /// RHH-disableable, NO retrain (0096).
+    fn filename_recovery(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("filename_recovery") {
+            return;
+        }
+        const LEAF: &str = "technology.filesystem.filename";
+        const FIRE_ON: &[&str] = &[
+            "representation.text.plain_text",
+            "representation.text.word",
+            "unknown",
+            "representation.text.entity_name",
+            "representation.identifier.alphanumeric_id",
+            "technology.cryptographic.token_urlsafe",
+            "technology.development.version",
+            "geography.address.full_address",
+            "identity.person.full_name",
+            "finance.crypto.bitcoin_address",
+            "technology.cryptographic.jwt",
+            "identity.commerce.isbn",
+            "identity.person.username",
+        ];
+        if !FIRE_ON.contains(&result.label.as_str()) {
+            return;
+        }
+        let non_empty = non_empty_trimmed(sample);
+        if non_empty.len() < 3 {
+            return;
+        }
+        let mut distinct_pass: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut passed = 0usize;
+        for v in &non_empty {
+            let t = v.trim();
+            if finetype_core::structure::is_filename(t) {
+                passed += 1;
+                distinct_pass.insert(t);
+            }
+        }
+        if passed * 10 < non_empty.len() * 9 || distinct_pass.len() < 3 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.95);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("filename_recovery".to_string());
         result.detected_locale = None;
     }
 

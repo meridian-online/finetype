@@ -14,7 +14,7 @@ from the cached sample. The real sweep is ~5 guards.
 | # | Type | Leaf | Stranded | Verdict | Notes |
 |---|------|------|---------:|---------|-------|
 | 1 | **url** | technology.internet.url | ~291 | **SHIPPED 2026-07-14** | fire-on widen to override tier; validator self-precise; 0 FP. `output/url-override/` |
-| 2 | filename | `representation.file.filename` (NEW) | 851 | **taxonomy-gap** — author must mint the leaf | biggest reservoir, 65% override-tier; ~0.2% FP (single-char `.h` watt-hour units); needs ≥3-distinct gate + drop ccTLD-colliding 2-char exts. **The gate can't score a leaf that doesn't exist.** |
+| 2 | filename | technology.filesystem.filename | 851 | **SHIPPED 2026-07-14** | leaf minted (sibling of windows_path) + filename_recovery guard; gate GO, gold +1 (fixed a defect it surfaced), 104 promotions 0 FP. `output/filename-recovery/` |
 | 3 | delimited_array | container.array.comma_separated (+pipe/semicolon) | ~590 | **needs-gate** | 3 value vetoes: reject `://` (URL-with-commas), float-tuples→coordinate leaf, time/%/ISO-date parts→csv-record leaf; + per-column delimiter voting for the sub-leaf. ~6–10% FP without them. Leaf exists → buildable today. |
 | 4 | version_string | technology.development.version | ~100–130 distinct | **needs-header-gate** | bare MAJOR.MINOR.PATCH is a date/clock magnet (~15% value-only FP); header gate `version\|firmware\|ver\|rev\|release\|build` MINUS `date\|time\|year\|month`, residual-only, never override a confident dmy_dot/ymd_dot; veto any 1900–2099 4-digit component. 72% is one replicated `ver=1.6.1` dump — weigh distinct reach. |
 | 5 | windows_path | technology.filesystem.windows_path | ~12 distinct | **needs-gate** | widen existing reader's fire-on to override labels; DRIVE branch (`C:\`) self-precise, UNC branch needs a hex-blob veto (reject `^\\+x?[0-9a-f]+$`, require interior `\`). ~90% is one `architectureSmells` dump — thin distinct reach. |
@@ -23,7 +23,7 @@ from the cached sample. The real sweep is ~5 guards.
 
 ## Next actions
 
-- **Author decision (the one real ask):** mint `representation.file.filename`? It unlocks the 851-column
+- **Author decision (the one real ask):** mint `technology.filesystem.filename` (sibling of the existing windows_path; representation.file.* is file *properties*, not the file entity)? It unlocks the 851-column
   filename reservoir — a common column type sprayed across five confident-wrong buckets. Worth it; the
   corpus-honest gate literally cannot score it until the leaf exists.
 - **Buildable next (no author input):** `delimited_array` — the best buildable-today gated guard (~590
