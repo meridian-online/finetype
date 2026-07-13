@@ -688,7 +688,7 @@ impl ColumnClassifier {
     /// `== postal_code` label gate means a genuine postal column — which never carries a
     /// legal-form header — is untouched. External-band finding (compref:gleif); the leaf
     /// is corpus-absent so the corpus-honest gate is structurally blind here — the header
-    /// + demote-only shape is the safety, the same posture as every membership guard off
+    /// and demote-only shape is the safety, the same posture as every membership guard off
     /// the company-reference seam. Value-based (0048), RHH-disableable.
     fn legal_form_postal_demote(&self, result: &mut ColumnResult, header: &str) {
         if rhh::is_disabled("legal_form_postal_demote") {

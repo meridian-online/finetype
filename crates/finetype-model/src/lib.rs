@@ -25,7 +25,6 @@ pub mod sibling_context;
 pub mod training;
 pub mod validation_features;
 pub mod value_attention;
-pub mod value_features;
 
 pub use char_cnn::{CharCnn, CharCnnConfig, CharVocab, HeadType, HierarchicalHead, HierarchyMap};
 pub use char_distribution::{extract_char_distribution, CHAR_DIST_DIM, CHAR_DIST_NAMES};
@@ -52,4 +51,3 @@ pub use sibling_context::SiblingContextAttention;
 pub use training::{Trainer, TrainingConfig, TrainingError};
 pub use validation_features::ValidationFeatureExtractor;
 pub use value_attention::{ValueAttentionConfig, ValueAttentionPool};
-pub use value_features::{value_feature_dim, value_feature_names, value_feature_row};
