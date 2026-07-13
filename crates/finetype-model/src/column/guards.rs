@@ -140,6 +140,7 @@ impl ColumnClassifier {
         // Luhn-valid by construction), so this one is header-gated too.
         self.imei_checksum_recovery(result, header, sample);
         self.s_expression_recovery(result, sample);
+        self.qualified_name_recovery(result, sample);
         // color_rgb: anchored `rgb(`/`rgba(` prefix, self-precise like s_expression.
         self.color_rgb_recovery(result, sample);
         self.ceded_leaf_recovery(result, sample);
@@ -523,6 +524,70 @@ impl ColumnClassifier {
         result.detected_locale = None;
     }
 
+    /// `qualified_name_recovery` (default ON). Recovers
+    /// `technology.code.qualified_name` (a dotted namespaced code symbol) that the
+    /// 244-dim model cannot predict, leaving ~1,300 corpus columns of .NET/Java
+    /// namespaces (`ICSharpCode.NRefactory6`, `Abot2.Tests.Integration`,
+    /// `AgileWizard.Domain`) misfiled. Residual audit (2026-07-13);
+    /// `structured_string_refinement` already recovers the 3+-segment forms FROM
+    /// residual via the taxonomy validator (`{2,}` = three-or-more segments), but that
+    /// validator rejects the 2-segment forms AND must NOT be widened — a bare `foo.bar`
+    /// is too common (Precision Principle). This guard closes both gaps with two tiers,
+    /// each keyed to a corpus-measured live-Sense distribution:
+    ///
+    /// - **Tier 1 (residual → qn):** `plain_text`/`word`/`unknown` promoted on
+    ///   `is_qualified_name` (2-segment needs a code signal + not-a-filename; 3+ direct).
+    /// - **Tier 2 (confident-mislabel override → qn):** the name/place/host text labels
+    ///   the model actively reaches for on a dotted PascalCase token
+    ///   (`entity_name`/`hostname`/`full_name`/`full_address`/`city`/`region`) promoted
+    ///   on the stricter `is_qualified_name_strong` — a code signal AND not a canonical
+    ///   hostname, so a genuine `www.breitbart.com` (Sense=hostname) is spared. Measured:
+    ///   zero real-host false positives. `username`/`alphanumeric_id` are deliberately
+    ///   EXCLUDED (Odoo user-refs `base.user_root`, HDF5 filenames `…_bf.h5` overlap).
+    ///
+    /// Promote when >=90% of non-empty values pass the tier's detector. NO header gate
+    /// (the detectors are self-precise). Value-based (0048), RHH-disableable.
+    fn qualified_name_recovery(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("qualified_name_recovery") {
+            return;
+        }
+        const LEAF: &str = "technology.code.qualified_name";
+        const RESIDUAL: &[&str] = &[
+            "representation.text.plain_text",
+            "representation.text.word",
+            "unknown",
+        ];
+        const OVERRIDE: &[&str] = &[
+            "representation.text.entity_name",
+            "technology.internet.hostname",
+            "identity.person.full_name",
+            "geography.address.full_address",
+            "geography.location.city",
+            "geography.location.region",
+        ];
+        let label = result.label.as_str();
+        let detector: fn(&str) -> bool = if RESIDUAL.contains(&label) {
+            finetype_core::structure::is_qualified_name
+        } else if OVERRIDE.contains(&label) {
+            finetype_core::structure::is_qualified_name_strong
+        } else {
+            return;
+        };
+        let non_empty = non_empty_trimmed(sample);
+        if non_empty.len() < 3 {
+            return;
+        }
+        let valid = non_empty.iter().filter(|v| detector(v)).count();
+        if valid * 10 < non_empty.len() * 9 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.95);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("qualified_name_recovery".to_string());
+        result.detected_locale = None;
+    }
+
     /// `jwt_substance_guard` (default ON). Demotes `technology.cryptographic.jwt`
     /// to `unknown` when the column's values are not real JWTs. The taxonomy
     /// pattern checks only the three-base64url-segment SHAPE, so the model
@@ -701,8 +766,10 @@ impl ColumnClassifier {
         result.detected_locale = None;
         result.confidence = result.confidence.min(0.6);
         result.disambiguation_applied = true;
-        result.disambiguation_rule =
-            Some(format!("legal_form_postal_demote:{}", header.to_lowercase()));
+        result.disambiguation_rule = Some(format!(
+            "legal_form_postal_demote:{}",
+            header.to_lowercase()
+        ));
     }
 
     /// `isbn_header_recovery` (default ON). Recovers `identity.commerce.isbn` on a

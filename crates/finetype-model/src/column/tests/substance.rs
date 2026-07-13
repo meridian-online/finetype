@@ -1714,7 +1714,12 @@ representation.identifier.increment:
     .map(String::from)
     .collect();
     let r = cc
-        .compose_from_sense("PLAYER_ID", &opaque, "representation.numeric.integer_number", 0.8)
+        .compose_from_sense(
+            "PLAYER_ID",
+            &opaque,
+            "representation.numeric.integer_number",
+            0.8,
+        )
         .unwrap();
     assert_eq!(
         r.label, "representation.identifier.numeric_code",
@@ -1749,7 +1754,12 @@ representation.identifier.increment:
         .map(String::from)
         .collect();
     let r = cc
-        .compose_from_sense("grid", &quantities, "representation.numeric.integer_number", 0.8)
+        .compose_from_sense(
+            "grid",
+            &quantities,
+            "representation.numeric.integer_number",
+            0.8,
+        )
         .unwrap();
     assert_eq!(
         r.label, "representation.numeric.integer_number",
@@ -2000,6 +2010,144 @@ fn s_expression_recovery_tolerates_truncated_trees() {
         "rule was {:?}",
         r.disambiguation_rule
     );
+}
+
+#[test]
+fn qualified_name_recovery_is_default_on() {
+    assert!(!rhh::is_disabled("qualified_name_recovery"));
+}
+
+#[test]
+fn qualified_name_recovery_promotes_2seg_namespaces() {
+    // 2-segment code namespaces the taxonomy validator (3+ segments) rejects,
+    // stranded in plain_text. The purpose-built detector recovers them.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let ns: Vec<String> = vec![
+        "ICSharpCode.NRefactory6",
+        "SisoDb.Sql2008",
+        "HtmlTags.Testing",
+        "calendar.attendee_portal",
+        "mail.model_mail_message",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("Namespace", &ns, "representation.text.plain_text", 0.6)
+        .unwrap();
+    assert_eq!(
+        r.label, "technology.code.qualified_name",
+        "rule was {:?}",
+        r.disambiguation_rule
+    );
+}
+
+#[test]
+fn qualified_name_recovery_declines_hostnames() {
+    // Bare 2-segment lowercase dotted values are hostnames, not code symbols —
+    // no code signal, so the detector must decline and leave them residual.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let hosts: Vec<String> = vec!["example.com", "google.net", "foo.org", "bar.io"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("domain", &hosts, "representation.text.plain_text", 0.6)
+        .unwrap();
+    assert_ne!(r.label, "technology.code.qualified_name");
+}
+
+#[test]
+fn qualified_name_recovery_declines_code_filenames() {
+    // `deform_conv_v2.py` has an underscore stem (a code signal) but is a
+    // filename — the file-extension check must exclude it.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let files: Vec<String> = vec![
+        "deform_conv_v2.py",
+        "scaled_mnist_train.py",
+        "data_generator.py",
+        "main_model.py",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("file_path", &files, "representation.text.plain_text", 0.6)
+        .unwrap();
+    assert_ne!(r.label, "technology.code.qualified_name");
+}
+
+#[test]
+fn qualified_name_recovery_overrides_mislabeled_namespaces() {
+    // Tier 2: a confident name/host label the model reached for on dotted PascalCase
+    // namespaces IS overridden — the values carry a code signal, not a real host.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let ns: Vec<String> = vec![
+        "AgileWizard.Domain",
+        "AnimeRecs.RecService.DTO",
+        "Abot2.Tests.Integration",
+        "SevenZip.CommandLineParser",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    for sense in [
+        "technology.internet.hostname",
+        "representation.text.entity_name",
+    ] {
+        let r = cc.compose_from_sense("Namespace", &ns, sense, 0.9).unwrap();
+        assert_eq!(
+            r.label, "technology.code.qualified_name",
+            "sense {sense} rule {:?}",
+            r.disambiguation_rule
+        );
+    }
+}
+
+#[test]
+fn qualified_name_recovery_spares_genuine_hosts() {
+    // Tier 2 must NOT reclassify a genuine hostname column — the override detector
+    // spares a canonical lowercase+TLD host.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let hosts: Vec<String> = vec![
+        "www.breitbart.com",
+        "www.foxnews.com",
+        "www.politico.com",
+        "amp.washingtontimes.com",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("publication", &hosts, "technology.internet.hostname", 0.9)
+        .unwrap();
+    assert_eq!(r.label, "technology.internet.hostname");
+}
+
+#[test]
+fn qualified_name_recovery_declines_multipart_filenames() {
+    // A residual column of multi-extension filenames must NOT be promoted — the
+    // lowercase file-extension guard rejects them at any depth (`.tar.gz`, `.h5`).
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let files: Vec<String> = vec![
+        "L253078_SAP000_B009_P000_bf.tar.gz",
+        "L253078_SAP000_B008_P000_bf.tar.gz",
+        "L118410_SAP000_B000_S0_P000_bf.h5",
+        "run_output_final.tar.gz",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("filename", &files, "representation.text.plain_text", 0.6)
+        .unwrap();
+    assert_ne!(r.label, "technology.code.qualified_name");
 }
 
 #[test]

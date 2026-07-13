@@ -310,6 +310,215 @@ pub fn is_locale_code(value: &str) -> bool {
     parts.len() >= 2 && parts.iter().all(|p| is_bcp47_tag(p))
 }
 
+/// File extensions that make a 2-segment dotted string a filename (`report.csv`,
+/// `deform_conv_v2.py`) rather than a namespaced code symbol. Only consulted for
+/// the 2-segment case — a bare-lowercase filename has no code signal and is
+/// already rejected, so this list only needs to catch code/data filenames whose
+/// STEM carries a code signal (underscore/CamelCase), the real collision.
+const FILE_EXTENSIONS: &[&str] = &[
+    "py",
+    "rb",
+    "js",
+    "ts",
+    "go",
+    "rs",
+    "java",
+    "c",
+    "cpp",
+    "cc",
+    "h",
+    "hpp",
+    "cs",
+    "php",
+    "swift",
+    "kt",
+    "scala",
+    "csv",
+    "tsv",
+    "txt",
+    "json",
+    "xml",
+    "yaml",
+    "yml",
+    "toml",
+    "md",
+    "rst",
+    "html",
+    "htm",
+    "css",
+    "scss",
+    "sql",
+    "sh",
+    "bat",
+    "ps1",
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "svg",
+    "bmp",
+    "webp",
+    "pdf",
+    "doc",
+    "docx",
+    "xls",
+    "xlsx",
+    "ppt",
+    "pptx",
+    "zip",
+    "gz",
+    "tar",
+    "rar",
+    "log",
+    "dat",
+    "bin",
+    "ini",
+    "cfg",
+    "conf",
+    "properties",
+    "jar",
+    "war",
+    "dll",
+    "exe",
+    "class",
+    "so",
+    "mp3",
+    "mp4",
+    "wav",
+    "avi",
+    "mov",
+    "parquet",
+    "npy",
+    "pkl",
+    "ipynb",
+    "h5",
+    "hdf5",
+    "nc",
+    "gz",
+    "bz2",
+    "xz",
+    "orc",
+    "avro",
+    "feather",
+    "sav",
+    "dta",
+];
+
+/// True when the last dot-separated segment is a LOWERCASE file extension — a
+/// filename (`report.tar.gz`, `run_bf.h5`), not a namespaced symbol. Restricted to
+/// a lowercase extension so a genuine namespace leaf that happens to share the
+/// spelling (`MyApp.Data.Xml`, `Foo.Bar.Sql`) is NOT rejected — a filename's
+/// extension is lowercase, a namespace leaf is Capitalized.
+fn ends_in_file_extension(parts: &[&str]) -> bool {
+    match parts.last() {
+        Some(last) if !last.chars().any(|c| c.is_ascii_uppercase()) => {
+            FILE_EXTENSIONS.contains(&last.to_ascii_lowercase().as_str())
+        }
+        _ => false,
+    }
+}
+
+/// A code signal that distinguishes a namespaced symbol from a bare `foo.bar`
+/// hostname: an underscore anywhere, or internal CamelCase (a lowercase letter
+/// immediately followed by an uppercase one, e.g. `SisoDb`, `HtmlTags`).
+fn has_code_signal(s: &str) -> bool {
+    if s.contains('_') {
+        return true;
+    }
+    let b = s.as_bytes();
+    b.windows(2)
+        .any(|w| w[0].is_ascii_lowercase() && w[1].is_ascii_uppercase())
+}
+
+/// True for a fully-qualified dotted code identifier — a namespaced symbol
+/// (Java/.NET package or class, module path, config key: `ICSharpCode.NRefactory6`,
+/// `org.jfree.chart.plot.XYPlot`, `calendar.attendee_portal`).
+///
+/// Every dot-separated segment must be a valid identifier (`^[A-Za-z_]\w*$`).
+/// Precision hinges on the 2-segment case, which STRUCTURALLY overlaps a
+/// hostname (`www.example`) and a filename (`report.csv`):
+/// - **3+ segments** are reverse-DNS-shaped and accepted directly (this matches
+///   the `technology.code.qualified_name` taxonomy validator's `{2,}` rule).
+/// - **2 segments** are accepted ONLY with a code signal (underscore / internal
+///   CamelCase) that a bare lowercase hostname lacks, AND only when the last
+///   segment is not a known file extension (excludes `my_file.txt`).
+///
+/// Whitespace-free, ASCII-identifier segments only. The 3+ case does NOT
+/// discriminate hostname (`www.example.com` validates) — that overlap is handled
+/// upstream by firing recovery on residual labels only, never overriding a
+/// confident `hostname`/`url` prediction.
+pub fn is_qualified_name(value: &str) -> bool {
+    let t = value.trim();
+    if t.len() < 3 || t.len() > 128 || !t.contains('.') || t.chars().any(char::is_whitespace) {
+        return false;
+    }
+    let parts: Vec<&str> = t.split('.').collect();
+    if parts.len() < 2 {
+        return false;
+    }
+    for p in &parts {
+        let mut cs = p.chars();
+        match cs.next() {
+            Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
+            _ => return false,
+        }
+        if !cs.all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return false;
+        }
+    }
+    // A lowercase file extension anywhere-terminal marks a filename, not a symbol
+    // (`run_bf.h5`, `data.tar.gz`) — reject at any depth.
+    if ends_in_file_extension(&parts) {
+        return false;
+    }
+    if parts.len() >= 3 {
+        return true;
+    }
+    // 2-segment: require a code signal (a bare `foo.bar` hostname lacks one).
+    has_code_signal(t)
+}
+
+/// A common public TLD — the last segment of a canonical hostname. Used to spare a
+/// genuine lowercase host (`www.breitbart.com`) from the qualified-name override,
+/// which otherwise structurally matches a dotted namespace.
+const COMMON_TLDS: &[&str] = &[
+    "com", "net", "org", "io", "co", "uk", "de", "fr", "edu", "gov", "mil", "info", "biz", "us",
+    "cn", "ru", "jp", "au", "ca", "eu", "nl", "es", "it", "br", "in", "me", "app", "dev", "cloud",
+    "xyz", "tv", "ai",
+];
+
+/// True for a lowercase, TLD-terminated, underscore-free dotted string — a
+/// canonical hostname (`www.example.com`, `amp.washingtontimes.com`) that the
+/// qualified-name override must NOT reclassify as code.
+fn looks_like_hostname(value: &str) -> bool {
+    let t = value.trim();
+    if t.contains('_') || t.chars().any(|c| c.is_ascii_uppercase()) {
+        return false;
+    }
+    match t.rsplit('.').next() {
+        Some(last) => COMMON_TLDS.contains(&last),
+        None => false,
+    }
+}
+
+/// Stricter form of [`is_qualified_name`] for OVERRIDING a confident foreign
+/// prediction — a name/place/host label the model reached for on a dotted
+/// PascalCase token (`AgileWizard.Domain` read as a hostname, `Abot2.Tests.Integration`
+/// read as an entity name). Requires a code signal a hostname / person-name lacks —
+/// an underscore, internal CamelCase (`SisoDb`), or an uppercase letter across 3+
+/// segments (`Akka.Remote.Tests`) — AND excludes a canonical hostname
+/// ([`looks_like_hostname`]). Measured on the corpus: 613 genuine namespace columns
+/// recovered from entity_name/hostname/city with ZERO real-host false positives.
+pub fn is_qualified_name_strong(value: &str) -> bool {
+    if !is_qualified_name(value) || looks_like_hostname(value) {
+        return false;
+    }
+    let t = value.trim();
+    let has_upper = t.chars().any(|c| c.is_ascii_uppercase());
+    let n_seg = t.split('.').count();
+    has_code_signal(t) || (has_upper && n_seg >= 3)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -468,6 +677,79 @@ mod tests {
             "",
         ] {
             assert!(!is_locale_code(s), "{s} must not validate as a locale code");
+        }
+    }
+
+    #[test]
+    fn qualified_name_accepts_code_namespaces() {
+        for s in [
+            "ICSharpCode.NRefactory6",  // 2-seg, CamelCase
+            "SisoDb.Sql2008",           // 2-seg, CamelCase
+            "HtmlTags.Testing",         // 2-seg, CamelCase
+            "calendar.attendee_portal", // 2-seg, underscore
+            "mail.model_mail_message",  // 2-seg, underscore
+            "Aspose.NET_OneClick_Word_Document",
+            "org.jfree.chart.plot.XYPlot", // reverse-DNS 5-seg
+            "com.example.app",             // reverse-DNS 3-seg lowercase
+            "EmployeeDirectory.Android",   // 2-seg, CamelCase
+        ] {
+            assert!(is_qualified_name(s), "{s} should be a qualified name");
+        }
+    }
+
+    #[test]
+    fn qualified_name_rejects_hostnames_filenames_prose() {
+        for s in [
+            "example.com",       // 2-seg bare lowercase — hostname, no code signal
+            "foo.bar",           // 2-seg bare lowercase — no code signal
+            "report.csv",        // filename (no code signal anyway)
+            "deform_conv_v2.py", // filename WITH underscore stem — ext check load-bearing
+            "scaled_mnist_train.py",
+            "myFile.txt",      // filename WITH CamelCase stem
+            "John.Smith",      // Title.Title — no internal CamelCase, no underscore
+            "hello world.foo", // whitespace
+            "no_dot_here",     // no dot
+            "123.456",         // segments not identifiers
+            ".leading",        // empty first segment
+            "trailing.",       // empty last segment
+            "",
+        ] {
+            assert!(!is_qualified_name(s), "{s} must not be a qualified name");
+        }
+    }
+
+    #[test]
+    fn qualified_name_strong_accepts_namespaces_over_confident_labels() {
+        // The override detector: dotted namespaces the model mislabels as a
+        // name/place/host — must carry a code signal.
+        for s in [
+            "AgileWizard.Domain",       // 2-seg CamelCase (Sense=hostname)
+            "Abot2.Tests.Integration",  // 3-seg, uppercase (Sense=entity_name)
+            "Akka.Remote.Tests",        // 3-seg, uppercase, no internal camel
+            "calendar.attendee_portal", // underscore
+            "SisoDb.Sql2008",           // internal CamelCase
+        ] {
+            assert!(
+                is_qualified_name_strong(s),
+                "{s} should be a strong qualified name"
+            );
+        }
+    }
+
+    #[test]
+    fn qualified_name_strong_spares_real_hosts_and_lowercase() {
+        for s in [
+            "www.breitbart.com", // canonical host — must be spared
+            "amp.washingtontimes.com",
+            "api.github.com",
+            "www.politico.com",
+            "com.google.common", // lowercase package — ambiguous with a host, spared
+            "foo.bar.baz",       // lowercase, no code signal
+        ] {
+            assert!(
+                !is_qualified_name_strong(s),
+                "{s} must NOT override a confident label"
+            );
         }
     }
 }
