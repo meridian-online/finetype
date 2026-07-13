@@ -6,6 +6,7 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "Evaluation infrastructure for FineType — report generation, actionability testing, benchmark harnesses"
+publish = false # internal eval tooling; never published (version-less path dep on core)
 
 [[bin]]
 name = "eval-report"
