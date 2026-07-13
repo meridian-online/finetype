@@ -1153,6 +1153,42 @@ fn region_nonmembership_veto_respects_region_header() {
     );
 }
 
+// ── legal_form_postal_demote (external band: gleif legal_form → false postal) ──
+
+#[test]
+fn legal_form_postal_demote_kills_false_postal() {
+    // GLEIF `legal_form`: 91% ISO-20275 sentinels (9999 "other" / 8888 "no legal
+    // form"), 4-digit → the numeric-postal detector claims postal_code at conf 1.0.
+    // No ELF certainty is worth building on a 91%-"N.A." column, so the false postal
+    // claim is demoted to `numeric_code` — the dominant 4-digit code shape.
+    let l = recovered_label(
+        "legal_form",
+        &[
+            "9999", "9999", "9999", "8888", "T91T", "XTIQ", "HZEH", "7WQO", "9999", "8888",
+        ],
+        "geography.address.postal_code",
+    );
+    assert_eq!(
+        l, "representation.identifier.numeric_code",
+        "a legal_form code column must not be a postal_code"
+    );
+}
+
+#[test]
+fn legal_form_postal_demote_spares_real_postal() {
+    // Demote-only + header-gated: a genuine postal column carries no legal-form
+    // header, so even 4-digit postcodes that share the sentinel shape stay postal.
+    let l = recovered_label(
+        "postal_code",
+        &["1000", "1100", "4000", "6000", "8000", "9999"],
+        "geography.address.postal_code",
+    );
+    assert!(
+        l.starts_with("geography.address.postal"),
+        "a real postal column must stay postal, got {l}"
+    );
+}
+
 // ── tld_geography_recovery (external band: majestic TLD → continent) ──
 
 #[test]

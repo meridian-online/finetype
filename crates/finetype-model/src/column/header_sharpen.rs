@@ -215,6 +215,26 @@ pub(crate) fn header_names_numeric_identifier(header: &str) -> bool {
     id_tok && !postal_tok
 }
 
+/// True if the header names a legal-form code column (`legal_form`, `LegalForm`,
+/// `elf`, `elf_code`) — the gate for `legal_form_postal_demote`. GLEIF's
+/// `legal_form` carries ISO 20275 Entity Legal Form codes; a 4-digit-sentinel-heavy
+/// one trips the numeric-postal detector, so the header is what identifies the false
+/// postal claim. Token-aware with a length cap: matches the standard `legal_form`
+/// header but NOT a prose header that merely mentions "legal forms" (those are
+/// `plain_text`, never postal, and the cap keeps them out). `elf` must be a
+/// standalone token so `self`/`shelf` do not match.
+pub(crate) fn header_names_legal_form(header: &str) -> bool {
+    let lower = header.to_lowercase();
+    let toks: Vec<&str> = lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .collect();
+    if toks.iter().any(|t| *t == "elf" || *t == "legalform") {
+        return true;
+    }
+    toks.len() <= 4 && toks.contains(&"legal") && toks.contains(&"form")
+}
+
 /// True if the header names an administrative division ABOVE city level — the
 /// disambiguator that separates the value-identical `region`/`city` siblings.
 /// Token-aware so `region`/`county`/`district`/`borough`/`province` match but

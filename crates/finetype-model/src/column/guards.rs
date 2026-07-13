@@ -100,6 +100,11 @@ impl ColumnClassifier {
         // intermediate increment.
         self.numeric_code_header_recovery(result, header, sample);
         self.unlocode_format_veto(result, sample);
+        // Grouped with the other geo-shape overcall demotes: a `legal_form`/`elf`
+        // column of 4-digit ISO-20275 sentinels reads as a numeric postal_code;
+        // demote off the false postal claim to the `word` residual (no clean type
+        // to promote to — the column is 91% "no legal form").
+        self.legal_form_postal_demote(result, header);
         self.city_region_header_corroboration(result, header, sample);
         self.country_code_corroboration(result, header, sample);
         self.geo_code_membership_vote(result, header, sample);
@@ -662,6 +667,42 @@ impl ColumnClassifier {
         result.confidence = result.confidence.min(0.6);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("unlocode_format_veto".to_string());
+    }
+
+    /// `legal_form_postal_demote` (default ON). Demotes a false
+    /// `geography.address.postal_code` assertion off a legal-form code column
+    /// (`legal_form`/`elf`) to `representation.identifier.numeric_code`. GLEIF's
+    /// `legal_form` carries ISO 20275 Entity Legal Form codes, but 91% of the column
+    /// is the reserved sentinels `9999` ("other") / `8888` ("no legal form"), which
+    /// are 4-digit and trip the numeric-postal detector at confidence 1.0 (locale
+    /// EN_PH). There is no ELF certainty worth building here — a column that is 91%
+    /// "no legal form" would harvest 91% "N.A." from a membership set, and the 4-char
+    /// shape is not self-precise — so this removes the false postal claim rather than
+    /// manufacturing a hollow one. Target = `numeric_code` (author decision 2026-07-13,
+    /// over the `word` categorical residual): the column is dominantly 4-digit
+    /// classification codes, which an analyst reads as a numeric code, and its all-digit
+    /// validator confirms the 91% majority (the ~9% alphabetic real ELF codes are the
+    /// known imperfection — the trade is a concrete code label over the residual).
+    /// Header-gated + demote-only: the `legal_form`/`elf` header is disjoint from every
+    /// postal header (corpus-wide, 0 of 6 legal-form-headed columns are postal), and the
+    /// `== postal_code` label gate means a genuine postal column — which never carries a
+    /// legal-form header — is untouched. External-band finding (compref:gleif); the leaf
+    /// is corpus-absent so the corpus-honest gate is structurally blind here — the header
+    /// + demote-only shape is the safety, the same posture as every membership guard off
+    /// the company-reference seam. Value-based (0048), RHH-disableable.
+    fn legal_form_postal_demote(&self, result: &mut ColumnResult, header: &str) {
+        if rhh::is_disabled("legal_form_postal_demote") {
+            return;
+        }
+        if result.label != "geography.address.postal_code" || !header_names_legal_form(header) {
+            return;
+        }
+        result.label = "representation.identifier.numeric_code".to_string();
+        result.detected_locale = None;
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule =
+            Some(format!("legal_form_postal_demote:{}", header.to_lowercase()));
     }
 
     /// `isbn_header_recovery` (default ON). Recovers `identity.commerce.isbn` on a
