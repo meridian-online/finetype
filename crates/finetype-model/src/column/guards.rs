@@ -718,6 +718,20 @@ impl ColumnClassifier {
     /// columns stay integers). Recovery-only: quantity columns (`employees`,
     /// `founded`) carry no code token and are untouched. Value-based veto
     /// discipline + header corroboration per 0094; RHH-disableable.
+    ///
+    /// Also gates on an IDENTIFIER header (`header_names_numeric_identifier`:
+    /// `id`/`ids`/`identifier`) — `*_id` integer columns are the single most common
+    /// mistake on a random production column (representative band 2026-07-13:
+    /// `PLAYER_ID`/`GAME_ID`/`student_id` typed as quantities to average). An id is
+    /// never a quantity, so it recovers off the integer attractor — and it SPLITS by
+    /// the model's own `values_form_increment`: a running surrogate key (dense,
+    /// contiguous, near-unique) → `increment`; an opaque id → `numeric_code`. The
+    /// split matches the author-ratified numeric-id gold/repr reconciliation
+    /// (2026-07-13) — gold's ac-04 panel had lumped numeric ids into integer_number;
+    /// the representative band already used the split. The id gate is deliberately a
+    /// SEPARATE function from the code gate so it does NOT widen the naics gate (which
+    /// shares `header_corroborates_numeric_code`) — an id column of arbitrary integers
+    /// must never leak into naics.
     fn numeric_code_header_recovery(
         &self,
         result: &mut ColumnResult,
@@ -727,9 +741,9 @@ impl ColumnClassifier {
         if rhh::is_disabled("numeric_code_header_recovery") {
             return;
         }
-        const LEAF: &str = "representation.identifier.numeric_code";
+        let id_header = header_names_numeric_identifier(header);
         if result.label != "representation.numeric.integer_number"
-            || !header_corroborates_numeric_code(header)
+            || !(header_corroborates_numeric_code(header) || id_header)
         {
             return;
         }
@@ -749,7 +763,14 @@ impl ColumnClassifier {
         if lens[lens.len() / 2] < 2 {
             return;
         }
-        result.label = LEAF.to_string();
+        // Split an identifier column by shape: a running surrogate key is `increment`,
+        // an opaque id (and any code-headed column) is `numeric_code`.
+        let leaf = if id_header && values_form_increment(sample) == Some(true) {
+            "representation.identifier.increment"
+        } else {
+            "representation.identifier.numeric_code"
+        };
+        result.label = leaf.to_string();
         result.confidence = result.confidence.max(0.85);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!(

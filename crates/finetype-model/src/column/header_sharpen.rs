@@ -189,6 +189,32 @@ pub(crate) fn header_corroborates_numeric_code(header: &str) -> bool {
     code_tok && !postal_tok
 }
 
+/// True if the header names a numeric IDENTIFIER column (`id`, `PLAYER_ID`,
+/// `student_id`, `identifier`) — the id-side gate for `numeric_code_header_recovery`.
+/// Kept SEPARATE from [`header_corroborates_numeric_code`] on purpose: that function
+/// ALSO gates `naics_industry_recovery`, and folding `id` into it wrongly promoted
+/// `member_id`/`business_id` columns whose CONSTANT values coincidentally matched a
+/// NAICS code (measured 2026-07-13). Token-aware; postal tokens veto (a `zip_id` is
+/// postal, not an id). `*_id` integer columns are the single most common mistake on
+/// a random production column (representative band); the recovery splits them by
+/// `values_form_increment` — a running surrogate key → `increment`, an opaque id →
+/// `numeric_code` (author-ratified numeric-id reconciliation, gold + repr 2026-07-13).
+pub(crate) fn header_names_numeric_identifier(header: &str) -> bool {
+    let lower = header.to_lowercase();
+    let mut id_tok = false;
+    let mut postal_tok = false;
+    for tok in lower.split(|c: char| !c.is_alphanumeric()) {
+        match tok {
+            "id" | "ids" | "identifier" => id_tok = true,
+            "zip" | "postal" | "postcode" | "zipcode" | "pin" | "pincode" | "plz" | "cep" => {
+                postal_tok = true
+            }
+            _ => {}
+        }
+    }
+    id_tok && !postal_tok
+}
+
 /// True if the header names an administrative division ABOVE city level — the
 /// disambiguator that separates the value-identical `region`/`city` siblings.
 /// Token-aware so `region`/`county`/`district`/`borough`/`province` match but

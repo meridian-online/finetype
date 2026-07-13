@@ -1642,6 +1642,86 @@ representation.identifier.numeric_code:
 }
 
 #[test]
+fn numeric_code_recovery_splits_id_columns() {
+    // `*_id` integer columns are the #1 random-column mistake (representative band).
+    // An id is never a quantity: opaque ids -> numeric_code, running surrogate keys
+    // -> increment (author-ratified numeric-id split 2026-07-13). Single-digit id
+    // sequences stay integer (median length gate); non-id headers are untouched.
+    let yaml = r#"
+representation.identifier.numeric_code:
+  title: "Numeric Code"
+  validation:
+    type: string
+    pattern: '^[0-9]+$'
+  tier: [VARCHAR, identifier]
+  release_priority: 4
+  samples: ["00120"]
+representation.identifier.increment:
+  title: "Increment"
+  validation:
+    type: string
+    pattern: '^[0-9]+$'
+  tier: [VARCHAR, identifier]
+  release_priority: 4
+  samples: ["1"]
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    // Opaque player ids (sparse, non-sequential) -> numeric_code.
+    let opaque: Vec<String> = vec![
+        "2544", "201567", "202684", "2747", "202681", "2210", "20412", "1495",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("PLAYER_ID", &opaque, "representation.numeric.integer_number", 0.8)
+        .unwrap();
+    assert_eq!(
+        r.label, "representation.identifier.numeric_code",
+        "opaque id -> numeric_code, rule {:?}",
+        r.disambiguation_rule
+    );
+    // Running surrogate key (dense, contiguous, near-unique) -> increment.
+    let seq: Vec<String> = (1000..1010).map(|i| i.to_string()).collect();
+    let r = cc
+        .compose_from_sense("id", &seq, "representation.numeric.integer_number", 0.8)
+        .unwrap();
+    assert_eq!(
+        r.label, "representation.identifier.increment",
+        "sequential id -> increment, rule {:?}",
+        r.disambiguation_rule
+    );
+    // Single-digit id sequence: median length < 2 -> stays integer.
+    let small: Vec<String> = vec!["1", "2", "3", "4", "5", "1"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("id", &small, "representation.numeric.integer_number", 0.8)
+        .unwrap();
+    assert_eq!(
+        r.label, "representation.numeric.integer_number",
+        "single-digit id sequence stays integer (median length gate)"
+    );
+    // False-friend header (`grid` tokenises to `grid`, no `id` token) -> untouched.
+    let quantities: Vec<String> = vec!["1200", "845", "23000", "410", "77", "9001"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("grid", &quantities, "representation.numeric.integer_number", 0.8)
+        .unwrap();
+    assert_eq!(
+        r.label, "representation.numeric.integer_number",
+        "non-id header must not trigger the id recovery"
+    );
+}
+
+#[test]
 fn numeric_code_recovery_leaves_quantities_and_postal_alone() {
     let cc =
         ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
