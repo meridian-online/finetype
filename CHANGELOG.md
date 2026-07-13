@@ -5,7 +5,7 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.6.49] - 2026-07-12
+## [0.6.49] - 2026-07-13
 
 ### Added
 
