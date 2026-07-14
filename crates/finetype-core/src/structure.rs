@@ -569,6 +569,158 @@ pub fn is_filename(value: &str) -> bool {
     true
 }
 
+/// The delimiter a homogeneous delimited-list cell uses.
+///
+/// Only the *self-precise* delimiters are represented. The bare comma is
+/// deliberately absent: a comma between two words is structurally identical
+/// whether it separates list items (`LTE, NR`) or lives inside one entity
+/// (`Winter Park, Florida`, `$928,760,770`, `Dec 30, 2020`, `10,91`), so a
+/// bare-comma list cannot be told from a place / money / date / decimal by
+/// value alone. A comma is accepted only when *brackets* disambiguate it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ListDelim {
+    /// Bracket-wrapped comma list — `[a, b, c]` / `('x', 'y')`.
+    Comma,
+    /// Pipe list — `a|b|c`.
+    Pipe,
+    /// Semicolon list — `a;b;c`.
+    Semicolon,
+}
+
+/// True if every part of a candidate list shares a coarse element shape
+/// (numeric / single-token / short-phrase) with no prose element — i.e. it
+/// reads as a homogeneous *list* rather than a heterogeneous positional
+/// *record* (which is `container.object.csv`, a different leaf). A part longer
+/// than six words is prose and disqualifies the cell.
+fn list_homogeneous(parts: &[&str]) -> bool {
+    if parts.len() < 2 {
+        return false;
+    }
+    let mut counts = [0usize; 3]; // [numeric, single-token, short-phrase]
+    for p in parts {
+        let words = p.split_whitespace().count();
+        if words == 0 || words > 6 {
+            return false; // empty or prose
+        }
+        let numeric = p.chars().any(|c| c.is_ascii_digit())
+            && p.chars()
+                .all(|c| c.is_ascii_digit() || matches!(c, '.' | '-' | '+' | ','));
+        if numeric {
+            counts[0] += 1;
+        } else if words == 1 {
+            counts[1] += 1;
+        } else {
+            counts[2] += 1;
+        }
+    }
+    let top = *counts.iter().max().unwrap();
+    // one coarse shape must dominate (>=80% of parts).
+    top * 5 >= parts.len() * 5 - parts.len()
+}
+
+/// A part is "date/time-ish" — a clock, a 4-digit year, or a month name. Used
+/// to veto a pipe/semicolon "list" that is really a split datetime
+/// (`Tuesday, 21 Feb 2017 | 7:58 AM ET`).
+fn looks_datetimey(part: &str) -> bool {
+    let p = part.trim();
+    if p.contains(':') && p.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+        return true; // clock 7:58
+    }
+    let lower = p.to_ascii_lowercase();
+    const MONTHS: [&str; 12] = [
+        "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+    ];
+    if MONTHS.iter().any(|m| lower.starts_with(m)) {
+        return true;
+    }
+    // a bare 4-digit token that is a plausible year
+    p.len() == 4 && p.chars().all(|c| c.is_ascii_digit()) && p.starts_with(['1', '2'])
+}
+
+/// Classify a cell as a homogeneous delimited **list** under a self-precise
+/// delimiter, returning which delimiter it uses. Returns `None` for anything
+/// that is not unambiguously a list.
+///
+/// This is the substance check behind the `delimited_array_recovery` Sharpen
+/// guard (reservoir-mining sweep, 2026-07-14). Recovers `container.array.*`
+/// leaves the 244-dim model strands as residual/entity text. Three branches,
+/// each self-precise:
+///
+/// - **Bracket** `[a, b, c]` / `('x', 'y')` → [`ListDelim::Comma`]. The
+///   brackets disambiguate the comma, so a two-element numeric list `[-1, 0]`
+///   is admitted (a bare `-1, 0` would not be).
+/// - **Pipe** `a|b|c` → [`ListDelim::Pipe`]. The pipe never lives inside
+///   dates / money / prose.
+/// - **Semicolon** `a;b;c` → [`ListDelim::Semicolon`]. Likewise self-precise.
+///
+/// Vetoes: any `://` (a URL with commas), prose parts, heterogeneous records
+/// (`list_homogeneous`), nested brackets, and — for a **bare** two-part
+/// pipe/semicolon list only — anything but two alphabetic single tokens (this
+/// drops `id|number` positional records and numeric coordinate/decimal pairs,
+/// whose two-element ambiguity a bracket would otherwise resolve). Balanced
+/// nested parens are left to [`is_s_expression`], which runs first.
+pub fn delimited_list_delim(value: &str) -> Option<ListDelim> {
+    let raw = value.trim();
+    if raw.len() < 3 || raw.contains("://") {
+        return None;
+    }
+    let bytes = raw.as_bytes();
+    let (open, close) = (bytes[0], bytes[raw.len() - 1]);
+    let bracketed = (open == b'[' && close == b']') || (open == b'(' && close == b')');
+    if bracketed {
+        let body = raw[1..raw.len() - 1].trim();
+        if !body.contains(',') {
+            return None;
+        }
+        let parts: Vec<&str> = body
+            .split(',')
+            .map(|p| p.trim().trim_matches(|c| c == '\'' || c == '"').trim())
+            .collect();
+        if parts.len() >= 2
+            && parts
+                .iter()
+                .all(|p| !p.is_empty() && !p.contains(['[', ']', '{', '}', '(', ')']))
+            && list_homogeneous(&parts)
+        {
+            return Some(ListDelim::Comma);
+        }
+        return None;
+    }
+    // Bare pipe / semicolon — self-precise delimiters.
+    for (delim, kind) in [('|', ListDelim::Pipe), (';', ListDelim::Semicolon)] {
+        if !raw.contains(delim) {
+            continue;
+        }
+        let parts: Vec<&str> = raw.split(delim).map(str::trim).collect();
+        if parts.len() < 2 || parts.iter().any(|p| p.is_empty()) {
+            continue;
+        }
+        // A flat-list element is a scalar, never a structured value: a bracket /
+        // brace in a part means the cell is a positional record or code artifact
+        // (JVM signature `(L…;L…`, `path/|hash/|{json}`), not a homogeneous list.
+        if parts
+            .iter()
+            .any(|p| p.contains(['(', ')', '{', '}', '[', ']']))
+        {
+            continue;
+        }
+        if !list_homogeneous(&parts) || parts.iter().any(|p| looks_datetimey(p)) {
+            continue;
+        }
+        // Two-element bare lists are ambiguous (id|num records, x;y pairs); admit
+        // only two alphabetic single tokens.
+        if parts.len() == 2
+            && !parts.iter().all(|p| {
+                p.split_whitespace().count() == 1 && p.chars().any(|c| c.is_ascii_alphabetic())
+            })
+        {
+            continue;
+        }
+        return Some(kind);
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -836,5 +988,75 @@ mod tests {
         ] {
             assert!(!is_filename(s), "{s} must NOT be a filename");
         }
+    }
+
+    #[test]
+    fn delimited_list_accepts_self_precise_lists() {
+        use ListDelim::*;
+        // bracket-wrapped comma lists (brackets disambiguate the comma)
+        assert_eq!(delimited_list_delim("[20000, 10000, 15000]"), Some(Comma));
+        assert_eq!(
+            delimited_list_delim("['email', 'phone', 'facebook']"),
+            Some(Comma)
+        );
+        assert_eq!(delimited_list_delim("[-1, 0]"), Some(Comma)); // 2-elem OK under brackets
+        assert_eq!(delimited_list_delim("('soxr', 'ompn')"), Some(Comma));
+        // pipe lists
+        assert_eq!(
+            delimited_list_delim("Biography|Comedy|Drama|Music"),
+            Some(Pipe)
+        );
+        assert_eq!(delimited_list_delim("man | arrive | beginning"), Some(Pipe));
+        // semicolon lists
+        assert_eq!(
+            delimited_list_delim("nanoparticles;polymers;raman-spectroscopy"),
+            Some(Semicolon)
+        );
+        assert_eq!(
+            delimited_list_delim("Tim Robbins; Morgan Freeman; Bob Gunton"),
+            Some(Semicolon)
+        );
+        assert_eq!(
+            delimited_list_delim("Specialty1;Specialty2"),
+            Some(Semicolon)
+        ); // 2 single tokens
+    }
+
+    #[test]
+    fn delimited_list_rejects_false_friends() {
+        // bare comma is NEVER a list (city / address / money / date / decimal)
+        assert_eq!(delimited_list_delim("Winter Park, Florida"), None);
+        assert_eq!(
+            delimited_list_delim("Carier Site, East Street, Braintree"),
+            None
+        );
+        assert_eq!(delimited_list_delim("$928,760,770"), None);
+        assert_eq!(delimited_list_delim("Dec 30, 2020"), None);
+        assert_eq!(delimited_list_delim("10,91"), None);
+        assert_eq!(delimited_list_delim("LTE, NR"), None); // genuine 2-item, but unbracketed comma -> not safe
+                                                           // URL with commas
+        assert_eq!(delimited_list_delim("https://x.com/a,b,c"), None);
+        // heterogeneous positional records (csv_record, not a homogeneous array)
+        assert_eq!(delimited_list_delim("343597384500|5875"), None); // 2-part numeric record
+        assert_eq!(
+            delimited_list_delim("Tuesday, 21 Feb 2017 | 7:58 AM ET"),
+            None
+        ); // split datetime
+        assert_eq!(delimited_list_delim("9.9312|76.2673"), None); // coordinate pair
+                                                                  // prose list element disqualifies (>6 words)
+        assert_eq!(
+            delimited_list_delim("the quick brown fox jumped over the lazy dog;a;b"),
+            None
+        );
+        // nested / s-expression shapes are not ours
+        assert_eq!(delimited_list_delim("[[1,2],[3,4]]"), None);
+        assert_eq!(delimited_list_delim("(a (b c) (d e))"), None);
+        // code artifacts: a list element carrying a bracket/brace is not a scalar
+        assert_eq!(
+            delimited_list_delim("(Lcom/spotify/Point;Lcom/fasterxml/JsonGenerator;"),
+            None
+        ); // JVM sig
+        assert_eq!(delimited_list_delim("demirbas/|26Rew/|{\"olculer\""), None);
+        // path|hash|json record
     }
 }

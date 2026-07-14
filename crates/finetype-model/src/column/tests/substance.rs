@@ -2282,6 +2282,156 @@ fn filename_recovery_needs_three_distinct() {
 }
 
 #[test]
+fn delimited_array_recovery_is_default_on() {
+    assert!(!rhh::is_disabled("delimited_array_recovery"));
+}
+
+#[test]
+fn delimited_array_recovery_promotes_by_winning_delimiter() {
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    // bracket-comma list -> comma_separated
+    let bracket: Vec<String> = vec![
+        "[20000, 10000, 15000]",
+        "[20000, 10000]",
+        "[10000, 15000, 90]",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("Bandwidths", &bracket, "unknown", 0.8)
+        .unwrap();
+    assert_eq!(
+        r.label, "container.array.comma_separated",
+        "rule {:?}",
+        r.disambiguation_rule
+    );
+
+    // pipe list -> pipe_separated (fires over the entity_name override)
+    let pipe: Vec<String> = vec![
+        "Biography|Comedy|Drama",
+        "Horror|Sci-Fi|Thriller",
+        "Action|Drama|War",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("Genre", &pipe, "representation.text.entity_name", 0.8)
+        .unwrap();
+    assert_eq!(
+        r.label, "container.array.pipe_separated",
+        "rule {:?}",
+        r.disambiguation_rule
+    );
+
+    // semicolon list -> semicolon_separated
+    let semi: Vec<String> = vec![
+        "nanoparticles;polymers;raman-spectroscopy",
+        "imaging-techniques;nanobiotechnology",
+        "optics-and-photonics;metamaterials",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("subjects", &semi, "representation.text.plain_text", 0.8)
+        .unwrap();
+    assert_eq!(
+        r.label, "container.array.semicolon_separated",
+        "rule {:?}",
+        r.disambiguation_rule
+    );
+}
+
+#[test]
+fn delimited_array_recovery_declines_bare_comma_false_friends() {
+    // The bare comma is never recovered: a place, an address, money, a date, a
+    // decimal are structurally identical to a two-word list.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    for (header, vals, sense) in [
+        (
+            "placeLocation",
+            vec!["Winter Park, Florida", "Florence, Italy", "Athens, Greece"],
+            "geography.location.city",
+        ),
+        (
+            "addr",
+            vec![
+                "Carier Site, East Street, Braintree",
+                "The Rose, Masefield Road, Braintree",
+                "Hunnable Estate, Great Yeldham",
+            ],
+            "geography.address.full_address",
+        ),
+        (
+            "name",
+            vec![
+                "Kristin, Georges Grinstein, Mark",
+                "Catherine Plaisant, Silvia Miksch",
+                "Geoffrey Ellis, David Peebles",
+            ],
+            "identity.person.full_name",
+        ),
+    ] {
+        let v: Vec<String> = vals.into_iter().map(String::from).collect();
+        let r = cc.compose_from_sense(header, &v, sense, 0.8).unwrap();
+        assert!(
+            !r.label.starts_with("container.array"),
+            "{header} ({sense}) must NOT be recovered as an array, got {} rule {:?}",
+            r.label,
+            r.disambiguation_rule
+        );
+    }
+}
+
+#[test]
+fn delimited_array_recovery_spares_numeric_sense_labels() {
+    // coordinate is deliberately NOT in the fire-on set — a bracketed numeric pair
+    // carries a genuine coordinate ambiguity, held back for a future carve-out.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let coords: Vec<String> = vec!["[0.026, 0.973]", "[0.096, 0.903]", "[0.999, 0.001]"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "graph_label_prob",
+            &coords,
+            "geography.coordinate.coordinates",
+            0.9,
+        )
+        .unwrap();
+    assert!(
+        !r.label.starts_with("container.array"),
+        "coordinate sense held back, got {}",
+        r.label
+    );
+}
+
+#[test]
+fn delimited_array_recovery_needs_three_distinct() {
+    // A near-constant list column carries too little signal to override.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let vals: Vec<String> = vec!["LTE|NR", "LTE|NR", "LTE|NR", "LTE|NR"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("Available", &vals, "representation.text.entity_name", 0.8)
+        .unwrap();
+    assert!(
+        !r.label.starts_with("container.array"),
+        "near-constant held back, got {}",
+        r.label
+    );
+}
+
+#[test]
 fn naics_recovery_admits_bare_code_header_for_long_codes() {
     // The real product surface: a 6-digit NAICS column under a bare `code`
     // header. Membership at 6 digits is decisive; the generic-code tier admits it.

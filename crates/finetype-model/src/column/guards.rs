@@ -142,6 +142,7 @@ impl ColumnClassifier {
         self.s_expression_recovery(result, sample);
         self.qualified_name_recovery(result, sample);
         self.filename_recovery(result, sample);
+        self.delimited_array_recovery(result, sample);
         // color_rgb: anchored `rgb(`/`rgba(` prefix, self-precise like s_expression.
         self.color_rgb_recovery(result, sample);
         self.ceded_leaf_recovery(result, sample);
@@ -647,6 +648,90 @@ impl ColumnClassifier {
         result.confidence = result.confidence.max(0.95);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("filename_recovery".to_string());
+        result.detected_locale = None;
+    }
+
+    /// `delimited_array_recovery` (default ON). Recovers the `container.array.*`
+    /// leaves (comma / pipe / semicolon) that the 244-dim model strands as
+    /// residual or entity text — ~470 corpus columns of genuine delimited lists
+    /// (`[20000, 10000, 15000]`, `Biography|Comedy|Drama`, `subjects: polymers;raman`)
+    /// misfiled as plain_text / word / unknown / entity_name (reservoir-mining
+    /// sweep, 2026-07-14).
+    ///
+    /// The substance check (`finetype_core::structure::delimited_list_delim`) is
+    /// self-precise by construction: it accepts a comma list ONLY when brackets
+    /// disambiguate it (`[a, b, c]`), and otherwise only the pipe / semicolon
+    /// delimiters — which, unlike the bare comma, never live inside a date, money
+    /// figure, decimal, address, or place name. The bare-comma majority of the
+    /// reservoir (`Winter Park, Florida`, single addresses, author lists) is
+    /// deliberately NOT recovered: a comma between two words is structurally
+    /// identical whether it is a list separator or an intra-entity comma, so it
+    /// cannot be told from a `city`/`full_address` by value alone (Precision
+    /// Principle).
+    ///
+    /// FIRE_ON is the residual set plus `entity_name` — the labels where a
+    /// delimited-list value is unambiguously a mislabel. The numeric-sense
+    /// overrides (`coordinate`, `currency.amount_comma`) are held back: a bracketed
+    /// two-element numeric list carries a genuine coordinate/decimal ambiguity that
+    /// needs its own element-count carve-out (deferred follow-up).
+    ///
+    /// Per-column delimiter **voting**: each cell votes its delimiter, the winner
+    /// must carry >=90% of the passing cells (column coherence), and its
+    /// `container.array.<delim>_separated` leaf is assigned. Promote when >=90% of
+    /// non-empty values pass AND >=3 distinct values pass the winning delimiter (a
+    /// near-constant column carries too little signal to override a foreign
+    /// prediction). Value-based (0048), RHH-disableable, NO retrain (0096).
+    fn delimited_array_recovery(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("delimited_array_recovery") {
+            return;
+        }
+        const FIRE_ON: &[&str] = &[
+            "representation.text.plain_text",
+            "representation.text.word",
+            "unknown",
+            "representation.text.entity_name",
+        ];
+        if !FIRE_ON.contains(&result.label.as_str()) {
+            return;
+        }
+        const LEAVES: [&str; 3] = [
+            "container.array.comma_separated",
+            "container.array.pipe_separated",
+            "container.array.semicolon_separated",
+        ];
+        use finetype_core::structure::ListDelim;
+        let non_empty = non_empty_trimmed(sample);
+        if non_empty.len() < 3 {
+            return;
+        }
+        let mut votes = [0usize; 3];
+        let mut distinct: [std::collections::HashSet<&str>; 3] = Default::default();
+        let mut passed = 0usize;
+        for v in &non_empty {
+            let t = v.trim();
+            if let Some(d) = finetype_core::structure::delimited_list_delim(t) {
+                let i = match d {
+                    ListDelim::Comma => 0,
+                    ListDelim::Pipe => 1,
+                    ListDelim::Semicolon => 2,
+                };
+                votes[i] += 1;
+                distinct[i].insert(t);
+                passed += 1;
+            }
+        }
+        if passed * 10 < non_empty.len() * 9 {
+            return;
+        }
+        let win = (0..3).max_by_key(|&i| votes[i]).unwrap();
+        // the winning delimiter must dominate the passing cells (column coherence)
+        if votes[win] * 10 < passed * 9 || distinct[win].len() < 3 {
+            return;
+        }
+        result.label = LEAVES[win].to_string();
+        result.confidence = result.confidence.max(0.95);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("delimited_array_recovery".to_string());
         result.detected_locale = None;
     }
 
