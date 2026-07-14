@@ -153,6 +153,54 @@ pub(crate) fn header_corroborates_tld(header: &str) -> bool {
         .any(|tok| tok == "tld" || tok == "tlds")
 }
 
+/// True if the header names a software-version column (`version`, `ver`, `build`,
+/// `firmware`, `release`, `rev`/`revision`, `semver`) AND carries no date/time
+/// token. Token-exact. The header gate is LOAD-BEARING for `version_string_recovery`:
+/// a bare `1.2.3` is value-ambiguous with a `DD.MM.YY` date and a `YYYY.MM.PATCH`
+/// calver, so the value shape alone over-promotes (measured: the header gate cuts
+/// the version-shaped reservoir 570 → 372, removing 20 date columns). Date tokens
+/// VETO because `release_date`/`build_date` tokenise to a version stem yet name a
+/// date column.
+pub(crate) fn header_corroborates_version(header: &str) -> bool {
+    let lower = header.to_lowercase();
+    let mut ver_tok = false;
+    let mut date_tok = false;
+    for tok in lower.split(|c: char| !c.is_alphanumeric()) {
+        if matches!(
+            tok,
+            "version"
+                | "versions"
+                | "ver"
+                | "build"
+                | "firmware"
+                | "release"
+                | "rev"
+                | "revision"
+                | "semver"
+        ) {
+            ver_tok = true;
+        }
+        if matches!(
+            tok,
+            "date"
+                | "time"
+                | "year"
+                | "month"
+                | "day"
+                | "timestamp"
+                | "datetime"
+                | "dob"
+                | "birth"
+                | "created"
+                | "updated"
+                | "modified"
+        ) {
+            date_tok = true;
+        }
+    }
+    ver_tok && !date_tok
+}
+
 /// True if the header names a stock-ticker column (`ticker`, `symbol`,
 /// `ticker_symbol`, `stock_symbol`). Token-exact on the distinctive `ticker` /
 /// `symbol` stems. The header gate is load-bearing for `ticker_membership_recovery`:

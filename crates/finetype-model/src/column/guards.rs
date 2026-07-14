@@ -143,6 +143,7 @@ impl ColumnClassifier {
         self.qualified_name_recovery(result, sample);
         self.filename_recovery(result, sample);
         self.delimited_array_recovery(result, sample);
+        self.version_string_recovery(result, header, sample);
         // color_rgb: anchored `rgb(`/`rgba(` prefix, self-precise like s_expression.
         self.color_rgb_recovery(result, sample);
         self.ceded_leaf_recovery(result, sample);
@@ -732,6 +733,69 @@ impl ColumnClassifier {
         result.confidence = result.confidence.max(0.95);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("delimited_array_recovery".to_string());
+        result.detected_locale = None;
+    }
+
+    /// `version_string_recovery` (default ON). Recovers `technology.development.version`
+    /// (a `v?MAJOR.MINOR.PATCH` software version) that the 244-dim model strands as
+    /// `unknown` / residual text — ~370 corpus columns of `ver` / `build` / `Fix Version`
+    /// values (`1.6.1`, `1.11.23`, `1.2.2`) the model never learned to call a version
+    /// (reservoir-mining sweep, 2026-07-14).
+    ///
+    /// This is the sweep's one HEADER-GATED recovery, and the gate is LOAD-BEARING, not
+    /// corroboration: the version shape is value-AMBIGUOUS (a `YYYY.MM.DD` date and a
+    /// `YYYY.MM.PATCH` calver share the three-dotted-number shape), so value alone
+    /// over-promotes (measured: the header gate cuts the shaped reservoir 570 → 372,
+    /// removing 20 date columns). Fires ONLY when `header_corroborates_version` (a
+    /// `version`/`ver`/`build`/… token, no date token) AND ≥90% of values pass
+    /// `finetype_core::structure::is_version_string` (SemVer shape + the four-digit-year
+    /// veto that excludes dates/calver).
+    ///
+    /// Fires on the residual labels PLUS the two numeric labels the model reaches for
+    /// on a dotted `N.N.N`: `value_sharpen`'s feature rule promotes the raw-model
+    /// `unknown` to `integer_number` / `decimal_number` (a version looks float-ish)
+    /// BEFORE this guard runs, and the validation veto only knocks it back to `unknown`
+    /// AFTER — so at guard time the label is numeric, not residual. Firing on the numeric
+    /// pair is safe: `is_version_string` demands exactly three dotted components with the
+    /// year veto, so no genuine integer (`42`) or decimal (`3.14`) can pass, and the
+    /// load-bearing version header gates it further. A confident date leaf (`dmy_short_dot`,
+    /// `ymd_dot`) is deliberately NOT included — that value-ambiguous boundary is
+    /// `value_sharpen`'s Rule 31 job (impossible-date-segment demotion), and overriding a
+    /// confident date on a header alone is the mistake the exclusion avoids. NO
+    /// distinct-cardinality floor: a constant version column (`1.6.1` on every row) is
+    /// normal and correct, so the header gate — not diversity — is the precision.
+    /// Value-based (0048), RHH-disableable, NO retrain (0096).
+    fn version_string_recovery(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("version_string_recovery") {
+            return;
+        }
+        const LEAF: &str = "technology.development.version";
+        const FIRE_ON: &[&str] = &[
+            "unknown",
+            "representation.text.plain_text",
+            "representation.text.word",
+            "representation.numeric.integer_number",
+            "representation.numeric.decimal_number",
+        ];
+        if !FIRE_ON.contains(&result.label.as_str()) || !header_corroborates_version(header) {
+            return;
+        }
+        let non_empty = non_empty_trimmed(sample);
+        if non_empty.len() < 3 {
+            return;
+        }
+        let passed = non_empty
+            .iter()
+            .filter(|v| finetype_core::structure::is_version_string(v))
+            .count();
+        if passed * 10 < non_empty.len() * 9 {
+            return;
+        }
+        let from = result.label.clone();
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.9);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("version_string_recovery:{from}"));
         result.detected_locale = None;
     }
 

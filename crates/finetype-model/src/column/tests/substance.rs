@@ -2432,6 +2432,100 @@ fn delimited_array_recovery_needs_three_distinct() {
 }
 
 #[test]
+fn version_string_recovery_is_default_on() {
+    assert!(!rhh::is_disabled("version_string_recovery"));
+}
+
+#[test]
+fn version_string_recovery_promotes_version_headed() {
+    // A residual column of SemVer values under a version header -> version.
+    // Constant is fine (a table's rows share one software version) — no distinct floor.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    for header in ["ver", "version", "Fix Version/s", "Build", "firmware_rev"] {
+        let vals: Vec<String> = vec!["1.6.1", "1.6.1", "1.6.1", "1.6.1"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let r = cc
+            .compose_from_sense(header, &vals, "unknown", 0.5)
+            .unwrap();
+        assert_eq!(
+            r.label, "technology.development.version",
+            "header {header} rule {:?}",
+            r.disambiguation_rule
+        );
+    }
+}
+
+#[test]
+fn version_string_recovery_needs_version_header() {
+    // The header gate is load-bearing: the SAME SemVer values under a non-version
+    // header must NOT be promoted (value shape alone is a date/calver magnet).
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let vals: Vec<String> = vec!["1.6.1", "1.11.23", "2.0.0"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    for header in ["measurement", "score", "ratio"] {
+        let r = cc
+            .compose_from_sense(header, &vals, "unknown", 0.5)
+            .unwrap();
+        assert_ne!(
+            r.label, "technology.development.version",
+            "header {header} must not promote"
+        );
+    }
+    // a date token vetoes even a version-ish header token
+    let r = cc
+        .compose_from_sense("release_date", &vals, "unknown", 0.5)
+        .unwrap();
+    assert_ne!(
+        r.label, "technology.development.version",
+        "date-token header must veto"
+    );
+}
+
+#[test]
+fn version_string_recovery_year_veto_spares_dates() {
+    // A YYYY.MM.DD date under a version header must NOT be promoted — the
+    // four-digit-year veto rejects the values, so <90% pass.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let dates: Vec<String> = vec!["2021.03.15", "2016.10.05", "2019.01.29"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("version", &dates, "unknown", 0.5)
+        .unwrap();
+    assert_ne!(
+        r.label, "technology.development.version",
+        "year-veto must reject date values"
+    );
+}
+
+#[test]
+fn version_string_recovery_residual_only() {
+    // A confident date leaf is NOT overridden (residual-only; that value-ambiguous
+    // boundary is value_sharpen Rule 31's job, not a header override).
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let vals: Vec<String> = vec!["1.11.23", "1.11.23", "1.11.23"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("Build", &vals, "datetime.date.dmy_short_dot", 0.9)
+        .unwrap();
+    assert_ne!(
+        r.label, "technology.development.version",
+        "confident date leaf must not be overridden"
+    );
+}
+
+#[test]
 fn naics_recovery_admits_bare_code_header_for_long_codes() {
     // The real product surface: a 6-digit NAICS column under a bare `code`
     // header. Membership at 6 digits is decisive; the generic-code tier admits it.

@@ -721,6 +721,61 @@ pub fn delimited_list_delim(value: &str) -> Option<ListDelim> {
     None
 }
 
+/// True if `value` is a semantic-version string: `v?MAJOR.MINOR.PATCH` (exactly
+/// three numeric components) with an optional `-prerelease` / `+build` suffix.
+///
+/// This is the VALUE half of the header-gated `version_string_recovery` guard.
+/// Unlike the self-precise structural checks in this module, the version shape is
+/// value-AMBIGUOUS: a `YYYY.MM.DD` date and a `YYYY.MM.PATCH` calendar version
+/// share the same three-dotted-number shape, so this predicate is NEVER used
+/// without a corroborating `version`/`ver`/`build` header. It carries one
+/// discriminator the taxonomy's plain SemVer regex lacks — a **year veto**: any
+/// component that is a four-digit 1900–2099 number is a date / calver, not a
+/// SemVer release, so the value is rejected (`2021.03.15`, `1.2020.0`). A genuine
+/// SemVer never carries a year-shaped component (`10.15.7`, `1.20.0` pass).
+///
+/// Requirements:
+/// - optional leading `v` / `V`
+/// - exactly three `.`-separated components, each non-empty ASCII digits
+/// - no component is a four-digit 1900–2099 year
+/// - an optional `-`/`+` suffix must be a non-empty identifier (`[A-Za-z0-9.+-]`)
+pub fn is_version_string(value: &str) -> bool {
+    let v = value.trim().trim_start_matches(['v', 'V']);
+    // Split the numeric core from an optional -prerelease / +build tail.
+    let (core, has_suffix) = match v.find(['-', '+']) {
+        Some(i) => (&v[..i], true),
+        None => (v, false),
+    };
+    let parts: Vec<&str> = core.split('.').collect();
+    if parts.len() != 3 {
+        return false;
+    }
+    for p in &parts {
+        if p.is_empty() || !p.bytes().all(|b| b.is_ascii_digit()) {
+            return false;
+        }
+        // Year veto: a four-digit 1900–2099 component is a date / calver.
+        if p.len() == 4 {
+            if let Ok(n) = p.parse::<u32>() {
+                if (1900..=2099).contains(&n) {
+                    return false;
+                }
+            }
+        }
+    }
+    if has_suffix {
+        let suffix = &v[core.len() + 1..];
+        if suffix.is_empty()
+            || !suffix
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'+'))
+        {
+            return false;
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1058,5 +1113,41 @@ mod tests {
         ); // JVM sig
         assert_eq!(delimited_list_delim("demirbas/|26Rew/|{\"olculer\""), None);
         // path|hash|json record
+    }
+
+    #[test]
+    fn version_string_accepts_semver() {
+        for s in [
+            "1.6.1",
+            "v1.2.3",
+            "V2.0.0",
+            "0.2.53",
+            "10.15.7",
+            "1.20.0",
+            "1.2.3-alpha",
+            "1.2.3-beta.1",
+            "1.2.3+build.123",
+            "1.11.23",
+        ] {
+            assert!(is_version_string(s), "{s} must be a version");
+        }
+    }
+
+    #[test]
+    fn version_string_rejects_dates_and_non_versions() {
+        for s in [
+            "2021.03.15", // YYYY.MM.DD date -> year veto
+            "1.2020.0",   // calver year component -> year veto
+            "2016.10.05", // date -> year veto
+            "1.2",        // two components (decimal / partial)
+            "1.2.3.4",    // four components (IPv4)
+            "1.2.x",      // non-numeric component
+            "",
+            "foo",
+            "1..3", // empty component
+            "v",    // bare v
+        ] {
+            assert!(!is_version_string(s), "{s} must NOT be a version");
+        }
     }
 }
