@@ -153,21 +153,56 @@ pub(crate) fn header_corroborates_tld(header: &str) -> bool {
         .any(|tok| tok == "tld" || tok == "tlds")
 }
 
+/// Split a header into lowercase word tokens, breaking on non-alphanumerics AND
+/// camelCase boundaries (a lowercase letter or digit immediately followed by an
+/// uppercase letter). A glued header like `psychopyVersion` / `AffectsVersions`
+/// thus yields a `version` / `versions` token, while an all-lowercase word such
+/// as `conversion` stays a single token (no boundary) and never matches. This is
+/// the tokeniser `header_corroborates_version` needs: the version headers in the
+/// corpus are overwhelmingly glued camelCase (`psychopyVersion` ×59,
+/// `platformBuildVersionName`), which a plain non-alphanumeric split misses.
+fn header_word_tokens(header: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut cur = String::new();
+    let mut prev: Option<char> = None;
+    for c in header.chars() {
+        if !c.is_alphanumeric() {
+            if !cur.is_empty() {
+                tokens.push(std::mem::take(&mut cur));
+            }
+            prev = None;
+            continue;
+        }
+        // camelCase boundary: a lowercase/digit run followed by an uppercase letter.
+        if let Some(p) = prev {
+            if c.is_uppercase() && (p.is_lowercase() || p.is_ascii_digit()) && !cur.is_empty() {
+                tokens.push(std::mem::take(&mut cur));
+            }
+        }
+        cur.extend(c.to_lowercase());
+        prev = Some(c);
+    }
+    if !cur.is_empty() {
+        tokens.push(cur);
+    }
+    tokens
+}
+
 /// True if the header names a software-version column (`version`, `ver`, `build`,
 /// `firmware`, `release`, `rev`/`revision`, `semver`) AND carries no date/time
-/// token. Token-exact. The header gate is LOAD-BEARING for `version_string_recovery`:
-/// a bare `1.2.3` is value-ambiguous with a `DD.MM.YY` date and a `YYYY.MM.PATCH`
-/// calver, so the value shape alone over-promotes (measured: the header gate cuts
-/// the version-shaped reservoir 570 → 372, removing 20 date columns). Date tokens
-/// VETO because `release_date`/`build_date` tokenise to a version stem yet name a
-/// date column.
+/// token. Tokenises camelCase-aware (`header_word_tokens`) so a glued
+/// `psychopyVersion` / `AffectsVersions` is caught while `conversion` is not. The
+/// header gate is LOAD-BEARING for `version_string_recovery`: a bare `1.2.3` is
+/// value-ambiguous with a `DD.MM.YY` date and a `YYYY.MM.PATCH` calver, so the
+/// value shape alone over-promotes (measured: the header gate cuts the version-shaped
+/// reservoir 570 → 372, removing 20 date columns). Date tokens VETO because
+/// `release_date`/`buildDate` name a date column, not a version.
 pub(crate) fn header_corroborates_version(header: &str) -> bool {
-    let lower = header.to_lowercase();
     let mut ver_tok = false;
     let mut date_tok = false;
-    for tok in lower.split(|c: char| !c.is_alphanumeric()) {
+    for tok in header_word_tokens(header) {
         if matches!(
-            tok,
+            tok.as_str(),
             "version"
                 | "versions"
                 | "ver"
@@ -181,7 +216,7 @@ pub(crate) fn header_corroborates_version(header: &str) -> bool {
             ver_tok = true;
         }
         if matches!(
-            tok,
+            tok.as_str(),
             "date"
                 | "time"
                 | "year"

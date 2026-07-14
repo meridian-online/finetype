@@ -2526,6 +2526,41 @@ fn version_string_recovery_residual_only() {
 }
 
 #[test]
+fn version_string_recovery_camelcase_header() {
+    // Glued camelCase version headers (psychopyVersion, AffectsVersions) tokenise
+    // camelCase-aware -> a `version` token, so they promote...
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let vals: Vec<String> = vec!["0.11.1", "0.9.5", "0.3.0", "0.2.0"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    for header in [
+        "psychopyVersion",
+        "AffectsVersions",
+        "platformBuildVersionName",
+    ] {
+        let r = cc
+            .compose_from_sense(header, &vals, "unknown", 0.5)
+            .unwrap();
+        assert_eq!(
+            r.label, "technology.development.version",
+            "camelCase header {header} rule {:?}",
+            r.disambiguation_rule
+        );
+    }
+    // ...but an all-lowercase false friend (conversion) has no camelCase boundary,
+    // so it stays one token and must NOT promote.
+    let r = cc
+        .compose_from_sense("conversion", &vals, "unknown", 0.5)
+        .unwrap();
+    assert_ne!(
+        r.label, "technology.development.version",
+        "conversion must not be read as a version header"
+    );
+}
+
+#[test]
 fn naics_recovery_admits_bare_code_header_for_long_codes() {
     // The real product surface: a 6-digit NAICS column under a bare `code`
     // header. Membership at 6 digits is decisive; the generic-code tier admits it.

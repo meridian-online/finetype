@@ -68,5 +68,31 @@ production.
 | Representative (advisory) | **195/260 = 0.750** — flat vs standing baseline |
 | Mandatory spot-check (414 recovered) | **0 FP** — every column version-headed SemVer; header distribution is all version tokens (`ver` 348, `repo2docker_version` 23, `latest_stable_release_number` 15, `version` 8, …) |
 
-Substrate: this file; `output/version-string/{mine.py, gate/, gold_pred_*.tsv, repr_pred_cand.tsv}`;
+## Addendum (2026-07-14): camelCase header gap + the value-evidence question
+
+**Value-evidence tier — investigated, rejected.** Could a column's own values disqualify the
+date hypothesis (`0.2.53` is impossible as any date → version, no header)? Measured
+(`value_evidence.py`, ordering-agnostic impossible-date test across all six DMY/MDY/YMD
+permutations): it doesn't pay. Of 580 SemVer-shaped columns, **499 are constant** (`ver=1.6.1`
+repeated) — no second value to disqualify anything, so value-evidence is structurally impossible
+for 86% of the reservoir. Only 82 columns carry an impossible-date value, 47 already header-gated;
+the incremental headerless reach is 35 columns, ~20 genuine. And going headerless opens an FP door
+the header shuts: `fax :: 963.777.4065` (a phone number) and `TIME :: 12.41.56` (a clock) are both
+impossible-as-date yet not versions. So value-evidence trades the header gate for a phone/time
+problem to reach ~20 columns — not worth it. The value-evidence logic that DOES work is already
+shipped: `value_sharpen` Rule 31 (impossible-DMY-segment → version) on date-sensed columns.
+
+**camelCase header gap — fixed (61 more columns, 0 FP).** The scout surfaced a real gate gap: the
+header tokeniser split only on non-alphanumerics, so glued camelCase version headers slipped
+through — `psychopyVersion` (54 cols), `AgentVersion`, `FixVersions`, `platformBuildVersionName`
+tokenised to one glued token that wasn't exactly `version`. Fixed with a camelCase-aware tokeniser
+(`header_word_tokens`: split on non-alphanumerics AND lowercase/digit→uppercase boundaries), so
+`psychopyVersion` → `[psychopy, version]` matches while all-lowercase `conversion` (no boundary)
+stays intact and never matches. Measured false friends (`conversion`/`subversion`/…) among
+SemVer-shaped columns: **zero**, doubly-guarded by the value gate. Gate GO, **61 new version
+columns, 0 lost, 0 FP**, gold 882/1037 flat (0 rows flipped). Whole guard now recovers 475.
+Substring matching was rejected in favour of camelCase tokenisation — the latter is the root-cause
+fix (a glued-word tokeniser) with no false-friend exposure at all.
+
+Substrate: this file; `output/version-string/{mine.py, value_evidence.py, gate/, gold_pred_*.tsv}`;
 roadmap `output/reservoir-mining/roadmap.md`.
