@@ -5,6 +5,53 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.50] - 2026-07-14
+
+### Added
+
+- **A bare filename is now its own type.** A file name with a real extension
+  (`report_final.xlsx`, `IMG_0042.png`, `atarisy2.cpp`) used to scatter across "plain text",
+  "an entity name", "an identifier", even "a crypto wallet". It now types as
+  `technology.filesystem.filename` — a sibling of the file-*path* type, placed in the
+  filesystem family rather than with file *properties* (extension, size). The shape `word.word`
+  is not precise on its own, so the substance is a curated set of real extensions plus a
+  letter-bearing stem; a bare ccTLD domain (`gov.md`) is deliberately left as a hostname.
+  Recovered deterministically at profile time; the 244-dim model does not predict the new leaf,
+  and no retrain was needed. (reservoir-mining sweep)
+
+### Fixed
+
+- **Software versions are no longer thrown away.** A column of `1.6.1` / `1.11.23` under a
+  `version` / `ver` / `build` header — including glued camelCase headers like `psychopyVersion`
+  or `AffectsVersions` — now types as `technology.development.version` where it used to be
+  discarded as unknown. The header is load-bearing because `1.2.3` is shape-identical to a
+  `DD.MM.YY` date and a `YYYY.MM.PATCH` calendar version, so a value-only rule would over-fire;
+  a four-digit-year veto keeps dates and calver out. (reservoir-mining sweep)
+
+- **Delimited lists are recognised as lists.** A column of `Biography|Comedy|Drama`,
+  `subjects: nanoparticles;polymers`, or `[20000, 10000, 15000]` now types as the matching
+  `container.array.*` type instead of "plain text" or "an entity name". Only the self-precise
+  delimiters are recovered — brackets that disambiguate a comma, plus bare pipe and semicolon —
+  because a bare `City, Region` comma is structurally identical whether it separates a list or
+  sits inside one place name, so bare-comma columns are deliberately left alone. (reservoir-mining sweep)
+
+- **URLs are recovered from confident mislabels.** A URL column the model had filed as an IPv6
+  address, an XML blob, an ARN, or an entity name now types as a URL — the URL validator
+  (a scheme and a dotted host) is the check, so a genuine member of those types is never touched.
+
+- **Dotted code namespaces are recognised.** `.NET` / `Java` namespaces
+  (`ICSharpCode.NRefactory6`, `Abot2.Tests.Integration`) now type as `technology.code.qualified_name`
+  instead of plain text, an entity name, or a hostname. Real hosts (`www.breitbart.com`) are
+  spared by a stricter check on the confident-mislabel side.
+
+- **Numeric identifier columns split by what they are.** A sequential row identifier now types as
+  an auto-increment, while an opaque numeric code types as a numeric code — resolving a boundary
+  the gold and representative fixtures had disagreed on, and improving both.
+
+- **Legal-form (ELF) codes no longer read as postal codes.** A column of entity legal-form codes
+  under a `legal_form` / `elf` header that the model reached for a postal code is demoted off
+  postal.
+
 ## [0.6.49] - 2026-07-13
 
 ### Added
