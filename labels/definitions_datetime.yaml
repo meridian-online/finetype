@@ -51,7 +51,7 @@ datetime.timestamp.iso_8601:
     - "2024-01-15T10:30:00Z"
     - "2019-12-31T23:59:59Z"
     - "2023-06-01T00:00:00Z"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references:
     - title: "ISO 8601-1:2019"
@@ -86,7 +86,7 @@ datetime.timestamp.iso_8601_compact:
   samples:
     - "20240115T103000"
     - "20191231T235959"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references:
     - title: "ISO 8601-1:2019"
@@ -119,7 +119,7 @@ datetime.timestamp.iso_8601_microseconds:
   samples:
     - "2024-01-15T10:30:00.123456Z"
     - "2019-12-31T23:59:59.000000Z"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references:
     - title: "ISO 8601-1:2019"
@@ -153,7 +153,7 @@ datetime.timestamp.iso_8601_offset:
     - "2024-01-15T10:30:00+05:00"
     - "2023-12-29T10:45:30-05:00"
     - "2024-06-15T12:00:00+00:00"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references:
     - title: "ISO 8601-1:2019"
@@ -184,7 +184,7 @@ datetime.timestamp.rfc_2822:
   samples:
     - "Tue, 15 Jan 2024 10:30:00 GMT+00:00"
     - "Sun, 31 Dec 2023 23:59:59 GMT+00:00"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.rfc-editor.org/rfc/rfc2822"
   references:
     - title: "RFC 2822 - Internet Message Format"
@@ -221,7 +221,7 @@ datetime.timestamp.rfc_3339:
     - "2019-12-31 23:59:59-05:00"
     - "2023-06-01 12:00:00+09:00"
     - "2024-03-15 10:30:00Z"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.rfc-editor.org/rfc/rfc3339"
   references:
     - title: "RFC 3339 - Date and Time on the Internet"
@@ -260,7 +260,7 @@ datetime.timestamp.sql_standard:
   samples:
     - "2024-01-15 10:30:00"
     - "2019-12-31 23:59:59"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/76583.html"
   references:
     - title: "SQL Standard (ISO/IEC 9075)"
@@ -295,7 +295,7 @@ datetime.timestamp.sql_minutes:
   samples:
     - "2024-01-15 10:30"
     - "2019-12-31 23:59"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/76583.html"
   references:
     - title: "SQL Standard (ISO/IEC 9075)"
@@ -332,7 +332,7 @@ datetime.timestamp.mdy_12h:
   samples:
     - "01/15/2024 10:30 AM"
     - "12/31/2019 11:59 PM"
-  glyph: "🕒"
+  icon: clock
   references:
     - title: "Date format by country - United States"
       link: "https://en.wikipedia.org/wiki/Date_format_by_country#United_States"
@@ -362,7 +362,7 @@ datetime.timestamp.mdy_24h:
   samples:
     - "01/15/2024 10:30:00"
     - "12/31/2019 23:59:59"
-  glyph: "🕒"
+  icon: clock
   references: null
   notes: "v1 name: datetime.formatted_datetime"
 
@@ -390,7 +390,7 @@ datetime.timestamp.dmy_hm:
   samples:
     - "15/01/2024 10:30"
     - "31/12/2019 23:59"
-  glyph: "🕒"
+  icon: clock
   references:
     - title: "Date format by country - Europe"
       link: "https://en.wikipedia.org/wiki/Date_format_by_country#Europe"
@@ -422,7 +422,7 @@ datetime.timestamp.iso_microseconds:
   samples:
     - "2024-01-15T10:30:00.123456"
     - "2019-12-31T23:59:59.000000"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references: null
   notes: "v1 name: datetime.datetime. Distinct from iso_8601_microseconds (has no trailing Z)."
@@ -454,7 +454,7 @@ datetime.timestamp.iso_seconds:
   samples:
     - "2013-06-04T01:02:03"
     - "2024-01-15T10:30:00"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references: null
   notes: >
@@ -491,7 +491,7 @@ datetime.timestamp.iso_minutes:
   samples:
     - "2013-06-04T01:02"
     - "2024-01-15T10:30"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references: null
   notes: >
@@ -528,7 +528,7 @@ datetime.timestamp.iso_milliseconds:
   samples:
     - "2013-06-04T01:02:03.123"
     - "2024-01-15T10:30:00.500"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references: null
   notes: >
@@ -562,7 +562,7 @@ datetime.timestamp.rfc_2822_ordinal:
     - "15th Jan 2024 10:30:00 +0000"
     - "1st Jan 2020 00:00:00 +0000"
     - "22nd Jul 2028 21:48:59 +0000"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.rfc-editor.org/rfc/rfc2822"
   references:
     - title: "RFC 2822 - Internet Message Format"
@@ -606,7 +606,7 @@ datetime.date.iso:
     - "2024-01-15"
     - "2019-12-31"
     - "2000-01-01"
-  glyph: "📅"
+  icon: calendar
   canonical: "https://www.iso.org/standard/70907.html"
   references:
     - title: "ISO 8601-1:2019"
@@ -640,7 +640,7 @@ datetime.date.mdy_slash:
   samples:
     - "01/15/2024"
     - "12/31/2019"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: "v1 name: datetime.formatted_date. Ambiguous with dmy_slash when day <= 12."
 
@@ -671,7 +671,7 @@ datetime.date.dmy_slash:
   samples:
     - "15/01/2024"
     - "31/12/2019"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     NEW in v2. Critical for non-US data. Ambiguous with mdy_slash when
@@ -704,7 +704,7 @@ datetime.date.dmy_dot:
   samples:
     - "15.01.2024"
     - "31.12.2019"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: "NEW in v2. Common in German-speaking and Eastern European data."
 
@@ -734,7 +734,7 @@ datetime.date.short_dmy:
   samples:
     - "15-01-24"
     - "31-12-99"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     Ambiguous with short_mdy in single-value mode (same regex pattern).
@@ -766,7 +766,7 @@ datetime.date.short_mdy:
   samples:
     - "01-15-24"
     - "12-31-99"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     Same regex as short_dmy — requires column-mode inference to disambiguate.
@@ -797,7 +797,7 @@ datetime.date.short_ymd:
   samples:
     - "24-01-15"
     - "99-12-31"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: null
 
@@ -827,7 +827,7 @@ datetime.date.compact_ymd:
   samples:
     - "20240115"
     - "20191231"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: "v1 name: date.numeric_ymd"
 
@@ -856,7 +856,7 @@ datetime.date.compact_dmy:
   samples:
     - "15012024"
     - "31122019"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     v1 name: date.numeric_dmy. Same regex as compact_ymd/compact_mdy.
@@ -887,7 +887,7 @@ datetime.date.compact_mdy:
   samples:
     - "01152024"
     - "12312019"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     v1 name: date.numeric_mdy. Same regex as compact_ymd/compact_dmy.
@@ -933,7 +933,7 @@ datetime.date.abbreviated_month:
     - "Jan 15, 2024"
     - "15 Jan 2024"
     - "Dec 31, 2019"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: "Per-locale samples needed for non-EN locales."
 
@@ -975,7 +975,7 @@ datetime.date.long_full_month:
     - "January 15, 2024"
     - "June 1, 2000"
     - "December 31, 2019"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: "v1 name: date.long_full_month_name"
 
@@ -1009,7 +1009,7 @@ datetime.date.weekday_abbreviated_month:
   samples:
     - "Monday, Jan 15, 2024"
     - "Tuesday, 31 Dec 2019"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: "v1 name: date.full_weekday_abbreviated_month"
 
@@ -1043,7 +1043,7 @@ datetime.date.weekday_full_month:
   samples:
     - "Monday, January 15, 2024"
     - "Tuesday, December 31, 2019"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: "v1 name: date.long_weekday_month_name"
 
@@ -1074,7 +1074,7 @@ datetime.date.ordinal:
     - "2024-015"
     - "2019-365"
     - "2020-366"
-  glyph: "📅"
+  icon: calendar
   references:
     - title: "ISO 8601-1:2019"
       link: "https://www.iso.org/standard/70907.html"
@@ -1105,7 +1105,7 @@ datetime.date.julian:
   samples:
     - "24-015"
     - "23-365"
-  glyph: "📅"
+  icon: calendar
   references:
     - title: "Julian Day Number"
       link: "https://en.wikipedia.org/wiki/Julian_day"
@@ -1137,7 +1137,7 @@ datetime.date.iso_week:
   samples:
     - "2024-W03"
     - "2019-W52"
-  glyph: "📅"
+  icon: calendar
   canonical: "https://www.iso.org/standard/70907.html"
   references:
     - title: "ISO 8601 Week Date"
@@ -1178,7 +1178,7 @@ datetime.time.iso:
   samples:
     - "10:30:00.123456"
     - "23:59:59.000000"
-  glyph: "🕐"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references: null
   notes: "v1 name: datetime.time"
@@ -1210,7 +1210,7 @@ datetime.time.hms_24h:
     - "10:30:00"
     - "23:59:59"
     - "00:00:00"
-  glyph: "🕐"
+  icon: clock
   references: null
   notes: "v1 name: datetime.formatted_time"
 
@@ -1241,7 +1241,7 @@ datetime.time.hm_24h:
     - "10:30"
     - "23:59"
     - "00:00"
-  glyph: "🕐"
+  icon: clock
   references: null
   notes: "NEW in v2."
 
@@ -1272,7 +1272,7 @@ datetime.time.hms_12h:
     - "10:30:00 AM"
     - "11:59:59 PM"
     - "12:00:00 AM"
-  glyph: "🕐"
+  icon: clock
   references: null
   notes: "NEW in v2."
 
@@ -1302,7 +1302,7 @@ datetime.time.hm_12h:
   samples:
     - "10:30 AM"
     - "11:59 PM"
-  glyph: "🕐"
+  icon: clock
   references: null
   notes: "NEW in v2."
 
@@ -1339,7 +1339,7 @@ datetime.epoch.unix_seconds:
     - "1705312200"
     - "1577836799"
     - "1000000000"
-  glyph: "🕐"
+  icon: clock
   canonical: "https://pubs.opengroup.org/onlinepubs/9699919799/"
   references:
     - title: "The Open Group Base Specifications - Epoch"
@@ -1374,7 +1374,7 @@ datetime.epoch.unix_milliseconds:
   samples:
     - "1705312200000"
     - "1577836799999"
-  glyph: "🕐"
+  icon: clock
   canonical: "https://pubs.opengroup.org/onlinepubs/9699919799/"
   references:
     - title: "The Open Group Base Specifications - Epoch"
@@ -1406,7 +1406,7 @@ datetime.epoch.unix_microseconds:
   samples:
     - "1705312200000000"
     - "1577836799999999"
-  glyph: "🕐"
+  icon: clock
   canonical: "https://pubs.opengroup.org/onlinepubs/9699919799/"
   references: null
   notes: "NEW in v2."
@@ -1442,7 +1442,7 @@ datetime.offset.iana:
     - "America/New_York"
     - "Europe/London"
     - "Asia/Tokyo"
-  glyph: "🌐"
+  icon: world
   canonical: "https://www.iana.org/time-zones"
   references:
     - title: "IANA Time Zone Database"
@@ -1479,7 +1479,7 @@ datetime.offset.timezone_abbreviation:
     - "EST"
     - "CEST"
     - "GMT"
-  glyph: "🌐"
+  icon: world
   references: null
   notes: >
     Unlike IANA zone names, the common timezone abbreviations are a small,
@@ -1521,7 +1521,7 @@ datetime.offset.utc:
     - "UTC +05:00"
     - "UTC -08:00"
     - "UTC +00:00"
-  glyph: "🌐"
+  icon: world
   canonical: "https://www.iso.org/standard/70907.html"
   references: null
   notes: "v1 name: datetime.gmt_offset"
@@ -1569,7 +1569,7 @@ datetime.duration.iso_8601:
     - "P1Y6M"
     - "P2W"
     - "P1Y2M3DT4H5M6S"
-  glyph: "⏳"
+  icon: hourglass
   canonical: "https://www.iso.org/standard/70907.html"
   references:
     - title: "ISO 8601-1:2019 Durations"
@@ -1614,7 +1614,7 @@ datetime.component.year:
     - "2024"
     - "1999"
     - "2000"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: "v1 name: datetime.year. Was designation: duplicate."
 
@@ -1770,7 +1770,7 @@ datetime.component.day_of_week:
     - "Monday"
     - "Friday"
     - "Sunday"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: "v1 name: datetime.day_of_week. Enum shown is EN only — each locale has its own enum."
 
@@ -1921,7 +1921,7 @@ datetime.component.month_name:
     - "January"
     - "June"
     - "December"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: "v1 name: date.month. Enum shown is EN only — each locale has its own enum."
 
@@ -1961,7 +1961,7 @@ datetime.component.periodicity:
     - "Daily"
     - "Monthly"
     - "Quarterly"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: null
 
@@ -2003,7 +2003,7 @@ datetime.timestamp.sql_microseconds:
     - "2024-01-15 14:30:00.123456"
     - "2019-12-31 23:59:59.000000"
     - "2023-06-01 08:15:30.789012"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/76583.html"
   references: null
   notes: >
@@ -2037,7 +2037,7 @@ datetime.timestamp.sql_milliseconds:
     - "2024-01-15 14:30:00.123"
     - "2019-12-31 23:59:59.000"
     - "2023-06-01 08:15:30.789"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/76583.html"
   references: null
   notes: >
@@ -2071,7 +2071,7 @@ datetime.timestamp.iso_8601_milliseconds:
     - "2024-01-15T14:30:00.123Z"
     - "2019-12-31T23:59:59.999Z"
     - "2023-06-01T00:00:00.000Z"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references:
     - title: "MDN Date.toISOString()"
@@ -2108,7 +2108,7 @@ datetime.timestamp.iso_8601_millis_offset:
     - "2024-01-15T14:30:00.123+05:30"
     - "2023-12-31T23:59:59.999-05:00"
     - "2024-06-01T12:00:00.000+00:00"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references: null
   notes: >
@@ -2142,7 +2142,7 @@ datetime.timestamp.iso_8601_micros_offset:
     - "2024-01-15T14:30:00.123456+00:00"
     - "2023-12-31T23:59:59.000000-05:00"
     - "2024-06-01T08:15:30.789012+05:30"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references:
     - title: "RFC 5424 — The Syslog Protocol"
@@ -2180,7 +2180,7 @@ datetime.timestamp.clf:
     - "15/Jan/2024:14:30:00 +0000"
     - "31/Dec/2023:23:59:59 -0500"
     - "01/Jun/2024:08:15:30 +0530"
-  glyph: "🕒"
+  icon: clock
   references:
     - title: "Apache Log Files"
       link: "https://httpd.apache.org/docs/2.4/logs.html"
@@ -2216,7 +2216,7 @@ datetime.timestamp.syslog_bsd:
     - "Jan 15 14:30:00"
     - "Dec 31 23:59:59"
     - "Jun  1 08:15:30"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://datatracker.ietf.org/doc/html/rfc3164"
   references:
     - title: "RFC 3164 — The BSD syslog Protocol"
@@ -2253,7 +2253,7 @@ datetime.timestamp.sql_microseconds_offset:
     - "2024-01-15 14:30:00.123456+00:00"
     - "2023-12-31 23:59:59.000000-05:00"
     - "2024-06-01 08:15:30.789012+05:30"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/76583.html"
   references: null
   notes: >
@@ -2287,7 +2287,7 @@ datetime.timestamp.pg_short_offset:
     - "2024-01-15 14:30:00.123456-05"
     - "2023-12-31 23:59:59.000000+00"
     - "2024-06-01 08:15:30.789012+10"
-  glyph: "🕒"
+  icon: clock
   references: null
   notes: >
     New in format coverage expansion. PostgreSQL sometimes emits short offsets
@@ -2321,7 +2321,7 @@ datetime.timestamp.dot_dmy_24h:
     - "15.01.2024 14:30:00"
     - "31.12.2023 23:59:59"
     - "01.06.2024 08:15:30"
-  glyph: "🕒"
+  icon: clock
   references: null
   notes: >
     New in format coverage expansion. Common in DACH region (Germany, Austria,
@@ -2354,7 +2354,7 @@ datetime.timestamp.slash_ymd_24h:
     - "2024/01/15 14:30:00"
     - "2023/12/31 23:59:59"
     - "2024/06/01 08:15:30"
-  glyph: "🕒"
+  icon: clock
   references: null
   notes: >
     New in format coverage expansion. Japanese system logs, .NET ja-JP culture.
@@ -2387,7 +2387,7 @@ datetime.timestamp.ctime:
     - "Mon Jan 15 14:30:00 2024"
     - "Tue Dec 31 23:59:59 2019"
     - "Sat Jun  1 08:15:30 2024"
-  glyph: "🕒"
+  icon: clock
   references: null
   notes: >
     New in format coverage expansion. Unix tradition format. Day may be
@@ -2420,7 +2420,7 @@ datetime.timestamp.epoch_nanoseconds:
     - "1705325400000000000"
     - "1704067199000000000"
     - "1717228530000000000"
-  glyph: "🕒"
+  icon: clock
   references:
     - title: "OpenTelemetry time_unix_nano"
       link: "https://opentelemetry.io/docs/specs/otel/metrics/data-model/"
@@ -2457,7 +2457,7 @@ datetime.timestamp.iso_space_zulu:
     - "2024-01-15 14:30:00Z"
     - "2023-12-31 23:59:59Z"
     - "2024-06-01 00:00:00Z"
-  glyph: "🕒"
+  icon: clock
   canonical: "https://www.iso.org/standard/70907.html"
   references: null
   notes: >
@@ -2491,7 +2491,7 @@ datetime.timestamp.dot_ymd_24h:
     - "2024.01.15 14:30:00"
     - "2023.12.31 23:59:59"
     - "2024.06.01 08:15:30"
-  glyph: "🕒"
+  icon: clock
   references: null
   notes: >
     New in format coverage expansion. Low prevalence. East Asian/Baltic niche.
@@ -2535,7 +2535,7 @@ datetime.date.ymd_slash:
     - "2024/01/15"
     - "2023/12/31"
     - "2000/06/01"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. High prevalence in East Asian data.
@@ -2567,7 +2567,7 @@ datetime.date.ymd_dot:
     - "2024.01.15"
     - "2023.12.31"
     - "2000.06.01"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Hungarian, Norwegian, East Asian systems.
@@ -2600,7 +2600,7 @@ datetime.date.dmy_dash:
     - "15-01-2024"
     - "31-12-2023"
     - "01-06-2000"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Ambiguous with mdy_dash when day <= 12.
@@ -2633,7 +2633,7 @@ datetime.date.mdy_dash:
     - "01-15-2024"
     - "12-31-2023"
     - "06-01-2000"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. US database exports. Ambiguous with
@@ -2667,7 +2667,7 @@ datetime.date.dmy_space_abbrev:
     - "15 Jan 2024"
     - "31 Dec 2023"
     - "1 Jun 2000"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. RFC 2822 date portion, military/NATO.
@@ -2699,7 +2699,7 @@ datetime.date.dmy_space_full:
     - "15 January 2024"
     - "31 December 2023"
     - "1 June 2000"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. CLDR en-GB long format.
@@ -2732,7 +2732,7 @@ datetime.date.abbrev_month_no_comma:
     - "Jan 15 2024"
     - "Dec 31 2023"
     - "Jun 1 2000"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. SQL Server BCP output. Distinct from
@@ -2765,7 +2765,7 @@ datetime.date.full_month_no_comma:
     - "January 15 2024"
     - "December 31 2023"
     - "June 1 2000"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Variant of long_full_month without comma.
@@ -2798,7 +2798,7 @@ datetime.date.dmy_dash_abbrev:
     - "15-Jan-2024"
     - "31-Dec-2023"
     - "01-Jun-2000"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Oracle NLS_DATE_FORMAT default (DD-MON-YYYY).
@@ -2832,7 +2832,7 @@ datetime.date.dmy_dash_abbrev_short:
     - "15-Jan-24"
     - "31-Dec-99"
     - "01-Jun-00"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Oracle classic DD-MON-RR format.
@@ -2864,7 +2864,7 @@ datetime.date.mdy_short_slash:
     - "01/15/24"
     - "12/31/23"
     - "06/01/00"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Excel US short date. Ambiguous with
@@ -2897,7 +2897,7 @@ datetime.date.dmy_short_slash:
     - "15/01/24"
     - "31/12/23"
     - "01/06/00"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Excel EU short date. Ambiguous with
@@ -2930,7 +2930,7 @@ datetime.date.dmy_short_dot:
     - "15.01.24"
     - "31.12.23"
     - "01.06.00"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. CLDR de-DE short format.
@@ -2964,7 +2964,7 @@ datetime.date.year_month:
     - "2024-01"
     - "2023-12"
     - "2000-06"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. ISO 8601 truncated date.
@@ -3000,7 +3000,7 @@ datetime.date.compact_ym:
     - "202401"
     - "202312"
     - "200006"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Data warehouse period keys.
@@ -3033,7 +3033,7 @@ datetime.date.month_year_full:
     - "January 2024"
     - "December 2023"
     - "June 2000"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Financial reports, gov statistics.
@@ -3065,7 +3065,7 @@ datetime.date.month_year_abbrev:
     - "Jan 2024"
     - "Dec 2023"
     - "Jun 2000"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Financial dashboards, CLDR yMMM skeleton.
@@ -3102,7 +3102,7 @@ datetime.date.month_year_slash:
     - "06/2000"
     - "12/25"
     - "03/26"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Billing data, financial periodization.
@@ -3136,7 +3136,7 @@ datetime.date.weekday_dmy_full:
     - "Monday, 15 January 2024"
     - "Sunday, 31 December 2023"
     - "Saturday, 1 June 2024"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. CLDR en-GB full format.
@@ -3166,7 +3166,7 @@ datetime.date.chinese_ymd:
     - "2024\u5E741\u670815\u65E5"
     - "2023\u5E7412\u670825\u65E5"
     - "2022\u5E746\u67081\u65E5"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Chinese standard date with Unicode
@@ -3196,7 +3196,7 @@ datetime.date.korean_ymd:
     - "2024\uB144 1\uC6D4 15\uC77C"
     - "2023\uB144 12\uC6D4 25\uC77C"
     - "2022\uB144 6\uC6D4 1\uC77C"
-  glyph: "📅"
+  icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Korean standard date with Unicode
@@ -3239,7 +3239,7 @@ datetime.date.jp_era_short:
     - "R1/05/01"
     - "H31/04/30"
     - "S64/01/07"
-  glyph: "📅"
+  icon: calendar
   references:
     - title: "Date and time notation in Japan"
       link: "https://en.wikipedia.org/wiki/Date_and_time_notation_in_Japan"
@@ -3282,7 +3282,7 @@ datetime.date.jp_era_long:
     - "\u4EE4\u548C6\u5E741\u670815\u65E5"
     - "\u5E73\u621031\u5E744\u670830\u65E5"
     - "\u662D\u548C64\u5E741\u67087\u65E5"
-  glyph: "📅"
+  icon: calendar
   references:
     - title: "Date and time notation in Japan"
       link: "https://en.wikipedia.org/wiki/Date_and_time_notation_in_Japan"
@@ -3325,7 +3325,7 @@ datetime.period.quarter:
     - "Q4 2023"
     - "2024-Q2"
     - "2023 Q3"
-  glyph: "📆"
+  icon: calendar-event
   references: null
   notes: >
     New in format coverage expansion. Accepts both "Q1 2024" and "2024-Q1"
@@ -3361,7 +3361,7 @@ datetime.period.fiscal_year:
     - "FY24"
     - "FY2023"
     - "FY25"
-  glyph: "📆"
+  icon: calendar-event
   references: null
   notes: >
     New in format coverage expansion. Fiscal year offset context varies

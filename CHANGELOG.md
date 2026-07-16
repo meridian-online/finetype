@@ -5,6 +5,21 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.52] - 2026-07-17
+
+### Changed
+
+- **The per-type `glyph` field is renamed to `icon` and now holds a
+  library-agnostic icon *name* instead of an emoji.** The previous value was a
+  raw emoji (e.g. 🏦, 📅); it is now a neutral kebab-case name (e.g.
+  `building-bank`, `calendar`, `world`) that a host UI maps onto its own icon
+  set (Tabler, Lucide, …). All 251 leaf types carry an `icon`; the 45 distinct
+  names were authored from the prior emoji vocabulary. The field surfaces in
+  `taxonomy --full --output json` and on the MCP type-detail resource under the
+  key `icon` (previously `glyph`). This is a breaking rename of the output key,
+  landed one release after `glyph` first shipped and before any consumer other
+  than the website depends on it.
+
 ## [0.6.51] - 2026-07-16
 
 ### Added
