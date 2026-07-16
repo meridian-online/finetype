@@ -53,6 +53,7 @@ enum Commands {
     /// and writes `id<TAB>composed_label`, running the real Sharpen stack WITHOUT the
     /// value-encode (compose_from_sense). Lets a Sharpen-rule change be corpus-honest-gated
     /// in minutes instead of re-encoding the 33k sample. Spec 2026-06-27-composed-accuracy-roadmap.
+    #[command(hide = true)]
     Resharpen {
         /// Input TSV (id, header, sense_label, sense_conf, 0x1f-joined values)
         #[arg(short, long)]

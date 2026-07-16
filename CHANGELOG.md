@@ -5,6 +5,31 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.51] - 2026-07-16
+
+### Added
+
+- **Every type now carries a `glyph` and, where one exists, a `canonical` spec URL.**
+  Two new per-type metadata fields land on the taxonomy: `glyph` (a short, neutral
+  emoji or ascii marker for visual identification, authored consistently per category)
+  is set on all 251 leaf types, and `canonical` (the single authoritative
+  specification for the type — e.g. ISO 8601 for an ISO timestamp, RFC 5322 for an
+  email, ISO 4217 for a currency code, ISO 6346 for a container number) is set on the
+  82 types with a stable standards-body spec. `canonical` is orthogonal to the existing
+  `references` list, which stays as supplementary `{title, link}[]`. Both fields surface
+  in `taxonomy --full --output json` and on the MCP type-detail resource, feeding the
+  website type registry.
+
+### Changed
+
+- **`taxonomy` plain-text output is cleaner.** The `(priority: N, {designation})` suffix
+  is dropped from the human-readable `taxonomy` listing — a type now prints simply as
+  `key → broad_type`. The `--priority` / `-d` / `-c` filter flags and every machine
+  output (`--output json` / `csv` / `--full`) are unchanged: `release_priority` and
+  `designation` remain load-bearing for training-data generation.
+- **The internal `resharpen` diagnostic verb is hidden from `--help`.** It stays fully
+  invokable for internal gate scripts; it is just no longer advertised in the CLI help.
+
 ## [0.6.50] - 2026-07-14
 
 ### Added

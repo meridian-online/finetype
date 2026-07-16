@@ -53,6 +53,8 @@ geography.location.country:
     - "Japan"
     - "Germany"
     - "Canada"
+  glyph: "🌍"
+  canonical: "https://www.iso.org/iso-3166-country-codes.html"
   references: null
   notes: >
     v1 migration: Was address.country. Locale-specific for country name
@@ -334,6 +336,8 @@ geography.location.country_code:
     - "JP"
     - "DE"
     - "CA"
+  glyph: "🌍"
+  canonical: "https://www.iso.org/iso-3166-country-codes.html"
   references: null
   notes: >
     v1 migration: Was address.country_code. Transform uppercases.
@@ -454,6 +458,8 @@ geography.location.state_code:
     - "TX"
     - "FL"
     - "ON"
+  glyph: "🌍"
+  canonical: "https://www.iso.org/iso-3166-country-codes.html"
   references: null
   notes: >
     New in v13. Separated from country_code remap (state_code→country_code
@@ -494,6 +500,7 @@ geography.location.continent:
     - "Europe"
     - "Asia"
     - "Africa"
+  glyph: "🌍"
   references: null
   notes: >
     v1 migration: Was address.continent. Locale-specific for continent name
@@ -526,6 +533,7 @@ geography.location.region:
     - "Ontario"
     - "Bavaria"
     - "Île-de-France"
+  glyph: "🌍"
   references: null
   notes: >
     v1 migration: Was address.subdivision and address.state. Alias covers
@@ -559,6 +567,7 @@ geography.location.city:
     - "London"
     - "Tokyo"
     - "Paris"
+  glyph: "🌍"
   references: null
   notes: >
     v1 migration: Was address.city. Locale-specific for city name representation.
@@ -598,6 +607,7 @@ geography.address.full_address:
     - "123 Main Street, New York, NY 10001, USA"
     - "456 Oxford Street, London, W1C 1AX, UK"
     - "789 Rue de Rivoli, Paris, 75004, France"
+  glyph: "🏠"
   references: null
   notes: >
     v1 migration: Was address.address. Locale-specific for address format
@@ -634,6 +644,7 @@ geography.address.street_name:
     - "Oxford Street"
     - "Fifth Avenue"
     - "Rue de Rivoli"
+  glyph: "🏠"
   references: null
   notes: >
     v1 migration: Was address.street_name. Locale-specific.
@@ -683,6 +694,7 @@ geography.address.street_suffix:
     - "Avenue"
     - "Boulevard"
     - "Road"
+  glyph: "🏠"
   references: null
   notes: >
     v1 migration: Was address.street_suffix. Locale-specific for suffix naming
@@ -1082,6 +1094,7 @@ geography.address.postal_code:
     - "75004"
     - "W1C 1AX"
     - "EC1A 1BB"
+  glyph: "📮"
   references: null
   notes: >
     v1 migration: Was address.postal_code (and address.zip_code).
@@ -1122,6 +1135,7 @@ geography.format.wkt:
     - "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))"
     - "MULTIPOINT ((10 40), (40 30), (20 20), (30 10))"
     - "POINT EMPTY"
+  glyph: "🗺️"
   references: null
   notes: >
     OGC Simple Features standard (ISO 19125). DuckDB spatial extension
@@ -1159,6 +1173,7 @@ geography.index.h3:
     - "8a2a1072b59ffff"
     - "872830828ffffff"
     - "8e28308280f0e4f"
+  glyph: "🗺️"
   references: null
   notes: >
     Uber H3 geospatial indexing system. Resolution 0 (coarsest) to 15 (finest).
@@ -1197,6 +1212,8 @@ geography.coordinate.latitude:
     - "-33.8688"
     - "51.5074"
     - "35.6762"
+  glyph: "📍"
+  canonical: "https://www.iso.org/standard/75147.html"
   references: null
   notes: >
     v1 migration: Was address.latitude. Decimal degrees format.
@@ -1231,6 +1248,8 @@ geography.coordinate.longitude:
     - "151.2093"
     - "-0.1278"
     - "139.6917"
+  glyph: "📍"
+  canonical: "https://www.iso.org/standard/75147.html"
   references: null
   notes: >
     v1 migration: Was address.longitude. Decimal degrees format.
@@ -1265,6 +1284,8 @@ geography.coordinate.coordinates:
     - "40.7128,-74.0060"
     - "51.5074,-0.1278"
     - "35.6762 139.6917"
+  glyph: "📍"
+  canonical: "https://www.iso.org/standard/75147.html"
   references: null
   notes: >
     v1 migration: Was address.coordinates. Spatial extension required for
@@ -1300,6 +1321,7 @@ geography.coordinate.geohash:
     - "dr5ru7c02wnm"
     - "gbsuv7ztq"
     - "ezs42e"
+  glyph: "📍"
   references: null
   notes: >
     Invented by Gustavo Niemeyer. Public-domain algorithm. Each additional
@@ -1334,6 +1356,7 @@ geography.coordinate.plus_code:
     - "8FVC9G8F+6W"
     - "9F4MGC94+MC"
     - "7FG49W00+2V"
+  glyph: "📍"
   references: null
   notes: >
     Google Open Location Code (github.com/google/open-location-code).
@@ -1368,6 +1391,8 @@ geography.coordinate.dms:
     - "35°41'22\"N 139°41'30\"E"
     - "33°51'54\"S 151°12'36\"E"
     - "48°51'24\"N 2°21'07\"E"
+  glyph: "📍"
+  canonical: "https://www.iso.org/standard/75147.html"
   references: null
   notes: >
     Traditional geographic coordinate notation. Latitude (N/S) followed by
@@ -1401,6 +1426,7 @@ geography.coordinate.mgrs:
     - "4QFJ1234567890"
     - "54SUE8765043210"
     - "32TQM5678901234"
+  glyph: "📍"
   references: null
   notes: >
     Based on UTM and UPS grids. Used by NATO military forces. Zone 1-60,
@@ -1448,6 +1474,7 @@ geography.transportation.iata_code:
     - "CDG"
     - "LHR"
     - "NRT"
+  glyph: "🚢"
   references: null
   notes: >
     v1 migration: Was address.iata_code. Transform uppercases.
@@ -1488,6 +1515,7 @@ geography.transportation.icao_code:
     - "LFPG"
     - "EGLL"
     - "RJTT"
+  glyph: "🚢"
   references: null
   notes: >
     v1 migration: Was address.icao_code. Transform uppercases.
@@ -1522,6 +1550,8 @@ geography.transportation.iso6346:
     - "CMAU6543210"
     - "TRIU7890123"
     - "MSKU2345678"
+  glyph: "🚢"
+  canonical: "https://www.iso.org/standard/83558.html"
   references: null
   notes: >
     ISO 6346:1995 — Freight containers. U = freight container,
@@ -1555,6 +1585,7 @@ geography.transportation.hs_code:
     - "0901.11.00.10"
     - "8517.12"
     - "3004.90.92"
+  glyph: "🚢"
   references: null
   notes: >
     HS is maintained by the World Customs Organization. First 6 digits
@@ -1595,6 +1626,7 @@ geography.transportation.unlocode:
     - "DEHAM"
     - "SGSIN"
     - "NLRTM"
+  glyph: "🚢"
   references: null
   notes: >
     UNECE Recommendation 16. Over 100,000 locations worldwide. Used in
@@ -1778,6 +1810,8 @@ geography.contact.calling_code:
     - "+33"
     - "+81"
     - "1"
+  glyph: "📞"
+  canonical: "https://www.itu.int/rec/T-REC-E.164"
   references: null
   notes: >
     v1 migration: Was address.calling_code (also aliased to address.isd_code).

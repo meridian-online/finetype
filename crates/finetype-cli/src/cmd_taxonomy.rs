@@ -163,10 +163,7 @@ pub(crate) fn cmd_taxonomy(
 
             for (key, def) in &defs {
                 let broad = def.broad_type.as_deref().unwrap_or("?");
-                println!(
-                    "{} \u{2192} {} (priority: {}, {:?})",
-                    key, broad, def.release_priority, def.designation
-                );
+                println!("{} \u{2192} {}", key, broad);
                 if let Some(title) = &def.title {
                     println!("  {}", title);
                 }
@@ -292,6 +289,12 @@ pub(crate) fn definition_to_full_json(
     }
     if let Some(refs) = references {
         obj.insert("references".into(), refs);
+    }
+    if let Some(ref canonical) = d.canonical {
+        obj.insert("canonical".into(), json!(canonical));
+    }
+    if let Some(ref glyph) = d.glyph {
+        obj.insert("glyph".into(), json!(glyph));
     }
 
     serde_json::Value::Object(obj)

@@ -50,6 +50,7 @@ representation.numeric.integer_number:
     - "-17"
     - "0"
     - "999999999"
+  glyph: "🔢"
   references: null
   notes: >
     v1 migration: Was numeric.integer_number. Converts to BIGINT.
@@ -91,6 +92,7 @@ representation.numeric.decimal_number:
     - "0.0001"
     - "6e-04"
     - "1.5E+10"
+  glyph: "🔢"
   references: null
   notes: >
     v1 migration: Was numeric.decimal_number. Transforms to DOUBLE.
@@ -137,6 +139,7 @@ representation.numeric.decimal_number_comma:
     - "12.345,678"
     - "100,00"
     - "-1.234,00"
+  glyph: "🔢"
   references: null
   notes: >
     New in v0.5.1. European decimal format uses period for thousands
@@ -173,6 +176,7 @@ representation.numeric.scientific_notation:
     - "5E+6"
     - "3.14e10"
     - "-2.5e-3"
+  glyph: "🔢"
   references: null
   notes: >
     v1 migration: New for v2. Covers scientific notation like 1.23e-4.
@@ -205,6 +209,7 @@ representation.numeric.percentage:
     - "99.99%"
     - "0.5%"
     - "100"
+  glyph: "%"
   references: null
   notes: >
     v1 migration: New for v2. Percentage as string representation.
@@ -251,6 +256,7 @@ representation.numeric.si_number:
     - "2.3B"
     - "$500K"
     - "-1.2M"
+  glyph: "🔢"
   references: null
   notes: >
     Inspired by python-ballpark library "business notation." Extremely common
@@ -291,6 +297,7 @@ representation.text.plain_text:
     - "This is a plain text description"
     - "A longer paragraph with multiple sentences"
     - "Single word"
+  glyph: "🔤"
   references: null
   notes: >
     v1 migration: Was text.text marked broad_characters. Very broad category
@@ -323,6 +330,7 @@ representation.text.word:
     - "world"
     - "hello-world"
     - "test_123"
+  glyph: "🔤"
   references: null
   notes: >
     v1 migration: Was text.word. Single word without spaces.
@@ -356,6 +364,8 @@ representation.format.color_hex:
     - "#f00"
     - "0000FF"
     - "#00FF00"
+  glyph: "🎨"
+  canonical: "https://www.w3.org/TR/css-color-4/"
   references: null
   notes: >
     v1 migration: Was text.hex_color. Transform uppercases.
@@ -395,6 +405,8 @@ representation.format.color_rgb:
     - "rgb(128, 128, 128)"
     - "rgba(0, 0, 255, 0.5)"
     - "rgb(255, 165, 0)"
+  glyph: "🎨"
+  canonical: "https://www.w3.org/TR/css-color-4/"
   references: null
   notes: >
     v1 migration: Was text.rgb_color. Format flexible to handle
@@ -431,6 +443,8 @@ representation.format.color_hsl:
     - "hsla(240, 100%, 50%, 0.5)"
     - "hsl(60, 75%, 60%)"
     - "hsla(300, 50%, 50%, 0.8)"
+  glyph: "🎨"
+  canonical: "https://www.w3.org/TR/css-color-4/"
   references: null
   notes: >
     New in taxonomy expansion. HSL completes the CSS colour
@@ -462,6 +476,8 @@ representation.text.emoji:
     - "🎉"
     - "❤️"
     - "🚀"
+  glyph: "🔤"
+  canonical: "https://www.unicode.org/reports/tr51/"
   references: null
   notes: >
     v1 migration: Was text.emoji. Single emoji or emoji sequence.
@@ -499,6 +515,7 @@ representation.text.entity_name:
     - "Toyota Motor Corp"
     - "Harvard University"
     - "Super Bowl LVIII"
+  glyph: "🔤"
   references: null
   notes: >
     Addresses full_name overcall: 3,086 SOTAB columns misclassified
@@ -540,6 +557,7 @@ representation.file.extension:
     - "docx"
     - "jpg"
     - "xlsx"
+  glyph: "📄"
   references: null
   notes: >
     v1 migration: Was file.extension. Transform lowercases and removes
@@ -575,6 +593,8 @@ representation.file.mime_type:
     - "image/png"
     - "text/html; charset=utf-8"
     - "application/vnd.ms-excel"
+  glyph: "📄"
+  canonical: "https://www.iana.org/assignments/media-types/media-types.xhtml"
   references: null
   notes: >
     v1 migration: Was file.mime_type marked broad_characters.
@@ -615,6 +635,7 @@ representation.file.file_size:
     - "1.5 MB"
     - "2 GB"
     - "512 KB"
+  glyph: "📄"
   references: null
   notes: >
     v1 migration: Was file.size. Transform converts to bytes.
@@ -653,6 +674,7 @@ representation.file.excel_format:
     - "mm/dd/yyyy"
     - "h:mm:ss AM/PM"
     - "0.00E+00"
+  glyph: "📄"
   references: null
   notes: >
     Common in GitTables data where format strings appear as column metadata.
@@ -691,6 +713,7 @@ representation.scientific.dna_sequence:
     - "ATGCAGC"
     - "GCTAGCTAGCTAG"
     - "ATGATGATG"
+  glyph: "🧬"
   references: null
   notes: >
     v1 migration: Was science.dna_sequence. IUPAC notation:
@@ -724,6 +747,7 @@ representation.scientific.rna_sequence:
     - "AUGCAGC"
     - "GCUAGCUAGCUAG"
     - "AUGAUGAUG"
+  glyph: "🧬"
   references: null
   notes: >
     v1 migration: Was science.rna_sequence. Like DNA but uses U instead of T.
@@ -756,6 +780,7 @@ representation.scientific.protein_sequence:
     - "MKVLLIVGS"
     - "ACDEFGHIKLMNPQRSTVWYFL"
     - "MPKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVG"
+  glyph: "🧬"
   references: null
   notes: >
     v1 migration: New for v2. Single-letter amino acid notation.
@@ -821,6 +846,7 @@ representation.scientific.measurement_unit:
     - "kg"
     - "Joule"
     - "J"
+  glyph: "📏"
   references: null
   notes: >
     v1 migration: Was science.measure_unit marked broad_words.
@@ -860,6 +886,7 @@ representation.scientific.cas_number:
     - "7647-14-5"
     - "67-56-1"
     - "71-43-2"
+  glyph: "🧪"
   references: null
   notes: >
     New in taxonomy expansion. CAS numbers are the global standard
@@ -897,6 +924,7 @@ representation.scientific.inchi:
     - "InChI=1S/CH4/h1H4"
     - "InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H"
     - "InChI=1S/CO2/c2-1-3"
+  glyph: "🧪"
   references: null
   notes: >
     New in taxonomy expansion. InChI is the IUPAC standard for
@@ -935,6 +963,7 @@ representation.scientific.smiles:
     - "c1ccccc1"
     - "CC(=O)O"
     - "C(=O)(N)N"
+  glyph: "🧪"
   references: null
   notes: >
     New in taxonomy expansion. SMILES is extremely common in
@@ -990,6 +1019,7 @@ representation.discrete.ordinal:
     - "★★★"
     - "3"
     - "excellent"
+  glyph: "🔢"
   references: null
   notes: >
     Ordinal values have natural ordering but may not be
@@ -1038,6 +1068,7 @@ representation.boolean.binary:
   samples:
     - "0"
     - "1"
+  glyph: "☑️"
   references: null
   notes: >
     The simplest boolean format — just 0 and 1. The model must
@@ -1074,6 +1105,7 @@ representation.boolean.initials:
     - "f"
     - "y"
     - "n"
+  glyph: "☑️"
   references: null
   notes: >
     Single-character boolean encoding. The model must distinguish
@@ -1113,6 +1145,7 @@ representation.boolean.terms:
     - "off"
     - "True"
     - "False"
+  glyph: "☑️"
   references: null
   notes: >
     Full-word boolean encoding. The most common format in
@@ -1152,6 +1185,8 @@ representation.identifier.uuid:
     - "550e8400-e29b-41d4-a716-446655440000"
     - "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
     - "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+  glyph: "🆔"
+  canonical: "https://www.rfc-editor.org/rfc/rfc9562"
   references: null
   notes: >
     Moved from technology.cryptographic.uuid in v0.5.1.
@@ -1193,6 +1228,7 @@ representation.identifier.alphanumeric_id:
     - "REF-00742"
     - "B28"
     - "FL-2087"
+  glyph: "🆔"
   references: null
   notes: >
     Moved from representation.code.alphanumeric_id in v0.5.1.
@@ -1228,6 +1264,7 @@ representation.identifier.increment:
     - "4"
     - "5"
     - "6"
+  glyph: "🆔"
   references: null
   notes: >
     Moved from representation.numeric.increment in v0.5.1.
@@ -1266,6 +1303,7 @@ representation.identifier.numeric_code:
     - "06075"
     - "0001"
     - "99"
+  glyph: "🆔"
   references: null
   notes: >
     Added in v0.5.2. Addresses the #2 analyst frustration:
