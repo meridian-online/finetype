@@ -153,6 +153,8 @@ fn type_detail(taxonomy: &Taxonomy, type_key: &str) -> Result<serde_json::Value,
         "description": definition.description,
         "transform": definition.transform,
         "designation": format!("{:?}", definition.designation),
+        "glyph": definition.glyph,
+        "canonical": definition.canonical,
         "samples": definition.samples,
     }))
 }

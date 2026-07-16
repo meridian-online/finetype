@@ -53,6 +53,8 @@ technology.internet.ip_v4:
     - "8.8.8.8"
     - "127.0.0.1"
     - "10.0.0.0"
+  glyph: "🌐"
+  canonical: "https://www.rfc-editor.org/rfc/rfc791"
   references: null
   notes: >
     v1 migration: Was internet.ip_v4. transform_ext uses DuckDB's inet extension
@@ -84,6 +86,7 @@ technology.internet.ip_v4_with_port:
     - "192.168.1.1:8080"
     - "10.0.0.1:3306"
     - "127.0.0.1:5432"
+  glyph: "🌐"
   references: null
   notes: >
     v1 migration: Was internet.ip_v4_with_port. Includes decompose to split
@@ -114,6 +117,8 @@ technology.internet.ip_v6:
     - "2001:db8:85a3::8a2e:370:7334"
     - "::1"
     - "fe80::1"
+  glyph: "🌐"
+  canonical: "https://www.rfc-editor.org/rfc/rfc4291"
   references: null
   notes: >
     v1 migration: Was internet.ip_v6. Complex regex due to :: compression notation.
@@ -142,6 +147,7 @@ technology.internet.mac_address:
     - "00:1a:2b:3c:4d:5e"
     - "08-00-27-00-00-00"
     - "a0:b1:c2:d3:e4:f5"
+  glyph: "🌐"
   references: null
   notes: >
     v1 migration: Was internet.mac_address. Pattern accepts both colon and hyphen
@@ -177,6 +183,8 @@ technology.internet.url:
     - "ftp://ftp.example.org/file.txt"
     - "https://example.com:8080/path?query=value#anchor"
     - "//cdn.example.com/lib.js"
+  glyph: "🔗"
+  canonical: "https://www.rfc-editor.org/rfc/rfc3986"
   references: null
   notes: >
     v1 migration: Was internet.url. Includes optional decompose for parsing
@@ -215,6 +223,8 @@ technology.internet.hostname:
     - "www.google.com"
     - "subdomain.example.org"
     - "localhost"
+  glyph: "🌐"
+  canonical: "https://www.rfc-editor.org/rfc/rfc1035"
   references: null
   notes: >
     v1 migration: Was internet.hostname. Pattern requires lowercase (use LOWER()
@@ -253,6 +263,8 @@ technology.internet.top_level_domain:
     - "uk"
     - "co.uk"
     - "xn--3e0b707e"
+  glyph: "🌐"
+  canonical: "https://www.iana.org/domains/root/db"
   references: null
   notes: >
     v1 migration: Was internet.tld (aliased to top_level_domain for clarity).
@@ -288,6 +300,8 @@ technology.internet.user_agent:
     - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     - "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)"
     - "curl/7.64.1"
+  glyph: "🌐"
+  canonical: "https://www.rfc-editor.org/rfc/rfc9110"
   references: null
   notes: >
     v1 migration: Was internet.user_agent. v13: Added prefix-based pattern
@@ -326,6 +340,8 @@ technology.internet.http_method:
     - "GET"
     - "post"
     - "Delete"
+  glyph: "🌐"
+  canonical: "https://www.rfc-editor.org/rfc/rfc9110"
   references: null
   notes: >
     v1 migration: Was internet.http_method marked broad_words. Lower priority
@@ -378,6 +394,7 @@ technology.cryptographic.hash:
     - "5d41402abc4b2a76b9719d911017c592"
     - "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
     - "2c26b46911185131006dfb3b57a99d73"
+  glyph: "🔐"
   references: null
   notes: >
     v1 migration: Was cryptographic.hash. Decompose infers algorithm from length:
@@ -408,6 +425,7 @@ technology.cryptographic.token_urlsafe:
     - "SFMyNDI5STExOjEwMQ"
     - "dGVzdC10b2tlbg"
     - "aGVsbG8td29ybGQ"
+  glyph: "🔐"
   references: null
   notes: >
     v1 migration: Was cryptographic.token_urlsafe. URL-safe Base64 avoids
@@ -452,6 +470,7 @@ technology.code.imei:
     - "490154203237518"
     - "352043068649148"
     - "011245002151205"
+  glyph: "💻"
   references: null
   notes: >
     v1 migration: Was code.imei. 15 numeric digits. Check digit (last digit)
@@ -489,6 +508,8 @@ technology.code.doi:
     - "10.1000/xyz123"
     - "10.1016/j.cell.2009.01.043"
     - "10.48550/arXiv.2301.07041"
+  glyph: "💻"
+  canonical: "https://www.iso.org/standard/81599.html"
   references: null
   notes: >
     New in v2. DOI prefix always starts with "10." followed by registrant
@@ -524,6 +545,8 @@ technology.code.locale_code:
     - "fr-FR"
     - "zh-Hans-CN"
     - "de-AT"
+  glyph: "💻"
+  canonical: "https://www.rfc-editor.org/rfc/rfc5646"
   references: null
   notes: >
     v1 migration: Was code.locale_code. IETF BCP 47 format. Common codes:
@@ -562,6 +585,8 @@ technology.development.version:
     - "1.2.3-alpha"
     - "1.2.3-beta.1"
     - "1.2.3+build.123"
+  glyph: "🔖"
+  canonical: "https://semver.org/"
   references: null
   notes: >
     v1 migration: Was development.version. Semantic versioning (MAJOR.MINOR.PATCH).
@@ -595,6 +620,7 @@ technology.development.calver:
     - "2024.02.09"
     - "2023.12.31"
     - "2024.01.15.1"
+  glyph: "🔖"
   references: null
   notes: >
     v1 migration: Was development.calver. Decompose extracts year, month, day.
@@ -629,6 +655,7 @@ technology.development.docker_ref:
     - "ghcr.io/myorg/myapp:v1.2.3"
     - "docker.io/library/postgres:16-alpine"
     - "gcr.io/project/service@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+  glyph: "🔖"
   references: null
   notes: >
     OCI image reference format. Includes optional registry,
@@ -667,6 +694,8 @@ technology.identifier.ulid:
     - "01ARZ3NDEKTSV4RRFFQ69G5FAV"
     - "01H5J3XZQK0000000000000000"
     - "01FWHE4G8R2SXHM3F07YR3FW0T"
+  glyph: "🆔"
+  canonical: "https://github.com/ulid/spec"
   references: null
   notes: >
     Crockford Base32 excludes I, L, O, U to avoid
@@ -697,6 +726,7 @@ technology.identifier.tsid:
     - "0190a1b2c3d4e5f6a7b8c9d0e1f2a3b4"
     - "018f47d5a6b70000000000000000abcd"
     - "0191c8e4f2a30000fedcba9876543210"
+  glyph: "🆔"
   references: null
   notes: >
     Leading 8-10 hex chars decode to a reasonable
@@ -730,6 +760,7 @@ technology.identifier.snowflake_id:
     - "175928847299117063"
     - "1234567890123456789"
     - "80351110224678912"
+  glyph: "🆔"
   references: null
   notes: >
     Twitter epoch: 1288834974657 (2010-11-04).
@@ -771,6 +802,7 @@ technology.cloud.aws_arn:
     - "arn:aws:iam::123456789012:user/johndoe"
     - "arn:aws:ec2:us-east-1:123456789012:instance/i-1234567890abcdef0"
     - "arn:aws:lambda:eu-west-1:123456789012:function:my-function"
+  glyph: "☁️"
   references: null
   notes: >
     Region and account-id may be empty for global
@@ -802,6 +834,7 @@ technology.cloud.s3_uri:
     - "s3://my-bucket/data/file.csv"
     - "s3://production-logs/2024/01/events.parquet"
     - "s3://data-lake-raw/ingestion/batch-001/part-00000.json"
+  glyph: "☁️"
   references: null
   notes: >
     Bucket names: 3-63 chars, lowercase, no underscores.
@@ -834,6 +867,8 @@ technology.cryptographic.jwt:
   samples:
     - "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
     - "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdXRoLmV4YW1wbGUuY29tIn0.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+  glyph: "🔐"
+  canonical: "https://www.rfc-editor.org/rfc/rfc7519"
   references: null
   notes: >
     Each segment is at least 10 base64url chars to
@@ -868,6 +903,8 @@ technology.internet.cidr:
     - "10.0.0.0/8"
     - "172.16.0.0/12"
     - "0.0.0.0/0"
+  glyph: "🌐"
+  canonical: "https://www.rfc-editor.org/rfc/rfc4632"
   references: null
   notes: >
     IPv4 CIDR only. Prefix length 0-32. Distinguished
@@ -902,6 +939,8 @@ technology.internet.urn:
     - "urn:ietf:rfc:2648"
     - "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66"
     - "urn:oid:2.16.840"
+  glyph: "🌐"
+  canonical: "https://www.rfc-editor.org/rfc/rfc8141"
   references: null
   notes: >
     NID (Namespace ID) is 1-32 lowercase alphanumeric
@@ -936,6 +975,8 @@ technology.internet.data_uri:
     - "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="
     - "data:application/json,{\"key\":\"value\"}"
     - "data:text/html,%3Ch1%3EHello%3C%2Fh1%3E"
+  glyph: "🌐"
+  canonical: "https://www.rfc-editor.org/rfc/rfc2397"
   references: null
   notes: >
     Media type is optional (defaults to text/plain;charset=US-ASCII).
@@ -970,6 +1011,7 @@ technology.filesystem.windows_path:
     - "C:\\Windows\\System32\\drivers\\WdfLdr.sys"
     - "D:\\research\\repos\\project\\src\\Main.cs"
     - "\\\\server\\share\\reports\\q3.xlsx"
+  glyph: "📁"
   references: null
   notes: >
     New in v0.6.36 (spec 2026-06-19-plain-text-type-discovery). Highest
@@ -1009,6 +1051,7 @@ technology.filesystem.filename:
     - "IMG_0042.png"
     - "archive.tar.gz"
     - "atarisy2.cpp"
+  glyph: "📁"
   references: null
   notes: >
     New type (reservoir-mining sweep 2026-07-14). Sibling of windows_path —
@@ -1045,6 +1088,8 @@ technology.internet.message_id:
     - "<30365805.1075860998985.JavaMail.evans@thyme>"
     - "<CAF2a3b9c@mail.gmail.com>"
     - "<199911abc@server.example.org>"
+  glyph: "🌐"
+  canonical: "https://www.rfc-editor.org/rfc/rfc5322"
   references: null
   notes: >
     New in v0.6.36 (spec 2026-06-19-plain-text-type-discovery). 3,032
@@ -1080,6 +1125,7 @@ technology.code.qualified_name:
     - "com.google.javascript.jscomp.Compiler"
     - "org.apache.commons.math.fraction.Fraction"
     - "Avalonia.UnitTests.Controls.ContentControl"
+  glyph: "💻"
   references: null
   notes: >
     New in v0.6.36 (spec 2026-06-19-plain-text-type-discovery). 1,677

@@ -417,6 +417,17 @@ pub struct Definition {
     pub samples: Vec<serde_yaml::Value>,
     /// External references
     pub references: Option<serde_yaml::Value>,
+    /// The single authoritative specification URL for this type (the one
+    /// canonical standard — e.g. ISO 17442 for an LEI, RFC 5322 for an email).
+    /// Orthogonal to `references`: `references` is a supplementary
+    /// `{title, link}[]` list, whereas `canonical` names the one defining spec.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canonical: Option<String>,
+    /// A short ascii char or emoji for visual identification of the type
+    /// (e.g. in the website type registry). Neutral/monochrome-friendly by
+    /// design — a bland, intuitive marker, not a decorative one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub glyph: Option<String>,
     /// Notes about the label
     pub notes: Option<String>,
     /// Whether this type represents personally identifiable information
@@ -1653,10 +1664,11 @@ representation.discrete.categorical:
     #[cfg(feature = "embedded-taxonomy")]
     #[test]
     fn test_embedded_taxonomy_and_frictionless_for() {
-        // Embedded taxonomy loads all 250 definitions without a labels/ dir
-        // (249 + finance.securities.ticker, the SEC-membership-backed ticker type).
+        // Embedded taxonomy loads all 251 definitions without a labels/ dir
+        // (249 + finance.securities.ticker, the SEC-membership-backed ticker type,
+        // + technology.filesystem.filename).
         let tax = Taxonomy::embedded().expect("embedded taxonomy parses");
-        assert_eq!(tax.len(), 250, "expected 250 embedded definitions");
+        assert_eq!(tax.len(), 251, "expected 251 embedded definitions");
 
         // The accessor returns the authoritative map for known labels…
         let email = super::frictionless_for("identity.person.email").unwrap();
