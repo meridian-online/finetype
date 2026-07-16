@@ -423,11 +423,13 @@ pub struct Definition {
     /// `{title, link}[]` list, whereas `canonical` names the one defining spec.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canonical: Option<String>,
-    /// A short ascii char or emoji for visual identification of the type
-    /// (e.g. in the website type registry). Neutral/monochrome-friendly by
-    /// design — a bland, intuitive marker, not a decorative one.
+    /// A library-agnostic icon *name* (kebab-case, e.g. `building-bank`,
+    /// `calendar`, `world`) for visual identification of the type in UIs
+    /// (e.g. the website type registry). Neutral by design — the name maps
+    /// onto a host icon set (Tabler, Lucide, …); not an emoji or a
+    /// decorative marker.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub glyph: Option<String>,
+    pub icon: Option<String>,
     /// Notes about the label
     pub notes: Option<String>,
     /// Whether this type represents personally identifiable information

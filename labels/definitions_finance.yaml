@@ -58,7 +58,7 @@ finance.banking.swift_bic:
     - "BNPAFRPP"
     - "CHASUS33XXX"
     - "BOFAUS3N"
-  glyph: "🏦"
+  icon: building-bank
   canonical: "https://www.iso.org/standard/84108.html"
   references: null
   notes: >
@@ -102,7 +102,7 @@ finance.banking.iban:
     - "NL91ABNA0417164300"
     - "ES9121000418450200051332"
     - "IT60X0542811101000000123456"
-  glyph: "🏦"
+  icon: building-bank
   canonical: "https://www.iso.org/standard/81090.html"
   references: null
   notes: >
@@ -168,7 +168,7 @@ finance.currency.amount:
     - "£250.75"
     - "($1,234.56)"
     - "($999.99)"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in v0.5.1. US/international format uses comma as thousands
@@ -208,7 +208,7 @@ finance.currency.amount_comma:
     - "€1.000.000,00"
     - "1.250,75 €"
     - "€100,00"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in v0.5.1. European format uses period as thousands separator
@@ -259,7 +259,7 @@ finance.currency.currency_code:
     - "JPY"
     - "CHF"
     - "AUD"
-  glyph: "💱"
+  icon: cash
   canonical: "https://www.iso.org/iso-4217-currency-codes.html"
   references: null
   notes: >
@@ -295,7 +295,7 @@ finance.currency.currency_symbol:
     - "₹"
     - "₩"
     - "₿"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     v1 migration: Was finance.currency_symbol. Uses Unicode currency symbol
@@ -339,7 +339,7 @@ finance.payment.credit_card_number:
     - "4532015112830366"
     - "5425233010103442"
     - "374245455400126"
-  glyph: "💳"
+  icon: credit-card
   canonical: "https://www.iso.org/standard/70484.html"
   references: null
   notes: >
@@ -383,7 +383,7 @@ finance.securities.cusip:
     - "037833100"
     - "17275R102"
     - "594918104"
-  glyph: "📈"
+  icon: chart-line
   references: null
   notes: >
     New in v2. CUSIP is the primary identifier for US/Canadian securities.
@@ -421,7 +421,7 @@ finance.securities.isin:
     - "GB0002634946"
     - "JP3633400001"
     - "DE0007164600"
-  glyph: "📈"
+  icon: chart-line
   canonical: "https://www.iso.org/standard/78502.html"
   references: null
   notes: >
@@ -455,7 +455,7 @@ finance.securities.sedol:
     - "0263494"
     - "B0WNLY7"
     - "3134865"
-  glyph: "📈"
+  icon: chart-line
   references: null
   notes: >
     New in v2. SEDOL codes never contain vowels (to avoid forming words).
@@ -495,7 +495,7 @@ finance.securities.figi:
     - "BBG000BVPV84"
     - "BBG000BPH459"
     - "BBG000GZQ728"
-  glyph: "📈"
+  icon: chart-line
   references: null
   notes: >
     New in taxonomy expansion. FIGI is the open standard for
@@ -533,7 +533,7 @@ finance.securities.lei:
     - "529900T8BM49AURSDO55"
     - "213800WSGIIZCXF1P572"
     - "549300MLUDYVRQOOXS22"
-  glyph: "📈"
+  icon: chart-line
   canonical: "https://www.iso.org/standard/78829.html"
   references: null
   notes: >
@@ -575,7 +575,7 @@ finance.securities.ticker:
     - "NVDA"
     - "BRK-B"
     - "TSLA"
-  glyph: "📈"
+  icon: chart-line
   references: null
   notes: >
     New in v0.6.49. Mined from the company-reference external band (EDGAR
@@ -619,7 +619,7 @@ finance.banking.aba_routing:
     - "071000013"
     - "011401533"
     - "121000358"
-  glyph: "🏦"
+  icon: building-bank
   references: null
   notes: >
     New in taxonomy expansion. ABA routing numbers identify US
@@ -659,7 +659,7 @@ finance.banking.bsb:
     - "082-001"
     - "063-010"
     - "013-252"
-  glyph: "🏦"
+  icon: building-bank
   references: null
   notes: >
     New in taxonomy expansion. BSB numbers are used in Australian
@@ -698,7 +698,7 @@ finance.crypto.bitcoin_address:
     - "1A1z7agoat2GPFH7pPPPP..."
     - "3J98t1WpEZ73CNmYviecrnyiWrnqRhWNLy"
     - "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
-  glyph: "🪙"
+  icon: coin
   references: null
   notes: >
     v1 migration: Was payment.bitcoin_address. Pattern covers P2PKH (1..),
@@ -729,7 +729,7 @@ finance.crypto.ethereum_address:
     - "0x742d35Cc6634C0532925a3b844Bc3e7c1f2B9C2C"
     - "0x0000000000000000000000000000000000000000"
     - "0xd9965507d3b0ce0ce6932b0337db0c11b85fcf7d"
-  glyph: "🪙"
+  icon: coin
   references: null
   notes: >
     v1 migration: Was payment.ethereum_address. Transform lowercases.
@@ -779,7 +779,7 @@ finance.currency.amount_accounting:
     - "$0.50"
     - "($999.99)"
     - "$10,000.00"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in format coverage expansion. Parentheses = negative is universal
@@ -814,7 +814,7 @@ finance.currency.amount_comma_suffix:
     - "-1.234,56 €"
     - "0,50 €"
     - "10.000,00 €"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in format coverage expansion. CLDR default for most eurozone countries.
@@ -848,7 +848,7 @@ finance.currency.amount_space:
     - "999,99 €"
     - "-1 234,56 €"
     - "10 000,00 €"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in format coverage expansion. French/Polish/Czech convention.
@@ -884,7 +884,7 @@ finance.currency.amount_lakh:
     - "₹99,999.50"
     - "Rs. 1,23,456.78"
     - "₹1,00,00,000.00"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in format coverage expansion. Indian numbering (2,2,3 grouping).
@@ -918,7 +918,7 @@ finance.currency.amount_apostrophe:
     - "1'234.56 CHF"
     - "CHF 10'000.00"
     - "-CHF 999.99"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in format coverage expansion. Must handle both U+0027 (apostrophe)
@@ -952,7 +952,7 @@ finance.currency.amount_nodecimal:
     - "₩10,000"
     - "¥100,000"
     - "₩1,234,567"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in format coverage expansion. Zero-decimal currencies per ISO 4217:
@@ -986,7 +986,7 @@ finance.currency.amount_code_prefix:
     - "EUR 1.234,56"
     - "GBP 999.99"
     - "JPY 10,000"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in format coverage expansion. SWIFT, FX, banking standard.
@@ -1019,7 +1019,7 @@ finance.currency.amount_crypto:
     - "1.50000000 ETH"
     - "100.00 USDT"
     - "0.025 BTC"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in format coverage expansion. Crypto amounts can have up to 18 decimal
@@ -1053,7 +1053,7 @@ finance.currency.amount_multisym:
     - "kr 1 234,56"
     - "Kč 1 234,56"
     - "zł 1 234,56"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in format coverage expansion. Multi-character symbols generalize
@@ -1086,7 +1086,7 @@ finance.currency.amount_neg_trailing:
     - "1,234.56 CR"
     - "$999.99-"
     - "10,000.00 DR"
-  glyph: "💱"
+  icon: cash
   references: null
   notes: >
     New in format coverage expansion. SAP, COBOL/mainframe, bank statements.
@@ -1129,7 +1129,7 @@ finance.rate.basis_points:
     - "25.5 bps"
     - "-50 bp"
     - "100 bps"
-  glyph: "📊"
+  icon: chart-bar
   references: null
   notes: >
     New in format coverage expansion. Fixed-income standard unit.
@@ -1164,7 +1164,7 @@ finance.rate.yield:
     - "+0.75%"
     - "-3.25%"
     - "+10.0%"
-  glyph: "📊"
+  icon: chart-bar
   references: null
   notes: >
     New in format coverage expansion. Distinct from percentage type by

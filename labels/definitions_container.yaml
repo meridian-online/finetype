@@ -65,7 +65,7 @@ container.object.json:
     - '{"user": "john", "age": 30}'
     - '{"name": "Alice", "email": "alice@example.com", "active": true}'
     - '{"nested": {"key": "value"}}'
-  glyph: "📦"
+  icon: package
   canonical: "https://www.rfc-editor.org/rfc/rfc8259"
   references: null
   notes: >
@@ -111,7 +111,7 @@ container.object.json_array:
     - "[1, 2, 3]"
     - '["a", "b", "c"]'
     - '[{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]'
-  glyph: "📦"
+  icon: package
   canonical: "https://www.rfc-editor.org/rfc/rfc8259"
   references: null
   notes: >
@@ -148,7 +148,7 @@ container.object.xml:
   samples:
     - '<root><name>John</name><age>30</age></root>'
     - '<user id="123"><email>john@example.com</email></user>'
-  glyph: "📦"
+  icon: package
   canonical: "https://www.w3.org/TR/xml/"
   references: null
   notes: >
@@ -190,7 +190,7 @@ container.object.html:
     - '<h1>Title</h1><p>Content here.</p>'
     - '<ul><li>Item 1</li><li>Item 2</li></ul>'
     - '<table><tr><td>Cell</td></tr></table>'
-  glyph: "📦"
+  icon: package
   canonical: "https://html.spec.whatwg.org/"
   references: null
   notes: >
@@ -230,7 +230,7 @@ container.object.yaml:
   samples:
     - "name: John\nage: 30\nactive: true"
     - "user:\n  id: 123\n  email: john@example.com"
-  glyph: "📦"
+  icon: package
   canonical: "https://yaml.org/spec/1.2.2/"
   references: null
   notes: >
@@ -270,7 +270,7 @@ container.object.csv:
   samples:
     - "John,30,true"
     - '"Smith, John",30,Engineer'
-  glyph: "📦"
+  icon: package
   canonical: "https://www.rfc-editor.org/rfc/rfc4180"
   references: null
   notes: >
@@ -313,7 +313,7 @@ container.object.s_expression:
     - "(+ (* 2 3) (- 4 1))"
     - "(a (b c) (d (e f)))"
     - "(S (INTJ (UH Uh)) (, ,) (NP-SBJ (PRP I)) (VP (VBP think)))"
-  glyph: "📦"
+  icon: package
   references: null
   notes: >
     New 2026-07-05 (company-reference audit; author-approved as a general
@@ -362,7 +362,7 @@ container.array.comma_separated:
     - "apple,banana,cherry"
     - "1,2,3,4,5"
     - "red,green,blue"
-  glyph: "📋"
+  icon: list
   references: null
   notes: >
     v1 migration: New for v2. Simple comma-separated list (not JSON).
@@ -395,7 +395,7 @@ container.array.pipe_separated:
   samples:
     - "apple|banana|cherry"
     - "1|2|3|4|5"
-  glyph: "📋"
+  icon: list
   references: null
   notes: >
     v1 migration: New for v2. Pipe-separated format common in
@@ -427,7 +427,7 @@ container.array.semicolon_separated:
   samples:
     - "apple;banana;cherry"
     - "1,5;2,3;4,7"
-  glyph: "📋"
+  icon: list
   references: null
   notes: >
     v1 migration: New for v2. Semicolon separator common in Europe
@@ -460,7 +460,7 @@ container.array.whitespace_separated:
     - "apple banana cherry"
     - "1 2 3 4 5"
     - "red\tgreen\tblue"
-  glyph: "📋"
+  icon: list
   references: null
   notes: >
     v1 migration: New for v2. Whitespace separator common in
@@ -496,7 +496,7 @@ container.key_value.query_string:
     - "name=John&age=30&city=NewYork"
     - "q=python&page=1"
     - "user_id=123&token=abc123xyz"
-  glyph: "🔑"
+  icon: key
   references: null
   notes: >
     v1 migration: New for v2. URL query string format.

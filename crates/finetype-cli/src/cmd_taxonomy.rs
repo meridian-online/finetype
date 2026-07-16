@@ -293,8 +293,8 @@ pub(crate) fn definition_to_full_json(
     if let Some(ref canonical) = d.canonical {
         obj.insert("canonical".into(), json!(canonical));
     }
-    if let Some(ref glyph) = d.glyph {
-        obj.insert("glyph".into(), json!(glyph));
+    if let Some(ref icon) = d.icon {
+        obj.insert("icon".into(), json!(icon));
     }
 
     serde_json::Value::Object(obj)
