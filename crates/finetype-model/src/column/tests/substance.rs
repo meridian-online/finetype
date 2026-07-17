@@ -1631,6 +1631,74 @@ fn entity_prose_override_keeps_species_binomials() {
     assert!(result.is_none(), "species binomials must stay entity_name");
 }
 
+// ── R34 excel_format_prose_demotion (legal_name → excel_format overcall) ──
+
+#[test]
+fn excel_format_prose_demotion_demotes_company_names() {
+    // Dotted/suffixed registry legal names read as Excel-format-shaped to the
+    // model, and excel_format's `\w`-tailed pattern PASSES them, so no
+    // schema-fail rule ever trips. The bare-token-alphabet discriminator
+    // flags them non-format and the >=2-token median confirms multi-word
+    // names → entity_name.
+    let values: Vec<String> = vec![
+        "A.E.R.C.O. S.A.",
+        "BANCO SANTANDER SA",
+        "GESTORA DE ACTIVOS SLU",
+        "INVERSIONES Y PATRIMONIOS SICAV",
+        "TALLERES MECANICOS DEL SUR SL",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let result = value_sharpen(&values, "representation.file.excel_format", 0.516, None);
+    let (label, rule) = result.expect("legal names must demote off excel_format");
+    assert_eq!(label, "representation.text.entity_name");
+    assert!(rule.starts_with("excel_format_prose_demotion:"));
+}
+
+#[test]
+fn excel_format_prose_demotion_keeps_legit_format_strings() {
+    // The 10 canonical Excel number-format strings: every alphabetic char
+    // lives in quoted/bracketed sections or the bare-token alphabet
+    // {a,d,e,g,h,m,p,s,y} — zero flagged non-format, no demotion.
+    let values: Vec<String> = vec![
+        "0.00",
+        "#,##0",
+        "$#,##0.00",
+        "0.00%",
+        "mm/dd/yyyy",
+        "h:mm:ss AM/PM",
+        "0.00E+00",
+        "0\"kg\"",
+        "[$-409]0.00",
+        "#,##0\" USD\"",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let result = value_sharpen(&values, "representation.file.excel_format", 0.9, None);
+    assert!(
+        result.is_none(),
+        "legit Excel format strings must stay excel_format, got {result:?}"
+    );
+}
+
+#[test]
+fn excel_format_prose_demotion_spares_single_token_ids() {
+    // The >=2-token median gate is load-bearing: a single-token id/code
+    // column whose letters fall outside the format alphabet must NOT demote
+    // to entity_name.
+    let values: Vec<String> = vec!["XK-403", "QZ-118", "RW-207", "XK-991", "QZ-546"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let result = value_sharpen(&values, "representation.file.excel_format", 0.6, None);
+    assert!(
+        result.is_none(),
+        "single-token id columns must not demote to entity_name, got {result:?}"
+    );
+}
+
 #[test]
 fn numeric_code_recovery_restores_naics_and_cik() {
     // F5 demotes no-leading-zero numeric_code to integer_number; a code-ish

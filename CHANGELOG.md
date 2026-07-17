@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Company-name / legal-name columns no longer mistype as
+  `representation.file.excel_format` (new `excel_format_prose_demotion` value
+  rule; fixes Spanish/dotted org-name distributions such as
+  `A.E.R.C.O. S.A.` / `… SLU` / `… SICAV`). The excel_format taxonomy pattern
+  ends in `\w`, so real names pass it and no schema-fail rule could trip; the
+  new rule strips quoted `"..."` literals and `[...]` sections, flags any
+  remaining alphabetic char outside the Excel bare-token alphabet
+  `{a,d,e,g,h,m,p,s,y}`, and demotes to `representation.text.entity_name`
+  when >50% of values are non-format AND the median whitespace-token count is
+  ≥2 (single-token id columns are spared). Pre-existing since ≤0.6.50.
 - Low-cardinality single-token controlled-vocabulary enum columns no longer
   mistype as `representation.text.entity_name` (new `entity_name_vocab_veto`
   guard demotes them to `representation.text.word`, the residual sink for
