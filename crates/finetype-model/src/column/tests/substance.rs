@@ -913,6 +913,67 @@ fn ticker_membership_recovery_declines_constant_column() {
     assert_ne!(l, "finance.securities.ticker");
 }
 
+// ── protein_sequence_length_veto (short-uppercase-code overcall) ──
+
+#[test]
+fn protein_sequence_length_veto_demotes_short_uppercase_codes() {
+    // A ticker-like column of short uppercase codes (all ≤7 chars, mostly
+    // amino-acid letters) mislabelled protein_sequence demotes to unknown —
+    // real proteins are ≥10 chars, so length separates with margin. Neutral
+    // header: no ticker recovery can re-promote, the column stays honestly
+    // unknown.
+    let l = recovered_label(
+        "code",
+        &["MSFT", "AMD", "TSLA", "CAT", "MMM", "GE"],
+        "representation.scientific.protein_sequence",
+    );
+    assert_eq!(
+        l, "unknown",
+        "short uppercase codes must not stay protein_sequence"
+    );
+}
+
+#[test]
+fn protein_sequence_length_veto_keeps_real_protein_sequences() {
+    // Genuine amino-acid sequences (≥10 chars) — the ≤8-length bar never
+    // clears, the column keeps its label.
+    let l = recovered_label(
+        "sequence",
+        &[
+            "ACDEFGHIKLMNPQRSTVWYFL",
+            "MPKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVG",
+            "MKVLLIVGSA",
+            "MSTNPKPQRKTKRNTNRRPQDV",
+        ],
+        "representation.scientific.protein_sequence",
+    );
+    assert_eq!(
+        l, "representation.scientific.protein_sequence",
+        "real protein sequences must keep their label"
+    );
+}
+
+#[test]
+fn protein_veto_then_ticker_recovery_promotes_edgar_tickers() {
+    // Ordering is load-bearing: the protein veto runs IMMEDIATELY BEFORE
+    // ticker_membership_recovery, so a ticker-headed column mislabelled
+    // protein_sequence demotes to unknown and is then promoted by the
+    // membership guard. IWM / AAXJ are Nasdaq-Trader-only symbols the SEC
+    // company map omits — under the pre-widened set this column sat at 80%
+    // membership (<90%, recovery declined); the widened set clears 100%.
+    let l = recovered_label(
+        "ticker",
+        &[
+            "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "SPY", "QQQ", "GLD", "IWM", "AAXJ",
+        ],
+        "representation.scientific.protein_sequence",
+    );
+    assert_eq!(
+        l, "finance.securities.ticker",
+        "a ticker-headed member column must recover to ticker, never protein_sequence"
+    );
+}
+
 // ── org_name_geography_demotion (external band seam 1c) ──
 
 #[test]

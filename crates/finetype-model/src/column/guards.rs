@@ -130,6 +130,13 @@ impl ColumnClassifier {
         self.unlocode_membership_recovery(result, sample);
         self.timezone_abbreviation_recovery(result, header, sample);
         self.naics_industry_recovery(result, header, sample);
+        // IMMEDIATELY BEFORE ticker_membership_recovery — ordering is
+        // load-bearing: the veto demotes a short-uppercase protein_sequence
+        // overcall to `unknown`, and the ticker recovery below can then still
+        // promote it when the header + membership gates clear; a headerless /
+        // non-member column stays honestly `unknown` instead of
+        // confidently-wrong protein_sequence.
+        self.protein_sequence_length_veto(result, sample);
         // ticker: header-gated membership promote — recovers finance.securities.ticker
         // from the state_code / word attractor (EDGAR ticker external-band finding).
         self.ticker_membership_recovery(result, header, sample);
@@ -275,6 +282,48 @@ impl ColumnClassifier {
         result.disambiguation_applied = true;
         result.disambiguation_rule =
             Some(format!("naics_industry_recovery:{}", header.to_lowercase()));
+        result.detected_locale = None;
+    }
+
+    /// `protein_sequence_length_veto` (default ON). Demotes a
+    /// `representation.scientific.protein_sequence` OVERCALL on a short-string
+    /// column to `unknown`. The protein pattern `^[ACDEFGHIKLMNPQRSTVWXY*]+$`
+    /// is a magnet for short uppercase codes — a stock-ticker column is 56%
+    /// all-amino-acid on the EDGAR measurement, so when the membership
+    /// recovery declines the column keeps the confidently-wrong protein
+    /// label. LENGTH is the discriminator, not the letter set (a B/J/O/U/Z
+    /// rule misses the all-amino majority): tickers are ≤7 chars, real
+    /// proteins ≥10 (training minimum 10; the one 9-char taxonomy sample
+    /// `MKVLLIVGS` stays safe under the ≤8 bar with a ≥1-char margin). Demote
+    /// when ≥3 distinct non-empty values AND ≥90% have length ≤8. On veto:
+    /// `unknown`, confidence.min(0.6) — asserting only the certainty
+    /// (not-a-protein), never guessing which code type it is (the ticker
+    /// recovery that runs NEXT re-promotes the headered membership case).
+    /// Modeled on `unlocode_format_veto`: demote-only, value-based, NO header
+    /// gate, RHH-disableable (0048).
+    fn protein_sequence_length_veto(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("protein_sequence_length_veto")
+            || result.label != "representation.scientific.protein_sequence"
+        {
+            return;
+        }
+        let non_empty = non_empty_trimmed(sample);
+        let distinct: std::collections::HashSet<&str> = non_empty.iter().copied().collect();
+        // ≥3 distinct: a constant/near-constant column carries too little
+        // distributional evidence to overturn the model (membership-guard lesson).
+        if distinct.len() < 3 {
+            return;
+        }
+        let short = non_empty.iter().filter(|v| v.len() <= 8).count();
+        // ≥90% short (short*10 >= total*9): a real protein column (≥10-char
+        // sequences) never clears this; a ticker/code column sits ~100%.
+        if short * 10 < non_empty.len() * 9 {
+            return;
+        }
+        result.label = "unknown".to_string();
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("protein_sequence_length_veto".to_string());
         result.detected_locale = None;
     }
 
