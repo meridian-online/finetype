@@ -5,6 +5,19 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.53] - Unreleased
+
+### Fixed
+
+- Low-cardinality single-token controlled-vocabulary enum columns no longer
+  mistype as `representation.text.entity_name` (new `entity_name_vocab_veto`
+  guard demotes them to `representation.text.word`, the residual sink for
+  small enums). `entity_name` has no validator and sits outside the attractor
+  lists, so a 5-value enum column asserted at low confidence previously
+  shipped uncorrected; the ≥90%-single-token gate spares genuine multi-word
+  entity-name columns and the `org_suffix_ratio < 0.1` gate spares org-name
+  columns.
+
 ## [0.6.52] - 2026-07-17
 
 ### Changed
