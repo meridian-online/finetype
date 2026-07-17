@@ -119,6 +119,11 @@ impl ColumnClassifier {
         // already entity_name, so this veto only sees a residual `region` overcall
         // on a non-place column (usgs net/type, gleif category).
         self.region_nonmembership_veto(result, header, sample);
+        // AFTER org_name_geography_demotion AND region_nonmembership_veto: the
+        // legit place→entity_name promote needs org_suffix_ratio >= 0.5, which
+        // this veto's < 0.1 gate structurally excludes — ordering keeps that
+        // promote's output out of this veto's scope by construction.
+        self.entity_name_vocab_veto(result, sample);
         // AFTER geo_subdivision_membership_promote: keeps the geo-membership
         // promotes grouped. UN/LOCODE (`USLAX`) is hyphenless, so the ISO-3166-2
         // promote above never claims it — no fight.
@@ -442,6 +447,72 @@ impl ColumnClassifier {
         result.label = LEAF.to_string();
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!("region_nonmembership_veto:{from}"));
+        result.detected_locale = None;
+    }
+
+    /// `entity_name_vocab_veto` (default ON). Demotes a
+    /// `representation.text.entity_name` OVERCALL on a low-cardinality
+    /// single-token controlled vocabulary to `representation.text.word` — the
+    /// established residual sink for small enums. `entity_name` is a
+    /// `broad_words` catch-all with no validation pattern, and it is absent
+    /// from `TEXT_ATTRACTORS`, so neither the validation veto nor the
+    /// attractor demotions ever evaluate it: a 5-value enum column
+    /// (`sector`/`subsector`/`industry_group`/…) asserted entity_name at low
+    /// confidence ships uncorrected. The value-side tell is shape: a genuine
+    /// entity-name column is dominated by multi-word names (`Toyota Motor
+    /// Corp`) or carries org/fund suffixes, while a controlled vocabulary is a
+    /// bounded set of single tokens. Demote when the sample has ≥3 non-empty
+    /// values, ≤20 distinct values, `org_suffix_ratio < 0.1` (excludes genuine
+    /// org columns — including everything `org_name_geography_demotion`
+    /// promotes, which needs ≥0.5), and ≥90% of distinct values contain no
+    /// internal whitespace (single-token `word` shape — the gate that
+    /// structurally spares multi-word entity names). Known trade: a
+    /// low-cardinality SINGLE-token Title-Case brand vocabulary would also
+    /// demote; gold holds no such column. Value-based (0048), demote-only,
+    /// RHH-disableable. Modeled on `region_nonmembership_veto`.
+    fn entity_name_vocab_veto(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("entity_name_vocab_veto") {
+            return;
+        }
+        const LEAF: &str = "representation.text.word";
+        if result.label != "representation.text.entity_name" {
+            return;
+        }
+        let non_empty = non_empty_trimmed(sample);
+        // ≥3 values: too few carries no distributional evidence to overturn
+        // the model (the constant-column lesson, mirrored from the membership
+        // recoveries).
+        if non_empty.len() < 3 {
+            return;
+        }
+        let distinct: std::collections::HashSet<&str> = non_empty.iter().copied().collect();
+        // ≤20 distinct: the controlled-vocabulary bound (mirrors the attractor
+        // cardinality signal and R32's enum band).
+        if distinct.len() > 20 {
+            return;
+        }
+        // A genuine org-name column is dense with org/fund suffixes (gleif
+        // `name` 0.97); a controlled vocabulary carries ~none. <0.1 keeps every
+        // real org column — and the org_name_geography_demotion promote
+        // (≥0.5) — structurally out of scope.
+        if org_suffix_ratio(sample) >= 0.1 {
+            return;
+        }
+        // ≥90% of DISTINCT values single-token (no internal whitespace): the
+        // `word` shape. Multi-word entity names (`Toyota Motor Corp`) fail
+        // this gate, so a real name column never demotes.
+        let single_token = distinct
+            .iter()
+            .filter(|v| !v.chars().any(char::is_whitespace))
+            .count();
+        if single_token * 10 < distinct.len() * 9 {
+            return;
+        }
+        let from = result.label.clone();
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("entity_name_vocab_veto:{from}"));
         result.detected_locale = None;
     }
 

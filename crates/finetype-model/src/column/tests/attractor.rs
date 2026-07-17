@@ -1255,3 +1255,75 @@ fn test_sharpen_attractor_non_attractor_type_ignored() {
         "Non-attractor type should never trigger demotion"
     );
 }
+
+// ── entity_name_vocab_veto (low-cardinality single-token vocab → word) ──────
+
+fn vocab_veto_label(header: &str, values: &[&str], sense: &str, conf: f32) -> String {
+    let vals: Vec<String> = values.iter().map(|s| s.to_string()).collect();
+    ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")))
+        .compose_from_sense(header, &vals, sense, conf)
+        .unwrap()
+        .label
+}
+
+#[test]
+fn entity_name_vocab_veto_demotes_controlled_vocabulary() {
+    // Mirrors test_attractor_cardinality_demotion for the entity_name leaf the
+    // attractor path never evaluates: a 5-value snake_case controlled vocabulary
+    // asserted entity_name at low confidence demotes to the `word` residual.
+    let values: Vec<String> = vec![
+        "sector",
+        "subsector",
+        "industry_group",
+        "industry",
+        "national_industry",
+        "sector",
+        "subsector",
+        "industry",
+        "national_industry",
+        "industry_group",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let result =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")))
+            .compose_from_sense("level", &values, "representation.text.entity_name", 0.535)
+            .unwrap();
+    assert_eq!(result.label, "representation.text.word");
+    assert!(result
+        .disambiguation_rule
+        .as_deref()
+        .unwrap_or_default()
+        .starts_with("entity_name_vocab_veto:"));
+    assert!(result.confidence <= 0.6);
+}
+
+#[test]
+fn entity_name_vocab_veto_keeps_multi_word_entity_names() {
+    // The single-token whitespace gate is load-bearing: a small catalog of
+    // genuine multi-word org names must stay entity_name.
+    let l = vocab_veto_label(
+        "name",
+        &[
+            "Toyota Motor Corp",
+            "Berkshire Hathaway Inc",
+            "Alphabet Inc",
+            "Toyota Motor Corp",
+            "Berkshire Hathaway Inc",
+        ],
+        "representation.text.entity_name",
+        0.55,
+    );
+    assert_eq!(l, "representation.text.entity_name");
+}
+
+#[test]
+fn entity_name_vocab_veto_keeps_high_cardinality_columns() {
+    // >20 distinct single-token values — not a controlled vocabulary; the
+    // cardinality bound spares it.
+    let vals: Vec<String> = (0..25).map(|i| format!("brandname{i}")).collect();
+    let refs: Vec<&str> = vals.iter().map(|s| s.as_str()).collect();
+    let l = vocab_veto_label("brand", &refs, "representation.text.entity_name", 0.55);
+    assert_eq!(l, "representation.text.entity_name");
+}
