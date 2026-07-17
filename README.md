@@ -7,6 +7,14 @@
 Precision format detection for text data. FineType classifies strings into a rich taxonomy of 245 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
 
 ```
+# Point it at a whole column — the accurate path. A column types more
+# accurately than a lone value: FineType samples the column and runs its
+# guard → veto → recovery stack over the distribution, so it has more
+# context than a single isolated value.
+$ printf '541511\n541512\n236220\n' | finetype infer
+representation.numeric.integer_number
+
+# Single values work too — conclusive for value-determinable types:
 $ finetype infer -i "192.168.1.1"
 technology.internet.ip_v4
 
@@ -57,14 +65,21 @@ cargo build --release
 ### CLI
 
 ```bash
-# Classify a single value
+# Classify a column of values — the accurate path (distribution-based).
+# Pipe one value per line, or pass a file with -f. FineType samples the
+# column and types from the whole distribution, so the guard/veto stack
+# has more context than it would from a single value. Column is the
+# default mode; add --confidence to see the sample count.
+printf '541511\n541512\n236220\n' | finetype infer --confidence
+#   representation.numeric.integer_number
+#     confidence: 0.7933 (3 samples)
+finetype infer -f column_values.txt --mode column
+
+# Classify a single value (conclusive for value-determinable types)
 finetype infer -i "bc89:60a9:23b8:c1e9:3924:56de:3eb1:3b90"
 
 # Profile a CSV file — detect all column types
 finetype profile -f data.csv
-
-# Column-mode inference (distribution-based disambiguation)
-finetype infer -f column_values.txt --mode column
 
 # Start MCP server for AI agent integration
 finetype mcp
