@@ -27,6 +27,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   shipped uncorrected; the ≥90%-single-token gate spares genuine multi-word
   entity-name columns and the `org_suffix_ratio < 0.1` gate spares org-name
   columns.
+- Short uppercase ticker columns no longer degrade to
+  `representation.scientific.protein_sequence`. Two complementary fixes: a
+  new `protein_sequence_length_veto` guard (demote-only, no header gate)
+  demotes a protein_sequence assertion to `unknown` when ≥90% of values are
+  ≤8 chars — tickers are ≤7 chars, real proteins ≥10, so length separates
+  with margin where the letter set cannot (56% of tickers are
+  all-amino-acid); and the `finance.securities.ticker` recovery membership
+  set is widened (SEC + Nasdaq Trader SymbolDirectory), lifting real
+  ticker-headed columns over the guard's ≥90% membership bar. The veto runs
+  immediately before `ticker_membership_recovery`, so a headered member
+  column still promotes to ticker while headerless/residual columns stay
+  honestly `unknown`.
+
+### Data
+
+- `labels/sets/us_tickers.txt` refreshed + widened, 9,304 → 16,348 symbols
+  (SEC `company_tickers.json` refresh UNION Nasdaq Trader
+  `nasdaqlisted.txt` + `otherlisted.txt`; test issues and footers dropped).
+  Covers the ETF / warrant / unit / right / preferred classes the SEC
+  company map omits. OTC/ADR `-F` and delisted symbols have no free
+  authoritative bulk list and are deliberately not chased — the length veto
+  covers that residual tail.
 
 ## [0.6.52] - 2026-07-17
 
