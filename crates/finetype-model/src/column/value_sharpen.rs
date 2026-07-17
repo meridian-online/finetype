@@ -472,6 +472,81 @@ pub(crate) fn value_sharpen(
         }
     }
 
+    // R34: excel_format prose demotion. The CharCNN reads dotted/suffixed
+    // company names (`A.E.R.C.O. S.A.`, Spanish `SL`/`SLU`/`SA`/`SICAV`
+    // registry forms) as Excel-format-shaped, and nothing recovers them:
+    // excel_format is absent from R32's strict-validator list, its taxonomy
+    // pattern ends in `\w` so real names PASS it (schema_fail_demotion's
+    // >50%-fail bar never trips), and org_name_geography_demotion only fires
+    // on geography leaves. Value-shape separation: an Excel number-format
+    // string's alphabetic content lives either inside quoted "..." literals /
+    // [...] sections or in the bare-token alphabet {a,d,e,g,h,m,p,s,y}
+    // (y/m/d/h/s date-time codes, AM/PM, Exponent, General — case-insensitive).
+    // Strip the quoted/bracketed sections; any remaining alphabetic char
+    // outside that alphabet marks the value non-format. Demote to entity_name
+    // when >50% of values are non-format AND the median whitespace-token count
+    // is >=2 — the >=2-token gate is load-bearing (mirrors org_suffix_ratio's
+    // multi-word discipline): it spares single-token id/code columns that a
+    // stray letter would otherwise flag. Measured separation: 200/200 GLEIF
+    // legal names flagged non-format, 0/10 legit format strings flagged.
+    // Value-based per 0048; demote-only; RHH-disableable.
+    if result_label == "representation.file.excel_format"
+        && !crate::rhh::is_disabled("excel_format_prose_demotion")
+    {
+        let non_empty = non_empty_trimmed(values);
+        if non_empty.len() >= 3 {
+            // Strip double-quoted "..." literals and [...] sections — the two
+            // format-syntax carriers of arbitrary text (0"kg", [$-409],
+            // [Red]). Unterminated sections swallow the rest of the value,
+            // matching how a format parser treats them.
+            let strip_literals = |v: &str| -> String {
+                let mut out = String::with_capacity(v.len());
+                let mut in_quote = false;
+                let mut in_bracket = false;
+                for c in v.chars() {
+                    if in_quote {
+                        in_quote = c != '"';
+                    } else if in_bracket {
+                        in_bracket = c != ']';
+                    } else {
+                        match c {
+                            '"' => in_quote = true,
+                            '[' => in_bracket = true,
+                            _ => out.push(c),
+                        }
+                    }
+                }
+                out
+            };
+            let is_non_format = |v: &str| {
+                strip_literals(v).chars().any(|c| {
+                    c.is_alphabetic()
+                        && !matches!(
+                            c.to_ascii_lowercase(),
+                            'a' | 'd' | 'e' | 'g' | 'h' | 'm' | 'p' | 's' | 'y'
+                        )
+                })
+            };
+            let mut tok_counts: Vec<usize> = non_empty
+                .iter()
+                .map(|v| v.split_whitespace().count())
+                .collect();
+            tok_counts.sort_unstable();
+            let median_tokens = tok_counts[tok_counts.len() / 2];
+            let non_format_n = non_empty.iter().filter(|v| is_non_format(v)).count();
+            if median_tokens >= 2 && non_format_n * 2 > non_empty.len() {
+                return Some((
+                    "representation.text.entity_name".to_string(),
+                    format!(
+                        "excel_format_prose_demotion:non_format={}/{}",
+                        non_format_n,
+                        non_empty.len()
+                    ),
+                ));
+            }
+        }
+    }
+
     // R33: entity_name prose override (company-reference audit, gold-priced).
     // entity_name over-emits onto free-text prose (titles, descriptions,
     // sentence fragments) — 25 of the expanded gold's entity_name assertions
