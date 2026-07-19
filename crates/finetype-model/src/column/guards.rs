@@ -331,14 +331,28 @@ impl ColumnClassifier {
     /// `finance.securities.ticker` leaf (company-reference external band: EDGAR
     /// `ticker` was over-emitted as `geography.location.state_code`). The
     /// 244-dim model cannot predict this leaf, and a short uppercase symbol
-    /// column lands on state_code / word / alphanumeric_id. Promote when the
-    /// header names a ticker column (`header_corroborates_ticker` — `ticker` /
-    /// `symbol`) AND ≥90% of values are US-listed symbols
-    /// (`membership::us_tickers`, labels/sets/us_tickers.txt) AND ≥3 DISTINCT
-    /// pass. The header gate is load-bearing: 15 of the 50 US state codes (`MA`,
-    /// `TX`, …) are themselves real tickers, so membership alone cannot separate
-    /// a ticker column from a state column — the header is the discriminator. The
-    /// ≥3-distinct gate blocks a constant column matching one symbol by
+    /// column lands on state_code / word / alphanumeric_id. Two header-gated
+    /// acceptance tiers (`header_corroborates_ticker` — `ticker` / `symbol`):
+    ///
+    ///  - Tier 1 (membership): ≥90% of values are US-listed symbols
+    ///    (`membership::us_tickers`, labels/sets/us_tickers.txt) AND ≥3 DISTINCT
+    ///    pass.
+    ///  - Tier 2 (shape-backed): ≥90% of values match the ticker SHAPE
+    ///    (`^[A-Z]{1,7}$` or a class/series form `BRK.A` / `RDS-A`), ≥50% are
+    ///    still real members, AND ≥3 DISTINCT are shaped. This is the
+    ///    ETF/ADR/delisted disambiguation lever (TASK-53.1): the full ~10.4k
+    ///    EDGAR ticker column carries ETF/warrant/ADR/delisted symbols with no
+    ///    free authoritative bulk list, so membership dips below the Tier-1 bar
+    ///    and the column would otherwise stall at `unknown` (post
+    ///    `protein_sequence_length_veto`). The ≥50%-membership floor keeps the
+    ///    tier grounded in real tickers — a header-gated column of arbitrary
+    ///    uppercase words (0% members) never promotes — and separates ticker
+    ///    from `protein_sequence` (proteins are ≥10 chars, failing the ≤7 shape).
+    ///
+    /// The header gate is load-bearing for BOTH tiers: 15 of the 50 US state
+    /// codes (`MA`, `TX`, …) are themselves real tickers, so values alone cannot
+    /// separate a ticker column from a state column — the header is the
+    /// discriminator. The ≥3-distinct gate blocks a constant column matching by
     /// coincidence (the `unlocode_membership_recovery` constant-column lesson).
     /// Value-based (0048), RHH-disableable.
     fn ticker_membership_recovery(
@@ -354,9 +368,19 @@ impl ColumnClassifier {
         if result.label == LEAF || !header_corroborates_ticker(header) {
             return;
         }
+        // Ticker shape: 1-7 uppercase letters, optionally a `.`/`-` class or
+        // series suffix (`BRK.A`, `RDS-A`, `GRP-U`). Deliberately no digits —
+        // OTC/foreign `-F` five-letter forms are still all-alpha.
+        use std::sync::OnceLock;
+        static SHAPE: OnceLock<regex::Regex> = OnceLock::new();
+        let shape = SHAPE.get_or_init(|| {
+            regex::Regex::new(r"^[A-Z]{1,7}([.-][A-Z]{1,4})?$").expect("ticker shape regex")
+        });
         let mut checked = 0usize;
         let mut passed = 0usize;
+        let mut shaped = 0usize;
         let mut distinct_pass: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut distinct_shaped: std::collections::HashSet<&str> = std::collections::HashSet::new();
         for v in sample {
             let t = v.trim();
             if t.is_empty() {
@@ -367,16 +391,30 @@ impl ColumnClassifier {
                 passed += 1;
                 distinct_pass.insert(t);
             }
+            if shape.is_match(t) {
+                shaped += 1;
+                distinct_shaped.insert(t);
+            }
         }
-        // >=90% US-listed membership AND >=3 DISTINCT passing values.
-        if checked < 3 || distinct_pass.len() < 3 || passed * 10 < checked * 9 {
+        if checked < 3 {
+            return;
+        }
+        // Tier 1: >=90% US-listed membership AND >=3 DISTINCT members.
+        let tier1 = distinct_pass.len() >= 3 && passed * 10 >= checked * 9;
+        // Tier 2: >=90% ticker-shaped AND >=50% members AND >=3 DISTINCT shaped
+        // — the ETF/ADR/delisted tail the bulk membership list cannot reach.
+        let tier2 =
+            distinct_shaped.len() >= 3 && shaped * 10 >= checked * 9 && passed * 2 >= checked;
+        if !tier1 && !tier2 {
             return;
         }
         let from = result.label.clone();
+        let tier = if tier1 { "member" } else { "shape" };
         result.label = LEAF.to_string();
-        result.confidence = result.confidence.max(0.90);
+        // Shape-only recovery is a shade less certain than a full-membership one.
+        result.confidence = result.confidence.max(if tier1 { 0.90 } else { 0.85 });
         result.disambiguation_applied = true;
-        result.disambiguation_rule = Some(format!("ticker_membership_recovery:{from}"));
+        result.disambiguation_rule = Some(format!("ticker_membership_recovery:{tier}:{from}"));
         result.detected_locale = None;
     }
 

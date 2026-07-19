@@ -124,6 +124,7 @@ representation.file.mime_type
 representation.format.color_hex
 representation.format.color_hsl
 representation.format.color_rgb
+representation.identifier.ulid
 representation.identifier.uuid
 representation.numeric.si_number
 representation.scientific.inchi
@@ -136,7 +137,6 @@ technology.cryptographic.hash
 technology.cryptographic.jwt
 technology.development.version
 technology.filesystem.windows_path
-technology.identifier.ulid
 technology.internet.cidr
 technology.internet.data_uri
 technology.internet.http_method

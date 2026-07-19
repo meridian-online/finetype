@@ -234,10 +234,14 @@ const FORMAT_LABELS: &[&str] = &[
     "representation.format.color_hex",
     "representation.format.color_hsl",
     "representation.format.color_rgb",
-    // representation.identifier (formerly code/numeric/cryptographic)
+    // representation.identifier (formerly code/numeric/cryptographic; ulid/tsid/
+    // snowflake_id moved here from technology.identifier in v0.6.54, TASK-21)
     "representation.identifier.alphanumeric_id",
     "representation.identifier.increment",
     "representation.identifier.numeric_code",
+    "representation.identifier.snowflake_id",
+    "representation.identifier.tsid",
+    "representation.identifier.ulid",
     "representation.identifier.uuid",
     // representation.scientific (bio sequences, chemical identifiers — structured alphabet)
     "representation.scientific.cas_number",
@@ -259,10 +263,6 @@ const FORMAT_LABELS: &[&str] = &[
     "technology.development.docker_ref",
     // technology.filesystem (structured paths)
     "technology.filesystem.windows_path",
-    // technology.identifier (structured IDs with embedded metadata)
-    "technology.identifier.snowflake_id",
-    "technology.identifier.tsid",
-    "technology.identifier.ulid",
     // technology.internet (structured network formats)
     "technology.internet.cidr",
     "technology.internet.data_uri",

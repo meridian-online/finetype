@@ -558,46 +558,8 @@ impl Generator {
                 }
             }
 
-            // ── identifier (3 types) ──────────────────────────────────
-            ("identifier", "ulid") => {
-                // Crockford Base32: 0-9, A-H, J-K, M-N, P-T, V-X, Y-Z (no I, L, O, U)
-                let crockford = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-                // First 10 chars: encode a timestamp in 2020-2030 range
-                let base_ms: u64 = 1_577_836_800_000; // 2020-01-01
-                let range_ms: u64 = 315_360_000_000; // ~10 years
-                let ts = base_ms + self.rng.gen_range(0..range_ms);
-                let mut ts_chars = [0u8; 10];
-                let mut t = ts;
-                for i in (0..10).rev() {
-                    ts_chars[i] = crockford[(t % 32) as usize];
-                    t /= 32;
-                }
-                let rand_chars: String = (0..16)
-                    .map(|_| crockford[self.rng.gen_range(0..32)] as char)
-                    .collect();
-                let ts_str: String = ts_chars.iter().map(|&b| b as char).collect();
-                Ok(format!("{}{}", ts_str, rand_chars))
-            }
-            ("identifier", "tsid") => {
-                // 32 hex chars with realistic timestamp in leading bytes
-                let base_ms: u64 = 1_577_836_800_000; // 2020-01-01
-                let range_ms: u64 = 315_360_000_000; // ~10 years
-                let ts = base_ms + self.rng.gen_range(0..range_ms);
-                let ts_hex = format!("{:012x}", ts);
-                let random_hex = self.gen_hex_string(20);
-                Ok(format!("{}{}", ts_hex, random_hex))
-            }
-            ("identifier", "snowflake_id") => {
-                // Twitter snowflake: (timestamp_ms - epoch) << 22 | worker << 12 | sequence
-                let twitter_epoch: u64 = 1_288_834_974_657;
-                let base_ms: u64 = 1_577_836_800_000; // 2020-01-01
-                let range_ms: u64 = 315_360_000_000;
-                let ts = base_ms + self.rng.gen_range(0..range_ms) - twitter_epoch;
-                let worker: u64 = self.rng.gen_range(0..1024);
-                let seq: u64 = self.rng.gen_range(0..4096);
-                let id = (ts << 22) | (worker << 12) | seq;
-                Ok(id.to_string())
-            }
+            // ── identifier: RETIRED — ulid/tsid/snowflake_id moved to
+            //    representation.identifier.* in v0.6.54 (TASK-21). ─────────
 
             // ── cloud (2 types) ───────────────────────────────────────
             ("cloud", "aws_arn") => {

@@ -1902,20 +1902,20 @@ mappings:
   expand: false
 - gt_label: ulid
   source: profile_eval
-  finetype_label: technology.identifier.ulid
-  finetype_domain: technology
+  finetype_label: representation.identifier.ulid
+  finetype_domain: representation
   match_quality: direct
   expand: false
 - gt_label: tsid
   source: profile_eval
-  finetype_label: technology.identifier.tsid
-  finetype_domain: technology
+  finetype_label: representation.identifier.tsid
+  finetype_domain: representation
   match_quality: direct
   expand: false
 - gt_label: snowflake id
   source: profile_eval
-  finetype_label: technology.identifier.snowflake_id
-  finetype_domain: technology
+  finetype_label: representation.identifier.snowflake_id
+  finetype_domain: representation
   match_quality: direct
   expand: false
 - gt_label: aws arn

@@ -1194,6 +1194,111 @@ representation.identifier.uuid:
     technology contexts. DuckDB UUID type accepts standard 8-4-4-4-12
     format. Also accepts without hyphens via UPPER() or normalization.
 
+representation.identifier.ulid:
+  title: "ULID"
+  description: >
+    Universally Unique Lexicographically Sortable Identifier. 26-character
+    Crockford Base32 string encoding a 48-bit timestamp and 80 bits of randomness.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: "TRY_CAST({col} AS ULID)"
+  decompose:
+    timestamp_ms: "EPOCH_MS(({col}::ULID)::BIGINT)"
+  validation:
+    type: string
+    pattern: "^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$"
+  tier: [VARCHAR, identifier]
+  release_priority: 4
+  aliases: null
+  samples:
+    - "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    - "01H5J3XZQK0000000000000000"
+    - "01FWHE4G8R2SXHM3F07YR3FW0T"
+  icon: id
+  canonical: "https://github.com/ulid/spec"
+  references: null
+  notes: >
+    Moved from technology.identifier.ulid in v0.6.54. A ULID is a general
+    identifier, not a technology-specific one — it belongs with UUID in the
+    representation.identifier family. Crockford Base32 excludes I, L, O, U to
+    avoid ambiguity. Always uppercase. First 10 chars encode millisecond
+    timestamp.
+
+representation.identifier.tsid:
+  title: "TSID"
+  description: >
+    Time-Sorted ID. 32 lowercase hexadecimal characters with an embedded
+    timestamp in the leading digits. Distinguished from UUID by having no
+    hyphens, and from cryptographic hashes by the timestamp constraint.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: "tsid_to_timestamp({col})"
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-9a-f]{32}$"
+  tier: [VARCHAR, identifier]
+  release_priority: 3
+  aliases: null
+  samples:
+    - "0190a1b2c3d4e5f6a7b8c9d0e1f2a3b4"
+    - "018f47d5a6b70000000000000000abcd"
+    - "0191c8e4f2a30000fedcba9876543210"
+  icon: id
+  references: null
+  notes: >
+    Moved from technology.identifier.tsid in v0.6.54. A general identifier,
+    sibling to UUID/ULID. Leading 8-10 hex chars decode to a reasonable
+    timestamp (2010-2050). Disambiguation from hash/token_hex requires
+    header hints or timestamp validation.
+
+representation.identifier.snowflake_id:
+  title: "Snowflake ID"
+  description: >
+    Twitter/Discord-style snowflake identifier. A 17-20 digit integer
+    encoding a millisecond timestamp, worker ID, and sequence number.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: BIGINT
+  frictionless:
+    type: integer
+  format_string: null
+  transform: "epoch_ms(({col}::BIGINT >> 22) + 1288834974657)"
+  transform_ext: null
+  decompose:
+    timestamp_ms: "({col}::BIGINT >> 22) + 1288834974657"
+    worker_id: "({col}::BIGINT >> 12) & 1023"
+    sequence: "{col}::BIGINT & 4095"
+  validation:
+    type: string
+    pattern: "^\\d{17,20}$"
+  tier: [BIGINT, identifier]
+  release_priority: 3
+  aliases: [twitter_id, discord_id]
+  samples:
+    - "175928847299117063"
+    - "1234567890123456789"
+    - "80351110224678912"
+  icon: id
+  references: null
+  notes: >
+    Moved from technology.identifier.snowflake_id in v0.6.54. The
+    Twitter/Discord ID *format* (aliases twitter_id/discord_id) — NOT
+    Snowflake-the-database, so it stays out of technology.cloud. A general
+    identifier, sibling to UUID/ULID/TSID. Twitter epoch: 1288834974657
+    (2010-11-04). Bits: 41 timestamp + 10 worker + 12 sequence. Range
+    ~10^17 to ~10^19.
+
 representation.identifier.alphanumeric_id:
   title: "Alphanumeric Identifier"
   description: >

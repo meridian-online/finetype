@@ -202,6 +202,9 @@ representation.format.color_rgb	false	^(?:rgb)?\(?([0-9]{1,3}),\s*([0-9]{1,3}),\
 representation.identifier.alphanumeric_id	false	^[A-Za-z][A-Za-z0-9 /_.#-]*[0-9][A-Za-z0-9 /_.#-]*$|^[0-9][A-Za-z0-9 /_.#-]*[A-Za-z][A-Za-z0-9 /_.#-]*$	false
 representation.identifier.increment	false	^[0-9]+$	false
 representation.identifier.numeric_code	false	^[0-9]+$	false
+representation.identifier.snowflake_id	false	^\d{17,20}$	false
+representation.identifier.tsid	false	^[0-9a-f]{32}$	false
+representation.identifier.ulid	false	^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$	false
 representation.identifier.uuid	false	^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$	true
 representation.numeric.decimal_number	false	^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$	true
 representation.numeric.decimal_number_comma	false	^-?[0-9]{1,3}(\.[0-9]{3})*(,[0-9]+)?$|^-?[0-9]+,[0-9]+$	true
@@ -234,9 +237,6 @@ technology.development.docker_ref	false	^(?:(?:[a-zA-Z0-9.\-]+(?::\d+)?)/)?(?:[a
 technology.development.version	false	^v?[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.]+)?(?:\+[a-zA-Z0-9.]+)?$	true
 technology.filesystem.filename	false	^[^\\/\r\n\t]+\.[A-Za-z0-9]{1,8}$	true
 technology.filesystem.windows_path	false	^([A-Za-z]:\\|\\\\)[^\r\n]*$	true
-technology.identifier.snowflake_id	false	^\d{17,20}$	false
-technology.identifier.tsid	false	^[0-9a-f]{32}$	false
-technology.identifier.ulid	false	^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$	false
 technology.internet.cidr	false	^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/([0-9]|[12]\d|3[0-2])$	true
 technology.internet.data_uri	false	^data:(?:[a-zA-Z0-9]+/[a-zA-Z0-9\-+.]+)?(?:;[a-zA-Z0-9\-]+=[^;,]*)*(?:;base64)?,.+$	true
 technology.internet.hostname	false	^(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$	true

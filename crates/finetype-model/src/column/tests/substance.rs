@@ -913,6 +913,42 @@ fn ticker_membership_recovery_declines_constant_column() {
     assert_ne!(l, "finance.securities.ticker");
 }
 
+#[test]
+fn ticker_shape_recovery_promotes_etf_adr_delisted_tail() {
+    // TASK-53.1: the full EDGAR ticker column carries ETF/ADR/delisted symbols
+    // that no free bulk membership list reaches, so membership dips below the
+    // Tier-1 90% bar. A ticker-headed, ≥90%-ticker-shaped column that is still
+    // ≥50% real members promotes on the shape tier — the ETF/ADR/delisted tail
+    // types as ticker instead of stalling at unknown / protein_sequence.
+    let l = recovered_label(
+        "ticker",
+        // 6 real members + 4 ticker-shaped non-members (fictional ETF/ADR/
+        // delisted forms) = 60% membership (<90% Tier-1, ≥50% floor), 100% shape.
+        &[
+            "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "GOOGL", // members
+            "ZXCVB", "QWERT", "ADRXX", "DLSTD", // shaped non-members
+        ],
+        "geography.location.state_code",
+    );
+    assert_eq!(
+        l, "finance.securities.ticker",
+        "ticker-shaped, half-member, ticker-headed column must promote via the shape tier"
+    );
+}
+
+#[test]
+fn ticker_shape_recovery_declines_ungrounded_uppercase() {
+    // The ≥50%-membership floor keeps the shape tier grounded: a ticker-headed
+    // column of arbitrary short uppercase words (0% members) must NOT promote,
+    // even though every value is ticker-SHAPED. Precision Principle.
+    let l = recovered_label(
+        "symbol",
+        &["ZXCVB", "QWERT", "ADRXX", "DLSTD", "PLKMN", "WXYZA"],
+        "representation.text.word",
+    );
+    assert_ne!(l, "finance.securities.ticker");
+}
+
 // ── protein_sequence_length_veto (short-uppercase-code overcall) ──
 
 #[test]

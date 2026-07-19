@@ -73,6 +73,8 @@ representation.file.mime_type
 representation.identifier.alphanumeric_id
 representation.identifier.increment
 representation.identifier.numeric_code
+representation.identifier.snowflake_id
+representation.identifier.tsid
 representation.identifier.uuid
 representation.numeric.decimal_number
 representation.numeric.decimal_number_comma
@@ -84,6 +86,4 @@ technology.code.doi
 technology.code.imei
 technology.code.locale_code
 technology.cryptographic.hash
-technology.identifier.snowflake_id
-technology.identifier.tsid
 technology.internet.ip_v4
