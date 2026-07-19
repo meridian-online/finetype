@@ -340,7 +340,7 @@ impl ColumnClassifier {
     ///  - Tier 2 (shape-backed): ≥90% of values match the ticker SHAPE
     ///    (`^[A-Z]{1,7}$` or a class/series form `BRK.A` / `RDS-A`), ≥50% are
     ///    still real members, AND ≥3 DISTINCT are shaped. This is the
-    ///    ETF/ADR/delisted disambiguation lever (TASK-53.1): the full ~10.4k
+    ///    ETF/ADR/delisted disambiguation lever: the full ~10.4k
     ///    EDGAR ticker column carries ETF/warrant/ADR/delisted symbols with no
     ///    free authoritative bulk list, so membership dips below the Tier-1 bar
     ///    and the column would otherwise stall at `unknown` (post

@@ -559,7 +559,7 @@ impl Generator {
             }
 
             // ── identifier: RETIRED — ulid/tsid/snowflake_id moved to
-            //    representation.identifier.* in v0.6.54 (TASK-21). ─────────
+            //    representation.identifier.* in v0.6.54. ─────────
 
             // ── cloud (2 types) ───────────────────────────────────────
             ("cloud", "aws_arn") => {

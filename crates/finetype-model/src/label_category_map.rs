@@ -235,7 +235,7 @@ const FORMAT_LABELS: &[&str] = &[
     "representation.format.color_hsl",
     "representation.format.color_rgb",
     // representation.identifier (formerly code/numeric/cryptographic; ulid/tsid/
-    // snowflake_id moved here from technology.identifier in v0.6.54, TASK-21)
+    // snowflake_id moved here from technology.identifier in v0.6.54)
     "representation.identifier.alphanumeric_id",
     "representation.identifier.increment",
     "representation.identifier.numeric_code",

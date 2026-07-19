@@ -915,7 +915,7 @@ fn ticker_membership_recovery_declines_constant_column() {
 
 #[test]
 fn ticker_shape_recovery_promotes_etf_adr_delisted_tail() {
-    // TASK-53.1: the full EDGAR ticker column carries ETF/ADR/delisted symbols
+    // The full EDGAR ticker column carries ETF/ADR/delisted symbols
     // that no free bulk membership list reaches, so membership dips below the
     // Tier-1 90% bar. A ticker-headed, ≥90%-ticker-shaped column that is still
     // ≥50% real members promotes on the shape tier — the ETF/ADR/delisted tail

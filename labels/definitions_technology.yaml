@@ -662,7 +662,7 @@ technology.development.docker_ref:
     repository path, tag, and digest components.
 
 # ═════════════════════════════════════════════════════════════════════
-# CATEGORY: identifier — RETIRED in v0.6.54 (TASK-21).
+# CATEGORY: identifier — RETIRED in v0.6.54.
 #
 # ulid / tsid / snowflake_id moved to representation.identifier.* (joining
 # uuid): these are general identifiers, not technology-specific ones. The

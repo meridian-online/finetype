@@ -633,7 +633,7 @@ impl Generator {
             // ── identifier (7 types) ─────────────────────────────────────
             ("identifier", "uuid") => Ok(Uuid::new_v4().to_string()),
             // ulid / tsid / snowflake_id moved here from technology.identifier
-            // in v0.6.54 (TASK-21) — general identifiers, siblings of uuid.
+            // in v0.6.54 — general identifiers, siblings of uuid.
             ("identifier", "ulid") => {
                 // Crockford Base32: 0-9, A-H, J-K, M-N, P-T, V-X, Y-Z (no I, L, O, U)
                 let crockford = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
