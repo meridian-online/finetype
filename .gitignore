@@ -401,3 +401,8 @@ output/company-reference-audit/item9_baseline_with_oracle.parquet
 output/company-reference-audit/eval_item9/sample_pass/
 output/company-reference-audit/sexp_baseline_with_oracle.parquet
 output/company-reference-audit/eval_sexp/sample_pass/
+
+# Blanket-ignore derived experiment output + model tokenizer artifacts (regenerable) — 2026-07-19.
+# Supersedes the per-experiment enumeration above; already-tracked files are unaffected.
+output/
+models/**/tokenizer.json
