@@ -40,6 +40,10 @@ pub(crate) fn cmd_infer_explain_batch(taxonomy_path: &std::path::Path) -> Result
     Ok(())
 }
 
+// The MCP server role (`FineTypeServer::new` + `serve_stdio`) is deprecated in
+// favour of arcform's `arc mcp`. The `finetype mcp` subcommand is kept working for
+// now, so this internal call site opts out of the deprecation lint at function scope.
+#[allow(deprecated)]
 pub(crate) fn cmd_mcp() -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig};
 
