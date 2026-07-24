@@ -1,7 +1,17 @@
-//! FineType MCP Server
+//! FineType MCP — library types and the (deprecated) MCP server role.
 //!
 //! Exposes FineType's type inference capabilities via the Model Context Protocol (MCP).
-//! Designed to be consumed by AI agents over stdio transport.
+//!
+//! # Deprecation — the MCP *server role* has moved
+//!
+//! Running an MCP server from this crate is **deprecated**. The MCP server role is
+//! superseded by arcform's `arc mcp` entrypoint — point MCP clients there instead.
+//!
+//! This crate is **retained for its library types**: the datapackage / JSON-schema
+//! emitters (`datapackage`, `json_schema`), taxonomy resources, and tool request/
+//! response types remain supported and are unaffected. Only the server lifecycle
+//! (`FineTypeServer::new` to build a server and `FineTypeServer::serve_stdio` to run
+//! one) is deprecated.
 //!
 //! # Architecture
 //!
@@ -11,9 +21,11 @@
 //!
 //! # Usage
 //!
+//! To run an MCP server, use arcform's `arc mcp`. The former server lifecycle in
+//! this crate is deprecated:
+//!
 //! ```ignore
-//! // From CLI: finetype mcp
-//! // Or programmatically:
+//! // Deprecated — prefer `arc mcp` (arcform):
 //! let server = FineTypeServer::new(column_classifier, taxonomy);
 //! server.serve_stdio().await?;
 //! ```
@@ -159,6 +171,15 @@ impl FineTypeServer {
     /// desired models wired up (multi-branch, sibling context, semantic hints,
     /// taxonomy, etc.). The taxonomy is extracted from the classifier's state
     /// and also stored separately for resource/tool access.
+    ///
+    /// **Deprecated** — part of the MCP server role, which has moved to arcform's
+    /// `arc mcp`. This crate is retained for its library types, not for running a
+    /// server.
+    #[deprecated(
+        note = "the MCP server role is superseded by `arc mcp` in arcform; this crate \
+                is retained for its library types (datapackage / JSON-schema helpers), \
+                not for running an MCP server"
+    )]
     pub fn new(column_classifier: ColumnClassifier, taxonomy: Taxonomy) -> Self {
         Self {
             tool_router: Self::tool_router(),
@@ -178,6 +199,15 @@ impl FineTypeServer {
     }
 
     /// Start serving over stdio transport.
+    ///
+    /// **Deprecated** — this is the MCP server run entry point, which has moved to
+    /// arcform's `arc mcp`. This crate is retained for its library types, not for
+    /// running a server.
+    #[deprecated(
+        note = "the MCP server role is superseded by `arc mcp` in arcform; this crate \
+                is retained for its library types (datapackage / JSON-schema helpers), \
+                not for running an MCP server"
+    )]
     pub async fn serve_stdio(self) -> Result<()> {
         let service = self.serve(rmcp::transport::stdio()).await?;
         service.waiting().await?;

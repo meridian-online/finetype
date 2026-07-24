@@ -1,14 +1,21 @@
 # finetype-mcp
 
-MCP (Model Context Protocol) server for
-[FineType](https://github.com/meridian-online/finetype) — exposes semantic
-type profiling as MCP tools so agents and MCP-capable clients can profile
-tabular data (which columns are ISINs, NAICS codes, timestamps, coordinates?)
-and generate typed schemas.
+Semantic type profiling for
+[FineType](https://github.com/meridian-online/finetype) — datapackage and
+JSON-schema emitters, taxonomy resources, and tool request/response types for
+profiling tabular data (which columns are ISINs, NAICS codes, timestamps,
+coordinates?) and generating typed schemas.
 
-Most users run this through the `finetype` CLI (`finetype mcp` starts the
-server over stdio):
-[installation instructions](https://github.com/meridian-online/finetype#installation).
+## The MCP server role is deprecated
+
+Running an MCP server from this crate is **deprecated**. The MCP server role is
+superseded by arcform's `arc mcp` entrypoint — point MCP clients there instead.
+The `FineTypeServer::new` / `serve_stdio` lifecycle carries `#[deprecated]`
+attributes; the `finetype mcp` subcommand still works for now but will be
+removed.
+
+This crate is **retained for its library types** (the datapackage / JSON-schema
+emitters and taxonomy resources), which remain supported.
 
 This crate is primarily a component of the CLI; the library API carries no
 stability promises. See
