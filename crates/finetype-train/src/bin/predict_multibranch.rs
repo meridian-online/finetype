@@ -16,6 +16,14 @@
 //!
 //! Usage:
 //!   predict_multibranch --model <dir> --data <ftmb> --out <tsv> [--no-sibling]
+//!                       [--zero-char|--zero-embed|--zero-stats|--zero-header|--zero-valid]
+//!
+//! The five `--zero-*` flags are single-branch ablations: each replaces one branch's
+//! input with zeros immediately before the forward, leaving every weight untouched, so
+//! the run measures how much the trained trunk was leaning on that branch at inference.
+//! Zeroing an input is NOT equivalent to retraining without the branch — the remaining
+//! branches never got a chance to re-fit — so a low delta is a lower bound on the
+//! branch's contribution, not a deletion warrant.
 //!
 //! Output TSV: join_key<TAB>predicted_label<TAB>confidence
 
@@ -35,43 +43,136 @@ use std::path::{Path, PathBuf};
 const SIBLING_DIR: &str = "models/sibling-context";
 const GROUP_CHUNK: usize = 64; // groups per forward batch
 
-fn main() -> Result<()> {
-    let mut model_dir: Option<PathBuf> = None;
-    let mut data: Option<PathBuf> = None;
-    let mut out: Option<PathBuf> = None;
-    let mut use_sibling = true;
-    let mut zero_embed = false;
-    let mut logit_adjust = 0.0f64; // tau; subtract tau*log(prior) from logits before argmax
-    let mut priors_path: Option<PathBuf> = None;
-    let mut value_encoder: Option<PathBuf> = None;
+/// Which branch inputs to replace with zeros immediately before the forward.
+///
+/// One flag per branch of the five-branch trunk. All five inputs are dense f32, so
+/// zeroing is well defined for every one of them: the branch still runs, it just sees
+/// no signal, and whatever the trunk recovers came from the other four.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct ZeroBranches {
+    char_: bool,
+    embed: bool,
+    stats: bool,
+    header: bool,
+    valid: bool,
+}
 
-    let mut args = std::env::args().skip(1);
+impl ZeroBranches {
+    /// True when no branch is ablated — i.e. this is the un-ablated control run.
+    fn none(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// Space-separated flag names for the run banner, so a log line can never be
+    /// mistaken for a control run (the failure mode a swallowed error produces).
+    fn describe(&self) -> String {
+        if self.none() {
+            return "none (control)".to_string();
+        }
+        let mut v = Vec::new();
+        for (on, name) in [
+            (self.char_, "char"),
+            (self.embed, "embed"),
+            (self.stats, "stats"),
+            (self.header, "header"),
+            (self.valid, "valid"),
+        ] {
+            if on {
+                v.push(name);
+            }
+        }
+        v.join(" ")
+    }
+}
+
+/// Parsed command line. Split out of `main` so the flag wiring is unit-testable
+/// without a model, an FTMB, or a forward pass.
+#[derive(Debug, Default, Clone, PartialEq)]
+struct Args {
+    model_dir: Option<PathBuf>,
+    data: Option<PathBuf>,
+    out: Option<PathBuf>,
+    use_sibling: bool,
+    zero: ZeroBranches,
+    /// tau; subtract tau*log(prior) from logits before argmax
+    logit_adjust: f64,
+    priors_path: Option<PathBuf>,
+    value_encoder: Option<PathBuf>,
+}
+
+fn parse_args<I: Iterator<Item = String>>(iter: I) -> Result<Args> {
+    let mut parsed = Args {
+        use_sibling: true,
+        ..Default::default()
+    };
+    let mut args = iter;
     while let Some(a) = args.next() {
         match a.as_str() {
-            "--model" => model_dir = args.next().map(PathBuf::from),
-            "--data" => data = args.next().map(PathBuf::from),
-            "--out" => out = args.next().map(PathBuf::from),
+            "--model" => parsed.model_dir = args.next().map(PathBuf::from),
+            "--data" => parsed.data = args.next().map(PathBuf::from),
+            "--out" => parsed.out = args.next().map(PathBuf::from),
             // Value-encoder dir for the per-value attention pool (choice 0106) — the
             // model's config has a value_attention block and the FTMB is v6.
-            "--value-encoder" => value_encoder = args.next().map(PathBuf::from),
-            "--no-sibling" => use_sibling = false,
-            // Ablation: replace the embed branch input with zeros before the forward,
-            // so the model decides on char/stats/header/validation only. If format
-            // types recover vs the un-ablated run, the embed was overriding them.
-            "--zero-embed" => zero_embed = true,
+            "--value-encoder" => parsed.value_encoder = args.next().map(PathBuf::from),
+            "--no-sibling" => parsed.use_sibling = false,
+            // Ablations: replace one branch's input with zeros before the forward, so
+            // the model decides on the other four only. If format types recover vs the
+            // un-ablated run, that branch was overriding them.
+            "--zero-char" => parsed.zero.char_ = true,
+            "--zero-embed" => parsed.zero.embed = true,
+            "--zero-stats" => parsed.zero.stats = true,
+            "--zero-header" => parsed.zero.header = true,
+            "--zero-valid" => parsed.zero.valid = true,
             // Post-hoc logit adjustment: logit_c -= tau * log(prior_c). Down-weights
             // frequent classes (the decimal_number / entity_name attractors) at
             // inference only — no retrain. --priors is a "label<TAB>train_count" TSV.
             "--logit-adjust" => {
-                logit_adjust = args.next().context("--logit-adjust needs tau")?.parse()?
+                parsed.logit_adjust = args.next().context("--logit-adjust needs tau")?.parse()?
             }
-            "--priors" => priors_path = args.next().map(PathBuf::from),
+            "--priors" => parsed.priors_path = args.next().map(PathBuf::from),
             other => bail!("unknown arg: {other}"),
         }
     }
+    Ok(parsed)
+}
+
+/// Replace `t` with zeros of the same shape/dtype/device when `zero` is set.
+fn zero_if(t: Tensor, zero: bool) -> candle_core::Result<Tensor> {
+    if zero {
+        t.zeros_like()
+    } else {
+        Ok(t)
+    }
+}
+
+/// Optional-input variant, for the header and validation branches.
+///
+/// A `None` input is left as `None`: `MultiBranchModel::forward_trunk` already
+/// substitutes a zero tensor of the configured branch width for a missing optional
+/// input, so `None` and `Some(zeros)` drive the branch identically.
+fn zero_if_opt(t: Option<Tensor>, zero: bool) -> candle_core::Result<Option<Tensor>> {
+    match (t, zero) {
+        (Some(t), true) => Ok(Some(t.zeros_like()?)),
+        (other, _) => Ok(other),
+    }
+}
+
+fn main() -> Result<()> {
+    let Args {
+        model_dir,
+        data,
+        out,
+        use_sibling,
+        zero,
+        logit_adjust,
+        priors_path,
+        value_encoder,
+    } = parse_args(std::env::args().skip(1))?;
+
     let model_dir = model_dir.context("--model required")?;
     let data = data.context("--data required")?;
     let out = out.context("--out required")?;
+    eprintln!("ablation: zeroed branches = {}", zero.describe());
 
     let device = Device::Cpu;
 
@@ -211,6 +312,10 @@ fn main() -> Result<()> {
         let end = (gi + GROUP_CHUNK).min(n_groups);
         let chunk: Vec<usize> = (gi..end).collect();
         let (c, e, s, h, v, _labels) = ds.batch_groups(&chunk, sibling.as_ref(), &device)?;
+        let c = zero_if(c, zero.char_)?;
+        let s = zero_if(s, zero.stats)?;
+        let h = zero_if_opt(h, zero.header)?;
+        let v = zero_if_opt(v, zero.valid)?;
         // Widen the embed input to blender ‖ pool when value attention is on, using
         // the same group→record expansion batch_groups produced.
         let e = if ds.has_value_attention() {
@@ -224,7 +329,9 @@ fn main() -> Result<()> {
         } else {
             e
         };
-        let e = if zero_embed { e.zeros_like()? } else { e };
+        // Applied AFTER the value-attention widening so the zeroed tensor is exactly
+        // the tensor the embed branch consumes (blender ‖ pool when attention is on).
+        let e = zero_if(e, zero.embed)?;
         let logits = model.forward(&c, &e, &s, h.as_ref(), v.as_ref(), false)?;
         let logits = match &adjust {
             Some(adj) => logits.broadcast_sub(adj)?, // logit_c -= tau*log(prior_c)
@@ -260,4 +367,149 @@ fn main() -> Result<()> {
         correct as f64 / total.max(1) as f64
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(argv: &[&str]) -> Args {
+        parse_args(argv.iter().map(|s| s.to_string())).expect("parse")
+    }
+
+    const BASE: [&str; 6] = ["--model", "m", "--data", "d", "--out", "o"];
+
+    fn parse_with(extra: &[&str]) -> Args {
+        let mut argv: Vec<&str> = BASE.to_vec();
+        argv.extend_from_slice(extra);
+        parse(&argv)
+    }
+
+    #[test]
+    fn no_zero_flag_is_the_control() {
+        let a = parse_with(&[]);
+        assert_eq!(a.zero, ZeroBranches::default());
+        assert!(a.zero.none());
+        assert_eq!(a.zero.describe(), "none (control)");
+        assert_eq!(a.model_dir, Some(PathBuf::from("m")));
+        assert_eq!(a.data, Some(PathBuf::from("d")));
+        assert_eq!(a.out, Some(PathBuf::from("o")));
+        assert!(a.use_sibling);
+    }
+
+    /// Each flag sets its own branch and no other — the failure that would silently
+    /// mislabel a whole ablation table.
+    #[test]
+    fn each_zero_flag_sets_exactly_its_own_branch() {
+        let cases: [(&str, ZeroBranches); 5] = [
+            (
+                "--zero-char",
+                ZeroBranches {
+                    char_: true,
+                    ..Default::default()
+                },
+            ),
+            (
+                "--zero-embed",
+                ZeroBranches {
+                    embed: true,
+                    ..Default::default()
+                },
+            ),
+            (
+                "--zero-stats",
+                ZeroBranches {
+                    stats: true,
+                    ..Default::default()
+                },
+            ),
+            (
+                "--zero-header",
+                ZeroBranches {
+                    header: true,
+                    ..Default::default()
+                },
+            ),
+            (
+                "--zero-valid",
+                ZeroBranches {
+                    valid: true,
+                    ..Default::default()
+                },
+            ),
+        ];
+        for (flag, expected) in cases {
+            let a = parse_with(&[flag]);
+            assert_eq!(a.zero, expected, "{flag} set the wrong branch");
+            assert!(!a.zero.none(), "{flag} still reads as the control");
+            assert_eq!(a.zero.describe(), flag.trim_start_matches("--zero-"));
+        }
+    }
+
+    #[test]
+    fn zero_flags_compose_and_do_not_disturb_other_args() {
+        let a = parse_with(&["--zero-char", "--zero-valid", "--no-sibling"]);
+        assert_eq!(
+            a.zero,
+            ZeroBranches {
+                char_: true,
+                valid: true,
+                ..Default::default()
+            }
+        );
+        assert_eq!(a.zero.describe(), "char valid");
+        assert!(!a.use_sibling);
+        assert_eq!(a.logit_adjust, 0.0);
+    }
+
+    #[test]
+    fn unknown_zero_flag_is_rejected() {
+        // A typo must fail loudly rather than silently score an un-ablated run.
+        assert!(parse_args(
+            ["--model", "m", "--zero-headers"]
+                .iter()
+                .map(|s| s.to_string())
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn zero_if_blanks_the_tensor_only_when_asked() -> Result<()> {
+        let dev = Device::Cpu;
+        let t = Tensor::from_vec(vec![1.0f32, -2.0, 3.5, 4.0], (2, 2), &dev)?;
+
+        let kept = zero_if(t.clone(), false)?;
+        assert_eq!(
+            kept.to_vec2::<f32>()?,
+            vec![vec![1.0, -2.0], vec![3.5, 4.0]]
+        );
+
+        let blanked = zero_if(t.clone(), true)?;
+        assert_eq!(blanked.dims(), t.dims());
+        assert_eq!(blanked.dtype(), t.dtype());
+        assert_eq!(
+            blanked.to_vec2::<f32>()?,
+            vec![vec![0.0, 0.0], vec![0.0, 0.0]]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn zero_if_opt_blanks_some_and_leaves_none_alone() -> Result<()> {
+        let dev = Device::Cpu;
+        let t = Tensor::from_vec(vec![5.0f32, 6.0, 7.0], (1, 3), &dev)?;
+
+        let blanked = zero_if_opt(Some(t.clone()), true)?.expect("some");
+        assert_eq!(blanked.dims(), t.dims());
+        assert_eq!(blanked.to_vec2::<f32>()?, vec![vec![0.0, 0.0, 0.0]]);
+
+        let kept = zero_if_opt(Some(t.clone()), false)?.expect("some");
+        assert_eq!(kept.to_vec2::<f32>()?, vec![vec![5.0, 6.0, 7.0]]);
+
+        // `None` stays `None`: forward_trunk substitutes a zero tensor of the
+        // configured branch width, so it is already the ablated input.
+        assert!(zero_if_opt(None, true)?.is_none());
+        assert!(zero_if_opt(None, false)?.is_none());
+        Ok(())
+    }
 }
