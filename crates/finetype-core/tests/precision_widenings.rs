@@ -17,6 +17,14 @@
 //!      validate alongside plain decimals like `0.081541`. Surfaced by
 //!      `us_baby_names.percent` (format_diversity in baseline).
 //!
+//! Later widenings:
+//!
+//!   2. `identity.industry.naics` — pattern gains a literal alternation branch
+//!      for the three official hyphenated sector ranges (`31-33`, `44-45`,
+//!      `48-49`) that Census publishes alongside the plain 2-6 digit codes.
+//!      The branch is exhaustive by construction, NOT a general
+//!      `(-[0-9]{2})?` suffix, which would admit non-ranges like `11-99`.
+//!
 //! When future iterations add widenings, append additional `pvc_widening_*`
 //! tests in this file. The accept/reject fixtures double as living
 //! documentation of the boundary each pattern guards.
@@ -117,6 +125,47 @@ fn pvc_widening_decimal_number_accepts_scientific_notation() {
             " 3.14",   // leading whitespace
             "3.14 ",   // trailing whitespace
             "3,14",    // comma decimal (that's decimal_number_comma)
+        ],
+    );
+}
+
+/// Widening 2 — `identity.industry.naics` accepts the official hyphenated
+/// sector ranges.
+///
+/// Census publishes exactly three sector ranges as hyphenated pairs: 31-33
+/// (Manufacturing), 44-45 (Retail Trade) and 48-49 (Transportation and
+/// Warehousing). They are real published NAICS sector codes and appear
+/// verbatim in reference data, but the pre-widening pattern only admitted
+/// sector-prefixed digit runs, so all three rejected.
+///
+/// ACCEPT-set: the three ranges, plus the prior contract (2-digit sector,
+/// 4-digit industry group, 6-digit national industry) which must stay green.
+///
+/// REJECT-set: the guard against a sloppy widening. A general
+/// `(-[0-9]{2})?` suffix would have accepted `11-99` — a digit pair that
+/// looks like a range but is not one. The rest are the textbook
+/// precision-violators: a dangling hyphen on either side, a range built from
+/// non-sector operands, an over-long digit run, and a spaced form.
+#[test]
+fn pvc_widening_naics_accepts_hyphenated_sector_ranges() {
+    assert_pattern_boundary(
+        "identity.industry.naics",
+        // ACCEPT
+        &[
+            // Pre-widening contract — must stay green: 2-digit sector,
+            // 4-digit industry group, 6-digit national industry.
+            "11", "2131", "541511", "92",
+            // Post-widening additions — the three official sector ranges.
+            "31-33", "44-45", "48-49",
+        ],
+        // REJECT
+        &[
+            "11-99",    // not a published sector range; the general-suffix trap
+            "31-",      // dangling hyphen, no right operand
+            "-33",      // dangling hyphen, no left operand
+            "3133-44",  // range operands must be bare sectors
+            "12345678", // longer than a 6-digit national industry
+            "31 - 33",  // spaced form is not the published notation
         ],
     );
 }

@@ -1275,12 +1275,13 @@ representation.identifier.numeric_code:
   title: "Numeric Code"
   description: >
     All-digit string where the digit pattern is meaningful and leading zeros
-    must be preserved. Covers ISO country numeric codes (840, 036), NAICS/SIC
-    industry codes, FIPS codes, product category codes, and similar
-    classification systems. The critical property is that these values MUST
-    remain as VARCHAR — casting to integer strips leading zeros and destroys
-    the code's identity. Defers to geography.address.postal_code and
-    identity.person.phone_number when those more specific types apply.
+    must be preserved. Covers ISO country numeric codes (840, 036), FIPS
+    codes, product category codes, and similar classification systems. The
+    critical property is that these values MUST remain as VARCHAR — casting
+    to integer strips leading zeros and destroys the code's identity. Defers
+    to geography.address.postal_code and identity.person.phone_number when
+    those more specific types apply, and to the identity.industry.* leaves
+    (identity.industry.naics) for industry classification codes.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
