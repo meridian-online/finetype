@@ -22,15 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   still holds a `Box<dyn ValueClassifier>`. `build.rs` and the CI model download
   no longer fetch `type_embeddings.safetensors` / `label_index.json`: they were
   the semantic classifier's artifacts and were never `include_bytes!`-embedded.
-- **Five header-hint families measured at zero effect.**
-  `header_hint_measurement`, `header_hint_sci_measurement`,
-  `header_hint_person_override`, `header_hint_geo_override` and
-  `header_hint_fallback` are gone from the multi-branch Sharpen path. Each was
-  measured at `columns_hit = 0` — disabling it changed no label — and the
-  deletion was re-measured on the shipped model over the 33,250-file stratified
-  sample, not just on the eval that first flagged them. The geography protection
-  that used to wrap `header_hint_person_override` stays, now unconditional: a
-  person-name hint never overrides a location type.
+- **Four header-hint families that do nothing.** `header_hint_measurement`,
+  `header_hint_sci_measurement`, `header_hint_geo_override` and
+  `header_hint_fallback` are gone from the multi-branch Sharpen path. With all
+  four removed, the composed prediction is byte-identical to the previous
+  binary's across all 837,625 columns of the 33,250-file stratified sample —
+  they are not "low impact", they are inert on the shipped model.
+
+  A fifth family on the same list, `header_hint_person_override`, was **kept**.
+  The list said it too was inert; re-measuring said otherwise. It changes 133
+  columns, and their headers — `authors`, `LastName`, `Surname`,
+  `billing_lastname`, `NPPES_PROVIDER_FIRST_NAME` — say those changes would be
+  regressions: surnames and place names share a vocabulary, the model reads
+  those columns as cities and regions, and this arm is what rescues them. The
+  eval that scored it at zero hits contains no such column and was scored
+  against a model that has since been replaced.
 
 ### Changed
 

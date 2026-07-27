@@ -1732,13 +1732,31 @@ impl ColumnClassifier {
             self.taxonomy.as_ref(),
         );
 
-        // Geography protection: a person-name hint never overrides a location
-        // type. The `header_hint_person_override` arm that used to let a
-        // *hardcoded* person hint win here measured zero label changes, so the
-        // protection is now unconditional.
+        // Geography protection: a person-name hint does not override a location
+        // type — EXCEPT when the hint is hardcoded, which is the
+        // `header_hint_person_override` arm below.
+        //
+        // This arm was on the measured-inert list and was re-measured before
+        // being trusted. It is not inert: on the shipped model it changes 133
+        // of 837,625 stratified-sample columns, and the headers say the change
+        // would be a regression — `authors`, `LastName`, `Surname`,
+        // `billing_lastname`, `NPPES_PROVIDER_FIRST_NAME` are person-name
+        // columns the model reads as a place because surnames and place names
+        // share a vocabulary, and this arm is what rescues them. The eval that
+        // scored it at zero hits contains no such column and was scored against
+        // a since-replaced model.
         if PERSON_NAME_HINTS.contains(&hinted_type)
             && LOCATION_TYPES.contains(&result.label.as_str())
         {
+            if !rhh::is_disabled("header_hint_person_override") && hint_is_hardcoded {
+                result.label = hinted_type.to_string();
+                result.confidence = result.confidence.max(0.6);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_person_override:{}",
+                    header.to_lowercase()
+                ));
+            }
             return;
         }
 
