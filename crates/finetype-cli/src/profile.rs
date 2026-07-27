@@ -17,7 +17,7 @@ use rayon::prelude::*;
 const QUALITY_HIGH_THRESHOLD: f32 = 0.85;
 const QUALITY_LOW_THRESHOLD: f32 = 0.70;
 
-fn quality_band_label(confidence: f32) -> &'static str {
+pub(crate) fn quality_band_label(confidence: f32) -> &'static str {
     if confidence >= QUALITY_HIGH_THRESHOLD {
         "high"
     } else if confidence >= QUALITY_LOW_THRESHOLD {
@@ -30,7 +30,11 @@ fn quality_band_label(confidence: f32) -> &'static str {
 /// The second-best vote, surfaced only on the `low` band (and only when it
 /// differs from the emitted label). `vote_distribution` is empty on rule/veto
 /// paths, which sit above the low threshold anyway, so this is `None` there.
-fn low_band_runner_up(label: &str, confidence: f32, votes: &[(String, f32)]) -> Option<String> {
+pub(crate) fn low_band_runner_up(
+    label: &str,
+    confidence: f32,
+    votes: &[(String, f32)],
+) -> Option<String> {
     if confidence >= QUALITY_LOW_THRESHOLD {
         return None;
     }

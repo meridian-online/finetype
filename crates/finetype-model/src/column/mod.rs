@@ -1629,11 +1629,16 @@ impl ColumnClassifier {
         // is off — every `disable_*` becomes a constant `false`, the optimiser
         // eliminates the conjunctions, and there is zero runtime overhead).
         // See .orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02.
+        let disable_measurement = rhh::is_disabled("header_hint_measurement");
+        let disable_sci_measurement = rhh::is_disabled("header_hint_sci_measurement");
+        let disable_person_override = rhh::is_disabled("header_hint_person_override");
+        let disable_geo_override = rhh::is_disabled("header_hint_geo_override");
         let disable_same_category = rhh::is_disabled("header_hint_same_category");
         let disable_cross_domain = rhh::is_disabled("header_hint_cross_domain");
         let disable_catchall = rhh::is_disabled("header_hint");
         let disable_generic = rhh::is_disabled("header_hint_generic");
         let disable_hardcoded = rhh::is_disabled("header_hint_hardcoded");
+        let disable_fallback = rhh::is_disabled("header_hint_fallback");
 
         // Get header hint: hardcoded first, then Model2Vec semantic
         let hinted_type: Option<String> = header_hint(header).map(|h| h.to_string());
@@ -1720,6 +1725,39 @@ impl ColumnClassifier {
             return;
         }
 
+        // Measurement disambiguation: height/weight
+        const MEASUREMENT_TYPES: &[&str] = &["identity.person.height", "identity.person.weight"];
+        const COORDINATE_TYPES: &[&str] = &[
+            "geography.coordinate.latitude",
+            "geography.coordinate.longitude",
+        ];
+        if !disable_measurement
+            && MEASUREMENT_TYPES.contains(&hinted_type)
+            && MEASUREMENT_TYPES.contains(&result.label.as_str())
+        {
+            result.label = hinted_type.to_string();
+            result.confidence = 0.9;
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("header_hint_measurement:{}", header.to_lowercase()));
+            return;
+        }
+
+        // Scientific measurement override (coordinates → decimal when header says measurement)
+        if !disable_sci_measurement
+            && hinted_type == "representation.numeric.decimal_number"
+            && COORDINATE_TYPES.contains(&result.label.as_str())
+        {
+            result.label = hinted_type.to_string();
+            result.confidence = 0.8;
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "header_hint_sci_measurement:{}",
+                header.to_lowercase()
+            ));
+            return;
+        }
+
         // Check hint in vote distribution (single-entry for multi-branch)
         let hint_in_votes = result
             .vote_distribution
@@ -1748,7 +1786,7 @@ impl ColumnClassifier {
         if PERSON_NAME_HINTS.contains(&hinted_type)
             && LOCATION_TYPES.contains(&result.label.as_str())
         {
-            if !rhh::is_disabled("header_hint_person_override") && hint_is_hardcoded {
+            if !disable_person_override && hint_is_hardcoded {
                 result.label = hinted_type.to_string();
                 result.confidence = result.confidence.max(0.6);
                 result.disambiguation_applied = true;
@@ -1757,6 +1795,38 @@ impl ColumnClassifier {
                     header.to_lowercase()
                 ));
             }
+            // Model2Vec person-name hints do NOT override locations
+            // (no unmasked votes to check in multi-branch)
+            return;
+        }
+
+        // Same-domain geographic override.
+        //
+        // The override itself is only half of what this arm does. Its `return` is
+        // load-bearing control flow: a column that reaches here with a location
+        // hint on a location label is SHIELDED from `header_hint_hardcoded`
+        // (which flattens confidence to 0.5 whenever pre-hint confidence is under
+        // 0.95) and from the country_code post-hint guard below. Delete the arm
+        // and those columns re-route through both — measured through
+        // `finetype profile -o json` on the shipped default: a `country` column of
+        // two-letter subdivision codes moves country -> state_code, and a
+        // `city_name` column keeps its label but collapses 0.877 -> 0.500,
+        // high band -> low, and surfaces a runner_up. Not inert. Do not remove
+        // without re-measuring confidence, quality_band and disambiguation_rule,
+        // not just the label.
+        if !disable_geo_override
+            && LOCATION_TYPES.contains(&hinted_type)
+            && LOCATION_TYPES.contains(&result.label.as_str())
+            && result.label != hinted_type
+            && (hint_is_hardcoded || result.confidence <= 0.90)
+        {
+            result.label = hinted_type.to_string();
+            result.confidence = result.confidence.max(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "header_hint_geo_override:{}",
+                header.to_lowercase()
+            ));
             return;
         }
 
@@ -1864,6 +1934,12 @@ impl ColumnClassifier {
                 result.disambiguation_rule =
                     Some(format!("header_hint_hardcoded:{}", header.to_lowercase()));
             }
+        } else if !disable_fallback && result.confidence < 0.3 && !hint_in_votes {
+            result.label = hinted_type.to_string();
+            result.confidence = 0.4;
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("header_hint_fallback:{}", header.to_lowercase()));
         }
 
         // Country/country_code post-hint guard (v14, ac-05).
