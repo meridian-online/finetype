@@ -30,6 +30,19 @@ jobs:
       - name: Check for drift between FINETYPE_CI_MODEL and models/default
         run: .github/scripts/check-ci-model-drift.sh
 
+  evidence:
+    name: Fixture manifest + scorer failure propagation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Manifest self-consistency
+        # Fails if a recorded score isn't its own correct/scored, if a bar has no
+        # source, or if a registered fixture file was edited without a new version
+        # being registered.
+        run: scripts/evidence.py verify
+      - name: Scorer propagates failures and stamps every score with its fixture
+        run: scripts/test_score_clean_label.sh
+
   fmt:
     name: Format
     runs-on: ubuntu-latest
