@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # run_clean_label_augment.sh — the CLEAN test (spec 2026-06-28-clean-label-retrain).
 #
-# The REPLACE run regressed (composed 0.774 vs 0.853) by swapping real semantic columns for
-# synthetic clean positives — gold cratered on exactly the synthesised families (city 0.958->
-# 0.458, continent 1.000->0.000). That confounds label-cleanliness with a synthetic distribution
-# shift. AUGMENT keeps ALL real v3 (real-column formats preserved) and ADDS clean generator
-# positives, isolating the label variable. Go/no-go = composed gold (reframe) vs s43 0.853.
+# The REPLACE run regressed (composed 0.774 against the s43 bar of the day, both on the
+# gold-2026-06-28 fixture) by swapping real semantic columns for synthetic clean positives —
+# gold cratered on exactly the synthesised families (city 0.958->0.458, continent 1.000->
+# 0.000). That confounds label-cleanliness with a synthetic distribution shift. AUGMENT keeps
+# ALL real v3 (real-column formats preserved) and ADDS clean generator positives, isolating
+# the label variable. Go/no-go = composed gold (reframe) against the s43 bar recorded in
+# evidence/fixtures.json for the gold fixture version that is actually checked out.
 #
 # 8M only (shipped architecture); reuses the already-built 245 gold FTMB. Idempotent.
 set -eo pipefail
@@ -57,7 +59,7 @@ print(f'Injected {len(c[\"type_index_keys\"])} type_index_keys')"
   fi
 else echo "skip (exists): $OUT/model.safetensors"; fi
 
-echo "================ DECISIVE (AUGMENT): 8M composed(reframe) vs 0.853 — $(date) ================"
-scripts/score_clean_label.sh "$OUT" "$GOLDFTMB" clean8m_aug
-echo "baseline s43 composed(reframe) = 794/931 = 0.853 | REPLACE was 0.774"
+BAR="m2v8m-s43/composed-reframe/0.6.53"
+echo "================ DECISIVE (AUGMENT): 8M composed(reframe) vs $BAR — $(date) ================"
+scripts/score_clean_label.sh "$OUT" "$GOLDFTMB" clean8m_aug --baseline "$BAR"
 echo "================ DONE — $(date) ================"

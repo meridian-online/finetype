@@ -3,7 +3,10 @@
 #
 # Single-seed retrain on the clean-label blend (vocab-membership labels for the semantic
 # families) holding the SHIPPED architecture + Sharpen FIXED. One variable: the training
-# labels for geo/person. Go/no-go = composed gold (reframe) vs s43's 794/931 = 0.853.
+# labels for geo/person. Go/no-go = composed gold (reframe) vs the s43 bar recorded in
+# evidence/fixtures.json for whichever gold fixture version is checked out — the bar is
+# looked up, never typed in here, because a float copied into a script goes stale the
+# moment the ground truth under it is re-adjudicated.
 #
 # Two encoders on the SAME clean blend:
 #   - 8M (primary): config m2v8m-244-config.json — the shipped architecture exactly.
@@ -75,24 +78,31 @@ print(f'Injected {len(c[\"type_index_keys\"])} type_index_keys')"
 }
 
 # Taxonomy drifted 244->245 since s43 (datetime.offset.timezone_abbreviation, a Sharpen-
-# recovered leaf with ZERO training rows). The 0.853 baseline was measured on THIS 245-binary
-# (its Sharpen recovers the 6 gold tz_abbr columns), so 245 is the reference environment. We
-# train the candidate at 245 — the extra leaf is inert (no training data, Sharpen-recovered in
-# both baseline and candidate) so it does not affect the geo/person variable under test.
+# recovered leaf with ZERO training rows). The recorded baseline was measured on THIS
+# 245-binary (its Sharpen recovers the 6 gold tz_abbr columns), so 245 is the reference
+# environment. We train the candidate at 245 — the extra leaf is inert (no training data,
+# Sharpen-recovered in both baseline and candidate) so it does not affect the geo/person
+# variable under test.
+
+# The go/no-go bar: the shipped model's composed score, looked up in the fixture manifest
+# under whichever gold version is checked out. If gold has moved since the bar was measured,
+# score_clean_label.sh refuses the comparison instead of judging this candidate against
+# ground truth that no longer exists.
+BAR="m2v8m-s43/composed-reframe/0.6.53"
 
 # ---- 8M primary (shipped architecture) — DECISIVE go/no-go ----
 train_one minishlab/potion-base-8M models/m2v8m-245-config.json \
   output/clean-label-retrain/clean_m2v8m-244.ftmb models/clean8m-s42 \
   output/clean-label-retrain/gold_m2v8m_245.ftmb
-echo "================ DECISIVE: 8M composed(reframe) vs baseline 0.853 — $(date) ================"
-scripts/score_clean_label.sh models/clean8m-s42 output/clean-label-retrain/gold_m2v8m_245.ftmb clean8m
-echo "baseline s43 composed(reframe) = 794/931 = 0.853 (go/no-go bar)"
+echo "================ DECISIVE: 8M composed(reframe) vs $BAR — $(date) ================"
+scripts/score_clean_label.sh models/clean8m-s42 output/clean-label-retrain/gold_m2v8m_245.ftmb \
+  clean8m --baseline "$BAR"
 
 # ---- 4M speed track (does clean data make the smaller encoder viable?) ----
 train_one minishlab/potion-base-4M models/m2v-245-config.json \
   output/clean-label-retrain/clean_m2v4m-244.ftmb models/clean4m-s42 \
   output/clean-label-retrain/gold_m2v4m.ftmb
 echo "================ SPEED TRACK: 4M composed(reframe) — $(date) ================"
-scripts/score_clean_label.sh models/clean4m-s42 output/clean-label-retrain/gold_m2v4m.ftmb clean4m
-echo "baseline s43 composed(reframe) = 794/931 = 0.853 (go/no-go bar)"
+scripts/score_clean_label.sh models/clean4m-s42 output/clean-label-retrain/gold_m2v4m.ftmb \
+  clean4m --baseline "$BAR"
 echo "================ DONE — $(date) ================"

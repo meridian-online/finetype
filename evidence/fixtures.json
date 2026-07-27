@@ -1,0 +1,68 @@
+{
+  "schema": "finetype/evidence-fixtures@1",
+  "description": "Fixture versions this repo measures against, content-addressed by sha256, with the baselines recorded on each. A bar belongs to a (model, fixture, binary) triple; it is never a constant in a script.",
+  "fixtures": {
+    "gold-2026-07-14": {
+      "path": "eval/gold/gold_corpus.tsv",
+      "sha256": "760ee4ace67064edd465d245103677e30171a9ce4bb07decc44bd69f914586a7",
+      "rows": 1037,
+      "registered": "2026-07-27",
+      "note": "Gold corpus as of the technology.filesystem.filename adjudication; 106 columns added and 37 labels re-adjudicated since gold-2026-06-28.",
+      "baselines": {
+        "m2v8m-s43/composed-reframe/0.6.53": {
+          "correct": 819,
+          "scored": 931,
+          "score": 0.88,
+          "measured": "2026-07-25",
+          "model": "m2v8m-s43",
+          "binary": "0.6.53",
+          "pipeline": "predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe",
+          "source": "docs/branch-ablation-m2v8m-s43.md, un-ablated control",
+          "note": "931 of the fixture's 1037 rows are scored: the 2026-06-22 corpus-pass FTMB does not cover the 106 columns added since."
+        },
+        "m2v8m-s43/sense-reframe/0.6.53": {
+          "correct": 492,
+          "scored": 931,
+          "score": 0.528,
+          "measured": "2026-07-25",
+          "model": "m2v8m-s43",
+          "binary": "0.6.53",
+          "pipeline": "predict_multibranch -> reshape -> score_gold_anchor --reframe (no Sharpen)",
+          "source": "docs/branch-ablation-m2v8m-s43.md, un-ablated control",
+          "note": "Standalone Sense, before composition."
+        }
+      }
+    },
+    "gold-2026-06-28": {
+      "path": "eval/gold/gold_corpus.tsv",
+      "sha256": "9dbbcd3abeed9f4477166673772c36b7ffacfc8e5619921eae00737194215edb",
+      "rows": 931,
+      "registered": "2026-07-27",
+      "note": "Historical: the gold corpus as it stood when the clean-label go/no-go bar was written (git blob at f903a2c). Retained so the bar it carried stays attributable to the ground truth that produced it.",
+      "baselines": {
+        "m2v8m-s43/composed-reframe/pre-0.6.41": {
+          "correct": 794,
+          "scored": 931,
+          "score": 0.853,
+          "measured": "2026-06-28",
+          "model": "m2v8m-s43",
+          "binary": "pre-0.6.41",
+          "pipeline": "predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe",
+          "source": "scripts/run_clean_label_retrain.sh at f903a2c; restated in docs/branch-ablation-m2v8m-s43.md",
+          "note": "The original hard-coded 0.853. Superseded as a live bar: neither its fixture nor its binary is current."
+        },
+        "m2v8m-s43/composed-reframe/0.6.53": {
+          "correct": 805,
+          "scored": 931,
+          "score": 0.865,
+          "measured": "2026-07-25",
+          "model": "m2v8m-s43",
+          "binary": "0.6.53",
+          "pipeline": "predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe",
+          "source": "docs/branch-ablation-m2v8m-s43.md, attribution table",
+          "note": "Same fixture as the pre-0.6.41 bar, current binary: the +11 columns are the 0.6.41/0.6.50/0.6.53 Sharpen typing guards."
+        }
+      }
+    }
+  }
+}

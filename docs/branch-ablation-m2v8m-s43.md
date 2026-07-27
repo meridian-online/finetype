@@ -1,5 +1,7 @@
-> Status: measured, NOT merged — the documented 0.853 baseline is stale and the
-> artefact's permanent home is an open convention question — 2026-07-25
+> Status: measured — 2026-07-25. The stale `0.853` bar and the failure-swallowing
+> scorer this file reported have since been fixed: bars now live in
+> `evidence/fixtures.json` keyed by gold fixture version, and every number below is
+> recorded there against the version it was measured on. See `evidence/README.md`.
 
 # Branch ablation — `m2v8m-s43`, five branches, per-label
 
@@ -11,7 +13,7 @@ Each run below is one forward pass over the same 931 gold columns with one branc
 
 ## Read this first — the documented baseline no longer reproduces
 
-`scripts/score_clean_label.sh` and `scripts/run_clean_label_retrain.sh` both assert a go/no-go bar of **composed `794/931 = 0.853`**. The un-ablated control was run first, before any ablation, and lands at **819/931 = 0.880** — 25 columns above it.
+When this was measured, `scripts/score_clean_label.sh` and `scripts/run_clean_label_retrain.sh` both asserted a go/no-go bar of **composed `794/931 = 0.853`** as a literal in the script. The un-ablated control was run first, before any ablation, and lands at **819/931 = 0.880** — 25 columns above it. Both bars are now recorded in `evidence/fixtures.json` against the gold fixture version each was measured on (`gold-2026-06-28` and `gold-2026-07-14` respectively), and neither script carries a float any more.
 
 That gap is **not** a mis-wiring. It is fully attributable to two things that shipped after the bar was written (2026-06-28, `f903a2c`):
 
@@ -27,7 +29,7 @@ Independent checks that the wiring is sound:
 
 - Two separately-built `finetype` release binaries produced byte-identical headline numbers.
 - FTMB dims (char 960 / embed 1024 / stats 27 / header 128 / valid 244, 931 records) match `models/m2v8m-s43/config.json` exactly.
-- Every stage's exit code was checked and row counts asserted at 931 after both the reshape and the compose — `score_clean_label.sh` swallows failures on both the composer (`|| cp`) and the scorer (`>/dev/null 2>&1 || true`), so these runs did not use it.
+- Every stage's exit code was checked and row counts asserted at 931 after both the reshape and the compose. At the time `score_clean_label.sh` swallowed failures on both the composer (`|| cp`) and the scorer (`>/dev/null 2>&1 || true`), so these runs did not use it; that script now checks every stage and asserts those same row counts itself, so a re-run through it is sound.
 
 **Consequence for the ablation numbers below: none.** Every run shares one fixture, one binary and one model; only the zeroed branch differs, so fixture drift cancels exactly in a delta. The control level is restated as **Sense 492/931 = 0.528, composed 819/931 = 0.880**.
 
@@ -191,7 +193,7 @@ scripts/score_clean_label.sh models/m2v8m-s43 \
     output/embed-frontier/gold_m2v8m.ftmb <tag> --zero-char
 ```
 
-Check each stage's exit code yourself; that script does not, and its `0.853` trailer is the stale bar described above. Budget ~4 min per pass — the cost is `compose_predictions.py` launching `finetype profile` once per column, 931 subprocesses; the forward itself is under two seconds.
+That script now checks every stage's exit code, asserts the row count through the compose, and prints the gold fixture version beside every score; add `--baseline m2v8m-s43/composed-reframe/0.6.53` to compare against the recorded control. Budget ~4 min per pass — the cost is `compose_predictions.py` launching `finetype profile` once per column, 931 subprocesses; the forward itself is under two seconds.
 
 ## What this does not say
 
