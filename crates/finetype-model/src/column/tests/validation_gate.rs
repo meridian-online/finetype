@@ -150,8 +150,12 @@ fn gate_answer_matches_the_full_validation_result_it_replaced() {
     let samples: Vec<Vec<String>> = vec![
         v(&["AAA", "BBB", "CCC"]),
         v(&["AAA", "zzz"]),
-        v(&["zzz", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA"]),
-        v(&["AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "zzz"]),
+        v(&[
+            "zzz", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA",
+        ]),
+        v(&[
+            "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "AAA", "zzz",
+        ]),
         v(&["", "AAA", " ", "BBB"]),
         v(&["zzz"]),
         v(&[]),

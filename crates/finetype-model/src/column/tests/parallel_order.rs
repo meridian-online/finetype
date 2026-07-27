@@ -51,7 +51,12 @@ fn distinguishable_columns() -> Vec<(Vec<String>, String)> {
             "uuid".to_string(),
         ),
         (
-            v(&["+14155552671", "+442071838750", "+61285993000", "+81312345678"]),
+            v(&[
+                "+14155552671",
+                "+442071838750",
+                "+61285993000",
+                "+81312345678",
+            ]),
             "phone_number".to_string(),
         ),
         (
@@ -59,13 +64,15 @@ fn distinguishable_columns() -> Vec<(Vec<String>, String)> {
             "colour".to_string(),
         ),
         (
-            v(&["https://a.example.com", "https://b.example.org", "https://c.example.net", "https://d.example.io"]),
+            v(&[
+                "https://a.example.com",
+                "https://b.example.org",
+                "https://c.example.net",
+                "https://d.example.io",
+            ]),
             "homepage".to_string(),
         ),
-        (
-            v(&["12.5", "88.25", "3.75", "0.5"]),
-            "amount".to_string(),
-        ),
+        (v(&["12.5", "88.25", "3.75", "0.5"]), "amount".to_string()),
     ]
 }
 
