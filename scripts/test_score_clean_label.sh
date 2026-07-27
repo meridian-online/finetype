@@ -244,21 +244,67 @@ if run "below bar, no gate" 0 STUB_MISS_COMPOSED=3 -- --baseline "stub/composed/
   want_out "-> below bar"
 fi
 
+# A guard must reject for the reason it claims: an exit code alone would let a crash,
+# a typo'd flag or an unrelated defect stand in for the check under test.
+rejects() {  # <label> <expected message fragment> -- <cmd...>
+  r_label="$1"; r_want="$2"; shift 2
+  [ "$1" = "--" ] && shift
+  if "$@" >"$TMP/reject.out" 2>&1; then
+    bad "$r_label: accepted, should have been refused"
+  elif grep -q -- "$r_want" "$TMP/reject.out"; then
+    ok "$CASE: $r_label"
+  else
+    bad "$r_label: refused, but not for the stated reason ('$r_want'): $(tail -n 3 "$TMP/reject.out" | tr '\n' '|')"
+  fi
+}
+
 echo "== manifest guards =="
 CASE="manifest guards"
-if scripts/evidence.py --manifest "$MANIFEST" register-fixture --id test-gold-v1 --path "$GOLD" >/dev/null 2>&1
-then bad "re-registering an existing id should fail"; else ok "$CASE: duplicate fixture id refused"; fi
-if scripts/evidence.py --manifest "$MANIFEST" register-fixture --id other --path "$GOLD" >/dev/null 2>&1
-then bad "re-registering the same content under a new id should fail"; else ok "$CASE: duplicate content refused"; fi
-if scripts/evidence.py --manifest "$MANIFEST" record-baseline --fixture test-gold-v1 \
-     --key "stub/composed/v1" --correct 1 --scored 8 --source h >/dev/null 2>&1
-then bad "overwriting a recorded baseline should fail"; else ok "$CASE: recorded baseline is immutable"; fi
-sed 's/"score": 0.875/"score": 0.999/' "$MANIFEST" > "$TMP/tampered.json"
-if scripts/evidence.py --manifest "$TMP/tampered.json" verify >/dev/null 2>&1
-then bad "verify should reject a score that is not correct/scored"; else ok "$CASE: verify catches a doctored score"; fi
-printf 'fam\tsha77\tcol77\tlabel77\n' >> "$GOLD"
-if scripts/evidence.py --manifest "$MANIFEST" verify >/dev/null 2>&1
-then bad "verify should reject an edited-but-unregistered fixture file"; else ok "$CASE: verify catches an unregistered edit"; fi
+rejects "duplicate fixture id refused" "Fixture ids are immutable" -- \
+  scripts/evidence.py --manifest "$MANIFEST" register-fixture --id test-gold-v1 --path "$GOLD"
+rejects "same content under a second id refused" "already registered as fixture" -- \
+  scripts/evidence.py --manifest "$MANIFEST" register-fixture --id other --path "$GOLD"
+rejects "recorded baseline is immutable" "A recorded measurement is history" -- \
+  scripts/evidence.py --manifest "$MANIFEST" record-baseline --fixture test-gold-v1 \
+  --key "stub/composed/v1" --correct 1 --scored 8 --source h
+
+echo "== verify =="
+CASE="verify"
+# On its own manifest, so each rejection below is attributable to the thing it names
+# rather than to some unrelated defect making verify fail for free. $MANIFEST cannot
+# serve: it deliberately holds a 900/931 bar against an 8-row fixture, which verify is
+# right to reject, and that would green every case here for the wrong reason.
+VGOLD="$TMP/verify_gold.tsv"
+VMAN="$TMP/verify.json"
+cp "$GOLD" "$VGOLD"
+scripts/evidence.py --manifest "$VMAN" register-fixture --id v1 --path "$VGOLD" >/dev/null
+scripts/evidence.py --manifest "$VMAN" record-baseline --fixture v1 --key "k" \
+  --correct 6 --scored 8 --model stub --source "harness" >/dev/null
+if scripts/evidence.py --manifest "$VMAN" verify >/dev/null
+then ok "$CASE: a consistent manifest passes"
+else bad "verify rejects a manifest that is actually consistent — every case below is void"; fi
+
+python3 - "$VMAN" "$TMP/tampered_score.json" <<'PY'
+import json, sys
+doc = json.load(open(sys.argv[1]))
+doc["fixtures"]["v1"]["baselines"]["k"]["score"] = 0.999
+json.dump(doc, open(sys.argv[2], "w"))
+PY
+rejects "catches a score that disagrees with its own counts" "score 0.999 != 6/8" -- \
+  scripts/evidence.py --manifest "$TMP/tampered_score.json" verify
+
+python3 - "$VMAN" "$TMP/tampered_source.json" <<'PY'
+import json, sys
+doc = json.load(open(sys.argv[1]))
+del doc["fixtures"]["v1"]["baselines"]["k"]["source"]
+json.dump(doc, open(sys.argv[2], "w"))
+PY
+rejects "catches an unsourced bar" "an unsourced bar is not evidence" -- \
+  scripts/evidence.py --manifest "$TMP/tampered_source.json" verify
+
+printf 'fam\tsha77\tcol77\tlabel77\n' >> "$VGOLD"
+rejects "catches an edited-but-unregistered fixture file" "is not registered under any fixture id" -- \
+  scripts/evidence.py --manifest "$VMAN" verify
 
 echo
 echo "passed $PASS, failed $FAIL"
