@@ -265,10 +265,21 @@ fn ptc_compact_ymd_each_window_is_pinned_by_a_value_only_it_rejects() {
 /// Values are corpus samples from financial-statement tables (`grossProfit`,
 /// `sharesOutstanding`, `goodWill`, `marketCap`, `intangibleAssets`) and from a
 /// `date` column beside them — the pair the shape-only validator could not
-/// separate. A third column of nineteenth-century archival dates is asserted
-/// inert too: under a `(19|20)\d{2}` year window that column is hard-vetoed at
-/// pass rate 0.0 and ships as an integer with no date transform, which is the
-/// same defect wearing the other hat.
+/// separate.
+///
+/// Four columns, each pinning a different clause AT THE VETO LAYER, which is
+/// the layer that rewrites a type:
+///
+/// - `financial` — vetoed. Inert under a shape-only validator.
+/// - `prompt_id` — vetoed only by the MONTH window (every value has a legal
+///   day). Delete the month window and this column passes at 1.0 and ships as
+///   a date.
+/// - `game_id` — vetoed only by the DAY window (every value has month 09 or
+///   10). Delete the day window and it passes at 1.0.
+/// - `dates` / `historical` — inert. Under a `(19|20)\d{2}` year window the
+///   nineteenth-century column is hard-vetoed at pass rate 0.0 and ships as an
+///   integer with no date transform, which is the same defect wearing the
+///   other hat.
 #[test]
 fn ptc_compact_ymd_veto_fires_on_financial_column_and_stays_inert_on_dates() {
     let tax = load_taxonomy();
@@ -289,6 +300,39 @@ fn ptc_compact_ymd_veto_fires_on_financial_column_and_stays_inert_on_dates() {
         veto.vetoed,
         "a column of eight-digit financial figures must be HARD-VETOED off compact_ymd; \
          pass_rate = {:?}",
+        veto.pass_rate
+    );
+
+    // `Prompt ID`, a real corpus identifier column. Every value has a legal day
+    // (18, 19, 22, 25, 26, 27, 10, 11) and an impossible month (45, 72), so the
+    // MONTH window alone is what vetoes it.
+    let prompt_id = [
+        "43064518", "43064519", "43064525", "43064522", "43064526", "43064527", "43197210",
+        "43197211",
+    ];
+    let opts: Vec<Option<&str>> = prompt_id.iter().map(|v| Some(*v)).collect();
+    let veto =
+        finetype_core::evaluate_validation_veto("datetime.date.compact_ymd", &opts, &tax, &safe);
+    assert!(
+        veto.vetoed,
+        "a column of surrogate keys with legal days and impossible months must be HARD-VETOED \
+         off compact_ymd — this is the MONTH window's own case; pass_rate = {:?}",
+        veto.pass_rate
+    );
+
+    // NBA `GAME_ID`, a real corpus column. Every value carries month 09 or 10,
+    // so the DAY window alone is what vetoes it.
+    let game_id = [
+        "21601092", "21601077", "21601062", "21601045", "21601037", "21601020", "21601003",
+        "21600990",
+    ];
+    let opts: Vec<Option<&str>> = game_id.iter().map(|v| Some(*v)).collect();
+    let veto =
+        finetype_core::evaluate_validation_veto("datetime.date.compact_ymd", &opts, &tax, &safe);
+    assert!(
+        veto.vetoed,
+        "a column of game identifiers with legal months and impossible days must be HARD-VETOED \
+         off compact_ymd — this is the DAY window's own case; pass_rate = {:?}",
         veto.pass_rate
     );
 
