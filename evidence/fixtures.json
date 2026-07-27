@@ -6,11 +6,29 @@
   ],
   "fixtures": {
     "gold-2026-07-14": {
+      "version": "gold-2026-07-14",
       "path": "eval/gold/gold_corpus.tsv",
       "sha256": "760ee4ace67064edd465d245103677e30171a9ce4bb07decc44bd69f914586a7",
       "rows": 1037,
       "registered": "2026-07-27",
+      "taxonomy": {
+        "version": "tax-e0baf2e4b3bd",
+        "sha256": "e0baf2e4b3bd276d1ea072a8e1ddabd6a86488fdd292541335f86ea69e36b1d0",
+        "types": 251,
+        "sources": [
+          "labels/definitions_container.yaml",
+          "labels/definitions_datetime.yaml",
+          "labels/definitions_finance.yaml",
+          "labels/definitions_geography.yaml",
+          "labels/definitions_identity.yaml",
+          "labels/definitions_representation.yaml",
+          "labels/definitions_technology.yaml"
+        ],
+        "commit": "b93d2a4"
+      },
       "note": "Gold corpus as of the technology.filesystem.filename adjudication; 106 columns added and 37 labels re-adjudicated since gold-2026-06-28.",
+      "label_column": "curated_label",
+      "labels_used": 55,
       "baselines": {
         "m2v8m-s43/composed-reframe/0.6.53": {
           "correct": 819,
@@ -34,12 +52,18 @@
           "source": "docs/branch-ablation-m2v8m-s43.md, un-ablated control",
           "note": "Standalone Sense, before composition."
         }
-      },
-      "version": "gold-2026-07-14",
+      }
+    },
+    "gold-2026-06-28": {
+      "version": "gold-2026-06-28",
+      "path": "eval/gold/gold_corpus.tsv",
+      "sha256": "9dbbcd3abeed9f4477166673772c36b7ffacfc8e5619921eae00737194215edb",
+      "rows": 931,
+      "registered": "2026-07-27",
       "taxonomy": {
-        "version": "tax-e0baf2e4b3bd",
-        "sha256": "e0baf2e4b3bd276d1ea072a8e1ddabd6a86488fdd292541335f86ea69e36b1d0",
-        "types": 251,
+        "version": "tax-a8494466d9c1",
+        "sha256": "a8494466d9c17ea768b10296e59d245a086ca1b91572b722d8751cbec1f5e07d",
+        "types": 245,
         "sources": [
           "labels/definitions_container.yaml",
           "labels/definitions_datetime.yaml",
@@ -49,17 +73,10 @@
           "labels/definitions_representation.yaml",
           "labels/definitions_technology.yaml"
         ],
-        "commit": "b93d2a4"
+        "commit": "f903a2c"
       },
-      "label_column": "curated_label",
-      "labels_used": 55
-    },
-    "gold-2026-06-28": {
-      "path": "eval/gold/gold_corpus.tsv",
-      "sha256": "9dbbcd3abeed9f4477166673772c36b7ffacfc8e5619921eae00737194215edb",
-      "rows": 931,
-      "registered": "2026-07-27",
       "note": "Historical: the gold corpus as it stood when the clean-label go/no-go bar was written (git blob at f903a2c). Retained so the bar it carried stays attributable to the ground truth that produced it.",
+      "label_column": "curated_label",
       "baselines": {
         "m2v8m-s43/composed-reframe/pre-0.6.41": {
           "correct": 794,
@@ -83,24 +100,7 @@
           "source": "docs/branch-ablation-m2v8m-s43.md, attribution table",
           "note": "Same fixture as the pre-0.6.41 bar, current binary: the +11 columns are the 0.6.41/0.6.50/0.6.53 Sharpen typing guards."
         }
-      },
-      "version": "gold-2026-06-28",
-      "taxonomy": {
-        "version": "tax-a8494466d9c1",
-        "sha256": "a8494466d9c17ea768b10296e59d245a086ca1b91572b722d8751cbec1f5e07d",
-        "types": 245,
-        "sources": [
-          "labels/definitions_container.yaml",
-          "labels/definitions_datetime.yaml",
-          "labels/definitions_finance.yaml",
-          "labels/definitions_geography.yaml",
-          "labels/definitions_identity.yaml",
-          "labels/definitions_representation.yaml",
-          "labels/definitions_technology.yaml"
-        ],
-        "commit": "f903a2c"
-      },
-      "label_column": "curated_label"
+      }
     }
   }
 }

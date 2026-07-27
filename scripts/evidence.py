@@ -277,28 +277,27 @@ def cmd_register_fixture(args) -> int:
             "mistake.",
         )
 
-    entry = doc["fixtures"].get(args.id, {})
-    entry.update(
-        {
-            "version": args.id,
-            "path": rel,
-            "sha256": sha,
-            "rows": rows,
-            "registered": args.date or dt.date.today().isoformat(),
-            "note": args.note or entry.get("note", ""),
-            "taxonomy": taxonomy_block(Path(args.taxonomy_root), args.taxonomy_commit),
-        }
-    )
-    column = args.label_column or entry.get("label_column")
+    prev = doc["fixtures"].get(args.id, {})
+    # Rebuilt in a fixed key order rather than updated in place, so re-registering a
+    # fixture produces the same bytes as registering it fresh — a manifest that reorders
+    # itself makes every later diff unreadable.
+    entry = {
+        "version": args.id,
+        "path": rel,
+        "sha256": sha,
+        "rows": rows,
+        "registered": args.date or dt.date.today().isoformat(),
+        "taxonomy": taxonomy_block(Path(args.taxonomy_root), args.taxonomy_commit),
+        "note": args.note or prev.get("note", ""),
+    }
+    column = args.label_column or prev.get("label_column")
     if column:
         entry["label_column"] = column
         # Only countable when the fixture is the file on disk; registering a historical
         # version by hash cannot count labels in a blob it does not have.
         if args.path and Path(args.path).is_file() and sha256_of(Path(args.path)) == sha:
             entry["labels_used"] = len(fixture_labels(Path(args.path), column))
-        else:
-            entry.pop("labels_used", None)
-    entry.setdefault("baselines", {})
+    entry["baselines"] = prev.get("baselines", {})
     doc["fixtures"][args.id] = entry
     save(manifest, doc)
     tax = entry["taxonomy"]
