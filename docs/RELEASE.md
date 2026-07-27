@@ -57,8 +57,15 @@ the real `profile` path (`scripts/score_gold_anchor.py predict … --binary
 ./target/release/finetype`, with `FINETYPE_MODEL` pointed at each variant) is what
 establishes it did not.
 
-Note that the *offline* scorer, `predict_multibranch`, reads **precomputed** features from
-an FTMB and therefore never touches the value encoder at all. It cannot see this change,
-and a "no difference" from that path would measure nothing.
+Use the `profile` path, not the offline one, and know why. The offline scorer,
+`predict_multibranch`, takes its branch features **precomputed** from an FTMB, so whether
+it opens the value encoder at all depends on the model config. For a config with **no**
+`value_attention` block — which is every model currently shipped, including `m2v8m-s43`,
+whose value encoder is wired through `value_embed_model` and resolved by the *inference*
+loader instead — it never reads the encoder, and a "no difference" from that path would
+measure nothing. For a config that **does** carry `value_attention`, it loads the
+directory given by `--value-encoder` to build the attention pool and hard-errors if that
+flag is missing, so there it does see the change. Either way `profile` is the path a user
+runs, so that is the one the re-score has to go through.
 
 See also: `DEVELOPMENT.md` for the three model-name env vars (`FINETYPE_CI_MODEL`, `FINETYPE_MODEL`, `FINETYPE_MODEL_DIR`) — each read by exactly one consumer.

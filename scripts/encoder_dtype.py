@@ -17,7 +17,14 @@ rather than damages:
     round to zero are counted and printed; they are legal (a zeroed row of a lookup
     table is what an unused token already looks like) but they are never silent.
   * **already-F16 is a no-op**, not an error, so re-running the tool on a converted
-    artifact cannot double-convert or corrupt it.
+    artifact cannot double-convert or corrupt it. The no-op is a *byte* no-op: when
+    nothing needs converting the file is not rewritten at all, so its sha256 does not
+    move. That matters for an encoder this tool did not produce — a HuggingFace export
+    writes its header keys in a different order, and re-serialising it would change the
+    hash while the tool printed "unchanged".
+  * **permission bits are preserved.** An in-place conversion leaves the destination's
+    mode alone; a new `--out` file is created at the umask default, not at the 0600 the
+    temporary file is born with.
 
 Rounding is IEEE 754 round-half-to-even, from CPython's `struct` `'e'` packer. That is
 fully specified by the standard and carries no libm dependence, so the same input file
@@ -29,9 +36,10 @@ Usage:
     scripts/encoder_dtype.py to-f16   <model.safetensors> [--out FILE] [--tensor NAME]...
     scripts/encoder_dtype.py self-test
 
-`to-f16` writes in place unless `--out` is given, and always writes to a temporary file
+`to-f16` writes in place unless `--out` is given, and any write goes to a temporary file
 in the destination directory before renaming, so an interrupted run cannot leave a
-half-written model where a whole one used to be.
+half-written model where a whole one used to be. With `--out` and nothing to convert it
+copies the input verbatim rather than re-serialising it.
 
 Exit codes:
     0 ok (including "already F16")
@@ -42,8 +50,11 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import shutil
+import stat
 import struct
 import sys
 import tempfile
@@ -62,6 +73,13 @@ class Refused(Exception):
     """The conversion would not survive the round trip. Nothing is written."""
 
 
+def _current_umask() -> int:
+    """Read the process umask without leaving it changed. There is no getter."""
+    mask = os.umask(0o022)
+    os.umask(mask)
+    return mask
+
+
 def read_safetensors(path: Path) -> tuple[dict, bytes]:
     """Return (header, data-buffer). Offsets in the header index into the buffer."""
     raw = path.read_bytes()
@@ -75,17 +93,32 @@ def read_safetensors(path: Path) -> tuple[dict, bytes]:
 
 
 def write_safetensors(path: Path, header: dict, data: bytes) -> None:
-    """Write header+data atomically, padding the header so the tensor data is 8-aligned."""
+    """Write header+data atomically, padding the header so the tensor data is 8-aligned.
+
+    The write goes to a temporary file in the destination directory and is renamed over
+    the destination, so an interrupted run cannot leave a half-written model where a
+    whole one used to be. `mkstemp` creates that temporary at 0600 and `os.replace`
+    carries the mode across with it, so the destination's own permission bits are
+    restored onto the temporary first — otherwise converting a world-readable model
+    artifact would silently make it private to whoever ran the tool. When the
+    destination does not exist yet it is created at the umask default, the mode an
+    ordinary `open()` would have given it, rather than at mkstemp's 0600.
+    """
     blob = json.dumps(header, separators=(",", ":"), sort_keys=True).encode()
     pad = (-(len(blob)) % 8)
     blob += b" " * pad
     path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = stat.S_IMODE(os.stat(path).st_mode)
+    except FileNotFoundError:
+        mode = 0o666 & ~_current_umask()
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".part")
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(struct.pack("<Q", len(blob)))
             fh.write(blob)
             fh.write(data)
+        os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:
         if os.path.exists(tmp):
@@ -189,13 +222,31 @@ def cmd_to_f16(args: argparse.Namespace) -> int:
 
     dest = args.out or args.path
     before = args.path.stat().st_size
+
+    if not converted:
+        # Nothing needed converting, so nothing is rewritten. Writing the rebuilt header
+        # here would re-serialise it with `sort_keys=True`, which changes the file's
+        # sha256 while this command prints "unchanged" and the same byte count — an
+        # invisible effect behind a visible no-op. The encoders this runs on are
+        # published artifacts whose sha256s are recorded as provenance, and
+        # `docs/RELEASE.md` invites running it on a directory you are not sure about.
+        for s in skipped:
+            print(f"unchanged: {s}")
+        if dest == args.path or (dest.exists() and os.path.samefile(dest, args.path)):
+            print(f"{args.path} {before} bytes -> not rewritten")
+            return 0
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(args.path, dest)
+        shutil.copymode(args.path, dest)
+        print(f"{args.path} {before} bytes -> {dest} {dest.stat().st_size} bytes (verbatim copy)")
+        return 0
+
     write_safetensors(dest, new_header, bytes(buf))
     after = dest.stat().st_size
 
     for s in skipped:
         print(f"unchanged: {s}")
-    if converted:
-        print(f"converted to F16: {', '.join(converted)}")
+    print(f"converted to F16: {', '.join(converted)}")
     if underflow_total:
         print(f"{underflow_total} element(s) rounded to zero (below the F16 subnormal floor)")
     print(f"{args.path} {before} bytes -> {dest} {after} bytes")
@@ -207,18 +258,33 @@ def cmd_to_f16(args: argparse.Namespace) -> int:
 # it prevents; a case that cannot fail is not a case.
 
 
-def _build(tensors: dict[str, tuple[str, list[int], bytes]]) -> bytes:
+def _build(
+    tensors: dict[str, tuple[str, list[int], bytes]], *, sort_header: bool = True
+) -> bytes:
+    """Serialise a safetensors file.
+
+    `sort_header=False` reproduces what a producer other than this tool emits. A real
+    HuggingFace export writes each tensor's keys in `dtype`, `shape`, `data_offsets`
+    order, which is *not* alphabetical — `models/model2vec/model.safetensors` starts
+    `{"embeddings":{"dtype":"F16","shape":[29528,128],"data_offsets":[0,7559168]}}`.
+    Re-serialising that with `sort_keys=True` yields the same *length* and a different
+    sha256, so a fixture built the tool's own way cannot detect the difference.
+    """
     header, buf = {}, bytearray()
     for name, (dtype, shape, payload) in tensors.items():
         offset = len(buf)
         buf += payload
         header[name] = {"dtype": dtype, "shape": shape, "data_offsets": [offset, len(buf)]}
-    blob = json.dumps(header, separators=(",", ":"), sort_keys=True).encode()
+    blob = json.dumps(header, separators=(",", ":"), sort_keys=sort_header).encode()
     blob += b" " * (-(len(blob)) % 8)
     return struct.pack("<Q", len(blob)) + blob + bytes(buf)
 
 
-def cmd_self_test(_args: argparse.Namespace) -> int:
+def cmd_self_test(args: argparse.Namespace) -> int:
+    # `self-test` takes no options; the parameter exists only because every sub-command
+    # is dispatched through the same `args.func(args)` call. Consumed here so it is not
+    # an unreferenced name.
+    del args
     failures: list[str] = []
 
     def check(label: str, ok: bool, detail: str = "") -> None:
@@ -245,9 +311,42 @@ def cmd_self_test(_args: argparse.Namespace) -> int:
         check("file halves in size", len(data) == len(exact) * 2)
 
         # 2. re-running must be a no-op, not a second conversion.
+        #    On its own this case is weak: the first run already rewrote the header into
+        #    this tool's own sorted form, so a second run reproduces it by construction.
+        #    Case 2b is the one that bites.
         first = p.read_bytes()
         rc = cmd_to_f16(argparse.Namespace(path=p, out=None, tensor=["embeddings"]))
         check("re-running on an F16 file changes nothing", rc == 0 and p.read_bytes() == first)
+
+        # 2b. an already-F16 file this tool did NOT write. `docs/RELEASE.md` invites
+        #     exactly this input ("safe to run on a directory you are not sure about"),
+        #     and `models/model2vec/model.safetensors` is such a file. Re-serialising the
+        #     header changes the file's sha256 while the tool prints "unchanged" and the
+        #     same byte count — an invisible effect behind a visible no-op, on files
+        #     whose sha256s are recorded as provenance in the eval report.
+        foreign = root / "foreign_f16.safetensors"
+        original16 = _build(
+            {"embeddings": ("F16", [2, 2], struct.pack("<4e", 1.0, -2.0, 0.5, 3.0))},
+            sort_header=False,
+        )
+        foreign.write_bytes(original16)
+        before16 = hashlib.sha256(original16).hexdigest()
+        rc = cmd_to_f16(argparse.Namespace(path=foreign, out=None, tensor=["embeddings"]))
+        after16 = hashlib.sha256(foreign.read_bytes()).hexdigest()
+        check(
+            "an externally produced F16 file is left byte-identical",
+            rc == 0 and after16 == before16,
+            f"{before16[:8]} -> {after16[:8]}",
+        )
+
+        # 2c. `--out` on an already-F16 input must still produce the file the caller
+        #     asked for, and it must be the input's bytes rather than a re-serialisation.
+        copied = root / "foreign_copy.safetensors"
+        rc = cmd_to_f16(argparse.Namespace(path=foreign, out=copied, tensor=["embeddings"]))
+        check(
+            "--out on an already-F16 input copies it verbatim",
+            rc == 0 and copied.is_file() and copied.read_bytes() == original16,
+        )
 
         # 3. round-half-to-even, the rule that makes the output platform-independent.
         #    2049 sits exactly between the F16 neighbours 2048 and 2050 -> ties to 2048.
@@ -296,6 +395,36 @@ def cmd_self_test(_args: argparse.Namespace) -> int:
         rc = cmd_to_f16(argparse.Namespace(path=p5, out=None, tensor=["embeddings"]))
         check("a missing tensor name is rejected", rc == 2, f"rc={rc}")
 
+        # 7. the destination's permission bits survive the atomic rename. `mkstemp`
+        #    creates at 0600 and `os.replace` carries that mode onto the destination, so
+        #    without an explicit chmod this tool quietly turns a world-readable model
+        #    artifact into one only the converting user can read. That has already
+        #    happened to a tracked model file in this repo.
+        p6 = root / "perm.safetensors"
+        p6.write_bytes(_build({"embeddings": ("F32", [2], struct.pack("<2f", 1.0, 2.0))}))
+        os.chmod(p6, 0o644)
+        rc = cmd_to_f16(argparse.Namespace(path=p6, out=None, tensor=["embeddings"]))
+        mode = stat.S_IMODE(os.stat(p6).st_mode)
+        check(
+            "an in-place conversion keeps the destination's mode",
+            rc == 0 and mode == 0o644,
+            f"0o{mode:03o}",
+        )
+
+        # 8. a brand-new `--out` destination is not born 0600 either — the same mkstemp
+        #    default would otherwise ship a fresh artifact nobody else can read.
+        p7 = root / "perm_src.safetensors"
+        p7.write_bytes(_build({"embeddings": ("F32", [2], struct.pack("<2f", 1.0, 2.0))}))
+        fresh = root / "perm_new.safetensors"
+        rc = cmd_to_f16(argparse.Namespace(path=p7, out=fresh, tensor=["embeddings"]))
+        want = 0o666 & ~_current_umask()
+        mode = stat.S_IMODE(os.stat(fresh).st_mode)
+        check(
+            "a new destination gets the umask default, not 0600",
+            rc == 0 and mode == want,
+            f"0o{mode:03o} (umask default 0o{want:03o})",
+        )
+
     print()
     if failures:
         print(f"{len(failures)} case(s) failed: {', '.join(failures)}", file=sys.stderr)
@@ -305,7 +434,9 @@ def cmd_self_test(_args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    # `__doc__` is None under `python -OO`, which strips docstrings.
+    summary = (__doc__ or "store an encoder's embedding matrix in half precision").splitlines()[0]
+    ap = argparse.ArgumentParser(description=summary)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p_i = sub.add_parser("inspect", help="print each tensor's dtype, shape and size")
