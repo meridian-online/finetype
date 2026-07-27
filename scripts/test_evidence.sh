@@ -389,6 +389,18 @@ json.dump(d, open(sys.argv[2], "w"), indent=2)
 PY
 expect_cmd_fail 5 "not a list of version strings" VBAD
 
+CASE="a 'reports' that is a list of non-strings"
+# The half of the same check the case above cannot reach. `["1.0.0"]` and `[1]` are both
+# lists, so `isinstance(reports, list)` accepts each; only the element check separates
+# them. Without it a report named `1` is looked for as a release and never found, and the
+# renderer's "the committed report is current" check silently stops checking.
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1])); d["reports"] = [1]
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "not a list of version strings" VBAD
+
 # ------------------------------------ a lookup that finds nothing stops the run ----
 echo "== a lookup that resolves to nothing is a failure, not an empty value =="
 
@@ -442,6 +454,18 @@ json.dump(d, open(sys.argv[2], "w"), indent=2)
 PY
 expect_cmd_fail 5 "is not a number" GB
 
+CASE="a bar whose score is a JSON boolean"
+# `bool` is a subclass of `int`, so `isinstance(True, (int, float))` is True and the
+# type check alone lets it through. `format(True, '.3f')` then prints 1.000 — a bar of
+# perfect accuracy conjured out of a typo.
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["fixtures"]["sbox-v1"]["baselines"]["m/p/1.0.0"]["score"] = True
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "records score=True, which is not a number" GB
+
 CASE="a bar whose column count is a string"
 break_manifest <<'PY'
 import json, sys
@@ -450,6 +474,22 @@ d["fixtures"]["sbox-v1"]["baselines"]["m/p/1.0.0"]["scored"] = "3"
 json.dump(d, open(sys.argv[2], "w"), indent=2)
 PY
 expect_cmd_fail 5 "not a whole number of columns" GB
+
+CASE="a bar whose column count is a JSON boolean"
+# The load-bearing one, and the reason the bool exclusion is not pedantry. `bool` is a
+# subclass of `int`, so an `int` check alone accepts `true`; get-baseline then emits
+# `True` in field 2, score_clean_label.sh cuts it out (line 203) and feeds it to
+# `$((COMP_CORRECT - BASE_CORRECT))` (line 212), where bash reads an unset name as 0.
+# The run reports its whole column count as the delta, calls that at-or-above, and
+# passes — a confident comparison against nothing, which is the failure this manifest
+# exists to prevent.
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["fixtures"]["sbox-v1"]["baselines"]["m/p/1.0.0"]["correct"] = True
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "records correct=True, which is not a whole number of columns" GB
 
 CASE="a 'baselines' that is not an object"
 break_manifest <<'PY'
