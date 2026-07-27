@@ -5,7 +5,7 @@
 //!
 //! Run with: `cargo test -p finetype-cli --test cli_golden -- --ignored`
 
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -1331,4 +1331,71 @@ fn golden_profile_compact_ymd_rejects_eight_digit_figures() {
         stray.is_empty(),
         "only the real date column may type as a compact date; also got {stray:?}"
     );
+}
+
+/// The other half of the contract: a genuine NINETEENTH-CENTURY YYYYMMDD column
+/// must keep its date type, its format string and its `strptime` transform.
+///
+/// The first revision of this change narrowed the year to `(19|20)\d{2}`, and a
+/// reviewer refuted it through this exact table: both columns dropped from
+/// `datetime.date.compact_ymd` (pass rate 1.0, transform attached) to
+/// `representation.numeric.integer_number` at pass rate 0.0 with rule
+/// `veto_fallback:vocab`, format string null and the date transform stripped.
+/// Genuine dates shipping as confident integers is the same defect the
+/// tightening exists to stop, so the year field carries no window and this test
+/// is what says so at the CLI boundary. Reads the whole emitted record, because
+/// a label-only check cannot see a stripped transform.
+#[test]
+#[ignore]
+fn golden_profile_compact_ymd_accepts_nineteenth_century_dates() {
+    let profile = run_profile_json(&fixture_path("compact_ymd_historical_dates.csv"));
+
+    for name in ["date", "FirstAddedDate"] {
+        let col = column_record(&profile, name);
+
+        // The WHOLE emitted record, field for field, minus `confidence` — that
+        // one is a raw model score and is asserted separately as a finite
+        // probability rather than pinned to a literal. `quality_band` is `low`
+        // because an eight-row two-column table gives the model little to go
+        // on; it is pinned because a stripped record changes it too, and this
+        // test exists to notice any field moving.
+        let mut expected = serde_json::Map::new();
+        expected.insert("column".into(), json!(name));
+        expected.insert("type".into(), json!("datetime.date.compact_ymd"));
+        expected.insert("broad_type".into(), json!("DATE"));
+        expected.insert("validation_pass_rate".into(), json!(1.0));
+        expected.insert("quality_band".into(), json!("low"));
+        expected.insert("format_string".into(), json!("%Y%m%d"));
+        expected.insert("transform".into(), json!("strptime({col}, '%Y%m%d')::DATE"));
+        expected.insert("is_generic".into(), json!(false));
+        expected.insert("non_null".into(), json!(8));
+        expected.insert("null".into(), json!(0));
+        expected.insert("samples_used".into(), json!(8));
+
+        let actual: serde_json::Map<String, Value> = col
+            .as_object()
+            .expect("column record is an object")
+            .iter()
+            .filter(|(k, _)| k.as_str() != "confidence")
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        assert_eq!(
+            actual, expected,
+            "{name}: an 1865-1872 YYYYMMDD column must emit the same record a 20th-century one \
+             does. Under a `(19|20)\\d{{2}}` year window this becomes \
+             representation.numeric.integer_number at pass rate 0.0, rule veto_fallback:vocab, \
+             format_string null and the strptime transform stripped."
+        );
+
+        let confidence = col["confidence"].as_f64().unwrap_or_else(|| {
+            panic!(
+                "{name}: confidence must be a number, got {:?}",
+                col["confidence"]
+            )
+        });
+        assert!(
+            confidence.is_finite() && confidence > 0.0 && confidence <= 1.0,
+            "{name}: confidence must be a real probability, got {confidence}"
+        );
+    }
 }
