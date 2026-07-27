@@ -48,6 +48,19 @@ jobs:
       - name: Scorer propagates failures and stamps every score with its fixture
         run: scripts/test_score_clean_label.sh
 
+  encoder-dtype:
+    name: Encoder half-precision packing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Round trip, tie rounding, overflow refusal, offset rebuild
+        # The bytes this tool writes get compiled into a released binary, so it is
+        # gated on the same runner that builds one: an out-of-range value must abort
+        # rather than store `inf`, a tie must round to even (the rule that keeps the
+        # output identical on macOS and Linux), and the untouched tensors in the same
+        # file must keep their bytes when the offsets are rebuilt. Stdlib only.
+        run: scripts/encoder_dtype.py self-test
+
   fmt:
     name: Format
     runs-on: ubuntu-latest

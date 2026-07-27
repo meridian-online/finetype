@@ -49,10 +49,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-# safetensors dtype tags this tool understands. The file format allows many more;
-# anything else is left untouched and reported, never guessed at.
-ITEMSIZE = {"F64": 8, "F32": 4, "F16": 2, "BF16": 2, "I64": 8, "I32": 4, "I16": 2, "I8": 1, "U8": 1}
-
 # The largest finite F16, and the smallest positive subnormal. Written as exact
 # decimal literals rather than computed, so this file states the boundary it enforces.
 F16_MAX = 65504.0
@@ -122,7 +118,7 @@ def f32_to_f16(buf: bytes, name: str) -> tuple[bytes, int]:
 
 
 def cmd_inspect(args: argparse.Namespace) -> int:
-    header, data = read_safetensors(args.path)
+    header, _ = read_safetensors(args.path)
     total = args.path.stat().st_size
     print(f"{args.path}  {total} bytes")
     for name, info in sorted(header.items()):
