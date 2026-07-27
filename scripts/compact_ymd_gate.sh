@@ -50,8 +50,12 @@ mkdir -p "$WD"
 CAND_YAML="$WD/candidate_yaml_backup"
 cp "$YAML" "$CAND_YAML"
 
+# `git checkout <ref> -- <path>` writes the INDEX as well as the worktree, so a
+# plain `cp` back leaves the file staged-modified against HEAD (`MM`). Unstage
+# first, then restore the bytes.
 restore() {
   echo "== [trap] restoring the candidate validator on disk =="
+  git restore --staged "$YAML" 2>/dev/null || true
   cp "$CAND_YAML" "$YAML"
 }
 trap restore EXIT
@@ -69,6 +73,7 @@ $PY scripts/gittables_corpus_pass.py --corpus-index "$SAMPLE" \
     --finetype-bin "$BIN" --execute --jobs 8 --out-dir "$WD/base_pass"
 
 echo "== [3/4] restore the candidate validator (explicit; trap is the backstop) =="
+git restore --staged "$YAML" 2>/dev/null || true
 cp "$CAND_YAML" "$YAML"
 
 echo "== [4/4] join the gated oracle onto the baseline, then score =="
