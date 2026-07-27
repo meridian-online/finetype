@@ -85,52 +85,21 @@ pub(crate) fn load_model2vec_resources() -> Option<finetype_model::Model2VecReso
     None
 }
 
-/// Wire Model2Vec + sibling context for multi-branch classifiers.
+/// Wire the shared Model2Vec encoder into a multi-branch classifier.
 ///
-/// When multi-branch is active, Sense is not used — but sibling-context attention
-/// still needs Model2Vec to encode headers. This wires both independently of Sense.
-pub(crate) fn wire_model2vec_and_siblings(cc: &mut finetype_model::ColumnClassifier) {
-    if let Some(m2v) = load_model2vec_resources() {
-        eprintln!("Loaded Model2Vec for multi-branch sibling context");
-        cc.set_model2vec(m2v);
-        wire_sibling_context(cc);
-    }
-}
-
-/// Wire Model2Vec for a multi-branch classifier WITHOUT sibling context.
+/// The multi-branch header branch encodes the column header with this encoder,
+/// so every `profile`/`infer` path needs it.
 ///
-/// `infer` classifies one column at a time and never calls the cross-column
-/// `classify_columns_with_context` path, so the sibling-context attention model
-/// (396,800 params) would be loaded from disk only to never be invoked. Skipping
-/// that load is the single-value/single-column infer fast path (card 0006).
-/// `profile`, which has real siblings, still wires both via
-/// `wire_model2vec_and_siblings`.
-pub(crate) fn wire_model2vec_only(cc: &mut finetype_model::ColumnClassifier) {
+/// This used to also load `models/sibling-context/model.safetensors` and attach
+/// it as a cross-column enrichment layer whenever that directory happened to be
+/// present. `build.rs` never embedded that artifact, so a released binary never
+/// had it: a developer running `finetype profile` from this checkout was
+/// measuring a pipeline that no released binary can run. Wiring it here is gone;
+/// the artifact is still trained (`train-sibling-context`) and still consumed by
+/// the multi-branch trainer, which is where it earns its keep.
+pub(crate) fn wire_model2vec(cc: &mut finetype_model::ColumnClassifier) {
     if let Some(m2v) = load_model2vec_resources() {
         cc.set_model2vec(m2v);
-    }
-}
-
-/// Load and wire the sibling-context attention module.
-///
-/// Looks for `models/sibling-context/model.safetensors`. When found,
-/// attaches to the column classifier. When absent, the pipeline is unchanged.
-pub(crate) fn wire_sibling_context(cc: &mut finetype_model::ColumnClassifier) {
-    let model_dir = std::path::PathBuf::from("models/sibling-context");
-    if !model_dir.join("model.safetensors").exists() {
-        return; // Silent — model is optional
-    }
-    match finetype_model::SiblingContextAttention::load(&model_dir) {
-        Ok(sibling) => {
-            eprintln!(
-                "Loaded sibling-context attention ({} params)",
-                sibling.param_count()
-            );
-            cc.set_sibling_context(sibling);
-        }
-        Err(e) => {
-            eprintln!("Warning: Failed to load sibling-context model: {e}");
-        }
     }
 }
 

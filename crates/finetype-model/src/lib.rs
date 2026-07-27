@@ -19,7 +19,6 @@ pub mod model;
 pub mod model2vec_shared;
 pub mod multi_branch;
 pub mod rhh;
-pub mod semantic;
 pub mod sense;
 pub mod sibling_context;
 pub mod training;
@@ -38,14 +37,11 @@ pub use embedding_aggregation::{
 };
 pub use entity::EntityClassifier;
 pub use features::{extract_features, FEATURE_DIM, FEATURE_NAMES};
-pub use inference::{
-    extract_validation_patterns, CharClassifier, ClassificationResult, Classifier, ValueClassifier,
-};
+pub use inference::{ClassificationResult, ValueClassifier};
 pub use label_category_map::LabelCategoryMap;
 pub use model::{TextClassifier, TextClassifierConfig};
 pub use model2vec_shared::Model2VecResources;
 pub use multi_branch::MultiBranchClassifier;
-pub use semantic::SemanticHintClassifier;
 pub use sense::{BroadCategory, EntitySubtype, SenseClassifier, SenseResult};
 pub use sibling_context::SiblingContextAttention;
 pub use training::{Trainer, TrainingConfig, TrainingError};

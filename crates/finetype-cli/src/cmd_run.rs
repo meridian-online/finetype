@@ -62,7 +62,7 @@ pub(crate) fn cmd_mcp() -> Result<()> {
         mb.n_classes()
     );
     let mut column_classifier = ColumnClassifier::with_multi_branch(mb, config);
-    wire_model2vec_and_siblings(&mut column_classifier);
+    wire_model2vec(&mut column_classifier);
 
     // Load taxonomy for validation-based disambiguation
     let taxonomy_path = PathBuf::from("labels");
@@ -91,7 +91,25 @@ pub(crate) fn cmd_mcp() -> Result<()> {
 /// Re-sharpen cached Sense predictions through the real Sharpen stack without the
 /// value-encode (corpus-honest gate fast path, spec 2026-06-27-composed-accuracy-roadmap).
 /// Input TSV: `id<TAB>header<TAB>sense_label<TAB>sense_conf<TAB>values(0x1f-joined)`.
-/// Output TSV: `id<TAB>composed_label`.
+///
+/// Output TSV — the WHOLE user-visible record, one column per line:
+/// `id<TAB>label<TAB>confidence<TAB>quality_band<TAB>runner_up<TAB>disambiguation_rule`.
+///
+/// It used to emit `id<TAB>label` only, and that is how a rule change was once
+/// certified "byte-identical across 837,625 columns" while it was in fact
+/// collapsing confidence from 0.877 to 0.500, dropping the quality band from
+/// `high` to `low`, surfacing a `runner_up`, and rewriting the
+/// `disambiguation_rule` — every one of which `finetype profile -o json`
+/// prints. A label-only diff cannot see any of that. `quality_band` and
+/// `runner_up` are computed with the same two functions `profile` uses, so this
+/// line is the profile record minus the fields Sharpen cannot touch.
+///
+/// `detected_locale` is deliberately NOT emitted: it is not run-to-run stable
+/// (the same binary over `eval/datasets/csv/ecommerce_orders.csv` produced
+/// `ZH_TW`, `AR_SA` and `HE` on three consecutive runs), so including it would
+/// make every diff report spurious transitions. That nondeterminism is a real
+/// defect and is tracked separately; until it is fixed, locale is out of scope
+/// for any byte-identity claim.
 pub(crate) fn cmd_resharpen(input: PathBuf, output: PathBuf, model: PathBuf) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig};
     use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -102,7 +120,7 @@ pub(crate) fn cmd_resharpen(input: PathBuf, output: PathBuf, model: PathBuf) -> 
     };
     let mb = load_multi_branch_classifier(&model)?;
     let mut cc = ColumnClassifier::with_multi_branch(mb, config);
-    wire_model2vec_and_siblings(&mut cc);
+    wire_model2vec(&mut cc);
     let mut taxonomy = load_taxonomy(&PathBuf::from("labels"))?;
     taxonomy.compile_validators();
     taxonomy.compile_locale_validators();
@@ -129,7 +147,22 @@ pub(crate) fn cmd_resharpen(input: PathBuf, output: PathBuf, model: PathBuf) -> 
             .map(|s| s.to_string())
             .collect();
         let composed = cc.compose_from_sense(header, &values, sense_label, sense_conf)?;
-        writeln!(out, "{}\t{}", id, composed.label)?;
+        let band = crate::profile::quality_band_label(composed.confidence);
+        let runner_up = crate::profile::low_band_runner_up(
+            &composed.label,
+            composed.confidence,
+            &composed.vote_distribution,
+        );
+        writeln!(
+            out,
+            "{}\t{}\t{:.6}\t{}\t{}\t{}",
+            id,
+            composed.label,
+            composed.confidence,
+            band,
+            runner_up.as_deref().unwrap_or(""),
+            composed.disambiguation_rule.as_deref().unwrap_or("")
+        )?;
         n += 1;
     }
     out.flush()?;
@@ -254,7 +287,7 @@ pub(crate) fn cmd_infer(
 
             // Multi-branch path: wire Model2Vec for header enrichment, no siblings.
             if column_classifier.has_multi_branch() {
-                wire_model2vec_only(&mut column_classifier);
+                wire_model2vec(&mut column_classifier);
             }
 
             if let Some(ref hdr) = header {
@@ -390,7 +423,7 @@ pub(crate) fn cmd_infer_batch(model: PathBuf, sample_size: usize) -> Result<()> 
 
     // Multi-branch path: wire Model2Vec for header enrichment, no sibling context.
     if column_classifier.has_multi_branch() {
-        wire_model2vec_only(&mut column_classifier);
+        wire_model2vec(&mut column_classifier);
     }
 
     // Separate taxonomy handle for the headerless deterministic fast-path, so

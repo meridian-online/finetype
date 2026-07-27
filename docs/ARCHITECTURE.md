@@ -67,7 +67,7 @@ flowchart TB
 | **Model2Vec encoding** | Encodes column header and sample values into 128-dim embeddings using potion-base-4M. |
 | **Feature extraction** | Computes 36 deterministic features per value: parse tests, character statistics, structural features. |
 | **Sense classifier** | Cross-attention over Model2Vec embeddings predicts broad category (6 classes) and entity subtype (4 classes). ~3.6ms/column. |
-| **Sibling-context attention** | Optional: 2-layer pre-norm transformer self-attention over all column headers enriches each column's embedding with cross-column context before Sense. |
+| **Sibling-context attention** | Training only: a 2-layer pre-norm transformer over all column headers, loaded frozen by the multi-branch trainer. No released binary embeds it, so inference does not use it. |
 | **Flat CharCNN** | Character-level CNN (250 classes) classifies each sample value independently. |
 | **Masked vote aggregation** | Filters CharCNN votes to Sense-eligible labels via `LabelCategoryMap`. Safety valve: falls back to unmasked when confidence is low. |
 | **Disambiguation** | Rule-based overrides for ambiguous type pairs. Validation-based candidate elimination rejects types where >50% of values fail JSON Schema validation. |
@@ -180,16 +180,15 @@ Decisions: 0041 (multi-branch implementing the Sense stage), 0042 (regex header 
 ### Column-level inference (multi-branch in the Sense stage)
 
 Vector of strings + header → single column type:
-1. Optional sibling-context attention enriches headers with cross-column context
-2. Sample 100 values, extract 4-branch features (960 char + 512 embed + 36 stats + header)
-3. Multi-branch forward pass → type label + confidence (single pass per column)
-4. Sharpen post-processing (shared with the Sense path; no neural inference):
+1. Sample 100 values, extract 4-branch features (960 char + 512 embed + 36 stats + header)
+2. Multi-branch forward pass → type label + confidence (single pass per column)
+3. Sharpen post-processing (shared with the Sense path; no neural inference):
    - `feature_sharpen()`: F1–F6 rules on label + 36-dim ColumnFeatures
    - `value_sharpen()`: R1–R31 rules on label + values + confidence
-   - `apply_header_sharpen()`: Model2Vec semantic header matching
-5. Post-hoc locale detection via `validation_by_locale` patterns
+   - `apply_header_sharpen()`: hardcoded header-hint table matching
+4. Post-hoc locale detection via `validation_by_locale` patterns
 
-Key implementation files: `column.rs` (Sharpen rules + pipeline), `semantic.rs` (header hints), `sibling_context.rs` (attention).
+Key implementation files: `column/mod.rs` (Sharpen rules + pipeline), `column/header_sharpen.rs` (the header-hint table).
 
 ### Tiered model architecture (alternative fallback)
 
@@ -273,8 +272,8 @@ The CLI uses `FINETYPE_MODEL` env var (default: `models/default`); the eval scri
 | Taxonomy definitions | `labels/definitions_*.yaml` (7 domain files) |
 | Column disambiguation + pipeline | `crates/finetype-model/src/column.rs` |
 | Sense classifier | `crates/finetype-model/src/sense.rs` |
-| Header hints (semantic) | `crates/finetype-model/src/semantic.rs` |
-| Sibling-context attention | `crates/finetype-model/src/sibling_context.rs` |
+| Header hints | `crates/finetype-model/src/column/header_sharpen.rs` |
+| Sibling-context attention (training only) | `crates/finetype-model/src/sibling_context.rs` |
 | Table validator (core engine) | `crates/finetype-core/src/table_validator.rs` |
 | CLI entry point | `crates/finetype-cli/src/main.rs` |
 | MCP server + tools | `crates/finetype-mcp/src/` |

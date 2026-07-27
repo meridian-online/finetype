@@ -76,9 +76,11 @@ fi
 echo "Model files:"
 find "models/${MODEL_DIR}" -type f | sort
 
-# ── Sibling-context model (optional) ──────────────────────────────────────
-# Download the sibling-context attention model for cross-column enrichment.
-# The build gracefully degrades if these are absent.
+# ── Sibling-context model (optional, TRAINING ONLY) ───────────────────────
+# The multi-branch trainer loads this as a frozen enrichment layer, and
+# scripts/overnight_m2v_244.sh requires it. Inference does NOT use it: no
+# released binary ever embedded it, so the CLI stopped loading it rather than
+# keep every repo-root measurement ahead of what a user's binary can do.
 echo ""
 echo "Downloading sibling-context model..."
 mkdir -p models/sibling-context
@@ -100,17 +102,20 @@ else
   rm -rf models/sibling-context
 fi
 
-# ── Model2Vec semantic hint classifier (optional) ──────────────────────────
-# Download the Model2Vec artifacts for the semantic column name classifier.
-# The build gracefully degrades if these are absent (HAS_MODEL2VEC=false).
+# ── Model2Vec header encoder (optional) ───────────────────────────────────
+# The multi-branch header branch encodes column headers with this static
+# encoder. The build gracefully degrades if these are absent
+# (HAS_MODEL2VEC=false). `type_embeddings.safetensors` + `label_index.json`
+# used to be fetched here for the semantic header classifier; that classifier
+# had no construction site outside tests and is gone.
 echo ""
-echo "Downloading Model2Vec semantic hint classifier..."
+echo "Downloading Model2Vec header encoder..."
 mkdir -p models/model2vec
 M2V_OK=true
-for file in model.safetensors type_embeddings.safetensors tokenizer.json label_index.json; do
+for file in model.safetensors tokenizer.json; do
   echo "  Downloading model2vec/${file}..."
   if ! curl -sfL --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused "${REPO}/model2vec/${file}" -o "models/model2vec/${file}"; then
-    echo "  WARNING: Failed to download model2vec/${file} — semantic hints will be disabled"
+    echo "  WARNING: Failed to download model2vec/${file} — the header branch will be disabled"
     M2V_OK=false
     break
   fi
@@ -120,7 +125,7 @@ if [ "${M2V_OK}" = true ]; then
   echo "Model2Vec files:"
   find models/model2vec -type f | sort
 else
-  echo "Model2Vec download failed — continuing without semantic hints"
+  echo "Model2Vec download failed — continuing without the header encoder"
   rm -rf models/model2vec
 fi
 

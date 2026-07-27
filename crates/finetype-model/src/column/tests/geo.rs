@@ -1,5 +1,5 @@
 use super::super::*;
-use super::{geo_vote_classifier, make_result};
+use super::{geo_vote_classifier, make_result, vals};
 
 #[test]
 fn test_coordinates_longitude_detected() {
@@ -805,17 +805,85 @@ fn test_location_types_module_level() {
 
 #[test]
 fn test_geo_override_same_domain() {
-    // When both hint and prediction are location types, the hint should win
-    // at ≤0.90 confidence (higher threshold than generic 0.50)
-    assert!(
-        LOCATION_TYPES.contains(&"geography.location.city"),
-        "city must be a location type"
+    // `header_hint_geo_override`, through the composed path a user actually sees.
+    //
+    // This test used to assert only that "city" and "country" are both in
+    // LOCATION_TYPES — it never called the function it was named for, so it
+    // passed unchanged on a branch that had DELETED the rule. Membership in a
+    // const array is not behaviour. Drive the rule instead.
+    //
+    // A location hint on a different location label overrides it and KEEPS the
+    // model's confidence (floor 0.6). The `return` matters as much as the
+    // override: it shields the column from `header_hint_hardcoded`, which
+    // flattens confidence to 0.5 for anything under 0.95. Deleting the arm
+    // leaves the label alone but drops 0.80 -> 0.50 — a `medium` quality band
+    // becoming `low`, with a runner_up surfaced — so the confidence and the
+    // rule are asserted, not just the label.
+    let cc = geo_vote_classifier();
+    let vals = vals(&["Osaka", "Lyon", "Perth", "Bogota", "Tallinn"]);
+    let r = cc
+        .compose_from_sense("city", &vals, "geography.location.country", 0.80)
+        .unwrap();
+    assert_eq!(r.label, "geography.location.city");
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("header_hint_geo_override:city"),
+        "the geo override must be the rule that fired, not a downstream fallback"
     );
     assert!(
-        LOCATION_TYPES.contains(&"geography.location.country"),
-        "country must be a location type"
+        (r.confidence - 0.80).abs() < 1e-6,
+        "the model's confidence must survive the override; got {}",
+        r.confidence
     );
-    // Both city and country are location types — same-domain override should apply
+}
+
+#[test]
+fn geo_override_shields_the_column_from_the_hardcoded_flattener() {
+    // The same arm, stated as the property that broke when it was deleted:
+    // whatever else changes, a location-hint-on-location-label column must not
+    // come out of Sharpen wearing `header_hint_hardcoded` at 0.5.
+    let cc = geo_vote_classifier();
+    let vals = vals(&["Osaka", "Lyon", "Perth", "Bogota", "Tallinn"]);
+    let r = cc
+        .compose_from_sense("city", &vals, "geography.location.country", 0.80)
+        .unwrap();
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("header_hint_hardcoded:city"),
+        "the hardcoded-authority arm must not be reached for this column"
+    );
+    assert!(
+        r.confidence > 0.70,
+        "confidence must stay above the low-band floor; got {}",
+        r.confidence
+    );
+}
+
+#[test]
+fn person_name_header_overrides_a_location_label() {
+    // `header_hint_person_override` — the arm the dead-weight pass first deleted
+    // and then restored on corpus evidence (133 columns headed `authors`,
+    // `LastName`, `Surname`, `billing_lastname`, `NPPES_PROVIDER_FIRST_NAME`).
+    // Nothing pinned it: mutating it to never fire left all 563 model tests
+    // green, so the next deletion pass would have removed it again with a clean
+    // suite. Surnames and place names share a vocabulary, so the model reads
+    // these columns as a place; a hardcoded person-name header is what rescues
+    // them.
+    let cc = geo_vote_classifier();
+    let vals = vals(&["Nakamura", "Okafor", "Silva", "Novak", "Dubois"]);
+    let r = cc
+        .compose_from_sense("last_name", &vals, "geography.location.city", 0.70)
+        .unwrap();
+    assert_eq!(r.label, "identity.person.last_name");
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("header_hint_person_override:last_name")
+    );
+    assert!(
+        (r.confidence - 0.70).abs() < 1e-6,
+        "the model's confidence must survive the override; got {}",
+        r.confidence
+    );
 }
 
 // ── Sharpen header bugfix tests (spec: 2026-04-12-sharpen-header-bugfixes) ──
