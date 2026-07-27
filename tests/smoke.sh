@@ -228,11 +228,16 @@ section "9. Profile — Column Order"
 # `profile` emits one entry per input column and every consumer reads that
 # sequence POSITIONALLY — the eval fixtures, the DuckDB extension, the
 # json-schema/datapackage writers. Column classification runs in parallel, and a
-# parallel collect into an unordered container permutes the sequence while
-# leaving the SET of columns intact, so this compares the emitted order against
-# the file's own header order, element for element.
+# parallel collect into an unordered container permutes results while leaving the
+# SET intact, so order has to be asserted, not assumed.
 #
-# The columns below are deliberately of different types: a file whose columns all
+# Two different things are checked, because checking only the first is not enough.
+# The emitted column NAMES are read from the input file, and the LABELS from the
+# parallel results, so a lost ordering inside the classifier scrambles which label
+# lands on which column while the names stay in perfect file order — a name-only
+# check passes on that build. So: the name sequence AND each column's own type.
+#
+# The columns are deliberately of eight different types; a file whose columns all
 # classify the same way would satisfy any permutation.
 TMPORDDIR=$(mktemp -d /tmp/finetype-smoke-order-XXXXXX)
 TMPORD="$TMPORDDIR/column_order.csv"
@@ -262,10 +267,61 @@ ORDER_DP=$("$FINETYPE" profile -f "$TMPORD" -o datapackage 2>/dev/null)
 ACTUAL_ORDER=$(printf '%s' "$ORDER_DP" | grep -o '"name": "[^"]*"' | sed 's/"name": "//; s/"$//' | grep -v '^column_order$' | paste -sd, -)
 assert_eq "datapackage fields follow file order" "$ACTUAL_ORDER" "$EXPECTED_ORDER"
 
+# Each column keeps its OWN type. `-o csv` emits `column,type` per row, so this
+# reads the pairing directly. A classifier that returns its results in some
+# schedule-determined order sends `charlie_url`'s label to `delta_country` and
+# vice versa, which every check above still passes.
+COLUMN_TYPE_PAIRS() {  # <extra profile args...>
+    "$FINETYPE" profile -f "$TMPORD" -o csv "$@" 2>/dev/null \
+        | tail -n +2 | cut -d, -f1,2 | tr -d '"'
+}
+
+# column:a fragment unique to the type that column's values are
+EXPECT_TYPES="zeta_email:email
+alpha_created_at:iso_8601
+mike_ip:ip_v4
+bravo_uuid:uuid
+yankee_amount:decimal_number
+charlie_url:url
+delta_country:country_code
+echo_id:alphanumeric_id"
+
+check_pairing() {  # <label> <pairs>
+    local what="$1" pairs="$2" col frag got bad=""
+    while IFS= read -r spec; do
+        col="${spec%%:*}"
+        frag="${spec#*:}"
+        got=$(printf '%s\n' "$pairs" | grep "^$col," | cut -d, -f2)
+        case "$got" in
+            *"$frag"*) ;;
+            *) bad="$bad $col=>'$got' (wanted *$frag*)" ;;
+        esac
+    done <<< "$EXPECT_TYPES"
+    if [ -z "$bad" ]; then
+        pass "$what"
+    else
+        fail "$what" "mis-paired:$bad"
+    fi
+}
+
+PAIRS_HINT=$(COLUMN_TYPE_PAIRS)
+check_pairing "each column keeps its own type" "$PAIRS_HINT"
+
+PAIRS_NOHINT=$(COLUMN_TYPE_PAIRS --no-header-hint)
+check_pairing "each column keeps its own type (--no-header-hint)" "$PAIRS_NOHINT"
+
 # Repeat runs must not reshuffle: thread scheduling varies, the answer must not.
-ORDER_JSON=$("$FINETYPE" profile -f "$TMPORD" -o json 2>/dev/null)
-ACTUAL_ORDER=$(printf '%s' "$ORDER_JSON" | grep -o '"column": "[^"]*"' | sed 's/"column": "//; s/"$//' | paste -sd, -)
-assert_eq "column order is stable across runs" "$ACTUAL_ORDER" "$EXPECTED_ORDER"
+# Compares the whole column,type sequence, so this catches a permutation without
+# knowing anything about which labels the current model produces.
+STABLE=1
+for _ in 1 2 3; do
+    [ "$(COLUMN_TYPE_PAIRS)" = "$PAIRS_HINT" ] || STABLE=0
+done
+if [ "$STABLE" -eq 1 ]; then
+    pass "column,type sequence is stable across runs"
+else
+    fail "column,type sequence is stable across runs" "repeat runs disagreed; first run was: $PAIRS_HINT"
+fi
 
 rm -rf "$TMPORDDIR"
 
