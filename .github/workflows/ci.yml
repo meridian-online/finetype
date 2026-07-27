@@ -37,9 +37,14 @@ jobs:
       - uses: actions/checkout@v5
       - name: Manifest self-consistency
         # Fails if a recorded score isn't its own correct/scored, if a bar has no
-        # source, or if a registered fixture file was edited without a new version
-        # being registered.
+        # source, if a registered fixture file was edited without a new version
+        # being registered, if a fixture does not name the taxonomy version its
+        # labels were adjudicated under, if evidence/ has grown past its budget or
+        # taken on a non-text artefact, or if a committed release report has drifted
+        # from the manifest it is generated from.
         run: scripts/evidence.py verify
+      - name: evidence/ stays small, text-only and true to the manifest
+        run: scripts/test_evidence.sh
       - name: Scorer propagates failures and stamps every score with its fixture
         run: scripts/test_score_clean_label.sh
 
