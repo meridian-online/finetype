@@ -19,6 +19,7 @@ use crate::rhh;
 use crate::semantic::SemanticHintClassifier;
 use crate::sibling_context::SiblingContextAttention;
 use finetype_core::{Designation, Taxonomy};
+use rayon::prelude::*;
 use std::collections::HashMap;
 
 /// No-op classifier used as placeholder when multi-branch is active.
@@ -439,19 +440,45 @@ const CEDED_RECOVERY_LEAVES: &[&str] = &[
     "technology.internet.user_agent",
 ];
 
+/// ≥90% of the sample's non-empty values must pass `leaf`'s taxonomy validator.
+///
+/// Two things this function deliberately does NOT do, both for speed and neither
+/// changing its answer:
+///
+/// 1. It resolves the validator ONCE instead of calling `validate_value_for_label`
+///    per value. That call built a full `ValidationResult` — formatting a
+///    human-readable message for every failing value — and this function reads
+///    only the boolean. Those discarded messages were ~15% of `profile` wall
+///    clock. Resolution never looks at the value, so a resolution failure is a
+///    property of the label, not of one value: the old loop would then have
+///    taken the `Err` arm for every value, left `checked == 0`, and returned
+///    false — which is what the early `return false` below does.
+/// 2. It stops as soon as the 0.9 bar is arithmetically out of reach. With `r`
+///    values left, the best attainable ratio is `(passed + r) / (checked + r)`
+///    (every remaining value non-empty and passing). That expression is monotone
+///    non-decreasing in `r` while `passed <= checked`, and f64 division is
+///    correctly rounded, hence monotone — so when the ceiling is already below
+///    the bar, no suffix of the sample can reach it and the final comparison
+///    would have been false.
 fn label_validates_sample(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bool {
+    let Some(validator) = finetype_core::validator::resolve_label_validator(leaf, tax) else {
+        return false;
+    };
     let mut checked = 0usize;
     let mut passed = 0usize;
+    let mut remaining = sample.len();
     for v in sample {
+        remaining -= 1;
         let t = v.trim();
         if t.is_empty() {
             continue;
         }
-        if let Ok(res) = finetype_core::validator::validate_value_for_label(t, leaf, tax) {
-            checked += 1;
-            if res.is_valid {
-                passed += 1;
-            }
+        checked += 1;
+        if validator.is_valid(t) {
+            passed += 1;
+        }
+        if ((passed + remaining) as f64) / ((checked + remaining) as f64) < 0.9 {
+            return false;
         }
     }
     checked > 0 && (passed as f64) / (checked as f64) >= 0.9
@@ -1070,7 +1097,7 @@ impl ColumnClassifier {
         // Fast path: no sibling context or no Model2Vec → per-column classification
         if !self.has_sibling_context() || self.model2vec.is_none() {
             return columns
-                .iter()
+                .par_iter()
                 .map(|(values, header)| self.classify_column_with_header(values, header))
                 .collect();
         }
@@ -1079,7 +1106,7 @@ impl ColumnClassifier {
         // other model classifies per-column.
         let Some(ref mb) = self.multi_branch else {
             return columns
-                .iter()
+                .par_iter()
                 .map(|(values, header)| self.classify_column_with_header(values, header))
                 .collect();
         };
@@ -1094,17 +1121,26 @@ impl ColumnClassifier {
         // Step 2: Run sibling-context attention → enriched [N_cols, D]
         let enriched = sibling_ctx.forward(&header_embs)?;
 
-        // Step 3: multi-branch with the enriched header (header branch MLP + Sharpen)
-        let mut results = Vec::with_capacity(columns.len());
-        for (i, (values, header)) in columns.iter().enumerate() {
-            let enriched_header = enriched.get(i)?; // [D]
-            results.push(self.classify_multi_branch_with_enriched(
-                mb,
-                values,
-                header,
-                &enriched_header,
-            )?);
-        }
+        // Step 3: multi-branch with the enriched header (header branch MLP + Sharpen).
+        //
+        // Columns are independent here — steps 1 and 2 already did all the
+        // cross-column work, and this step only reads `&self` and row `i` of the
+        // enriched matrix — so the loop is data-parallel.
+        //
+        // `par_iter().enumerate()` is an INDEXED parallel iterator and
+        // `collect::<Result<Vec<_>, _>>()` from one restores input order, so the
+        // returned sequence matches `columns` position for position regardless of
+        // how the work was scheduled. Column order is contract, not cosmetics: the
+        // caller zips these results back against its own column list by position.
+        // Nothing here may collect into an unordered container.
+        let results: Vec<ColumnResult> = columns
+            .par_iter()
+            .enumerate()
+            .map(|(i, (values, header))| {
+                let enriched_header = enriched.get(i)?; // [D]
+                self.classify_multi_branch_with_enriched(mb, values, header, &enriched_header)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(results)
     }

@@ -221,9 +221,113 @@ else
     fail "finetype load exits 2 via clap unknown-subcommand" "got exit ${LOAD_EXIT:-0}: $LOAD_OUT"
 fi
 
+# ── Column order ──────────────────────────────────────────────────────────────
+
+section "9. Profile — Column Order"
+
+# `profile` emits one entry per input column and every consumer reads that
+# sequence POSITIONALLY — the eval fixtures, the DuckDB extension, the
+# json-schema/datapackage writers. Column classification runs in parallel, and a
+# parallel collect into an unordered container permutes results while leaving the
+# SET intact, so order has to be asserted, not assumed.
+#
+# Two different things are checked, because checking only the first is not enough.
+# The emitted column NAMES are read from the input file, and the LABELS from the
+# parallel results, so a lost ordering inside the classifier scrambles which label
+# lands on which column while the names stay in perfect file order — a name-only
+# check passes on that build. So: the name sequence AND each column's own type.
+#
+# The columns are deliberately of eight different types; a file whose columns all
+# classify the same way would satisfy any permutation.
+TMPORDDIR=$(mktemp -d /tmp/finetype-smoke-order-XXXXXX)
+TMPORD="$TMPORDDIR/column_order.csv"
+cat > "$TMPORD" <<'CSVEOF'
+zeta_email,alpha_created_at,mike_ip,bravo_uuid,yankee_amount,charlie_url,delta_country,echo_id
+ada@example.com,2024-01-05T09:30:00Z,192.168.0.1,550e8400-e29b-41d4-a716-446655440000,12.50,https://a.example.com,US,A1
+grace@example.org,2024-02-11T18:04:22Z,10.0.0.255,6ba7b810-9dad-11d1-80b4-00c04fd430c8,88.25,https://b.example.org,GB,B2
+alan@example.net,2024-03-30T00:00:01Z,172.16.4.9,6ba7b811-9dad-11d1-80b4-00c04fd430c8,3.75,https://c.example.net,DE,C3
+edsger@example.com,2024-04-01T12:12:12Z,8.8.8.8,6ba7b812-9dad-11d1-80b4-00c04fd430c8,0.50,https://d.example.io,FR,D4
+CSVEOF
+
+EXPECTED_ORDER=$(head -1 "$TMPORD" | tr ',' '\n' | tr -d '\r' | paste -sd, -)
+
+# Default path (header hints + sibling context).
+ORDER_JSON=$("$FINETYPE" profile -f "$TMPORD" -o json 2>/dev/null)
+ACTUAL_ORDER=$(printf '%s' "$ORDER_JSON" | grep -o '"column": "[^"]*"' | sed 's/"column": "//; s/"$//' | paste -sd, -)
+assert_eq "profile emits columns in file order" "$ACTUAL_ORDER" "$EXPECTED_ORDER"
+
+# Header-hint-free path — a different per-column loop, same contract.
+ORDER_JSON=$("$FINETYPE" profile -f "$TMPORD" -o json --no-header-hint 2>/dev/null)
+ACTUAL_ORDER=$(printf '%s' "$ORDER_JSON" | grep -o '"column": "[^"]*"' | sed 's/"column": "//; s/"$//' | paste -sd, -)
+assert_eq "profile --no-header-hint emits columns in file order" "$ACTUAL_ORDER" "$EXPECTED_ORDER"
+
+# datapackage writes the columns as an ordered `fields` array; same check through
+# the interoperable envelope.
+ORDER_DP=$("$FINETYPE" profile -f "$TMPORD" -o datapackage 2>/dev/null)
+ACTUAL_ORDER=$(printf '%s' "$ORDER_DP" | grep -o '"name": "[^"]*"' | sed 's/"name": "//; s/"$//' | grep -v '^column_order$' | paste -sd, -)
+assert_eq "datapackage fields follow file order" "$ACTUAL_ORDER" "$EXPECTED_ORDER"
+
+# Each column keeps its OWN type. `-o csv` emits `column,type` per row, so this
+# reads the pairing directly. A classifier that returns its results in some
+# schedule-determined order sends `charlie_url`'s label to `delta_country` and
+# vice versa, which every check above still passes.
+COLUMN_TYPE_PAIRS() {  # <extra profile args...>
+    "$FINETYPE" profile -f "$TMPORD" -o csv "$@" 2>/dev/null \
+        | tail -n +2 | cut -d, -f1,2 | tr -d '"'
+}
+
+# column:a fragment unique to the type that column's values are
+EXPECT_TYPES="zeta_email:email
+alpha_created_at:iso_8601
+mike_ip:ip_v4
+bravo_uuid:uuid
+yankee_amount:decimal_number
+charlie_url:url
+delta_country:country_code
+echo_id:alphanumeric_id"
+
+check_pairing() {  # <label> <pairs>
+    local what="$1" pairs="$2" col frag got bad=""
+    while IFS= read -r spec; do
+        col="${spec%%:*}"
+        frag="${spec#*:}"
+        got=$(printf '%s\n' "$pairs" | grep "^$col," | cut -d, -f2)
+        case "$got" in
+            *"$frag"*) ;;
+            *) bad="$bad $col=>'$got' (wanted *$frag*)" ;;
+        esac
+    done <<< "$EXPECT_TYPES"
+    if [ -z "$bad" ]; then
+        pass "$what"
+    else
+        fail "$what" "mis-paired:$bad"
+    fi
+}
+
+PAIRS_HINT=$(COLUMN_TYPE_PAIRS)
+check_pairing "each column keeps its own type" "$PAIRS_HINT"
+
+PAIRS_NOHINT=$(COLUMN_TYPE_PAIRS --no-header-hint)
+check_pairing "each column keeps its own type (--no-header-hint)" "$PAIRS_NOHINT"
+
+# Repeat runs must not reshuffle: thread scheduling varies, the answer must not.
+# Compares the whole column,type sequence, so this catches a permutation without
+# knowing anything about which labels the current model produces.
+STABLE=1
+for _ in 1 2 3; do
+    [ "$(COLUMN_TYPE_PAIRS)" = "$PAIRS_HINT" ] || STABLE=0
+done
+if [ "$STABLE" -eq 1 ]; then
+    pass "column,type sequence is stable across runs"
+else
+    fail "column,type sequence is stable across runs" "repeat runs disagreed; first run was: $PAIRS_HINT"
+fi
+
+rm -rf "$TMPORDDIR"
+
 # ── Error Handling ────────────────────────────────────────────────────────────
 
-section "9. Error Handling"
+section "10. Error Handling"
 
 # Missing subcommand should show help (non-zero exit is OK)
 OUT=$("$FINETYPE" 2>&1) || true

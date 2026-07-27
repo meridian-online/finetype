@@ -86,20 +86,29 @@ const CONCLUSIVE_LEAVES: &[&str] = &[
 
 /// ≥90% of the sample's non-empty values must pass `leaf`'s validator. Mirrors
 /// `label_validates_sample` (model crate) — the same bar the Sharpen
-/// veto-consistency gate uses.
+/// veto-consistency gate uses, and the same two speed properties: the validator
+/// is resolved once (not rebuilt, with a discarded error string per failing
+/// value, on every call), and the scan stops once the 0.9 bar is arithmetically
+/// unreachable. Both are answer-preserving; see `label_validates_sample`.
 fn validates(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bool {
+    let Some(validator) = crate::validator::resolve_label_validator(leaf, tax) else {
+        return false;
+    };
     let mut checked = 0usize;
     let mut passed = 0usize;
+    let mut remaining = sample.len();
     for v in sample {
+        remaining -= 1;
         let t = v.trim();
         if t.is_empty() {
             continue;
         }
-        if let Ok(res) = crate::validator::validate_value_for_label(t, leaf, tax) {
-            checked += 1;
-            if res.is_valid {
-                passed += 1;
-            }
+        checked += 1;
+        if validator.is_valid(t) {
+            passed += 1;
+        }
+        if ((passed + remaining) as f64) / ((checked + remaining) as f64) < 0.9 {
+            return false;
         }
     }
     checked > 0 && (passed as f64) / (checked as f64) >= 0.9
