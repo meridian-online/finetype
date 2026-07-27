@@ -1238,3 +1238,97 @@ fn profile_files_rejects_non_json_schema_output() {
         "expected clap error mentioning json-schema; got: {stderr}"
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPACT-DATE PRECISION — the eight-digit-figure false positive
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Pull one column's full emitted record out of a `profile -o json` document.
+fn column_record<'a>(profile: &'a Value, column_name: &str) -> &'a Value {
+    profile["columns"]
+        .as_array()
+        .expect("profile missing columns array")
+        .iter()
+        .find(|c| c["column"].as_str() == Some(column_name))
+        .unwrap_or_else(|| panic!("column '{column_name}' not found in profile"))
+}
+
+/// `datetime.date.compact_ymd` must separate a real YYYYMMDD date column from
+/// the eight-digit figures and surrogate keys that sit beside it.
+///
+/// The fixture is a financial-statement shape taken from real corpus columns:
+/// a `date` column of genuine YYYYMMDD values, three balance-sheet figures
+/// (`commonStock`, `researchDevelopment`, `longTermDebt`), a constant
+/// `marketCap`, and an eight-digit `game_id`. Under a shape-only `^\d{8}$`
+/// validator every one of these validates as a date at 100%, so the hard
+/// validation veto has nothing to push back with and the figures ship as
+/// confident dates with a `strptime` transform attached.
+///
+/// The assertions read the WHOLE emitted record — type, broad_type,
+/// validation_pass_rate, quality_band, disambiguation_rule, format_string,
+/// transform — because a label-only check cannot tell a fixed column from one
+/// that kept its date transform.
+#[test]
+#[ignore]
+fn golden_profile_compact_ymd_rejects_eight_digit_figures() {
+    let profile = run_profile_json(&fixture_path("compact_ymd_vs_eight_digit_figures.csv"));
+
+    // The genuine date column is untouched: still a date, still validating at
+    // 100%, still carrying its format and transform, no rule fired.
+    let date = column_record(&profile, "date");
+    assert_eq!(date["type"], "datetime.date.compact_ymd");
+    assert_eq!(date["broad_type"], "DATE");
+    assert_eq!(date["validation_pass_rate"], 1.0);
+    assert_eq!(date["quality_band"], "high");
+    assert_eq!(date["format_string"], "%Y%m%d");
+    assert_eq!(date["transform"], "strptime({col}, '%Y%m%d')::DATE");
+    assert!(
+        date["disambiguation_rule"].is_null(),
+        "the real date column must not need a rule to survive; got {:?}",
+        date["disambiguation_rule"]
+    );
+
+    // The balance-sheet figures are hard-vetoed off the date label. The
+    // validation pass rate is the load-bearing field: it is what the veto
+    // reads, and a shape-only validator reports 1.0 here.
+    for name in ["commonStock", "researchDevelopment"] {
+        let col = column_record(&profile, name);
+        assert_eq!(
+            col["type"], "representation.numeric.integer_number",
+            "{name} should type as an integer, not a date"
+        );
+        assert_eq!(col["broad_type"], "BIGINT", "{name} broad_type");
+        assert_eq!(
+            col["validation_pass_rate"], 0.0,
+            "{name} must FAIL the compact_ymd validator, not pass it at 1.0"
+        );
+        assert_eq!(
+            col["disambiguation_rule"], "veto_fallback:vocab",
+            "{name} should reach its type through the validation veto"
+        );
+        assert!(
+            col["format_string"].is_null() && col["transform"] != "strptime({col}, '%Y%m%d')::DATE",
+            "{name} must not keep a date transform: {:?} / {:?}",
+            col["format_string"],
+            col["transform"]
+        );
+    }
+
+    // Nothing else in the table may claim to be a compact date.
+    let stray: Vec<&str> = profile["columns"]
+        .as_array()
+        .expect("columns array")
+        .iter()
+        .filter(|c| {
+            c["type"]
+                .as_str()
+                .is_some_and(|t| t.starts_with("datetime.date.compact_"))
+        })
+        .filter_map(|c| c["column"].as_str())
+        .filter(|n| *n != "date")
+        .collect();
+    assert!(
+        stray.is_empty(),
+        "only the real date column may type as a compact date; also got {stray:?}"
+    );
+}

@@ -818,7 +818,15 @@ datetime.date.compact_ymd:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{8}$"
+    # Range-carrying, not shape-only. `^\d{8}$` confirms EVERY eight-digit
+    # token, so an eight-digit financial figure (grossProfit 71132000,
+    # sharesOutstanding 25012600) and an eight-digit surrogate key
+    # (NBA GAME_ID 21601092, PostId 18502653) validated as a date. The
+    # year/month/day windows are the substance: 1900-2099, month 01-12,
+    # day 01-31. Deliberately NOT per-month day counts — 20240230 still
+    # validates; the windows carry the discrimination the corpus needs and
+    # a calendar-exact regex buys ~nothing over it.
+    pattern: "^(19|20)\\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\\d|3[01])$"
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
