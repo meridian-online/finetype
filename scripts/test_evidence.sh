@@ -302,6 +302,257 @@ then ok "same fixture, same pipeline, different binary: the delta is stated"
 else bad "a legitimate same-fixture delta was refused too — the rule is over-broad"; fi
 restore
 
+# ------------------------------------ a manifest that does not resolve stops it ----
+# Everything below drives a *command* and asserts three things: the exit code the caller
+# branches on, a named reason on stderr, and the absence of a Python traceback. The
+# traceback check is the point. A manifest of the wrong shape used to reach code that
+# assumed it had resolved — `doc.get` on a list, `.get` on a fixture that is a string —
+# so the failure surfaced as an AttributeError several frames from its cause, reading
+# like a bug in the tool rather than "your manifest is wrong". A crash is the good
+# outcome here; the bad one is a run that carries on holding a value nobody measured.
+BADDIR="$TMP/broken"
+BAD="$BADDIR/fixtures.json"
+mkdir -p "$BADDIR"
+
+expect_cmd_fail() { # want-exit, want-substring, command...
+  local want_code="$1" want="$2"
+  shift 2
+  local log="$TMP/cmd.log" got=0
+  set +e
+  "$@" >"$log" 2>&1
+  got=$?
+  set -e
+  if [ "$got" -eq 0 ]; then
+    bad "exited 0 — it proceeded on a manifest it should have refused (wanted $want_code: $want)"
+  elif grep -q 'Traceback (most recent call last)' "$log"; then
+    bad "crashed with a Python traceback instead of a named failure: $(tr '\n' ' ' < "$log" | cut -c1-200)"
+  elif [ "$got" -ne "$want_code" ]; then
+    bad "exited $got, expected $want_code; said: $(tr '\n' ' ' < "$log" | cut -c1-200)"
+  elif ! grep -q -- "$want" "$log"; then
+    bad "exited $want_code but not for '$want'; said: $(tr '\n' ' ' < "$log" | cut -c1-200)"
+  else
+    ok "$CASE"
+  fi
+}
+
+# Each case starts from the good manifest and breaks one thing, so the rejection is
+# attributable to that thing. $MAN is never touched; nothing here needs restore.
+break_manifest() { python3 - "$MAN" "$BAD"; }
+
+VBAD() { "$EV" --manifest "$BAD" verify --taxonomy-root "$SBOX" --evidence-dir "$SBOX/evidence"; }
+
+echo "== a manifest that cannot be resolved is refused, not worked around =="
+
+CASE="a manifest that is not JSON"
+printf '{ "schema": broken,\n' > "$BAD"
+expect_cmd_fail 5 "is not valid JSON" VBAD
+
+CASE="a manifest that is valid JSON but not an object"
+printf '[]\n' > "$BAD"
+expect_cmd_fail 5 "not an object" VBAD
+
+CASE="a manifest that is not UTF-8"
+python3 -c "import sys; open(sys.argv[1],'wb').write(b'\xff\xfe{\x00\"s\x00')" "$BAD"
+expect_cmd_fail 5 "could not be read as UTF-8" VBAD
+
+CASE="a manifest declaring another schema"
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1])); d["schema"] = "somebody/else@1"
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "declares schema" VBAD
+
+CASE="a 'fixtures' that is not an object"
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1])); d["fixtures"] = []
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "has no 'fixtures' object" VBAD
+
+CASE="a fixture entry that is not an object"
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1])); d["fixtures"]["sbox-v1"] = "gold-corpus"
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "not an object" VBAD
+
+CASE="a 'reports' that is a bare string"
+# The shape that silently weakens the check rather than failing it: iterating "1.0.0"
+# yields five one-character release names, none of which is the report that must exist.
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1])); d["reports"] = "1.0.0"
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "not a list of version strings" VBAD
+
+CASE="a 'reports' that is a list of non-strings"
+# The half of the same check the case above cannot reach. `["1.0.0"]` and `[1]` are both
+# lists, so `isinstance(reports, list)` accepts each; only the element check separates
+# them. Without it a report named `1` is looked for as a release and never found, and the
+# renderer's "the committed report is current" check silently stops checking.
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1])); d["reports"] = [1]
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "not a list of version strings" VBAD
+
+# ------------------------------------ a lookup that finds nothing stops the run ----
+echo "== a lookup that resolves to nothing is a failure, not an empty value =="
+
+CASE="resolve-fixture on an unregistered file"
+expect_cmd_fail 3 "is not a registered fixture version" \
+  "$EV" --manifest "$MAN" resolve-fixture --path "$SBOX/labels/definitions_beta.yaml"
+
+CASE="resolve-fixture --format tsv on an unregistered file"
+expect_cmd_fail 3 "is not a registered fixture version" \
+  "$EV" --manifest "$MAN" resolve-fixture --path "$SBOX/labels/definitions_beta.yaml" --format tsv
+
+CASE="get-baseline on a fixture that is not registered"
+expect_cmd_fail 3 "no fixture 'sbox-v9'" \
+  "$EV" --manifest "$MAN" get-baseline --fixture sbox-v9 --key "m/p/1.0.0"
+
+CASE="record-baseline against a fixture that is not registered"
+expect_cmd_fail 3 "no fixture 'sbox-v9'" \
+  "$EV" --manifest "$MAN" record-baseline --fixture sbox-v9 --key k --correct 1 --scored 2 \
+  --source sandbox
+
+CASE="get-baseline for a key with no recorded score"
+expect_cmd_fail 4 "has no recorded score" \
+  "$EV" --manifest "$MAN" get-baseline --fixture sbox-v1 --key "m/p/never-run"
+
+CASE="get-baseline --format tsv for a key with no recorded score"
+# The tsv branch is the one the scorer calls. It must not emit a row of empty fields for
+# a bar that was never measured — a blank line still gets `cut` into a comparison.
+expect_cmd_fail 4 "has no recorded score" \
+  "$EV" --manifest "$MAN" get-baseline --fixture sbox-v1 --key "m/p/never-run" --format tsv
+
+# ---------------------------------------- an incomplete bar is never emitted ----
+echo "== an incomplete bar is refused, not emitted with blank fields =="
+
+GB() { "$EV" --manifest "$BAD" get-baseline --fixture sbox-v1 --key "m/p/1.0.0" --format tsv; }
+
+CASE="a bar missing its column count"
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+del d["fixtures"]["sbox-v1"]["baselines"]["m/p/1.0.0"]["correct"]
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "is missing correct" GB
+
+CASE="a bar whose score is a string"
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["fixtures"]["sbox-v1"]["baselines"]["m/p/1.0.0"]["score"] = "0.667"
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "is not a number" GB
+
+CASE="a bar whose score is a JSON boolean"
+# `bool` is a subclass of `int`, so `isinstance(True, (int, float))` is True and the
+# type check alone lets it through. `format(True, '.3f')` then prints 1.000 — a bar of
+# perfect accuracy conjured out of a typo.
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["fixtures"]["sbox-v1"]["baselines"]["m/p/1.0.0"]["score"] = True
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "records score=True, which is not a number" GB
+
+CASE="a bar whose column count is a string"
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["fixtures"]["sbox-v1"]["baselines"]["m/p/1.0.0"]["scored"] = "3"
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "not a whole number of columns" GB
+
+CASE="a bar whose column count is a JSON boolean"
+# The load-bearing one, and the reason the bool exclusion is not pedantry. `bool` is a
+# subclass of `int`, so an `int` check alone accepts `true`; get-baseline then emits
+# `True` in field 2, score_clean_label.sh cuts it out (line 203) and feeds it to
+# `$((COMP_CORRECT - BASE_CORRECT))` (line 212), where bash reads an unset name as 0.
+# The run reports its whole column count as the delta, calls that at-or-above, and
+# passes — a confident comparison against nothing, which is the failure this manifest
+# exists to prevent.
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["fixtures"]["sbox-v1"]["baselines"]["m/p/1.0.0"]["correct"] = True
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "records correct=True, which is not a whole number of columns" GB
+
+CASE="a 'baselines' that is not an object"
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["fixtures"]["sbox-v1"]["baselines"] = ["m/p/1.0.0"]
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "not an object" GB
+
+CASE="a bar that is not a measurement"
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["fixtures"]["sbox-v1"]["baselines"]["m/p/1.0.0"] = 0.667
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "not a recorded measurement" GB
+
+CASE="record-baseline reporting a malformed prior measurement"
+break_manifest <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["fixtures"]["sbox-v1"]["baselines"]["m/p/1.0.0"] = {"score": 0.667}
+json.dump(d, open(sys.argv[2], "w"), indent=2)
+PY
+expect_cmd_fail 5 "is missing correct, scored" \
+  "$EV" --manifest "$BAD" record-baseline --fixture sbox-v1 --key "m/p/1.0.0" \
+  --correct 3 --scored 3 --source sandbox
+
+# The positive control for the whole section. Without it every case above is satisfied
+# by a get-baseline that refuses everything, which would break the scorer outright.
+# `set +e` around the capture is load-bearing: under `set -e` a failing command
+# substitution aborts the whole script, so a refuse-everything mutation would end the
+# run here instead of reddening a named case — red either way, but unattributable.
+emitted() { # capture stdout+stderr and exit code without tripping set -e
+  set +e
+  GOT="$("$@" 2>&1)"
+  RC=$?
+  set -e
+}
+
+CASE="a complete bar is still emitted in full"
+emitted "$EV" --manifest "$MAN" get-baseline --fixture sbox-v1 --key "m/p/1.0.0" --format tsv
+want="$(printf '0.667\t2\t3\tm\t1.0.0\tp\tsandbox')"
+if [ "$RC" -ne 0 ]; then
+  bad "get-baseline refused a complete bar (exit $RC): $(printf '%s' "$GOT" | tr '\n' ' ' | cut -c1-160)"
+elif [ "$GOT" = "$want" ]; then
+  ok "score, correct, scored, model, binary, pipeline and source all survive"
+else
+  bad "the emitted record changed: got '$GOT', want '$want'"
+fi
+
+CASE="a complete bar is still emitted as a bare score"
+emitted "$EV" --manifest "$MAN" get-baseline --fixture sbox-v1 --key "m/p/1.0.0"
+if [ "$RC" -ne 0 ]; then
+  bad "get-baseline refused a complete bar (exit $RC): $(printf '%s' "$GOT" | tr '\n' ' ' | cut -c1-160)"
+elif [ "$GOT" = "0.667" ]; then
+  ok "the default format still prints the score"
+else
+  bad "got '$GOT', want 0.667"
+fi
+
 # ------------------------------------------------------------ the real report ----
 echo "== the committed 0.6.53 report is current =="
 CASE="repo release report"

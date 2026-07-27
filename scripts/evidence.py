@@ -40,6 +40,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 SCHEMA = "finetype/evidence-fixtures@1"
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -71,7 +72,17 @@ EVIDENCE_MAX_FILE_BYTES = 200 * 1024
 EVIDENCE_MAX_TOTAL_BYTES = 1024 * 1024
 
 
-def die(code: int, *lines: str) -> None:
+def die(code: int, *lines: str) -> NoReturn:
+    """Print the reason and stop. Declared NoReturn because it is one.
+
+    This annotation is load-bearing, not cosmetic. Every guard in this file is written
+    as `if <bad>: die(...)` and then carries on assuming the bad case is gone. Typed as
+    returning None, a checker has to assume execution continues past every one of those
+    guards — which is why it flagged four reads of an unbound `doc`, a `None` unpacked
+    as a tuple and three subscripts of `None`. Those reads are unreachable, and saying
+    so here is what lets the checker prove the *rest* of the file's None-handling
+    instead of drowning in false positives from this one function.
+    """
     for line in lines:
         print(line, file=sys.stderr)
     sys.exit(code)
@@ -162,6 +173,16 @@ def fixture_labels(path: Path, column: str) -> list[str]:
 
 
 def load(manifest: Path) -> dict:
+    """Read the manifest, or stop.
+
+    This is the only door into the manifest, so it is where shape is established rather
+    than hoped for. Everything downstream indexes `doc["fixtures"]` and calls `.get` on
+    each entry; if a malformed manifest got past here those become an AttributeError or
+    a KeyError several frames away, which reads as a bug in the caller rather than as
+    "your manifest is wrong". Worse, the wrong shape is exactly how a score stops being
+    attributable — so the manifest failing to resolve must be the loudest thing that
+    happens, never something a later frame papers over.
+    """
     if not manifest.exists():
         die(
             EXIT_INCONSISTENT,
@@ -171,22 +192,62 @@ def load(manifest: Path) -> dict:
             "      register-fixture.",
         )
     try:
-        doc = json.loads(manifest.read_text())
+        raw = manifest.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        die(
+            EXIT_INCONSISTENT,
+            f"FAIL: {manifest} could not be read as UTF-8 text: {exc}",
+            "      The manifest is JSON. A file that cannot be read is not a manifest that",
+            "      resolved to nothing — it is a manifest that resolved to no answer at all,",
+            "      and no score may be quoted against it.",
+        )
+    try:
+        doc = json.loads(raw)
     except json.JSONDecodeError as exc:
         die(EXIT_INCONSISTENT, f"FAIL: {manifest} is not valid JSON: {exc}")
+    if not isinstance(doc, dict):
+        die(
+            EXIT_INCONSISTENT,
+            f"FAIL: {manifest} holds a JSON {type(doc).__name__}, not an object.",
+            "      The manifest is a mapping of fixture id to fixture. Valid JSON that is not",
+            "      that shape resolves no fixture version at all.",
+        )
     if doc.get("schema") != SCHEMA:
         die(
             EXIT_INCONSISTENT,
             f"FAIL: {manifest} declares schema {doc.get('schema')!r}, expected {SCHEMA!r}.",
         )
-    if not isinstance(doc.get("fixtures"), dict):
+    fixtures = doc.get("fixtures")
+    if not isinstance(fixtures, dict):
         die(EXIT_INCONSISTENT, f"FAIL: {manifest} has no 'fixtures' object.")
+    for fid, fx in fixtures.items():
+        if not isinstance(fx, dict):
+            die(
+                EXIT_INCONSISTENT,
+                f"FAIL: {manifest}: fixture {fid!r} is a JSON {type(fx).__name__}, not an "
+                f"object.",
+                "      A fixture entry carries its version, content hash, row count, taxonomy",
+                "      and baselines. Anything else has no fixture version to report.",
+            )
+    # `reports` drives the check that a committed release report is still current. A
+    # non-list here is not cosmetic: the check would iterate a string character by
+    # character, or vanish entirely, and "the baseline is committed" would go back to
+    # being a claim.
+    reports = doc.get("reports", [])
+    if not isinstance(reports, list) or not all(isinstance(r, str) for r in reports):
+        die(
+            EXIT_INCONSISTENT,
+            f"FAIL: {manifest} has a 'reports' that is not a list of version strings "
+            f"(found {type(reports).__name__}).",
+            "      'reports' is what makes a committed release report a checked fact. A value",
+            "      of the wrong shape silently skips that check instead of failing it.",
+        )
     return doc
 
 
 def save(manifest: Path, doc: dict) -> None:
     manifest.parent.mkdir(parents=True, exist_ok=True)
-    manifest.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
+    manifest.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def find_by_sha(doc: dict, sha: str) -> tuple[str, dict] | None:
@@ -333,7 +394,8 @@ def cmd_list(args) -> int:
 
 
 def _get_fixture(doc: dict, fid: str) -> dict:
-    fx = doc["fixtures"].get(fid)
+    fixtures: dict = doc["fixtures"]
+    fx = fixtures.get(fid)
     if fx is None:
         die(
             EXIT_NO_FIXTURE,
@@ -343,12 +405,67 @@ def _get_fixture(doc: dict, fid: str) -> dict:
     return fx
 
 
+def _baselines_of(fid: str, fx: dict) -> dict:
+    baselines = fx.get("baselines", {})
+    if not isinstance(baselines, dict):
+        die(
+            EXIT_INCONSISTENT,
+            f"FAIL: fixture {fid!r} has a 'baselines' that is a JSON "
+            f"{type(baselines).__name__}, not an object.",
+            "      Baselines are keyed measurements. Nothing can be looked up in a value of",
+            "      that shape, so no bar can be resolved from this fixture.",
+        )
+    return baselines
+
+
+def _require_measurement(fid: str, key: str, b) -> dict:
+    """A recorded bar must be a complete measurement before anyone reads it.
+
+    `score_clean_label.sh` cuts fields out of `get-baseline --format tsv` to decide pass
+    or fail. A missing field used to come back as an empty column, which the caller fed
+    straight into shell arithmetic — the bar quietly becoming nothing at all. That is the
+    failure this whole manifest exists to prevent, so it is refused here rather than
+    emitted and left for a downstream `cut` to misread.
+    """
+    if not isinstance(b, dict):
+        die(
+            EXIT_INCONSISTENT,
+            f"FAIL: baseline {key!r} on fixture {fid!r} is a JSON {type(b).__name__}, not a "
+            f"recorded measurement.",
+            "      A bar is correct/scored/score plus its provenance. Anything else is not a",
+            "      measurement this run may compare itself against.",
+        )
+    missing = [f for f in ("correct", "scored", "score") if f not in b]
+    if missing:
+        die(
+            EXIT_INCONSISTENT,
+            f"FAIL: baseline {key!r} on fixture {fid!r} is missing {', '.join(missing)}.",
+            "      An incomplete bar emitted with blank fields is still a bar the caller will",
+            "      compare against. Re-record it with record-baseline.",
+        )
+    for field in ("correct", "scored"):
+        if not isinstance(b[field], int) or isinstance(b[field], bool):
+            die(
+                EXIT_INCONSISTENT,
+                f"FAIL: baseline {key!r} on fixture {fid!r} records {field}={b[field]!r}, "
+                f"which is not a whole number of columns.",
+            )
+    if not isinstance(b["score"], (int, float)) or isinstance(b["score"], bool):
+        die(
+            EXIT_INCONSISTENT,
+            f"FAIL: baseline {key!r} on fixture {fid!r} records score={b['score']!r}, which "
+            f"is not a number.",
+        )
+    return b
+
+
 def cmd_get_baseline(args) -> int:
     doc = load(args.manifest)
     fx = _get_fixture(doc, args.fixture)
-    b = fx.get("baselines", {}).get(args.key)
+    baselines = _baselines_of(args.fixture, fx)
+    b = baselines.get(args.key)
     if b is None:
-        keys = ", ".join(fx.get("baselines", {})) or "(none recorded)"
+        keys = ", ".join(baselines) or "(none recorded)"
         die(
             EXIT_NO_BASELINE,
             f"FAIL: baseline {args.key!r} has no recorded score on fixture {args.fixture!r}.",
@@ -356,6 +473,7 @@ def cmd_get_baseline(args) -> int:
             "      A bar measured on one fixture version says nothing about another. Measure",
             "      this baseline on this fixture and record it with record-baseline.",
         )
+    b = _require_measurement(args.fixture, args.key, b)
     if args.format == "tsv":
         fields = [f"{b['score']:.3f}"]
         fields += [str(b.get(k, "")) for k in ("correct", "scored", "model", "binary", "pipeline", "source")]
@@ -372,9 +490,10 @@ def cmd_record_baseline(args) -> int:
         die(EXIT_USAGE, "FAIL: --scored must be positive.")
     if not 0 <= args.correct <= args.scored:
         die(EXIT_USAGE, f"FAIL: --correct {args.correct} is not in 0..{args.scored}.")
-    baselines = fx.setdefault("baselines", {})
+    baselines = _baselines_of(args.fixture, fx)
+    fx["baselines"] = baselines
     if args.key in baselines and not args.force:
-        prev = baselines[args.key]
+        prev = _require_measurement(args.fixture, args.key, baselines[args.key])
         die(
             EXIT_USAGE,
             f"FAIL: baseline {args.key!r} is already recorded on {args.fixture!r} as "
