@@ -16,8 +16,6 @@ use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use crate::model2vec_shared::Model2VecResources;
 use crate::multi_branch::MultiBranchClassifier;
 use crate::rhh;
-use crate::semantic::SemanticHintClassifier;
-use crate::sibling_context::SiblingContextAttention;
 use finetype_core::{Designation, Taxonomy};
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -640,11 +638,6 @@ pub struct ColumnResult {
 pub struct ColumnClassifier {
     classifier: Box<dyn ValueClassifier>,
     config: ColumnConfig,
-    /// Optional semantic column name classifier (Model2Vec embeddings).
-    /// When present, used as the primary header hint source before falling
-    /// back to the hardcoded `header_hint()` dictionary.
-    /// Bypassed when Sense is active (Sense already sees the header).
-    semantic_hint: Option<SemanticHintClassifier>,
     /// Optional taxonomy for validation-based attractor demotion.
     /// When present, enables Signal 1 (validation failure) in the
     /// attractor demotion disambiguation rule (Rule 14).
@@ -656,12 +649,6 @@ pub struct ColumnClassifier {
     entity_classifier: Option<EntityClassifier>,
     /// Shared Model2Vec resources for sibling-context header encoding (multi-branch).
     model2vec: Option<Model2VecResources>,
-    /// Optional sibling-context attention module.
-    /// When present and Sense is active, enriches column header embeddings with
-    /// cross-column context before Sense classification. Requires `model2vec` to
-    /// encode headers. Without a trained model artifact, this is None and the
-    /// pipeline is unchanged.
-    sibling_context: Option<SiblingContextAttention>,
     /// Optional multi-branch column classifier (Sherlock-style).
     /// When present, `classify_column_with_header` uses the multi-branch forward
     /// pass directly (column-level features → MLP → label), bypassing both
@@ -680,12 +667,10 @@ impl ColumnClassifier {
         Self {
             classifier,
             config,
-            semantic_hint: None,
             taxonomy: None,
             skip_sharpen: false,
             entity_classifier: None,
             model2vec: None,
-            sibling_context: None,
             multi_branch: None,
         }
     }
@@ -693,34 +678,6 @@ impl ColumnClassifier {
     /// Create with default configuration.
     pub fn with_defaults(classifier: Box<dyn ValueClassifier>) -> Self {
         Self::new(classifier, ColumnConfig::default())
-    }
-
-    /// Create a column classifier with a semantic hint classifier.
-    ///
-    /// The semantic classifier uses Model2Vec embeddings to map column names
-    /// to type labels, replacing the hardcoded header_hint() dictionary.
-    /// Falls back to header_hint() when the semantic classifier doesn't match.
-    pub fn with_semantic_hint(
-        classifier: Box<dyn ValueClassifier>,
-        config: ColumnConfig,
-        semantic: SemanticHintClassifier,
-    ) -> Self {
-        Self {
-            classifier,
-            config,
-            semantic_hint: Some(semantic),
-            taxonomy: None,
-            entity_classifier: None,
-            model2vec: None,
-            sibling_context: None,
-            multi_branch: None,
-            skip_sharpen: false,
-        }
-    }
-
-    /// Attach a semantic hint classifier to an existing ColumnClassifier.
-    pub fn set_semantic_hint(&mut self, semantic: SemanticHintClassifier) {
-        self.semantic_hint = Some(semantic);
     }
 
     /// Attach a taxonomy for validation-based attractor demotion.
@@ -740,20 +697,6 @@ impl ColumnClassifier {
     /// the prediction is demoted to `representation.text.entity_name`.
     pub fn set_entity_classifier(&mut self, entity: EntityClassifier) {
         self.entity_classifier = Some(entity);
-    }
-
-    /// Attach a sibling-context attention module.
-    ///
-    /// When present (multi-branch), `classify_columns_with_context` encodes all
-    /// column headers with Model2Vec, runs sibling-context attention to enrich
-    /// them, then feeds the enriched header into the multi-branch header branch.
-    pub fn set_sibling_context(&mut self, sibling: SiblingContextAttention) {
-        self.sibling_context = Some(sibling);
-    }
-
-    /// Check whether sibling-context attention is available.
-    pub fn has_sibling_context(&self) -> bool {
-        self.sibling_context.is_some()
     }
 
     /// Attach Model2Vec resources without Sense.
@@ -781,11 +724,9 @@ impl ColumnClassifier {
         Self {
             classifier: dummy,
             config,
-            semantic_hint: None,
             taxonomy: None,
             entity_classifier: None,
             model2vec: None,
-            sibling_context: None,
             multi_branch: Some(multi_branch),
             skip_sharpen: false,
         }
@@ -1077,72 +1018,28 @@ impl ColumnClassifier {
         &*self.classifier
     }
 
-    /// Classify multiple columns with sibling context.
+    /// Classify multiple columns.
     ///
-    /// When sibling-context attention is available:
-    /// 1. Encode all column headers with Model2Vec → `[N_cols, 128]`
-    /// 2. Run sibling-context attention → `[N_cols, 128]` (enriched)
-    /// 3. For each column: run the active pipeline with enriched headers
+    /// Columns are independent — each runs `classify_column_with_header` — so
+    /// the loop is data-parallel. `par_iter()` is an INDEXED parallel iterator
+    /// and `collect::<Result<Vec<_>, _>>()` restores input order, so the returned
+    /// sequence matches `columns` position for position regardless of how the
+    /// work was scheduled. Column order is contract, not cosmetics: the caller
+    /// zips these results back against its own column list by position. Nothing
+    /// here may collect into an unordered container.
     ///
-    /// Supports both Sense→Sharpen and multi-branch pipelines:
-    /// - Sense→Sharpen: enriched header feeds into Sense classification
-    /// - Multi-branch: enriched header feeds into the 4th header branch MLP
-    ///
-    /// When sibling context is NOT available (no trained model), falls back to
-    /// per-column `classify_column_with_header` — producing identical results.
+    /// This used to run sibling-context attention over the column headers first
+    /// when `models/sibling-context/` happened to be on disk. That model was
+    /// never embedded in a released binary, so it made every repo-root
+    /// measurement a measurement of a pipeline no user runs.
     pub fn classify_columns_with_context(
         &self,
         columns: &[(Vec<String>, String)], // (values, header) per column
     ) -> Result<Vec<ColumnResult>, InferenceError> {
-        // Fast path: no sibling context or no Model2Vec → per-column classification
-        if !self.has_sibling_context() || self.model2vec.is_none() {
-            return columns
-                .par_iter()
-                .map(|(values, header)| self.classify_column_with_header(values, header))
-                .collect();
-        }
-
-        // Only the multi-branch path consumes sibling-context enrichment; any
-        // other model classifies per-column.
-        let Some(ref mb) = self.multi_branch else {
-            return columns
-                .par_iter()
-                .map(|(values, header)| self.classify_column_with_header(values, header))
-                .collect();
-        };
-
-        let sibling_ctx = self.sibling_context.as_ref().unwrap();
-        let m2v = self.model2vec.as_ref().unwrap();
-
-        // Step 1: Encode all column headers with Model2Vec
-        let headers: Vec<&str> = columns.iter().map(|(_, h)| h.as_str()).collect();
-        let header_embs = m2v.encode_batch(&headers)?; // [N_cols, D]
-
-        // Step 2: Run sibling-context attention → enriched [N_cols, D]
-        let enriched = sibling_ctx.forward(&header_embs)?;
-
-        // Step 3: multi-branch with the enriched header (header branch MLP + Sharpen).
-        //
-        // Columns are independent here — steps 1 and 2 already did all the
-        // cross-column work, and this step only reads `&self` and row `i` of the
-        // enriched matrix — so the loop is data-parallel.
-        //
-        // `par_iter().enumerate()` is an INDEXED parallel iterator and
-        // `collect::<Result<Vec<_>, _>>()` from one restores input order, so the
-        // returned sequence matches `columns` position for position regardless of
-        // how the work was scheduled. Column order is contract, not cosmetics: the
-        // caller zips these results back against its own column list by position.
-        // Nothing here may collect into an unordered container.
-        let results: Vec<ColumnResult> = columns
+        columns
             .par_iter()
-            .enumerate()
-            .map(|(i, (values, header))| {
-                let enriched_header = enriched.get(i)?; // [D]
-                self.classify_multi_branch_with_enriched(mb, values, header, &enriched_header)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(results)
+            .map(|(values, header)| self.classify_column_with_header(values, header))
+            .collect()
     }
 
     /// Classify a column of values with an optional header name hint.
@@ -1195,14 +1092,8 @@ impl ColumnClassifier {
         // Hardcoded hints have been curated through multiple iterations
         // and cover known cases precisely. Model2Vec adds value for unknown headers
         // but can override correct hardcoded mappings.
-        let hardcoded_hint_legacy = header_hint(header).map(|h| h.to_string());
-        let hinted_type: Option<String> = hardcoded_hint_legacy.clone().or_else(|| {
-            self.semantic_hint
-                .as_ref()
-                .and_then(|sh| sh.classify_header(header))
-                .map(|r| r.label.clone())
-        });
-        let hint_is_hardcoded_legacy = hardcoded_hint_legacy.is_some();
+        let hinted_type: Option<String> = header_hint(header).map(|h| h.to_string());
+        let hint_is_hardcoded_legacy = hinted_type.is_some();
 
         if let Some(hinted_type) = hinted_type.as_deref() {
             // If the model already predicts the hinted type, just boost confidence
@@ -1459,8 +1350,8 @@ impl ColumnClassifier {
     /// feature_sharpen → value_sharpen → datetime/structured refinement →
     /// sharpen_and_guard (header hints) → username veto → post-hoc locale → finalize.
     ///
-    /// `classify_multi_branch`, `classify_multi_branch_with_enriched`, and
-    /// `compose_from_sense` all call this after seeding `result` from the Sense label.
+    /// `classify_multi_branch` and `compose_from_sense` both call this after seeding
+    /// `result` from the Sense label.
     /// `compose_from_sense` is what the corpus-honest gate scores (cmd_run.rs), so any
     /// drift between it and the native paths = the gate scoring a different pipeline
     /// than production ships. Keeping the tail here makes that drift impossible; the
@@ -1650,89 +1541,6 @@ impl ColumnClassifier {
         Ok(result)
     }
 
-    /// Multi-branch classification with enriched header + Sharpen (AC-1).
-    ///
-    /// Like `classify_multi_branch()` but uses a sibling-context-enriched
-    /// header tensor instead of the raw header string. Called from
-    /// `classify_columns_with_context()` when both multi-branch and sibling
-    /// context are active.
-    ///
-    /// Note: header hints require the raw header string, which is passed
-    /// separately from the enriched tensor.
-    fn classify_multi_branch_with_enriched(
-        &self,
-        mb: &MultiBranchClassifier,
-        values: &[String],
-        header: &str,
-        enriched_header: &candle_core::Tensor,
-    ) -> Result<ColumnResult, InferenceError> {
-        if values.is_empty() {
-            return Ok(ColumnResult {
-                label: "unknown".to_string(),
-                confidence: 0.0,
-                vote_distribution: vec![],
-                disambiguation_applied: false,
-                disambiguation_rule: None,
-                samples_used: 0,
-                detected_locale: None,
-                is_generic: false,
-                column_features: None,
-            });
-        }
-
-        // Sample values (same strategy as classify_column)
-        let sample = if values.len() <= self.config.sample_size {
-            values.to_vec()
-        } else {
-            let step = values.len() as f64 / self.config.sample_size as f64;
-            (0..self.config.sample_size)
-                .map(|i| values[(i as f64 * step) as usize].clone())
-                .collect()
-        };
-
-        let samples_used = sample.len();
-
-        // Step 1: Classify via multi-branch with enriched header
-        let (label, confidence) = mb.classify_column_with_enriched_header(
-            &sample,
-            enriched_header,
-            self.taxonomy.as_ref(),
-        )?;
-
-        // Step 2: Compute deterministic ColumnFeatures
-        let per_value_features: Vec<[f32; FEATURE_DIM]> =
-            sample.iter().map(|v| extract_features(v)).collect();
-        let column_features = aggregate_features(&per_value_features);
-
-        let mut result = ColumnResult {
-            label: label.clone(),
-            confidence,
-            vote_distribution: vec![(label, confidence)],
-            disambiguation_applied: false,
-            disambiguation_rule: Some("multi-branch-sibling".to_string()),
-            samples_used,
-            detected_locale: None,
-            is_generic: false,
-            column_features: Some(column_features.clone()),
-        };
-
-        // Honest-gate composition (FINETYPE_INJECT_LABEL): override the Sense label
-        // with an externally-supplied one (another model's prediction), then run the
-        // REAL Sharpen stack on it — lets us compose any model's predictions without
-        // that model being in the binary. Diagnostic only; empty/unset = no-op.
-        if !self.skip_sharpen {
-            if let Ok(inj) = std::env::var("FINETYPE_INJECT_LABEL") {
-                if !inj.is_empty() {
-                    result.label = inj;
-                    result.confidence = 1.0;
-                }
-            }
-        }
-        // Steps 3-6: the shared Sharpen firing tail (see `run_sharpen`).
-        self.run_sharpen(&mut result, header, &sample, values, &column_features);
-        Ok(result)
-    }
-
     /// Header hint Sharpen for the multi-branch pipeline (AC-5).
     ///
     /// Applies header-based semantic matching to refine multi-branch predictions.
@@ -1821,26 +1629,15 @@ impl ColumnClassifier {
         // is off — every `disable_*` becomes a constant `false`, the optimiser
         // eliminates the conjunctions, and there is zero runtime overhead).
         // See .orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02.
-        let disable_measurement = rhh::is_disabled("header_hint_measurement");
-        let disable_sci_measurement = rhh::is_disabled("header_hint_sci_measurement");
-        let disable_person_override = rhh::is_disabled("header_hint_person_override");
-        let disable_geo_override = rhh::is_disabled("header_hint_geo_override");
         let disable_same_category = rhh::is_disabled("header_hint_same_category");
         let disable_cross_domain = rhh::is_disabled("header_hint_cross_domain");
         let disable_catchall = rhh::is_disabled("header_hint");
         let disable_generic = rhh::is_disabled("header_hint_generic");
         let disable_hardcoded = rhh::is_disabled("header_hint_hardcoded");
-        let disable_fallback = rhh::is_disabled("header_hint_fallback");
 
         // Get header hint: hardcoded first, then Model2Vec semantic
-        let hardcoded_hint = header_hint(header).map(|h| h.to_string());
-        let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
-            self.semantic_hint
-                .as_ref()
-                .and_then(|sh| sh.classify_header(header))
-                .map(|r| r.label.clone())
-        });
-        let hint_is_hardcoded = hardcoded_hint.is_some();
+        let hinted_type: Option<String> = header_hint(header).map(|h| h.to_string());
+        let hint_is_hardcoded = hinted_type.is_some();
 
         let hinted_type = match hinted_type.as_deref() {
             Some(h) => h,
@@ -1923,39 +1720,6 @@ impl ColumnClassifier {
             return;
         }
 
-        // Measurement disambiguation: height/weight
-        const MEASUREMENT_TYPES: &[&str] = &["identity.person.height", "identity.person.weight"];
-        const COORDINATE_TYPES: &[&str] = &[
-            "geography.coordinate.latitude",
-            "geography.coordinate.longitude",
-        ];
-        if !disable_measurement
-            && MEASUREMENT_TYPES.contains(&hinted_type)
-            && MEASUREMENT_TYPES.contains(&result.label.as_str())
-        {
-            result.label = hinted_type.to_string();
-            result.confidence = 0.9;
-            result.disambiguation_applied = true;
-            result.disambiguation_rule =
-                Some(format!("header_hint_measurement:{}", header.to_lowercase()));
-            return;
-        }
-
-        // Scientific measurement override (coordinates → decimal when header says measurement)
-        if !disable_sci_measurement
-            && hinted_type == "representation.numeric.decimal_number"
-            && COORDINATE_TYPES.contains(&result.label.as_str())
-        {
-            result.label = hinted_type.to_string();
-            result.confidence = 0.8;
-            result.disambiguation_applied = true;
-            result.disambiguation_rule = Some(format!(
-                "header_hint_sci_measurement:{}",
-                header.to_lowercase()
-            ));
-            return;
-        }
-
         // Check hint in vote distribution (single-entry for multi-branch)
         let hint_in_votes = result
             .vote_distribution
@@ -1968,39 +1732,13 @@ impl ColumnClassifier {
             self.taxonomy.as_ref(),
         );
 
-        // Geography protection: person-name hints don't override location types
+        // Geography protection: a person-name hint never overrides a location
+        // type. The `header_hint_person_override` arm that used to let a
+        // *hardcoded* person hint win here measured zero label changes, so the
+        // protection is now unconditional.
         if PERSON_NAME_HINTS.contains(&hinted_type)
             && LOCATION_TYPES.contains(&result.label.as_str())
         {
-            if !disable_person_override && hint_is_hardcoded {
-                // Hardcoded person-name hint overrides location
-                result.label = hinted_type.to_string();
-                result.confidence = result.confidence.max(0.6);
-                result.disambiguation_applied = true;
-                result.disambiguation_rule = Some(format!(
-                    "header_hint_person_override:{}",
-                    header.to_lowercase()
-                ));
-            }
-            // Model2Vec person-name hints do NOT override locations
-            // (no unmasked votes to check in multi-branch)
-            return;
-        }
-
-        // Same-domain geographic override
-        if !disable_geo_override
-            && LOCATION_TYPES.contains(&hinted_type)
-            && LOCATION_TYPES.contains(&result.label.as_str())
-            && result.label != hinted_type
-            && (hint_is_hardcoded || result.confidence <= 0.90)
-        {
-            result.label = hinted_type.to_string();
-            result.confidence = result.confidence.max(0.6);
-            result.disambiguation_applied = true;
-            result.disambiguation_rule = Some(format!(
-                "header_hint_geo_override:{}",
-                header.to_lowercase()
-            ));
             return;
         }
 
@@ -2108,12 +1846,6 @@ impl ColumnClassifier {
                 result.disambiguation_rule =
                     Some(format!("header_hint_hardcoded:{}", header.to_lowercase()));
             }
-        } else if !disable_fallback && result.confidence < 0.3 && !hint_in_votes {
-            result.label = hinted_type.to_string();
-            result.confidence = 0.4;
-            result.disambiguation_applied = true;
-            result.disambiguation_rule =
-                Some(format!("header_hint_fallback:{}", header.to_lowercase()));
         }
 
         // Country/country_code post-hint guard (v14, ac-05).

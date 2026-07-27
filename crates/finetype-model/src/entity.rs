@@ -77,7 +77,7 @@ impl DomainPatterns {
 /// Entity classifier using a Deep Sets MLP.
 ///
 /// Loads MLP weights from safetensors, reuses a shared Model2Vec tokenizer
-/// and embedding matrix from `SemanticHintClassifier` for value encoding.
+/// and embedding matrix from `Model2VecResources` for value encoding.
 pub struct EntityClassifier {
     /// Token embedding matrix: [vocab_size, embed_dim] (shared from Model2Vec)
     embeddings: Tensor,
@@ -235,7 +235,7 @@ impl MlpWeights {
 impl EntityClassifier {
     /// Load from a directory containing model.safetensors and config.json.
     ///
-    /// Requires a shared tokenizer and embedding matrix (typically from SemanticHintClassifier).
+    /// Requires a shared tokenizer and embedding matrix (typically from Model2VecResources).
     pub fn load<P: AsRef<Path>>(
         model_dir: P,
         tokenizer: tokenizers::Tokenizer,
@@ -856,12 +856,12 @@ mod tests {
         }
 
         // Load Model2Vec tokenizer and embeddings
-        let semantic = crate::semantic::SemanticHintClassifier::load(&m2v_dir).unwrap();
+        let m2v = Model2VecResources::load(&m2v_dir).unwrap();
 
         let classifier = EntityClassifier::load(
             &model_dir,
-            semantic.tokenizer().clone(),
-            semantic.embeddings().clone(),
+            m2v.tokenizer().clone(),
+            m2v.embeddings().clone(),
         )
         .unwrap();
 
@@ -930,12 +930,12 @@ mod tests {
             return;
         }
 
-        // Load via existing path (SemanticHintClassifier → clone tok/emb)
-        let semantic = crate::semantic::SemanticHintClassifier::load(&m2v_dir).unwrap();
+        // Load via existing path (shared resources → clone tok/emb)
+        let m2v = Model2VecResources::load(&m2v_dir).unwrap();
         let standalone = EntityClassifier::load(
             &model_dir,
-            semantic.tokenizer().clone(),
-            semantic.embeddings().clone(),
+            m2v.tokenizer().clone(),
+            m2v.embeddings().clone(),
         )
         .unwrap();
 

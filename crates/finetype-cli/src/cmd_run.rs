@@ -62,7 +62,7 @@ pub(crate) fn cmd_mcp() -> Result<()> {
         mb.n_classes()
     );
     let mut column_classifier = ColumnClassifier::with_multi_branch(mb, config);
-    wire_model2vec_and_siblings(&mut column_classifier);
+    wire_model2vec(&mut column_classifier);
 
     // Load taxonomy for validation-based disambiguation
     let taxonomy_path = PathBuf::from("labels");
@@ -102,7 +102,7 @@ pub(crate) fn cmd_resharpen(input: PathBuf, output: PathBuf, model: PathBuf) -> 
     };
     let mb = load_multi_branch_classifier(&model)?;
     let mut cc = ColumnClassifier::with_multi_branch(mb, config);
-    wire_model2vec_and_siblings(&mut cc);
+    wire_model2vec(&mut cc);
     let mut taxonomy = load_taxonomy(&PathBuf::from("labels"))?;
     taxonomy.compile_validators();
     taxonomy.compile_locale_validators();
@@ -254,7 +254,7 @@ pub(crate) fn cmd_infer(
 
             // Multi-branch path: wire Model2Vec for header enrichment, no siblings.
             if column_classifier.has_multi_branch() {
-                wire_model2vec_only(&mut column_classifier);
+                wire_model2vec(&mut column_classifier);
             }
 
             if let Some(ref hdr) = header {
@@ -390,7 +390,7 @@ pub(crate) fn cmd_infer_batch(model: PathBuf, sample_size: usize) -> Result<()> 
 
     // Multi-branch path: wire Model2Vec for header enrichment, no sibling context.
     if column_classifier.has_multi_branch() {
-        wire_model2vec_only(&mut column_classifier);
+        wire_model2vec(&mut column_classifier);
     }
 
     // Separate taxonomy handle for the headerless deterministic fast-path, so

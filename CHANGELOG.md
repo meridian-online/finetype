@@ -5,6 +5,45 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Removed
+
+- **Two unreachable classifiers and a header-hint classifier no user could run
+  (−2,777 lines).** `SemanticHintClassifier` (`semantic.rs`) had no construction
+  site outside `#[cfg(test)]` code — `ColumnClassifier::set_semantic_hint` had no
+  caller at all — so the `semantic_hint` field was `None` in every binary ever
+  shipped and the Model2Vec header matching it advertised never ran. `Classifier`
+  and `CharClassifier` in `inference.rs` had no construction site anywhere,
+  tests included, taking their `post_process` / `pattern_validate` tails and
+  `extract_validation_patterns` with them; multi-branch is the only inference
+  path (choice 0107 removed its callers, not the code). `InferenceError`,
+  `ClassificationResult` and the `ValueClassifier` trait stay — `ColumnClassifier`
+  still holds a `Box<dyn ValueClassifier>`. `build.rs` and the CI model download
+  no longer fetch `type_embeddings.safetensors` / `label_index.json`: they were
+  the semantic classifier's artifacts and were never `include_bytes!`-embedded.
+- **Five header-hint families measured at zero effect.**
+  `header_hint_measurement`, `header_hint_sci_measurement`,
+  `header_hint_person_override`, `header_hint_geo_override` and
+  `header_hint_fallback` are gone from the multi-branch Sharpen path. Each was
+  measured at `columns_hit = 0` — disabling it changed no label — and the
+  deletion was re-measured on the shipped model over the 33,250-file stratified
+  sample, not just on the eval that first flagged them. The geography protection
+  that used to wrap `header_hint_person_override` stays, now unconditional: a
+  person-name hint never overrides a location type.
+
+### Changed
+
+- **The dev binary and the released binary now classify the same way.**
+  `finetype profile` used to load `models/sibling-context/model.safetensors`
+  whenever that directory happened to exist and run a 396,800-parameter
+  cross-column attention layer over the headers before the multi-branch header
+  branch. `build.rs` never embedded that artifact, so no released binary could
+  do this — every number measured from a repo checkout described a pipeline no
+  user runs. Inference no longer loads it. The artifact is still trained and is
+  still loaded frozen by the multi-branch trainer, which is where it earns its
+  keep.
+
 ## [0.6.53] - 2026-07-18
 
 ### Fixed
