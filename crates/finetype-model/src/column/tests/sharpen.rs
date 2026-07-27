@@ -528,3 +528,45 @@ technology.code.qualified_name:
         "representation.text.plain_text"
     );
 }
+
+#[test]
+fn low_confidence_hardcoded_hint_exits_through_the_hardcoded_arm() {
+    // Pins the premise that makes `header_hint_fallback` removable.
+    //
+    // That arm — confidence under 0.3 with the hint absent from the votes ->
+    // hinted type at 0.4 — closed the header-hint else-if chain, and it could
+    // never run: the arm before it fires for every hardcoded hint not in the
+    // votes, and since the Model2Vec hint source is gone, EVERY hint that
+    // reaches the chain is hardcoded. Reaching the fallback needed
+    // `hint_in_votes` to be both true (to skip the hardcoded arm) and false (its
+    // own condition).
+    //
+    // The deletion itself cannot be pinned by a test — a no-op has no
+    // observable. What this test pins is the invariant the no-op rests on: a
+    // sub-0.3-confidence column with a hardcoded hint must come out of the
+    // hardcoded arm at 0.5. Narrow that arm — put a confidence floor on it, say
+    // — and the gap the fallback used to cover reopens, and this test reddens.
+    //
+    // Same domain, different category (identity.person vs identity.financial),
+    // so neither the same-category nor the cross-domain override intercepts.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let words: Vec<String> = ["alpha", "bravo", "charlie", "delta", "echo"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("password", &words, "identity.financial.currency_code", 0.2)
+        .unwrap();
+    assert_eq!(r.label, "identity.person.password");
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("header_hint_hardcoded:password"),
+        "the hardcoded-authority arm must be what fires; a fallback below it is unreachable"
+    );
+    assert!(
+        (r.confidence - 0.5).abs() < 1e-6,
+        "hardcoded authority sets 0.5, not the fallback's 0.4; got {}",
+        r.confidence
+    );
+}

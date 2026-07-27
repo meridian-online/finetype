@@ -1638,7 +1638,6 @@ impl ColumnClassifier {
         let disable_catchall = rhh::is_disabled("header_hint");
         let disable_generic = rhh::is_disabled("header_hint_generic");
         let disable_hardcoded = rhh::is_disabled("header_hint_hardcoded");
-        let disable_fallback = rhh::is_disabled("header_hint_fallback");
 
         // Get header hint: hardcoded first, then Model2Vec semantic
         let hinted_type: Option<String> = header_hint(header).map(|h| h.to_string());
@@ -1934,13 +1933,27 @@ impl ColumnClassifier {
                 result.disambiguation_rule =
                     Some(format!("header_hint_hardcoded:{}", header.to_lowercase()));
             }
-        } else if !disable_fallback && result.confidence < 0.3 && !hint_in_votes {
-            result.label = hinted_type.to_string();
-            result.confidence = 0.4;
-            result.disambiguation_applied = true;
-            result.disambiguation_rule =
-                Some(format!("header_hint_fallback:{}", header.to_lowercase()));
         }
+        // A fifth arm, `header_hint_fallback` (`confidence < 0.3 && !hint_in_votes`
+        // -> hinted_type at 0.4), used to close this chain. It is removed because it
+        // is unreachable, and the proof is two lines up rather than a measurement:
+        // reaching it requires the `header_hint_hardcoded` arm above to be false,
+        // which — since `hint_is_hardcoded` is now unconditionally `true` here, the
+        // early `return` above having rejected every header with no hardcoded hint —
+        // requires `hint_in_votes`; and the fallback itself requires `!hint_in_votes`.
+        // No input satisfies both. It was reachable only through the Model2Vec
+        // semantic hint source, whose classifier had no construction site outside
+        // `#[cfg(test)]` and so was `None` in every binary ever released.
+        //
+        // Confirmed empirically as well as structurally: disabling the family over
+        // the 837,625-column stratified sample moves nothing — not the label, the
+        // confidence, the quality band, the runner-up, or the rule.
+        //
+        // One caveat, since it is a real behaviour change in one configuration: on a
+        // `rhh-instrumentation` build, `RHH_DISABLE_HINTS=header_hint_hardcoded` used
+        // to let columns fall through to this arm. That diagnostic ablation now leaves
+        // them on the model's own label. `RHH_DISABLE_HINTS=header_hint_fallback` is
+        // now a no-op, which is the truth it should always have reported.
 
         // Country/country_code post-hint guard (v14, ac-05).
         // After ALL header hint processing, if the label is "country" but >=95%

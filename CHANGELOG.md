@@ -22,23 +22,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   still holds a `Box<dyn ValueClassifier>`. `build.rs` and the CI model download
   no longer fetch `type_embeddings.safetensors` / `label_index.json`: they were
   the semantic classifier's artifacts and were never `include_bytes!`-embedded.
-- **Four header-hint families that do nothing.** `header_hint_measurement`,
-  `header_hint_sci_measurement`, `header_hint_geo_override` and
-  `header_hint_fallback` are gone from the multi-branch Sharpen path. With all
-  four removed, the composed prediction is byte-identical to the previous
-  binary's across all 837,625 columns of the 33,250-file stratified sample —
-  they are not "low impact", they are inert on the shipped model.
+- **One header-hint family, and it is unreachable rather than unused.**
+  `header_hint_fallback` — confidence under 0.3 with the hint absent from the
+  votes, promoting the hinted type at 0.4 — closed the header-hint else-if
+  chain. Reaching it required the arm above it to decline, and that arm fires
+  for every hardcoded hint not in the votes; with the Model2Vec hint source gone
+  (see above), every hint that reaches the chain IS hardcoded. So the fallback
+  needed the hint to be simultaneously present and absent from the votes. It was
+  live only through the semantic classifier no released binary contained. Its
+  removal moves nothing on the 837,625-column stratified sample: not the label,
+  the confidence, the quality band, the runner-up, or the rule.
 
-  A fifth family on the same list, `header_hint_person_override`, was **kept**.
-  The list said it too was inert; re-measuring said otherwise. It changes 133
-  columns, and their headers — `authors`, `LastName`, `Surname`,
-  `billing_lastname`, `NPPES_PROVIDER_FIRST_NAME` — say those changes would be
-  regressions: surnames and place names share a vocabulary, the model reads
-  those columns as cities and regions, and this arm is what rescues them. The
-  eval that scored it at zero hits contains no such column and was scored
-  against a model that has since been replaced.
+  Four other families on the same measured-dead list — `header_hint_measurement`,
+  `header_hint_sci_measurement`, `header_hint_geo_override` and
+  `header_hint_person_override` — are **kept**, all four on evidence. They are
+  reachable, and removing any of them changes what `finetype profile` prints:
+
+  | family | corpus columns moved | reproduction |
+  |---|---|---|
+  | `header_hint_geo_override` | 294 (rule) | a `city` column at 0.80 becomes 0.50, band `medium` -> `low`, runner-up surfaced |
+  | `header_hint_person_override` | 133 (label + rule) | `authors`, `LastName`, `Surname`, `billing_lastname` columns revert to city/region/word |
+  | `header_hint_measurement` | 0 | a `height` column at 0.90 becomes 0.50, band `high` -> `low`, runner-up surfaced |
+  | `header_hint_sci_measurement` | 0 | a `temperature` column at 0.80 becomes 0.90 or 0.60, band moves either way |
+
+  The two that move zero corpus columns are not therefore inert — the stratified
+  sample simply contains no height/weight column, and `header_hint_coord_veto`
+  (added later) shadows the scientific-measurement arm whenever a coordinate
+  column's values are numeric, which is nearly always. Zero hits on a corpus
+  measures the corpus, not the rule.
 
 ### Changed
+
+- **`finetype resharpen` emits the whole composed record**, not just the label:
+  `id`, label, confidence, quality band, runner-up, disambiguation rule. A
+  label-only diff cannot see a rule that keeps the answer and halves the
+  confidence, and that is exactly the failure mode this verb is used to rule
+  out. `scripts/compare_composed_records.py` diffs two such passes and reports
+  per-field and per-transition counts. `detected_locale` is excluded: it is not
+  yet run-to-run stable on a fixed binary.
+
 
 - **The dev binary and the released binary now classify the same way.**
   `finetype profile` used to load `models/sibling-context/model.safetensors`
