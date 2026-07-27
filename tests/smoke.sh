@@ -221,9 +221,57 @@ else
     fail "finetype load exits 2 via clap unknown-subcommand" "got exit ${LOAD_EXIT:-0}: $LOAD_OUT"
 fi
 
+# ── Column order ──────────────────────────────────────────────────────────────
+
+section "9. Profile — Column Order"
+
+# `profile` emits one entry per input column and every consumer reads that
+# sequence POSITIONALLY — the eval fixtures, the DuckDB extension, the
+# json-schema/datapackage writers. Column classification runs in parallel, and a
+# parallel collect into an unordered container permutes the sequence while
+# leaving the SET of columns intact, so this compares the emitted order against
+# the file's own header order, element for element.
+#
+# The columns below are deliberately of different types: a file whose columns all
+# classify the same way would satisfy any permutation.
+TMPORDDIR=$(mktemp -d /tmp/finetype-smoke-order-XXXXXX)
+TMPORD="$TMPORDDIR/column_order.csv"
+cat > "$TMPORD" <<'CSVEOF'
+zeta_email,alpha_created_at,mike_ip,bravo_uuid,yankee_amount,charlie_url,delta_country,echo_id
+ada@example.com,2024-01-05T09:30:00Z,192.168.0.1,550e8400-e29b-41d4-a716-446655440000,12.50,https://a.example.com,US,A1
+grace@example.org,2024-02-11T18:04:22Z,10.0.0.255,6ba7b810-9dad-11d1-80b4-00c04fd430c8,88.25,https://b.example.org,GB,B2
+alan@example.net,2024-03-30T00:00:01Z,172.16.4.9,6ba7b811-9dad-11d1-80b4-00c04fd430c8,3.75,https://c.example.net,DE,C3
+edsger@example.com,2024-04-01T12:12:12Z,8.8.8.8,6ba7b812-9dad-11d1-80b4-00c04fd430c8,0.50,https://d.example.io,FR,D4
+CSVEOF
+
+EXPECTED_ORDER=$(head -1 "$TMPORD" | tr ',' '\n' | tr -d '\r' | paste -sd, -)
+
+# Default path (header hints + sibling context).
+ORDER_JSON=$("$FINETYPE" profile -f "$TMPORD" -o json 2>/dev/null)
+ACTUAL_ORDER=$(printf '%s' "$ORDER_JSON" | grep -o '"column": "[^"]*"' | sed 's/"column": "//; s/"$//' | paste -sd, -)
+assert_eq "profile emits columns in file order" "$ACTUAL_ORDER" "$EXPECTED_ORDER"
+
+# Header-hint-free path — a different per-column loop, same contract.
+ORDER_JSON=$("$FINETYPE" profile -f "$TMPORD" -o json --no-header-hint 2>/dev/null)
+ACTUAL_ORDER=$(printf '%s' "$ORDER_JSON" | grep -o '"column": "[^"]*"' | sed 's/"column": "//; s/"$//' | paste -sd, -)
+assert_eq "profile --no-header-hint emits columns in file order" "$ACTUAL_ORDER" "$EXPECTED_ORDER"
+
+# datapackage writes the columns as an ordered `fields` array; same check through
+# the interoperable envelope.
+ORDER_DP=$("$FINETYPE" profile -f "$TMPORD" -o datapackage 2>/dev/null)
+ACTUAL_ORDER=$(printf '%s' "$ORDER_DP" | grep -o '"name": "[^"]*"' | sed 's/"name": "//; s/"$//' | grep -v '^column_order$' | paste -sd, -)
+assert_eq "datapackage fields follow file order" "$ACTUAL_ORDER" "$EXPECTED_ORDER"
+
+# Repeat runs must not reshuffle: thread scheduling varies, the answer must not.
+ORDER_JSON=$("$FINETYPE" profile -f "$TMPORD" -o json 2>/dev/null)
+ACTUAL_ORDER=$(printf '%s' "$ORDER_JSON" | grep -o '"column": "[^"]*"' | sed 's/"column": "//; s/"$//' | paste -sd, -)
+assert_eq "column order is stable across runs" "$ACTUAL_ORDER" "$EXPECTED_ORDER"
+
+rm -rf "$TMPORDDIR"
+
 # ── Error Handling ────────────────────────────────────────────────────────────
 
-section "9. Error Handling"
+section "10. Error Handling"
 
 # Missing subcommand should show help (non-zero exit is OK)
 OUT=$("$FINETYPE" 2>&1) || true

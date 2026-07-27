@@ -48,7 +48,8 @@ pub use validation_veto::{
     VETO_THRESHOLD,
 };
 pub use validator::{
-    validate_column, validate_column_for_label, validate_value, validate_value_for_label,
-    ColumnStats, ColumnValidationResult, CompiledValidator, InvalidStrategy, QuarantinedValue,
-    ValidationCheck, ValidationError, ValidationResult, ValidatorError,
+    resolve_label_validator, validate_column, validate_column_for_label, validate_value,
+    validate_value_for_label, ColumnStats, ColumnValidationResult, CompiledValidator,
+    InvalidStrategy, LabelValidator, QuarantinedValue, ValidationCheck, ValidationError,
+    ValidationResult, ValidatorError,
 };

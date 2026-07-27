@@ -55,6 +55,12 @@ luhn = "1.0"
 phonenumber = "0.3"
 regex = "1.10"
 jsonschema = "0.42"
+# Data parallelism. Columns are independent, so per-column classification is a
+# `par_iter().map().collect()` — an INDEXED parallel iterator, which collects in
+# input order. Output column order is part of the contract (eval fixtures and the
+# DuckDB extension both read it positionally), so nothing here may collect into
+# an unordered container.
+rayon = "1.11"
 
 # CLI
 clap = { version = "4.5", features = ["derive"] }

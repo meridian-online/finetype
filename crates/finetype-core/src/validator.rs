@@ -311,6 +311,58 @@ pub fn validate_value_for_label(
     validate_value(value, schema)
 }
 
+/// A label's validator: borrowed from the taxonomy's compiled cache when one is
+/// there, owned when it had to be compiled on the spot.
+///
+/// Exists so a caller can resolve a label's validator ONCE and then validate a
+/// whole sample against it, without caring which of the two `validate_value_for_label`
+/// paths supplied it. Derefs to the validator, so `is_valid` is called directly on it.
+pub enum LabelValidator<'a> {
+    /// Borrowed from `Taxonomy::get_validator` (the taxonomy had `compile_validators()` run).
+    Cached(&'a CompiledValidator),
+    /// Compiled here, from the label's definition, for a taxonomy without a cache.
+    Owned(Box<CompiledValidator>),
+}
+
+impl std::ops::Deref for LabelValidator<'_> {
+    type Target = CompiledValidator;
+
+    fn deref(&self) -> &CompiledValidator {
+        match self {
+            Self::Cached(v) => v,
+            Self::Owned(v) => v,
+        }
+    }
+}
+
+/// Resolve `label`'s validator once, for a caller that will then check many values.
+///
+/// `validate_value_for_label` re-resolves the label on every call AND builds a full
+/// `ValidationResult` — every failing value formats a human-readable error message.
+/// A caller that reads only `is_valid` throws all of that away; on the `profile` hot
+/// path, formatting those discarded messages was measured at ~15% of wall clock.
+/// Resolve once, then call `is_valid` per value.
+///
+/// Returns `None` in exactly the cases where `validate_value_for_label` returns
+/// `Err`. That substitution is safe because resolution does not look at the value:
+/// an unknown label or a label with no validation schema fails identically for
+/// every value in the sample, so a per-value `Err` is really a per-label `Err`.
+pub fn resolve_label_validator<'a>(
+    label: &str,
+    taxonomy: &'a Taxonomy,
+) -> Option<LabelValidator<'a>> {
+    // Fast path: the taxonomy's compiled cache.
+    if let Some(compiled) = taxonomy.get_validator(label) {
+        return Some(LabelValidator::Cached(compiled));
+    }
+
+    // Slow path: look up the definition and compile once (not once per value).
+    let schema = taxonomy.get(label)?.validation.as_ref()?;
+    CompiledValidator::new(schema)
+        .ok()
+        .map(|v| LabelValidator::Owned(Box::new(v)))
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // COLUMN VALIDATION WITH STRATEGIES
 // ═══════════════════════════════════════════════════════════════════════════════
