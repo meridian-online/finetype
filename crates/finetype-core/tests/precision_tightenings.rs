@@ -100,11 +100,13 @@ fn assert_pattern_boundary(label: &str, accept: &[&str], reject: &[&str]) {
 ///   `commonStock` 20361000 (d00), `grossProfit` 20100500 (d00),
 ///   `longTermDebt` 19571000 (d00), NBA `GAME_ID` 21601092 (m10 valid, d92).
 ///
-/// A previous doc-comment here claimed the first nine of those "all have a
-/// leading pair that is not a plausible century … so ONLY the year window
-/// rejects them". That was false for all nine, and it is what disguised the
-/// coverage gap: with the year window deleted the REJECT set stayed 100%
-/// rejecting, so no test could see the year policy at all.
+/// A previous doc-comment here filed 71132000, 25012600, 48479000, 16514000,
+/// 15800000, 21601092, 18502653, 10169207 and 31038000 under a year window,
+/// claiming they "all have a leading pair that is not a plausible century … so
+/// ONLY the year window rejects them". That was false for all nine — eight die
+/// on the month, one on the day — and it is what disguised the coverage gap:
+/// with the year window deleted the REJECT set stayed 100% rejecting, so no
+/// test could see the year policy at all.
 /// `ptc_compact_ymd_each_window_is_pinned_by_a_value_only_it_rejects` below
 /// pins each window by construction instead of by hope.
 ///
