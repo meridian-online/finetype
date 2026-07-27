@@ -268,24 +268,29 @@ expect_fail "has drifted from the manifest"
 # ------------------------------------------------------------ no cross-fixture ----
 echo "== the report never subtracts across fixture versions =="
 CASE="cross-fixture delta"
-# A second fixture version, same pipeline, different ground truth. The delta table must
-# stay empty and the pair must be listed as refused instead.
+# A second fixture version carrying a *different binary* on the same pipeline and the
+# same denominator — the shape that tempts a subtraction. Everything a naive pair loop
+# needs is present except the one thing that matters: the ground truth is not the same.
+# The delta table must stay empty and the pair must be listed as refused instead.
 GOLD2="$SBOX/gold2.tsv"
 cp "$GOLD" "$GOLD2"; printf 'c4\talpha.one.thing\n' >> "$GOLD2"
 "$EV" --manifest "$MAN" register-fixture --id sbox-v2 --path "$GOLD2" \
   --label-column curated_label --taxonomy-root "$SBOX" --date 2026-01-02 >/dev/null
-"$EV" --manifest "$MAN" record-baseline --fixture sbox-v2 --key "m/p/1.0.0" \
-  --correct 3 --scored 3 --model m --binary 1.0.0 --pipeline "p" --source "sandbox" >/dev/null
+"$EV" --manifest "$MAN" record-baseline --fixture sbox-v2 --key "m/p/0.9.0" \
+  --correct 3 --scored 3 --model m --binary 0.9.0 --pipeline "p" --source "sandbox" >/dev/null
 "$EV" --manifest "$MAN" render-release --binary 1.0.0 >/dev/null
 REPORT="$SBOX/evidence/release-1.0.0.md"
-delta_rows="$(sed -n '/^## Same-fixture comparison/,/^## /p' "$REPORT" | grep -c '^| `sbox' || true)"
+delta_rows="$(sed -n '/^## Same-fixture comparison/,/^### /p' "$REPORT" | grep -c '^| `sbox' || true)"
 if [ "$delta_rows" = "0" ]
 then ok "no delta row is emitted for two different fixture versions"
 else bad "the delta table stated $delta_rows cross-fixture row(s)"; fi
 
 CASE="cross-fixture refusal is stated"
-if grep -q "different fixture versions" "$REPORT"
-then ok "the pair is listed as a refused comparison"
+# Matched against the refused bullet itself, naming both fixture ids. A looser pattern
+# matches this report's own intro prose about fixture versions and passes on a renderer
+# that dropped the refusals entirely.
+if grep -q '^- `sbox-v1` .* vs `sbox-v2` .*different fixture versions' "$REPORT"
+then ok "the pair is listed as a refused comparison, naming both fixtures"
 else bad "the cross-fixture pair was silently dropped instead of refused"; fi
 
 CASE="same-fixture delta is still offered"
