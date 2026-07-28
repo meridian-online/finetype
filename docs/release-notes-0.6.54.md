@@ -130,9 +130,11 @@ The gain comes from two places — the validation gate no longer builds error me
 immediately discards, and columns are now typed in parallel — so a corpus of *single*-column
 files gives the parallelism nothing to do and gains little. Wide tables are where it lands.
 
-The answers are unchanged: both builds were run over the same corpora and diffed byte for
-byte. The comparison spans everything that landed between the two releases, not any one
-change — which is what a user upgrading actually experiences.
+Neither optimisation changes an answer. What backs that here is the accuracy section
+below — both gold fixtures re-measured on this tree at **+0 columns** — plus a smoke
+assertion that compares the emitted `column,type` *pairing* across repeated runs, not just
+the column-name sequence. The comparison above spans everything that landed between the two
+releases, not any one change, which is what a user upgrading actually experiences.
 
 ### The binary is about 22.6% smaller
 
@@ -141,21 +143,18 @@ moment it loads, so storing it at full precision on disk was paying twice the by
 something inference never sees. It now ships at half precision. The embedded payload drops
 by 15,118,336 bytes on every platform.
 
-| | bytes |
-|---|---:|
-| published `v0.6.53` macOS arm64 binary | 67,424,752 |
-| `0.6.54` built from this tree | 52,148,256 |
-| | **−22.7%** |
-
 Held to a controlled A/B where the *only* thing that changes is the storage dtype — same
-source, same machine, both endpoints reproduced from a cold rebuild — the figure is
-67,388,816 → 52,148,240, **−22.6%**. The two differ because the first pair also spans the
-source changes between the releases. Full byte-level accounting of where the extra 122,240
-bytes go: `evidence/half-precision-value-encoder.md`.
+source, same machine, both endpoints reproduced from a cold rebuild — a macOS arm64 release
+binary goes **67,388,816 → 52,148,240 bytes, −22.6%**. Full byte-level accounting of where
+the extra 122,240 bytes go: `evidence/half-precision-value-encoder.md`.
 
-The published `v0.6.53` macOS arm64 archive is 53,291,389 bytes. The `0.6.54` archive is
-built on the release runner and is not predicted here; float payload compresses poorly
-either way, so most of the saving should survive into it.
+End to end, which is the number you will actually see: the published `v0.6.53` macOS arm64
+binary is **67,424,752** bytes and this release builds to **52,148,256** — **−22.7%**. The
+two figures differ because the second pair also spans the source changes between releases.
+
+For reference, the published `v0.6.53` macOS arm64 archive is 53,291,389 bytes. The 0.6.54
+archive is built on the release runner and its size is on the release page rather than
+predicted here.
 
 This one carries a caveat worth stating plainly: **it is label-invariant on our gold
 fixture, not output-invariant.** Every label and every quality band is identical. The
