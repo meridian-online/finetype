@@ -84,9 +84,12 @@ duckdb -noheader -list -c "
   ORDER BY 1" > "$WD/files.txt"
 echo "   $(wc -l < "$WD/files.txt") tables"
 
-: > "$WD/side_provenance.tsv"
+# NOT truncated here: under REPORT_ONLY the provenance of the passes already on
+# disk is the only record of what produced them, and clearing it would leave the
+# report unable to name its own inputs. `run_pass` truncates on its first call.
 run_pass() {  # run_pass <tag> <ref|"">
   local tag="$1" ref="$2"
+  [ "$tag" = base ] && : > "$WD/side_provenance.tsv"
   echo "== side $tag (${ref:-working tree}) : place label files =="
   if [ -n "$ref" ]; then git checkout "$ref" -- "$YAML" "$SAFE"; else restore; fi
   grep -q "datetime.date.compact_dmy" "$YAML"
@@ -100,11 +103,21 @@ run_pass() {  # run_pass <tag> <ref|"">
       --finetype-bin "$BIN" --execute --jobs 8 --out-dir "$WD/${tag}_pass"
 }
 
-echo "== [2/4] BASELINE side ($BASE_REF) =="
-run_pass base "$BASE_REF"
+# REPORT_ONLY=1 re-derives the report from passes already on disk. The two
+# corpus passes cost ~20 min; the analysis below is seconds and gets edited far
+# more often than the passes get re-run.
+if [ "${REPORT_ONLY:-0}" = "1" ]; then
+  echo "== REPORT_ONLY: reusing the passes already in $WD =="
+  [ -f "$WD/base_pass/corpus_pass/columns.parquet" ] || { echo "FAIL: no base pass in $WD"; exit 1; }
+  [ -f "$WD/cand_pass/corpus_pass/columns.parquet" ] || { echo "FAIL: no cand pass in $WD"; exit 1; }
+  [ -s "$WD/side_provenance.tsv" ] || { echo "FAIL: no side provenance in $WD"; exit 1; }
+else
+  echo "== [2/4] BASELINE side ($BASE_REF) =="
+  run_pass base "$BASE_REF"
 
-echo "== [3/4] CANDIDATE side (working tree) =="
-run_pass cand ""
+  echo "== [3/4] CANDIDATE side (working tree) =="
+  run_pass cand ""
+fi
 
 echo "== [4/4] label counts and the compact_dmy transition matrix =="
 {
@@ -150,6 +163,69 @@ duckdb -c "
     FROM (SELECT sense_prediction AS label, count(*) AS n FROM b GROUP BY 1) b
     FULL OUTER JOIN (SELECT sense_prediction AS label, count(*) AS n FROM c GROUP BY 1) c USING (label)
   ) WHERE abs(n_cand - n_base) > 5 ORDER BY abs(n_cand - n_base) DESC;
+
+  -- ═══ THE COLLATERAL, WHICH IS THE PART THAT COSTS SOMETHING ═══════════════
+  -- A validator's per-label pass rate is an INPUT to the multi-branch model's
+  -- validation branch. Tightening the DAY-FIRST leaf therefore moves a feature
+  -- on every eight-digit column in the corpus, including YEAR-FIRST ones: a
+  -- genuine YYYYMMDD value scores 1.0 on the day-first validator before this
+  -- change and 0.0 after it, because its middle pair is a day-of-month and
+  -- overflows the month window. The sections below measure what that costs.
+  SELECT '== columns that LOST datetime.date.compact_ymd ==' AS section;
+  SELECT coalesce(c.sense_prediction, '(dropped from pass)') AS became, count(*) AS n
+  FROM b JOIN c USING (file_path, column_name)
+  WHERE b.sense_prediction = 'datetime.date.compact_ymd'
+    AND c.sense_prediction IS DISTINCT FROM 'datetime.date.compact_ymd'
+  GROUP BY 1 ORDER BY 2 DESC;
+
+  SELECT '== ...and were they GENUINE dates? (every sampled value a valid YYYYMMDD) ==' AS section;
+  SELECT count(*) AS n_moved,
+         count(*) FILTER (WHERE all_ymd) AS all_values_valid_yyyymmdd,
+         count(*) FILTER (WHERE NOT all_ymd) AS not_all_valid
+  FROM (
+    SELECT list_reduce(list_transform(str_split(b.sample_values_truncated, '│'),
+             x -> CASE WHEN regexp_matches(trim(x),
+                    '^\d{4}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\$') THEN 1 ELSE 0 END),
+             (a, x) -> a * x) = 1 AS all_ymd
+    FROM b JOIN c USING (file_path, column_name)
+    WHERE b.sense_prediction = 'datetime.date.compact_ymd'
+      AND c.sense_prediction IS DISTINCT FROM 'datetime.date.compact_ymd'
+  );
+
+  SELECT '== ...under which headers (names only, never corpus values) ==' AS section;
+  SELECT lower(b.column_name) AS header, count(*) AS n
+  FROM b JOIN c USING (file_path, column_name)
+  WHERE b.sense_prediction = 'datetime.date.compact_ymd'
+    AND c.sense_prediction IS DISTINCT FROM 'datetime.date.compact_ymd'
+  GROUP BY 1 ORDER BY 2 DESC;
+
+  SELECT '== same question for the compact_mdy losses ==' AS section;
+  SELECT coalesce(c.sense_prediction, '(dropped from pass)') AS became, count(*) AS n
+  FROM b JOIN c USING (file_path, column_name)
+  WHERE b.sense_prediction = 'datetime.date.compact_mdy'
+    AND c.sense_prediction IS DISTINCT FROM 'datetime.date.compact_mdy'
+  GROUP BY 1 ORDER BY 2 DESC;
+
+  -- The trade, stated as one row so it cannot be quoted selectively.
+  SELECT '== THE TRADE ==' AS section;
+  SELECT
+    (SELECT count(*) FROM b WHERE sense_prediction = 'datetime.date.compact_dmy')
+      AS day_first_before,
+    (SELECT count(*) FROM c WHERE sense_prediction = 'datetime.date.compact_dmy')
+      AS day_first_after,
+    (SELECT count(*) FROM b JOIN c USING (file_path, column_name)
+      WHERE b.sense_prediction = 'datetime.date.compact_ymd'
+        AND c.sense_prediction IS DISTINCT FROM 'datetime.date.compact_ymd')
+      AS genuine_ymd_columns_lost,
+    (SELECT count(*) FROM c JOIN b USING (file_path, column_name)
+      WHERE c.sense_prediction = 'datetime.date.compact_dmy'
+        AND b.sense_prediction IS DISTINCT FROM 'datetime.date.compact_dmy')
+      AS newly_typed_day_first;
 " | tee -a "$WD/blast_radius.txt"
+
+# `output/` is blanket-gitignored as derived experiment scratch, and a number
+# nobody else can open is not evidence. The report is copied into `docs/`.
+cp "$WD/blast_radius.txt" docs/compact-dmy-blast-radius.txt
+echo "wrote docs/compact-dmy-blast-radius.txt"
 
 echo "wrote $WD/blast_radius.txt"
