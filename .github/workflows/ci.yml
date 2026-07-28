@@ -48,6 +48,33 @@ jobs:
       - name: Scorer propagates failures and stamps every score with its fixture
         run: scripts/test_score_clean_label.sh
 
+  encoder-dtype:
+    name: Encoder half-precision packing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Round trip, tie rounding, overflow refusal, offsets, no-op, mode, metadata
+        # The bytes this tool writes get compiled into a released binary, so it is
+        # gated on the same runner that builds one: an out-of-range value must abort
+        # rather than store `inf`, a tie must round to even (the rule that keeps the
+        # output identical on macOS and Linux), and the untouched tensors in the same
+        # file must keep their bytes when the offsets are rebuilt.
+        #
+        # Two of the cases are about what the tool does when it has nothing to do. An
+        # encoder it did not write — a HuggingFace export, whose header keys are not in
+        # sorted order — must come back byte-identical, because printing "unchanged"
+        # while moving the file's sha256 is worse than failing; and a conversion must
+        # not drop the destination's permission bits, which is what the atomic-rename
+        # write does on its own.
+        #
+        # The rest are the silent-degradation shapes, each added because deleting the
+        # code that prevents it left every other case green: a hardcoded 0644 that
+        # *widens* a 0600 artifact, a `__metadata__` block dropped behind a successful
+        # convert, a `--out` copy that loses the source's mode, an integer tensor
+        # reinterpreted as floats, and a header written without its alignment padding.
+        # Stdlib only.
+        run: scripts/encoder_dtype.py self-test
+
   fmt:
     name: Format
     runs-on: ubuntu-latest

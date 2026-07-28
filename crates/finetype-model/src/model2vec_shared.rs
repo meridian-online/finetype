@@ -14,6 +14,21 @@ use crate::inference::InferenceError;
 use candle_core::{DType, Device, Tensor};
 use std::path::Path;
 
+/// Storage dtypes accepted for the token embedding matrix.
+///
+/// The matrix is a lookup table, not a trained graph — every consumer pulls rows out
+/// of it with `index_select` and does F32 arithmetic from there — so the dtype it is
+/// *stored* in is packaging, not precision that inference depends on. F16 halves the
+/// file, and halves what a release binary carries (build.rs pastes it in with
+/// `include_bytes!`), for embeddings whose column-feature cosine against the F32
+/// original is 1.0 to six decimal places.
+///
+/// The set is stated rather than inferred because `to_dtype` is not a validator: an
+/// integer tensor would convert without complaint and give a matrix of
+/// plausible-looking garbage. A dtype nobody meant to ship should fail at load with
+/// its own name in the message.
+const ACCEPTED_EMBEDDING_DTYPES: [DType; 3] = [DType::F16, DType::BF16, DType::F32];
+
 /// Shared Model2Vec tokenizer and embedding matrix.
 ///
 /// Load once via [`Model2VecResources::load`] or [`Model2VecResources::from_bytes`],
@@ -44,16 +59,22 @@ impl Model2VecResources {
             InferenceError::InvalidPath(format!("Failed to load Model2Vec tokenizer: {}", e))
         })?;
 
-        // Load token embeddings — stored as float16, convert to float32 for computation
+        // Load token embeddings. Either F16 or F32 on disk (see
+        // ACCEPTED_EMBEDDING_DTYPES); up-cast once, here, so everything downstream
+        // sees one dtype and no caller has to know how the artifact was packed.
         let model_tensors = candle_core::safetensors::load_buffer(model_bytes, &device)?;
-        let embeddings = model_tensors
-            .get("embeddings")
-            .ok_or_else(|| {
-                InferenceError::InvalidPath(
-                    "Missing 'embeddings' tensor in model.safetensors".into(),
-                )
-            })?
-            .to_dtype(DType::F32)?;
+        let stored = model_tensors.get("embeddings").ok_or_else(|| {
+            InferenceError::InvalidPath("Missing 'embeddings' tensor in model.safetensors".into())
+        })?;
+        if !ACCEPTED_EMBEDDING_DTYPES.contains(&stored.dtype()) {
+            return Err(InferenceError::InvalidPath(format!(
+                "'embeddings' is stored as {:?}, which is not a float dtype this loader \
+                 will up-cast (accepted: {:?})",
+                stored.dtype(),
+                ACCEPTED_EMBEDDING_DTYPES,
+            )));
+        }
+        let embeddings = stored.to_dtype(DType::F32)?;
 
         Ok(Self {
             tokenizer,
@@ -187,11 +208,10 @@ impl Model2VecResources {
 mod tests {
     use super::*;
 
-    /// Build a minimal WordPiece tokenizer for testing.
+    /// Minimal WordPiece tokenizer for testing.
     ///
     /// Vocab: [PAD]=0, [UNK]=1, email=2, phone=3, number=4, data=5
-    fn make_test_tokenizer() -> tokenizers::Tokenizer {
-        let tokenizer_json = r###"{
+    const TEST_TOKENIZER_JSON: &str = r###"{
             "version": "1.0",
             "model": {
                 "type": "WordPiece",
@@ -216,7 +236,9 @@ mod tests {
             },
             "pre_tokenizer": { "type": "BertPreTokenizer" }
         }"###;
-        tokenizers::Tokenizer::from_bytes(tokenizer_json.as_bytes())
+
+    fn make_test_tokenizer() -> tokenizers::Tokenizer {
+        tokenizers::Tokenizer::from_bytes(TEST_TOKENIZER_JSON.as_bytes())
             .expect("test tokenizer should parse")
     }
 
@@ -462,5 +484,129 @@ mod tests {
             "encode_one and encode_batch should agree on direction, cos_sim = {}",
             cos_sim
         );
+    }
+
+    // ── stored dtype ────────────────────────────────────────────────────────────
+    // The embedding matrix is a lookup table, so what it is stored as and what it is
+    // computed in are separate decisions. These cases hold that separation: F16 on
+    // disk must load, must arrive as F32, and must agree with the F32 file it was
+    // packed from — and a dtype that is not a float at all must be refused rather
+    // than converted into a matrix of plausible numbers.
+
+    /// Write a loadable model dir (tokenizer + safetensors) under a unique temp path.
+    fn write_model_dir(case: &str, embeddings: &Tensor) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("finetype-m2v-dtype-{}-{case}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp model dir");
+        std::fs::write(dir.join("tokenizer.json"), TEST_TOKENIZER_JSON).expect("write tokenizer");
+        let mut map = std::collections::HashMap::new();
+        map.insert("embeddings".to_string(), embeddings.clone());
+        candle_core::safetensors::save(&map, dir.join("model.safetensors")).expect("save weights");
+        dir
+    }
+
+    /// A deterministic 6x8 matrix whose entries are NOT exactly representable in F16,
+    /// so an F16 round trip genuinely perturbs it. Multiply-add only — no libm — so
+    /// the same bytes come out on every platform.
+    fn drifting_embeddings(device: &Device) -> Tensor {
+        let data: Vec<f32> = (0..48).map(|i| (i as f32) * 0.017 + 0.003).collect();
+        Tensor::from_vec(data, (6, 8), device).expect("test embeddings")
+    }
+
+    #[test]
+    fn test_f16_stored_embeddings_load_and_upcast() {
+        let device = Device::Cpu;
+        let f16 = make_test_embeddings(&device)
+            .to_dtype(DType::F16)
+            .expect("cast to f16");
+        let dir = write_model_dir("upcast", &f16);
+
+        let res = Model2VecResources::load(&dir).expect("F16 embeddings should load");
+
+        // Half precision is a storage decision only: everything downstream reads f32.
+        assert_eq!(
+            res.embeddings().dtype(),
+            DType::F32,
+            "embeddings must be up-cast to F32 at load"
+        );
+        assert_eq!(res.embed_dim().unwrap(), 4);
+
+        // "email" = token 2 = [0, 1, 0, 0], all exactly representable in F16.
+        let v: Vec<f32> = res
+            .encode_one("email")
+            .expect("F16-stored embeddings must still encode")
+            .to_vec1()
+            .unwrap();
+        assert_eq!(v, vec![0.0, 1.0, 0.0, 0.0]);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_f16_and_f32_storage_agree_on_encodings() {
+        let device = Device::Cpu;
+        let f32_emb = drifting_embeddings(&device);
+        let f16_emb = f32_emb.to_dtype(DType::F16).expect("cast to f16");
+
+        let dir32 = write_model_dir("agree-f32", &f32_emb);
+        let dir16 = write_model_dir("agree-f16", &f16_emb);
+        let res32 = Model2VecResources::load(&dir32).expect("F32 dir loads");
+        let res16 = Model2VecResources::load(&dir16).expect("F16 dir loads");
+
+        let texts = &["email", "phone number", "data email phone"];
+        let a = res32.encode_batch(texts).unwrap();
+        let b = res16.encode_batch(texts).unwrap();
+        assert_eq!(a.dims(), b.dims());
+
+        let mut any_difference = false;
+        for (i, text) in texts.iter().enumerate() {
+            let ra: Vec<f32> = a.get(i).unwrap().to_vec1().unwrap();
+            let rb: Vec<f32> = b.get(i).unwrap().to_vec1().unwrap();
+            if ra != rb {
+                any_difference = true;
+            }
+            let dot: f32 = ra.iter().zip(&rb).map(|(x, y)| x * y).sum();
+            let na: f32 = ra.iter().map(|x| x * x).sum::<f32>().sqrt();
+            let nb: f32 = rb.iter().map(|x| x * x).sum::<f32>().sqrt();
+            let cos = dot / (na * nb);
+            assert!(cos > 0.9999, "row {i} ({text}) diverged: cos_sim = {cos}");
+            let max_abs = ra
+                .iter()
+                .zip(&rb)
+                .map(|(x, y)| (x - y).abs())
+                .fold(0.0f32, f32::max);
+            assert!(max_abs < 1.0e-2, "row {i} ({text}) max |Δ| = {max_abs}");
+        }
+
+        // Without this the agreement above could be vacuous — two dirs holding the
+        // same bytes agree trivially. The fixture is chosen so F16 really does move
+        // the numbers; the point is that it does not move them enough to matter.
+        assert!(
+            any_difference,
+            "fixture is not exercising the F16 round trip: every component came back bit-identical"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir32);
+        let _ = std::fs::remove_dir_all(&dir16);
+    }
+
+    #[test]
+    fn test_non_float_stored_embeddings_are_rejected() {
+        let device = Device::Cpu;
+        let ints = Tensor::from_vec(vec![0i64, 1, 2, 3, 4, 5, 6, 7], (2, 4), &device)
+            .expect("int embeddings");
+        let dir = write_model_dir("reject-int", &ints);
+
+        let err = Model2VecResources::load(&dir)
+            .err()
+            .expect("an integer embedding matrix must not load as if it were weights");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("I64"),
+            "the rejection must name the dtype it found, got: {msg}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
