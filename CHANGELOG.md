@@ -65,8 +65,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   | `datetime.date.compact_ym` | 353 | 353 |
 
   Of the 946 columns that left `compact_dmy`: 615 → `integer_number`, 187 →
-  `unknown`, 76 → `numeric_code`, 51 → `word`, 11 → `increment`. **Zero columns
-  were newly typed `compact_dmy`.**
+  `unknown`, 76 → `numeric_code`, 51 → `word`, 11 → `increment`, 4 →
+  `alphanumeric_id`, 2 → `compact_mdy` (946 total). **Zero columns were newly
+  typed `compact_dmy`.** These 946 were not individually audited for
+  genuineness the way the 68 `compact_ymd` losses were — the table records where
+  they went, not what they were. The `compact_mdy` row (92 → 71) is likewise
+  measured but unaudited: whether those 21 were false positives removed or
+  genuine dates downgraded is not established here.
 
   The `compact_ymd` row is the cost, and it is collateral rather than intent: a
   validator's per-label pass rate is an **input** to the multi-branch model's

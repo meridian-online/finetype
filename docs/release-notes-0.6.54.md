@@ -54,8 +54,12 @@ label state. Table: `docs/compact-date-residual.tsv`. Reproduce:
 | columns typed year-first compact date | 230 | **162** |
 | columns *newly* typed as a compact date | — | **0** |
 
-The 946 columns that lost the day-first date type were financial figures and identifiers:
-615 became `integer_number`, 187 `unknown`, 76 `numeric_code`, 51 `word`, 11 `increment`.
+The 946 columns that lost the day-first date type became: 615 `integer_number`, 187
+`unknown`, 76 `numeric_code`, 51 `word`, 11 `increment`, 4 `alphanumeric_id`, 2
+`compact_mdy`. That is where they went; **it is not an audit of what they were.** Unlike the
+68 losses below, these 946 were not individually checked for genuineness, so this release
+does not claim every one of them was a false positive — 187 landing on `unknown` is
+evidence for neither reading.
 
 The second row is a real cost and it is not hidden. A validator's pass rate is an input to
 the model, so tightening the day-first leaf also moves a feature on year-first columns: a
@@ -65,10 +69,16 @@ of the columns that moved are genuine dates** — every sampled value a valid `Y
 headed `date` (65) and `game_date` (3). 67 of them now come back `unknown` and one comes
 back as text.
 
-So the trade is **946 confidently-wrong dates removed against 68 correct ones downgraded to
-`unknown`**. We think that is the right way round — a confident picture that is wrong is
-the failure this product exists to prevent, and `unknown` is honest rather than wrong — but
-if you consume compact `YYYYMMDD` date columns, 68 in 230 is the number to plan against.
+So the trade is **946 columns no longer typed as day-first dates, against 68 genuine dates
+downgraded to `unknown`**. The 68 are audited; the 946 are not. On the probes that motivated
+the change the day-first type was plainly wrong — eight-digit financial figures carrying a
+`%d%m%Y` conversion — and we think the trade is the right way round, because a confident
+picture that is wrong is the failure this product exists to prevent and `unknown` is honest
+rather than wrong. But if you consume compact `YYYYMMDD` date columns, 68 in 230 is the
+number to plan against.
+
+`compact_mdy` also moved, 92 → 71. Those 21 were not audited either, so this release makes
+no claim about which way that one cuts.
 
 Genuine day-first dates *with separators* are untouched. `DD/MM/YYYY` and `DD.MM.YYYY`
 columns keep their labels, format strings and transforms, byte for byte across the change
@@ -219,7 +229,7 @@ Three limits on that, because a number without its limits is worth less than no 
   argument for running them rather than asserting they bite. Both gate CI.
 - **Branch ablation on the shipped model** — one flag per branch of the five-branch model,
   so each branch's contribution is measurable on the model that actually ships.
-- **~2,800 lines removed**: two classifiers with no construction site outside tests, one
+- **2,745 lines removed** (one commit, `eaa64e2`, 16 files): two classifiers with no construction site outside tests, one
   header-hint rule reachable only through a classifier no released binary contained, and a
   cross-column attention layer that only ever ran in a repo checkout — meaning every
   measurement taken from a checkout described a pipeline no user was running.
