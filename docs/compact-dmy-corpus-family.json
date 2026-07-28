@@ -1,0 +1,579 @@
+{
+  "compact_dmy": {
+    "by_pattern": {
+      "candidate": {
+        "columns_at_pass_rate_1_0": 18,
+        "columns_below_veto_threshold": 922,
+        "day_first_candidate_columns_lost_upper_bound": 0,
+        "day_first_candidate_headers_lost": [],
+        "fraction_below_veto_threshold": 0.9574247144340602,
+        "mean_pass_rate": 0.054300796123226025,
+        "pattern": "^(0[1-9]|[12]\\d|3[01])(0[1-9]|1[0-2])\\d{4}$",
+        "top_headers_still_passing": [
+          [
+            "id",
+            13
+          ],
+          [
+            "sharesoutstanding",
+            3
+          ],
+          [
+            "selection_id",
+            3
+          ],
+          [
+            "arrest date",
+            3
+          ],
+          [
+            "sellinggeneraladministrative",
+            2
+          ],
+          [
+            "researchdevelopment",
+            2
+          ],
+          [
+            "shortterminvestments",
+            2
+          ],
+          [
+            "treasurystock",
+            1
+          ],
+          [
+            "depreciation",
+            1
+          ],
+          [
+            "totalcurrentassets",
+            1
+          ],
+          [
+            "shortlongtermdebt",
+            1
+          ],
+          [
+            "investments",
+            1
+          ],
+          [
+            "minorityinterest",
+            1
+          ],
+          [
+            "otherassets",
+            1
+          ],
+          [
+            "longterminvestments",
+            1
+          ],
+          [
+            "othercurrentliab",
+            1
+          ],
+          [
+            "cash",
+            1
+          ],
+          [
+            "intangibleassets",
+            1
+          ],
+          [
+            "wc",
+            1
+          ],
+          [
+            "booking date",
+            1
+          ]
+        ]
+      },
+      "shape_only": {
+        "columns_at_pass_rate_1_0": 653,
+        "columns_below_veto_threshold": 211,
+        "day_first_candidate_columns_lost_upper_bound": 0,
+        "day_first_candidate_headers_lost": [],
+        "fraction_below_veto_threshold": 0.21910695742471442,
+        "mean_pass_rate": 0.7657061266874351,
+        "pattern": "^\\d{8}$",
+        "top_headers_still_passing": [
+          [
+            "game_id",
+            218
+          ],
+          [
+            "id",
+            68
+          ],
+          [
+            "minorityinterest",
+            58
+          ],
+          [
+            "pos",
+            49
+          ],
+          [
+            "depreciation",
+            32
+          ],
+          [
+            "sellinggeneraladministrative",
+            28
+          ],
+          [
+            "sharesoutstanding",
+            23
+          ],
+          [
+            "otherassets",
+            21
+          ],
+          [
+            "researchdevelopment",
+            20
+          ],
+          [
+            "ebit",
+            14
+          ],
+          [
+            "grossprofit",
+            12
+          ],
+          [
+            "cash",
+            10
+          ],
+          [
+            "inventory",
+            10
+          ],
+          [
+            "othercurrentassets",
+            10
+          ],
+          [
+            "selection_id",
+            9
+          ],
+          [
+            "othercurrentliab",
+            8
+          ],
+          [
+            "longterminvestments",
+            8
+          ],
+          [
+            "issuanceofstock",
+            8
+          ],
+          [
+            "arrest date",
+            7
+          ],
+          [
+            "longtermdebt",
+            6
+          ],
+          [
+            "intangibleassets",
+            6
+          ],
+          [
+            "otherliab",
+            6
+          ],
+          [
+            "shortlongtermdebt",
+            6
+          ],
+          [
+            "20180001",
+            6
+          ],
+          [
+            "dau_cogrdarea",
+            6
+          ]
+        ]
+      },
+      "year_1000_2099": {
+        "columns_at_pass_rate_1_0": 6,
+        "columns_below_veto_threshold": 952,
+        "day_first_candidate_columns_lost_upper_bound": 54,
+        "day_first_candidate_headers_lost": [
+          [
+            "sharesoutstanding",
+            17
+          ],
+          [
+            "marketcap",
+            6
+          ],
+          [
+            "group_id",
+            5
+          ],
+          [
+            "averagedailyvolume10day",
+            3
+          ],
+          [
+            "clm_from_dt",
+            3
+          ],
+          [
+            "clm_thru_dt",
+            3
+          ],
+          [
+            "averagedailyvolume3month",
+            2
+          ],
+          [
+            "ship_date",
+            2
+          ],
+          [
+            "incomebeforetax",
+            1
+          ],
+          [
+            "otheroperatingexpenses",
+            1
+          ],
+          [
+            "researchdevelopment",
+            1
+          ],
+          [
+            "grossprofit",
+            1
+          ],
+          [
+            "issuanceofstock",
+            1
+          ],
+          [
+            "colldate",
+            1
+          ],
+          [
+            "postid",
+            1
+          ],
+          [
+            "condition_end_date",
+            1
+          ],
+          [
+            "condition_start_date",
+            1
+          ],
+          [
+            "id",
+            1
+          ],
+          [
+            "observation_date",
+            1
+          ],
+          [
+            "requestdate",
+            1
+          ],
+          [
+            "incident number",
+            1
+          ]
+        ],
+        "fraction_below_veto_threshold": 0.9885773624091381,
+        "mean_pass_rate": 0.015835929387331256,
+        "pattern": "^(0[1-9]|[12]\\d|3[01])(0[1-9]|1[0-2])(1\\d|20)\\d{2}$",
+        "top_headers_still_passing": [
+          [
+            "arrest date",
+            3
+          ],
+          [
+            "id",
+            2
+          ],
+          [
+            "sharesoutstanding",
+            1
+          ],
+          [
+            "shortlongtermdebt",
+            1
+          ],
+          [
+            "longterminvestments",
+            1
+          ],
+          [
+            "cash",
+            1
+          ],
+          [
+            "booking date",
+            1
+          ],
+          [
+            "selection_id",
+            1
+          ]
+        ]
+      }
+    },
+    "columns": 972,
+    "measurable": 963,
+    "top_headers": [
+      [
+        "game_id",
+        218
+      ],
+      [
+        "id",
+        100
+      ],
+      [
+        "minorityinterest",
+        58
+      ],
+      [
+        "pos",
+        49
+      ],
+      [
+        "trials",
+        33
+      ],
+      [
+        "depreciation",
+        32
+      ],
+      [
+        "dau_cogrdarea",
+        31
+      ],
+      [
+        "sellinggeneraladministrative",
+        28
+      ],
+      [
+        "nvgrdarea",
+        28
+      ],
+      [
+        "sharesoutstanding",
+        23
+      ],
+      [
+        "otherassets",
+        21
+      ],
+      [
+        "season_id",
+        21
+      ],
+      [
+        "researchdevelopment",
+        20
+      ],
+      [
+        "ebit",
+        14
+      ],
+      [
+        "grossprofit",
+        12
+      ],
+      [
+        "cash",
+        11
+      ],
+      [
+        "inventory",
+        10
+      ],
+      [
+        "othercurrentassets",
+        10
+      ],
+      [
+        "selection_id",
+        9
+      ],
+      [
+        "arrest date",
+        9
+      ],
+      [
+        "othercurrentliab",
+        8
+      ],
+      [
+        "longterminvestments",
+        8
+      ],
+      [
+        "issuanceofstock",
+        8
+      ],
+      [
+        "longtermdebt",
+        6
+      ],
+      [
+        "intangibleassets",
+        6
+      ]
+    ],
+    "unmeasurable_no_samples": 9
+  },
+  "compact_family_counts": {
+    "datetime.date.compact_dmy": 972,
+    "datetime.date.compact_mdy": 92,
+    "datetime.date.compact_ym": 353,
+    "datetime.date.compact_ymd": 230
+  },
+  "day_first_legitimacy": {
+    "compact_day_first_candidates": {
+      "by_current_label": {
+        "datetime.date.compact_dmy": 3,
+        "datetime.date.compact_ymd": 16,
+        "representation.identifier.increment": 1,
+        "representation.identifier.numeric_code": 1,
+        "representation.numeric.integer_number": 33,
+        "representation.text.word": 4,
+        "unknown": 4
+      },
+      "columns": 62,
+      "definition": "every sampled value is 8 digits with day 01-31 and month 01-12, and at least one leading pair is 13-31 \u2014 a pair no month can be. WIDE on purpose: a YYYYMMDD date that also reads day-first is counted, so this is an upper bound",
+      "fraction_of_corpus": 7.559380764789868e-05,
+      "top_headers": [
+        [
+          "sharesoutstanding",
+          18
+        ],
+        [
+          "marketcap",
+          6
+        ],
+        [
+          "group_id",
+          5
+        ],
+        [
+          "reviewed",
+          4
+        ],
+        [
+          "averagedailyvolume10day",
+          3
+        ],
+        [
+          "clm_from_dt",
+          3
+        ],
+        [
+          "clm_thru_dt",
+          3
+        ],
+        [
+          "totalassets",
+          2
+        ],
+        [
+          "averagedailyvolume3month",
+          2
+        ],
+        [
+          "ship_date",
+          2
+        ],
+        [
+          "incomebeforetax",
+          1
+        ],
+        [
+          "otheroperatingexpenses",
+          1
+        ],
+        [
+          "researchdevelopment",
+          1
+        ],
+        [
+          "capitalsurplus",
+          1
+        ],
+        [
+          "grossprofit",
+          1
+        ],
+        [
+          "issuanceofstock",
+          1
+        ],
+        [
+          "colldate",
+          1
+        ],
+        [
+          "postid",
+          1
+        ],
+        [
+          "condition_end_date",
+          1
+        ],
+        [
+          "condition_start_date",
+          1
+        ],
+        [
+          "id",
+          1
+        ],
+        [
+          "observation_date",
+          1
+        ],
+        [
+          "requestdate",
+          1
+        ],
+        [
+          "incident number",
+          1
+        ]
+      ]
+    },
+    "separator_bearing_day_first_control": {
+      "by_label": {
+        "datetime.date.dmy_dash": 198,
+        "datetime.date.dmy_dash_abbrev": 40,
+        "datetime.date.dmy_dash_abbrev_short": 216,
+        "datetime.date.dmy_dot": 83,
+        "datetime.date.dmy_short_dot": 22,
+        "datetime.date.dmy_short_slash": 819,
+        "datetime.date.dmy_slash": 503,
+        "datetime.date.dmy_space_abbrev": 39,
+        "datetime.date.dmy_space_full": 67
+      },
+      "columns": 1987,
+      "why": "the control for corpus skew: if this is empty the corpus holds no day-first dates at all and nothing can be concluded about the compact leaf"
+    }
+  },
+  "pass_parquet": "output/compact-ymd-gate/full/cand_pass/corpus_pass/columns.parquet",
+  "total_columns_profiled": 820173,
+  "veto_threshold": 0.5
+}
