@@ -84,12 +84,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   selectively.
 
 - **Every clause of the day-first change is defended by a test that dies without
-  it.** Six mutations, each deleting one clause, both suites run for each
-  (`docs/compact-dmy-mutation-matrix.md`): `revert_whole_change` kills 8 of 14,
-  each of the three windows kills 6, the allowlist entry kills 3, and *adding* a
-  century year window kills 6 — so the year staying `\d{4}` is an enforced
-  decision rather than an omission. The three control rows stay green under
-  `revert_whole_change`, which is what makes them controls.
+  it.** Six mutations, both suites run for each
+  (`docs/compact-dmy-mutation-matrix.md`): the whole change reverted kills 8 of
+  14; each of the three windows deleted on its own kills 6; the veto-safe
+  allowlist entry deleted kills 3; and *adding* a century year window kills 6 —
+  so the year staying `\d{4}` is an enforced decision rather than an omission.
+  The three control rows stay green under the full revert, which is what makes
+  them controls rather than more of the same assertion.
 
 - **The day-first change touches no genuine non-US date column.** Four realistic
   fixtures — compact day-first with every day 13–31, compact day-first from

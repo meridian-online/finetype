@@ -131,11 +131,15 @@ The gain comes from two places — the validation gate no longer builds error me
 immediately discards, and columns are now typed in parallel — so a corpus of *single*-column
 files gives the parallelism nothing to do and gains little. Wide tables are where it lands.
 
-Neither optimisation changes an answer. What backs that here is the accuracy section
-below — both gold fixtures re-measured on this tree at **+0 columns** — plus a smoke
-assertion that compares the emitted `column,type` *pairing* across repeated runs, not just
-the column-name sequence. The comparison above spans everything that landed between the two
-releases, not any one change, which is what a user upgrading actually experiences.
+Both optimisations are answer-preserving by construction — one stops formatting error
+strings that were discarded on the next line, and the other collects from an *indexed*
+parallel iterator, which returns results in input order. What checks it rather than
+asserting it: both gold fixtures re-measure on this tree at **+0 columns** (below), and the
+smoke suite asserts the emitted `column,type` **pairing** across repeated runs rather than
+the column-name sequence alone — the assertion that catches an order-losing collect, which
+a name-only check walks straight past. The comparison above spans everything that landed
+between the two releases, not any one change, which is what a user upgrading actually
+experiences.
 
 ### The binary is about 22.6% smaller
 
