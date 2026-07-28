@@ -97,6 +97,15 @@ pub(crate) fn load_model2vec_resources() -> Option<finetype_model::Model2VecReso
 /// measuring a pipeline that no released binary can run. Wiring it here is gone;
 /// the artifact is still trained (`train-sibling-context`) and still consumed by
 /// the multi-branch trainer, which is where it earns its keep.
+///
+/// That leaves a REAL train/serve skew — the header branch was trained behind
+/// that module — and putting it back has been built and measured rather than
+/// argued: `docs/sibling-context-serving-measurement.md`. Reproducing training
+/// conditions here moves the emitted record on 46.8% of columns of real files,
+/// ties on the only ground-truthed instrument (720 vs 719 of 828), and loses
+/// 8,113 columns to 2,611 against a fixed column-intrinsic oracle over 693,499
+/// corpus columns. Do not restore it on the strength of the argument alone; the
+/// argument is sound and the measurement disagrees with it.
 pub(crate) fn wire_model2vec(cc: &mut finetype_model::ColumnClassifier) {
     if let Some(m2v) = load_model2vec_resources() {
         cc.set_model2vec(m2v);

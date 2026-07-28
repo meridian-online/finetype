@@ -51,6 +51,28 @@
           "pipeline": "predict_multibranch -> reshape -> score_gold_anchor --reframe (no Sharpen)",
           "source": "docs/branch-ablation-m2v8m-s43.md, un-ablated control",
           "note": "Standalone Sense, before composition."
+        },
+        "m2v8m-s43/native-profile-header-raw/0.6.53": {
+          "correct": 719,
+          "scored": 828,
+          "score": 0.868,
+          "measured": "2026-07-28",
+          "model": "m2v8m-s43",
+          "binary": "0.6.53",
+          "pipeline": "finetype profile over the gold rows' own source files (multi-column, full value depth) -> x-finetype-label vs curated_label",
+          "source": "docs/sibling-context-serving-measurement.md",
+          "note": "NOT the gold headline and NOT comparable to it: a different pipeline (native profile with the validation veto, not predict_multibranch -> compose) and a different subset (828 of the fixture's 1037 rows — 762 source files that are present locally with a unique file stem). Recorded because it is the ONLY ground-truthed instrument that can see sibling context at all: the headline's FTMB is one singleton group per column, and singletons are never enriched. Header branch served RAW header embeddings."
+        },
+        "m2v8m-s43/native-profile-header-sibling-enriched/0.6.53": {
+          "correct": 720,
+          "scored": 828,
+          "score": 0.87,
+          "measured": "2026-07-28",
+          "model": "m2v8m-s43",
+          "binary": "0.6.53",
+          "pipeline": "finetype profile over the gold rows' own source files (multi-column, full value depth) -> x-finetype-label vs curated_label",
+          "source": "docs/sibling-context-serving-measurement.md",
+          "note": "Same 828 rows, same files, header branch served SIBLING-ENRICHED embeddings. The two directions disagree on 7 of 828 columns (4 the enriched direction gets right, 3 the raw one does); a 1-column margin on 828 rows is not a result."
         }
       }
     },
@@ -99,6 +121,52 @@
           "pipeline": "predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe",
           "source": "docs/branch-ablation-m2v8m-s43.md, attribution table",
           "note": "Same fixture as the pre-0.6.41 bar, current binary: the +11 columns are the 0.6.41/0.6.50/0.6.53 Sharpen typing guards."
+        }
+      }
+    },
+    "corpus-oracle-2026-06-07": {
+      "version": "corpus-oracle-2026-06-07",
+      "path": "output/ydf-validation-gate/v19_gated.parquet",
+      "sha256": "195b3af9078e7d653a935c1bf82d5af97a9ada594d17baec834afd58fb404140",
+      "rows": 1811352,
+      "registered": "2026-07-28",
+      "taxonomy": {
+        "version": "tax-bc0dc59de853",
+        "sha256": "bc0dc59de8537f5322b56aa91b223b9ed56cfc593d4338459f69e52b1a3e0002",
+        "types": 251,
+        "sources": [
+          "labels/definitions_container.yaml",
+          "labels/definitions_datetime.yaml",
+          "labels/definitions_finance.yaml",
+          "labels/definitions_geography.yaml",
+          "labels/definitions_identity.yaml",
+          "labels/definitions_representation.yaml",
+          "labels/definitions_technology.yaml"
+        ]
+      },
+      "note": "Corpus-scale A/B instrument, not an accuracy fixture. The gated-YDF oracle over the corpus-honest gate's stratified GitTables sample (output/corpus-honest-gate/stratified_sample.files.txt sha256 f99196a8da4f5a18ec4617dc27b39aecc347cfaa6ed8039868760c0010a83741, 33,250 paths, 33,054 reconstructible from eval/gittables/corpus_pass/columns.parquet sha256 de1d05b18835352d89297151aab0d00123cdc704d2d9f4ebde7cabe3a8822c97 = 837,625 columns). rows = the oracle parquet's own 1,811,352 rows (the whole corpus pass); 693,499 of the 837,625 sample columns are adjudicable, because the oracle NULLs any YDF label fewer than half the column's values pass. The oracle is a column-intrinsic MODEL, so an absolute agreement rate here is NOT an accuracy claim — only the difference between two pipelines scored against the same oracle carries meaning. The sample is ~3% of GitTables, non-adversarial, stratified on a retired model's calls, and 10.3% of its columns sit in tables whose headers are pandas artefacts.",
+      "baselines": {
+        "m2v8m-s43/oracle-agreement-header-raw/0.6.53": {
+          "correct": 351010,
+          "scored": 693499,
+          "score": 0.506,
+          "measured": "2026-07-28",
+          "model": "m2v8m-s43",
+          "binary": "0.6.53",
+          "pipeline": "profile --raw-model over the reconstructed sample tables -> resharpen -> agreement with ydf_prediction_gated",
+          "source": "docs/sibling-context-serving-measurement.md",
+          "note": "Header branch served RAW header embeddings — what the repo ships."
+        },
+        "m2v8m-s43/oracle-agreement-header-sibling-enriched/0.6.53": {
+          "correct": 345508,
+          "scored": 693499,
+          "score": 0.498,
+          "measured": "2026-07-28",
+          "model": "m2v8m-s43",
+          "binary": "0.6.53",
+          "pipeline": "profile --raw-model over the reconstructed sample tables -> resharpen -> agreement with ydf_prediction_gated",
+          "source": "docs/sibling-context-serving-measurement.md",
+          "note": "Header branch served SIBLING-ENRICHED embeddings — training conditions reproduced. Same reconstructed tables (all 33,054 CSVs byte-identical across the two runs) and the same Sharpen stage (composed output byte-identical when both binaries resharpen one Sense cache), so the difference is attributable to the header input alone."
         }
       }
     }
