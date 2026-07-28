@@ -1,0 +1,249 @@
+{
+  "a": "output/half-precision/records_binF32_modelF32_run1.tsv",
+  "b": "output/half-precision/records_binF16_modelF16.tsv",
+  "common": 843,
+  "declared_unstable_fields": [
+    "locale"
+  ],
+  "max_abs_delta": {
+    "confidence": 0.0007000000000000339
+  },
+  "max_abs_delta_at": {
+    "confidence": "country_id:id (0.4221 -> 0.4228)"
+  },
+  "only_a": [],
+  "only_b": [],
+  "per_field": {
+    "broad_type": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "column": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "confidence": {
+      "differ": 170,
+      "examples": [
+        {
+          "a": "0.5694",
+          "b": "0.5696",
+          "column": "id",
+          "sha": "00f12cef362c"
+        },
+        {
+          "a": "0.8535",
+          "b": "0.8534",
+          "column": "County",
+          "sha": "01dc44536cc6"
+        },
+        {
+          "a": "0.2851",
+          "b": "0.2852",
+          "column": "REC_DIR",
+          "sha": "021dc73b1374"
+        },
+        {
+          "a": "0.6225",
+          "b": "0.6226",
+          "column": "Latitude",
+          "sha": "02866d6d4950"
+        },
+        {
+          "a": "0.6823",
+          "b": "0.6822",
+          "column": "Name",
+          "sha": "02a59309e9e7"
+        },
+        {
+          "a": "0.7337",
+          "b": "0.7338",
+          "column": "PA",
+          "sha": "04076fd58a62"
+        },
+        {
+          "a": "0.8435",
+          "b": "0.8434",
+          "column": "earningsTimestampStart",
+          "sha": "068341dbf53a"
+        },
+        {
+          "a": "0.5879",
+          "b": "0.5881",
+          "column": "group_id:id",
+          "sha": "07b52133f884"
+        },
+        {
+          "a": "0.7634",
+          "b": "0.7632",
+          "column": "type_tax_use",
+          "sha": "07d60392033f"
+        },
+        {
+          "a": "0.7996",
+          "b": "0.7995",
+          "column": "RealTime(ms)",
+          "sha": "090636308c0d"
+        },
+        {
+          "a": "0.9353",
+          "b": "0.9352",
+          "column": "Lng",
+          "sha": "0a22821b67f5"
+        },
+        {
+          "a": "0.2609",
+          "b": "0.2606",
+          "column": "template_name",
+          "sha": "0bc1b2a261bb"
+        },
+        {
+          "a": "0.9857",
+          "b": "0.9858",
+          "column": "countryCode",
+          "sha": "0c01eda7366d"
+        },
+        {
+          "a": "0.5689",
+          "b": "0.5686",
+          "column": "Country Code",
+          "sha": "0dead6b6b687"
+        },
+        {
+          "a": "0.7098",
+          "b": "0.7096",
+          "column": "Notes",
+          "sha": "0e22054274dc"
+        },
+        {
+          "a": "0.5421",
+          "b": "0.5423",
+          "column": "exchangeTimezoneName",
+          "sha": "10163c07cc6f"
+        },
+        {
+          "a": "0.6191",
+          "b": "0.6190",
+          "column": "BenchmarkName",
+          "sha": "14740791fded"
+        },
+        {
+          "a": "0.4221",
+          "b": "0.4228",
+          "column": "country_id:id",
+          "sha": "163620cd34c7"
+        },
+        {
+          "a": "0.5316",
+          "b": "0.5315",
+          "column": "msg_id",
+          "sha": "168d4b90975a"
+        },
+        {
+          "a": "0.6896",
+          "b": "0.6897",
+          "column": "template_name",
+          "sha": "18b342a8be8d"
+        },
+        {
+          "a": "0.9857",
+          "b": "0.9858",
+          "column": "countryCode",
+          "sha": "1aa886137d41"
+        },
+        {
+          "a": "0.9182",
+          "b": "0.9181",
+          "column": "Latitude",
+          "sha": "1da8a8118f98"
+        },
+        {
+          "a": "0.8560",
+          "b": "0.8559",
+          "column": "name",
+          "sha": "1e7885cf6326"
+        },
+        {
+          "a": "0.9874",
+          "b": "0.9875",
+          "column": "country",
+          "sha": "216f6a46b2a2"
+        },
+        {
+          "a": "0.6991",
+          "b": "0.6992",
+          "column": "town_map_darkelf_t00",
+          "sha": "234d6bd77b56"
+        }
+      ],
+      "of": 843
+    },
+    "disambiguation": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "format_string": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "is_generic": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "locale": {
+      "differ": 1,
+      "examples": [
+        {
+          "a": "DE_CH",
+          "b": "SL",
+          "column": "zip",
+          "sha": "14d9f1620452"
+        }
+      ],
+      "of": 843
+    },
+    "non_null": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "null": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "quality_band": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "runner_up": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "samples_used": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "transform": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "type": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    }
+  },
+  "rows_a": 843,
+  "rows_b": 843,
+  "whole_record_differ": 171
+}

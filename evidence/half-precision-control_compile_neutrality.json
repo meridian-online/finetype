@@ -1,0 +1,98 @@
+{
+  "a": "output/half-precision/records_binF32_modelF32_run1.tsv",
+  "b": "output/half-precision/records_binF16_modelF32.tsv",
+  "common": 843,
+  "declared_unstable_fields": [
+    "locale"
+  ],
+  "max_abs_delta": {
+    "confidence": 0.0
+  },
+  "max_abs_delta_at": {
+    "confidence": ""
+  },
+  "only_a": [],
+  "only_b": [],
+  "per_field": {
+    "broad_type": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "column": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "confidence": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "disambiguation": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "format_string": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "is_generic": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "locale": {
+      "differ": 1,
+      "examples": [
+        {
+          "a": "DE_CH",
+          "b": "ES_AR",
+          "column": "zip",
+          "sha": "14d9f1620452"
+        }
+      ],
+      "of": 843
+    },
+    "non_null": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "null": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "quality_band": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "runner_up": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "samples_used": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "transform": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    },
+    "type": {
+      "differ": 0,
+      "examples": [],
+      "of": 843
+    }
+  },
+  "rows_a": 843,
+  "rows_b": 843,
+  "whole_record_differ": 1
+}
