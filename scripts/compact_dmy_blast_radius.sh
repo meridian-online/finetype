@@ -9,12 +9,23 @@
 # sees that. (Same reason `compact_ymd_gate.sh` exists and the fast gate cannot
 # substitute for it.)
 #
-# Why TWO BINARIES and not one binary with the YAML swapped. Half of this change
-# is `labels/definitions_datetime.yaml`, which `load_taxonomy` reads from disk at
-# runtime — swappable. The other half is `labels/veto_safe.txt`, which
-# `finetype-core` pulls in with `include_str!` at COMPILE time. Swapping only the
-# YAML would run the baseline pass with the candidate's hard-veto scope already
-# in force and understate the change. So each side gets its own build.
+# EACH SIDE IS BUILT **AND RUN** INSIDE ITS OWN LABEL STATE. The change spans
+# two files that reach the binary by different routes:
+#
+#   labels/veto_safe.txt              `include_str!` at COMPILE time
+#       (crates/finetype-core/src/validation_veto.rs), so each side needs its
+#       own build.
+#   labels/definitions_datetime.yaml  read from `./labels` AT RUNTIME —
+#       `profile` hard-codes `PathBuf::from("labels")` against the process's
+#       working directory, and `gittables_corpus_pass.py` spawns it with no
+#       `cwd=`, so the pass inherits this script's directory: the repo root.
+#
+# An earlier revision built both binaries, restored the candidate label files,
+# and only then ran both passes — which ran the BASELINE binary against the
+# CANDIDATE taxonomy, so the "before" side already had the tightening in force
+# and the measured blast radius was near zero by construction. Ordering the two
+# phases per side is the whole fix, and the on-disk blob shas are recorded so
+# the report names exactly what produced each side.
 #
 # Why a TARGETED file list and not the 33,250-file stratified sample. The
 # question is "how many columns type compact_dmy, and how many does the change
@@ -37,12 +48,14 @@ export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONUNBUFFERED=1
 WD="${1:?usage: compact_dmy_blast_radius.sh <workdir> [base-ref] [prior-pass-parquet]}"
 BASE_REF="${2:-origin/main}"
 PRIOR="${3:-output/compact-ymd-gate/full/cand_pass/corpus_pass/columns.parquet}"
+PRIOR_BASE="${4:-output/compact-ymd-gate/full/base_pass/corpus_pass/columns.parquet}"
 YAML=labels/definitions_datetime.yaml
 SAFE=labels/veto_safe.txt
 PY=./eval/gittables/.venv/bin/python
 BIN=./target/release/finetype
 
 [ -f "$PRIOR" ] || { echo "FAIL: no prior corpus pass at $PRIOR"; exit 1; }
+[ -f "$PRIOR_BASE" ] || { echo "FAIL: no prior corpus pass at $PRIOR_BASE"; exit 1; }
 mkdir -p "$WD"
 
 cp "$YAML" "$WD/candidate_yaml_backup"
@@ -57,36 +70,52 @@ restore() {
 }
 trap restore EXIT
 
-echo "== [1/6] derive the file list: every table holding a compact-date column =="
+echo "== [1/4] derive the file list: every table holding a compact-date column =="
+# UNION of both sides of the prior gate, not just its candidate side: a table
+# whose only compact-date column was pushed OFF the family by that change would
+# be missing from the candidate side alone, and those are exactly the tables
+# this change might move back.
 duckdb -noheader -list -c "
-  SELECT DISTINCT file_path
-  FROM read_parquet('$PRIOR')
+  SELECT DISTINCT file_path FROM read_parquet('$PRIOR')
+  WHERE sense_prediction LIKE 'datetime.date.compact%'
+  UNION
+  SELECT DISTINCT file_path FROM read_parquet('$PRIOR_BASE')
   WHERE sense_prediction LIKE 'datetime.date.compact%'
   ORDER BY 1" > "$WD/files.txt"
 echo "   $(wc -l < "$WD/files.txt") tables"
 
-echo "== [2/6] build the CANDIDATE binary (working tree) =="
-cargo build --release -p finetype-cli
-cp "$BIN" "$WD/finetype-candidate"
+: > "$WD/side_provenance.tsv"
+run_pass() {  # run_pass <tag> <ref|"">
+  local tag="$1" ref="$2"
+  echo "== side $tag (${ref:-working tree}) : place label files =="
+  if [ -n "$ref" ]; then git checkout "$ref" -- "$YAML" "$SAFE"; else restore; fi
+  grep -q "datetime.date.compact_dmy" "$YAML"
+  printf '%s\t%s\t%s\t%s\n' "$tag" "${ref:-working-tree}" \
+    "$(git hash-object "$YAML")" "$(git hash-object "$SAFE")" >> "$WD/side_provenance.tsv"
+  echo "== side $tag : build (veto_safe.txt is compiled in) =="
+  cargo build --release -p finetype-cli
+  echo "== side $tag : pass (definitions_datetime.yaml is read from ./labels) =="
+  rm -rf "$WD/${tag}_pass"
+  $PY scripts/gittables_corpus_pass.py --corpus-index "$WD/files.txt" \
+      --finetype-bin "$BIN" --execute --jobs 8 --out-dir "$WD/${tag}_pass"
+}
 
-echo "== [3/6] build the BASELINE binary ($BASE_REF label files) =="
-git checkout "$BASE_REF" -- "$YAML" "$SAFE"
-grep -q "datetime.date.compact_dmy" "$YAML"
-cargo build --release -p finetype-cli
-cp "$BIN" "$WD/finetype-baseline"
-restore
+echo "== [2/4] BASELINE side ($BASE_REF) =="
+run_pass base "$BASE_REF"
 
-echo "== [4/6] candidate pass =="
-rm -rf "$WD/cand_pass"
-$PY scripts/gittables_corpus_pass.py --corpus-index "$WD/files.txt" \
-    --finetype-bin "$WD/finetype-candidate" --execute --jobs 8 --out-dir "$WD/cand_pass"
+echo "== [3/4] CANDIDATE side (working tree) =="
+run_pass cand ""
 
-echo "== [5/6] baseline pass =="
-rm -rf "$WD/base_pass"
-$PY scripts/gittables_corpus_pass.py --corpus-index "$WD/files.txt" \
-    --finetype-bin "$WD/finetype-baseline" --execute --jobs 8 --out-dir "$WD/base_pass"
-
-echo "== [6/6] label counts and the compact_dmy transition matrix =="
+echo "== [4/4] label counts and the compact_dmy transition matrix =="
+{
+  echo "# compact_dmy blast radius"
+  echo "# head_sha  $(git rev-parse HEAD)"
+  echo "# base_ref  $BASE_REF  $(git rev-parse "$BASE_REF")"
+  echo "# taxonomy_version  $(python3 scripts/evidence.py taxonomy-version 2>/dev/null | tr -d '\n' || echo unknown)"
+  echo "# tables    $(wc -l < "$WD/files.txt" | tr -d ' ')"
+  echo "# side  ref  definitions_datetime.yaml_blob  veto_safe.txt_blob"
+  sed 's/^/# /' "$WD/side_provenance.tsv"
+} > "$WD/blast_radius.txt"
 duckdb -c "
   CREATE OR REPLACE VIEW b AS SELECT * FROM read_parquet('$WD/base_pass/corpus_pass/columns.parquet');
   CREATE OR REPLACE VIEW c AS SELECT * FROM read_parquet('$WD/cand_pass/corpus_pass/columns.parquet');
@@ -121,6 +150,6 @@ duckdb -c "
     FROM (SELECT sense_prediction AS label, count(*) AS n FROM b GROUP BY 1) b
     FULL OUTER JOIN (SELECT sense_prediction AS label, count(*) AS n FROM c GROUP BY 1) c USING (label)
   ) WHERE abs(n_cand - n_base) > 5 ORDER BY abs(n_cand - n_base) DESC;
-" | tee "$WD/blast_radius.txt"
+" | tee -a "$WD/blast_radius.txt"
 
 echo "wrote $WD/blast_radius.txt"
