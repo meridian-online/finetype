@@ -58,6 +58,20 @@ enum MergeNorm {
     Layer(candle_nn::LayerNorm),
 }
 
+/// Where the header branch's input vector comes from.
+///
+/// `Raw` embeds the column name with Model2Vec on the spot — the single-column
+/// case, and what training does for a table group of one. `Enriched` accepts a
+/// `[D]` row that sibling-context attention has already produced across the whole
+/// table — what training does for every group of two or more columns.
+///
+/// Modelled as one type so both cases traverse an identical forward pass; the
+/// header vector is the ONLY thing that differs between them.
+enum HeaderSource<'a> {
+    Raw(&'a str),
+    Enriched(&'a Tensor),
+}
+
 pub struct MultiBranchClassifier {
     char_branch: BranchWeights,
     embed_branch: BranchWeights,
@@ -466,6 +480,11 @@ impl MultiBranchClassifier {
 
     /// Classify a column of values, returning (label, confidence).
     ///
+    /// Header enrichment note: this is the RAW-header entry point. The header
+    /// branch was trained on sibling-enriched embeddings, so a caller that has a
+    /// whole table in hand should use
+    /// [`Self::classify_column_with_enriched_header`] instead.
+    ///
     /// Extracts branch features from the values, runs the MLP forward pass,
     /// and returns the predicted label with confidence score.
     ///
@@ -482,6 +501,43 @@ impl MultiBranchClassifier {
         &self,
         values: &[String],
         header: &str,
+        taxonomy: Option<&Taxonomy>,
+    ) -> Result<(String, f32), InferenceError> {
+        self.classify_column_from_header_source(values, HeaderSource::Raw(header), taxonomy)
+    }
+
+    /// Classify a column using a header embedding that has already been computed.
+    ///
+    /// Like [`Self::classify_column`], but the header branch is fed a `[D]` tensor
+    /// instead of a raw string. The sibling-context attention module produces those
+    /// tensors: it encodes every header in the table with Model2Vec, attends across
+    /// them, and hands back one enriched row per column.
+    ///
+    /// This exists because the shipped model's header branch was TRAINED on enriched
+    /// embeddings — the trainer runs the same frozen attention over each table group
+    /// before the header features reach the branch — so serving raw embeddings asks
+    /// the branch for a judgement under conditions it never saw.
+    ///
+    /// Shares [`Self::classify_column_from_header_source`] with `classify_column`, so
+    /// the two paths cannot drift: the header tensor is the only difference between
+    /// them, by construction rather than by maintenance.
+    pub fn classify_column_with_enriched_header(
+        &self,
+        values: &[String],
+        enriched_header: &Tensor, // [D] — already enriched by sibling attention
+        taxonomy: Option<&Taxonomy>,
+    ) -> Result<(String, f32), InferenceError> {
+        self.classify_column_from_header_source(
+            values,
+            HeaderSource::Enriched(enriched_header),
+            taxonomy,
+        )
+    }
+
+    fn classify_column_from_header_source(
+        &self,
+        values: &[String],
+        header: HeaderSource<'_>,
         taxonomy: Option<&Taxonomy>,
     ) -> Result<(String, f32), InferenceError> {
         if values.is_empty() {
@@ -509,13 +565,16 @@ impl MultiBranchClassifier {
 
         // Extract header embedding if the model has a header branch
         let header_t = if self.header_branch.is_some() {
-            let header_embed = if !header.is_empty() {
-                self.model2vec
-                    .encode_one(header)
+            let header_embed = match header {
+                HeaderSource::Raw(h) if !h.is_empty() => self
+                    .model2vec
+                    .encode_one(h)
                     .and_then(|t| t.to_vec1::<f32>().ok())
-                    .unwrap_or_else(|| vec![0.0f32; self.config.header_dim])
-            } else {
-                vec![0.0f32; self.config.header_dim]
+                    .unwrap_or_else(|| vec![0.0f32; self.config.header_dim]),
+                HeaderSource::Raw(_) => vec![0.0f32; self.config.header_dim],
+                HeaderSource::Enriched(t) => t
+                    .to_vec1::<f32>()
+                    .unwrap_or_else(|_| vec![0.0f32; self.config.header_dim]),
             };
             Some(
                 Tensor::from_slice(&header_embed, (1, self.config.header_dim), &device)

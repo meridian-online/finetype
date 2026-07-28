@@ -89,18 +89,57 @@ pub(crate) fn load_model2vec_resources() -> Option<finetype_model::Model2VecReso
 ///
 /// The multi-branch header branch encodes the column header with this encoder,
 /// so every `profile`/`infer` path needs it.
-///
-/// This used to also load `models/sibling-context/model.safetensors` and attach
-/// it as a cross-column enrichment layer whenever that directory happened to be
-/// present. `build.rs` never embedded that artifact, so a released binary never
-/// had it: a developer running `finetype profile` from this checkout was
-/// measuring a pipeline that no released binary can run. Wiring it here is gone;
-/// the artifact is still trained (`train-sibling-context`) and still consumed by
-/// the multi-branch trainer, which is where it earns its keep.
 pub(crate) fn wire_model2vec(cc: &mut finetype_model::ColumnClassifier) {
     if let Some(m2v) = load_model2vec_resources() {
         cc.set_model2vec(m2v);
     }
+}
+
+/// Wire the shared Model2Vec encoder AND the sibling-context attention module.
+///
+/// For the multi-column paths only. The shipped model's header branch was trained
+/// with this module in front of it — the trainer enriches each table group's
+/// headers through the same frozen weights — so a multi-column caller that skips
+/// it feeds the branch an input distribution it never learned.
+///
+/// Both a disk artifact (`models/sibling-context/`) and the embedded copy are
+/// accepted, disk first, mirroring `load_model2vec_resources`. Earlier this
+/// existed as a disk-only load with nothing embedded, which meant a developer
+/// measured one pipeline and every released binary ran another.
+pub(crate) fn wire_model2vec_and_siblings(cc: &mut finetype_model::ColumnClassifier) {
+    wire_model2vec(cc);
+    if let Some(sibling) = load_sibling_context() {
+        cc.set_sibling_context(sibling);
+    }
+}
+
+/// Load the sibling-context attention module: disk first, then embedded bytes.
+///
+/// Returns `None` when neither is available, leaving the caller on raw header
+/// embeddings. A load FAILURE is reported on stderr rather than swallowed —
+/// silently degrading to the un-enriched pipeline is the failure mode this whole
+/// change exists to remove.
+pub(crate) fn load_sibling_context() -> Option<finetype_model::SiblingContextAttention> {
+    let model_dir = std::path::PathBuf::from("models/sibling-context");
+    if model_dir.join("model.safetensors").exists() {
+        return finetype_model::SiblingContextAttention::load(&model_dir)
+            .map_err(|e| eprintln!("Warning: failed to load sibling-context model from disk: {e}"))
+            .ok();
+    }
+
+    #[cfg(feature = "embed-models")]
+    {
+        if embedded::HAS_SIBLING_CONTEXT {
+            return finetype_model::SiblingContextAttention::from_bytes(
+                embedded::SIBLING_CONTEXT_WEIGHTS,
+                embedded::SIBLING_CONTEXT_CONFIG,
+            )
+            .map_err(|e| eprintln!("Warning: failed to load embedded sibling-context model: {e}"))
+            .ok();
+        }
+    }
+
+    None
 }
 
 /// Load taxonomy from a file or directory.

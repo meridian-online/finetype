@@ -81,7 +81,11 @@ fn classifier() -> ColumnClassifier {
 }
 
 fn batch_labels(cc: &ColumnClassifier, columns: &[(Vec<String>, String)]) -> Vec<String> {
-    cc.classify_columns_with_context(columns)
+    let borrowed: Vec<(&[String], &str)> = columns
+        .iter()
+        .map(|(v, h)| (v.as_slice(), h.as_str()))
+        .collect();
+    cc.classify_columns_with_context(&borrowed)
         .unwrap()
         .into_iter()
         .map(|r| r.label)

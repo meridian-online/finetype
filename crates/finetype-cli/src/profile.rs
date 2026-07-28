@@ -138,8 +138,10 @@ pub(crate) fn cmd_profile(
         column_classifier.set_taxonomy(taxonomy);
     }
 
-    // Wire the shared Model2Vec encoder the multi-branch header branch needs.
-    wire_model2vec(&mut column_classifier);
+    // Wire the shared Model2Vec encoder the multi-branch header branch needs, and
+    // the sibling-context attention that branch was trained behind. `profile` sees
+    // whole tables, so it is the one command that can reproduce training conditions.
+    wire_model2vec_and_siblings(&mut column_classifier);
 
     // Diagnostic: skip Sharpen post-processing for ablation studies
     if raw_model {
@@ -316,18 +318,63 @@ pub(crate) fn cmd_profile(
             invalid_samples: Vec<String>,
         }
 
-        // Per-column classification.
+        // Cross-column pre-pass: classify every non-empty column together so each
+        // header is enriched by its siblings before the multi-branch header branch
+        // reads it — the condition that branch was trained under.
         //
-        // One column's profile depends on nothing but that column, so the loop
-        // is data-parallel. `par_iter().enumerate()` is an INDEXED parallel
-        // iterator and `collect::<Result<Vec<_>, _>>()` from one yields results
-        // in input order — the emitted column sequence still matches the input
-        // file's column sequence, which eval fixtures and the DuckDB extension
-        // both depend on. Nothing here may collect into an unordered container.
+        // Empty columns are excluded, matching training: a column with no values is
+        // not a record in its table group, so it was never one of the headers the
+        // attention module attended across.
         //
-        // There used to be a second, cross-column path here, taken whenever a
-        // sibling-context model happened to be on disk. No released binary ever
-        // embedded that model, so no user ever took it.
+        // `no_header_hint` suppresses it: there are no headers to attend across.
+        // `Vec<Option<_>>` is indexed by column position, so a column that was left
+        // out simply falls through to the per-column call below.
+        let sibling_classified: Option<Vec<Option<finetype_model::ColumnResult>>> =
+            if column_classifier.has_sibling_context() && !no_header_hint {
+                let mut positions: Vec<usize> = Vec::new();
+                let mut hints: Vec<String> = Vec::new();
+                for (i, col_values) in columns.iter().enumerate() {
+                    if col_values.is_empty() {
+                        continue;
+                    }
+                    // Same header the per-column path would use, JSON leaf and all,
+                    // so enrichment is the only difference between the two routes.
+                    let name = headers
+                        .get(i)
+                        .cloned()
+                        .unwrap_or_else(|| format!("col_{}", i));
+                    hints.push(if is_json_input {
+                        path_leaf(&name)
+                    } else {
+                        name
+                    });
+                    positions.push(i);
+                }
+                let inputs: Vec<(&[String], &str)> = positions
+                    .iter()
+                    .zip(hints.iter())
+                    .map(|(&i, h)| (columns[i].as_slice(), h.as_str()))
+                    .collect();
+                let results = column_classifier.classify_columns_with_context(&inputs)?;
+                let mut slots: Vec<Option<finetype_model::ColumnResult>> =
+                    vec![None; columns.len()];
+                for (k, &i) in positions.iter().enumerate() {
+                    slots[i] = Some(results[k].clone());
+                }
+                Some(slots)
+            } else {
+                None
+            };
+
+        // Per-column post-processing.
+        //
+        // Given a column's classification, the rest of its profile depends on
+        // nothing but that column, so the loop is data-parallel.
+        // `par_iter().enumerate()` is an INDEXED parallel iterator and
+        // `collect::<Result<Vec<_>, _>>()` from one yields results in input order —
+        // the emitted column sequence still matches the input file's column
+        // sequence, which eval fixtures and the DuckDB extension both depend on.
+        // Nothing here may collect into an unordered container.
         let profiles: Vec<ColProfile> = columns
             .par_iter()
             .enumerate()
@@ -372,10 +419,17 @@ pub(crate) fn cmd_profile(
                     name.clone()
                 };
 
-                let result = if no_header_hint {
-                    column_classifier.classify_column(col_values)?
-                } else {
-                    column_classifier.classify_column_with_header(col_values, &header_hint)?
+                // The sibling pre-pass already classified this column when it ran;
+                // otherwise classify it here.
+                let result = match sibling_classified
+                    .as_ref()
+                    .and_then(|slots| slots[i].as_ref())
+                {
+                    Some(enriched) => enriched.clone(),
+                    None if no_header_hint => column_classifier.classify_column(col_values)?,
+                    None => {
+                        column_classifier.classify_column_with_header(col_values, &header_hint)?
+                    }
                 };
 
                 let (vp_rate, vetoed, advisory_low) = col_validation_veto(

@@ -155,6 +155,16 @@ fn download_models() -> PathBuf {
         &["model.safetensors", "tokenizer.json"],
     );
 
+    // Sibling-context attention: the frozen cross-column module the shipped
+    // model's header branch was TRAINED behind. Serving without it asks that
+    // branch for a judgement under conditions it never saw, so it is a required
+    // part of the released binary, not an optional dev-machine extra.
+    download_model_group(
+        &models_dir,
+        "sibling-context",
+        &["model.safetensors", "config.json"],
+    );
+
     // Create models/default symlink -> the multi-branch default.
     let default_link = models_dir.join("default");
     let _ = fs::remove_file(&default_link);
@@ -382,6 +392,35 @@ fn generate_embedded_models(models_base: &Path, labels_base: &Path) {
         code.push_str("\npub const HAS_MB_VALUE_M2V: bool = false;\n");
         code.push_str("pub const MB_VALUE_TOKENIZER: &[u8] = &[];\n");
         code.push_str("pub const MB_VALUE_MODEL: &[u8] = &[];\n");
+    }
+
+    // ── Sibling-context attention ───────────────────────────────────────────
+    // The header branch of the shipped model was trained on embeddings this
+    // module produced (finetype-train enriches each table group before the
+    // header features reach the branch). Embedding it here is what lets a
+    // released binary run the pipeline the model was trained for; while it was
+    // absent, `profile` served raw header embeddings to a branch that had never
+    // been shown one.
+    let sibling_dir = models_base.join("sibling-context");
+    println!("cargo:rerun-if-changed={}", sibling_dir.display());
+    if sibling_dir.join("model.safetensors").exists() && sibling_dir.join("config.json").exists() {
+        let sib_weights = portable_path(&sibling_dir.join("model.safetensors"));
+        let sib_config = portable_path(&sibling_dir.join("config.json"));
+        code.push_str("\npub const HAS_SIBLING_CONTEXT: bool = true;\n");
+        code.push_str(&format!(
+            "pub const SIBLING_CONTEXT_WEIGHTS: &[u8] = include_bytes!(\"{sib_weights}\");\n"
+        ));
+        code.push_str(&format!(
+            "pub const SIBLING_CONTEXT_CONFIG: &[u8] = include_bytes!(\"{sib_config}\");\n"
+        ));
+        println!(
+            "cargo:warning=Embedding sibling-context attention from {}",
+            sibling_dir.display()
+        );
+    } else {
+        code.push_str("\npub const HAS_SIBLING_CONTEXT: bool = false;\n");
+        code.push_str("pub const SIBLING_CONTEXT_WEIGHTS: &[u8] = &[];\n");
+        code.push_str("pub const SIBLING_CONTEXT_CONFIG: &[u8] = &[];\n");
     }
 
     // Embed taxonomy YAML files

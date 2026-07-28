@@ -16,6 +16,7 @@ use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use crate::model2vec_shared::Model2VecResources;
 use crate::multi_branch::MultiBranchClassifier;
 use crate::rhh;
+use crate::sibling_context::SiblingContextAttention;
 use finetype_core::{Designation, Taxonomy};
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -649,6 +650,14 @@ pub struct ColumnClassifier {
     entity_classifier: Option<EntityClassifier>,
     /// Shared Model2Vec resources for sibling-context header encoding (multi-branch).
     model2vec: Option<Model2VecResources>,
+    /// Optional sibling-context attention module.
+    ///
+    /// When present alongside `model2vec` and `multi_branch`,
+    /// `classify_columns_with_context` enriches every column header with
+    /// cross-column context before the multi-branch header branch reads it —
+    /// which is the condition that branch was trained under. `None` leaves the
+    /// pipeline on raw header embeddings.
+    sibling_context: Option<SiblingContextAttention>,
     /// Optional multi-branch column classifier (Sherlock-style).
     /// When present, `classify_column_with_header` uses the multi-branch forward
     /// pass directly (column-level features → MLP → label), bypassing both
@@ -671,6 +680,7 @@ impl ColumnClassifier {
             skip_sharpen: false,
             entity_classifier: None,
             model2vec: None,
+            sibling_context: None,
             multi_branch: None,
         }
     }
@@ -707,6 +717,21 @@ impl ColumnClassifier {
         self.model2vec = Some(model2vec);
     }
 
+    /// Attach the sibling-context attention module.
+    ///
+    /// With it attached, `classify_columns_with_context` encodes every column
+    /// header with Model2Vec, attends across them, and feeds the enriched row into
+    /// the multi-branch header branch. Requires `model2vec` and `multi_branch`;
+    /// without either, the module is held but never consulted.
+    pub fn set_sibling_context(&mut self, sibling: SiblingContextAttention) {
+        self.sibling_context = Some(sibling);
+    }
+
+    /// Whether sibling-context attention is attached.
+    pub fn has_sibling_context(&self) -> bool {
+        self.sibling_context.is_some()
+    }
+
     /// Create a column classifier using a multi-branch model.
     ///
     /// Multi-branch is fundamentally column-level (Vec<String> → features → label),
@@ -727,6 +752,7 @@ impl ColumnClassifier {
             taxonomy: None,
             entity_classifier: None,
             model2vec: None,
+            sibling_context: None,
             multi_branch: Some(multi_branch),
             skip_sharpen: false,
         }
@@ -1018,27 +1044,67 @@ impl ColumnClassifier {
         &*self.classifier
     }
 
-    /// Classify multiple columns.
+    /// Classify multiple columns of one table, enriching each header with the
+    /// context of its siblings when the attention module is attached.
     ///
-    /// Columns are independent — each runs `classify_column_with_header` — so
-    /// the loop is data-parallel. `par_iter()` is an INDEXED parallel iterator
-    /// and `collect::<Result<Vec<_>, _>>()` restores input order, so the returned
-    /// sequence matches `columns` position for position regardless of how the
-    /// work was scheduled. Column order is contract, not cosmetics: the caller
+    /// The multi-branch header branch was trained on enriched embeddings: the
+    /// trainer runs frozen sibling-context attention over each table group before
+    /// the header features reach the branch, guarded by `n_cols > 1`. This method
+    /// reproduces that condition at inference — same module, same guard — so the
+    /// branch is asked for a judgement under the conditions it learned.
+    ///
+    /// The guard is not cosmetic. A table group of one column was NOT enriched
+    /// during training, so enriching a single column here would introduce the very
+    /// skew this path exists to close, in the opposite direction.
+    ///
+    /// Falls back to per-column classification when the module, Model2Vec, or the
+    /// multi-branch model is absent, or when there is nothing to attend across.
+    ///
+    /// Either way, `par_iter()`/`par_iter().enumerate()` are INDEXED parallel
+    /// iterators and `collect::<Result<Vec<_>, _>>()` restores input order, so the
+    /// returned sequence matches `columns` position for position regardless of how
+    /// the work was scheduled. Column order is contract, not cosmetics: the caller
     /// zips these results back against its own column list by position. Nothing
     /// here may collect into an unordered container.
-    ///
-    /// This used to run sibling-context attention over the column headers first
-    /// when `models/sibling-context/` happened to be on disk. That model was
-    /// never embedded in a released binary, so it made every repo-root
-    /// measurement a measurement of a pipeline no user runs.
     pub fn classify_columns_with_context(
         &self,
-        columns: &[(Vec<String>, String)], // (values, header) per column
+        columns: &[(&[String], &str)], // (values, header) per column
     ) -> Result<Vec<ColumnResult>, InferenceError> {
+        let per_column = || -> Result<Vec<ColumnResult>, InferenceError> {
+            columns
+                .par_iter()
+                .map(|(values, header)| self.classify_column_with_header(values, header))
+                .collect()
+        };
+
+        // Enrichment needs the attention module, the encoder that feeds it, the
+        // multi-branch model that consumes it, and at least two columns to attend
+        // across — the last matching the trainer's `n_cols > 1` guard.
+        let (Some(sibling_ctx), Some(m2v), Some(mb)) = (
+            self.sibling_context.as_ref(),
+            self.model2vec.as_ref(),
+            self.multi_branch.as_ref(),
+        ) else {
+            return per_column();
+        };
+        if columns.len() < 2 {
+            return per_column();
+        }
+
+        // Encode every header once, then attend across them: [N, D] → [N, D].
+        let headers: Vec<&str> = columns.iter().map(|(_, h)| *h).collect();
+        let header_embs = m2v.encode_batch(&headers)?;
+        let enriched = sibling_ctx.forward(&header_embs)?;
+
+        // Steps above did all the cross-column work; each column now reads only
+        // `&self` and row `i` of the enriched matrix, so this loop is data-parallel.
         columns
             .par_iter()
-            .map(|(values, header)| self.classify_column_with_header(values, header))
+            .enumerate()
+            .map(|(i, (values, header))| {
+                let enriched_header = enriched.get(i)?; // [D]
+                self.classify_multi_branch_with_enriched(mb, values, header, &enriched_header)
+            })
             .collect()
     }
 
@@ -1410,6 +1476,37 @@ impl ColumnClassifier {
         values: &[String],
         header: &str,
     ) -> Result<ColumnResult, InferenceError> {
+        self.classify_multi_branch_inner(mb, values, header, None)
+    }
+
+    /// Multi-branch classification whose header branch reads a sibling-enriched
+    /// embedding instead of the raw column name.
+    ///
+    /// Called from `classify_columns_with_context` once the attention module has
+    /// produced one enriched row per column. The raw header string is still passed
+    /// through: Sharpen's header hints match on the NAME, not on the embedding, and
+    /// they read the same string either way.
+    ///
+    /// Shares `classify_multi_branch_inner` with the raw path so sampling, feature
+    /// extraction, seed record and the whole Sharpen tail are identical by
+    /// construction — the header vector fed to the branch is the only difference.
+    fn classify_multi_branch_with_enriched(
+        &self,
+        mb: &MultiBranchClassifier,
+        values: &[String],
+        header: &str,
+        enriched_header: &candle_core::Tensor,
+    ) -> Result<ColumnResult, InferenceError> {
+        self.classify_multi_branch_inner(mb, values, header, Some(enriched_header))
+    }
+
+    fn classify_multi_branch_inner(
+        &self,
+        mb: &MultiBranchClassifier,
+        values: &[String],
+        header: &str,
+        enriched_header: Option<&candle_core::Tensor>,
+    ) -> Result<ColumnResult, InferenceError> {
         if values.is_empty() {
             return Ok(ColumnResult {
                 label: "unknown".to_string(),
@@ -1436,8 +1533,15 @@ impl ColumnClassifier {
 
         let samples_used = sample.len();
 
-        // Step 1: Classify via multi-branch (feature extraction + forward pass)
-        let (label, confidence) = mb.classify_column(&sample, header, self.taxonomy.as_ref())?;
+        // Step 1: Classify via multi-branch (feature extraction + forward pass).
+        // The enriched header, when present, replaces the on-the-spot Model2Vec
+        // encode of `header`; nothing else about the forward pass changes.
+        let (label, confidence) = match enriched_header {
+            Some(enriched) => {
+                mb.classify_column_with_enriched_header(&sample, enriched, self.taxonomy.as_ref())?
+            }
+            None => mb.classify_column(&sample, header, self.taxonomy.as_ref())?,
+        };
 
         // Step 2: Compute deterministic ColumnFeatures (36-dim, no neural inference)
         let per_value_features: Vec<[f32; FEATURE_DIM]> =
