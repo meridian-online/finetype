@@ -203,7 +203,23 @@ finding that got two earlier pull requests refused, and the reason
 
 ## Baseline drift — measured, not assumed
 
-<!-- BASELINE_DRIFT -->
+The F32 binary built here is **67,388,816** bytes; the figure this change was proposed
+against is 67,541,712. The F16 side lands the same 152,896 bytes low, so the shift is in the
+*baseline*, not in the conversion, and the 15,240,576-byte saving is unaffected.
+
+**What accounts for the 152,896 is NOT established.** Settling it needs a build of the
+pre-merge commit, which means moving this shared checkout off its branch, and that was not
+done. What is on the record instead is circumstantial and pointed both ways:
+
+- the earlier figure predates three merges into `main` — one of them deleted 2,745 lines
+  across `finetype-model` and `finetype-cli`, including all of `semantic.rs` and 1,276
+  lines of `inference.rs`, which under `lto = true` is a plausible six-figure reduction;
+- but the same window **grew** `labels/definitions_datetime.yaml` by 1,045 bytes, and that
+  file is `include_str!`-embedded, so it pushes the other way.
+
+A reviewer who wants this closed can build `finetype-cli` at the merge base with the F32
+artifact restored from `.finetype-model-backups/` and read the size. Until someone does,
+"the intervening merges account for it" is a hypothesis, not a measurement.
 
 ## Reproducing this
 

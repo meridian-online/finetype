@@ -50,6 +50,13 @@ IEEE round-half-to-even out of CPython's `struct`, which is why the same input p
 the same bytes on a laptop and on a CI runner: these bytes get compiled into a binary, and
 a per-platform difference there is a byte-drift failure waiting to happen.
 
+What it is worth, measured on `m2v8m-s43` (macOS arm64): the artifact goes 30,236,760 →
+15,118,424 bytes and the release binary 67,388,816 → **52,148,240**, −22.6 %. The binary
+sheds 122,240 bytes more than the artifact does, and that is expected rather than a
+mystery: 4,096 of it is the 16 KB-aligned `__TEXT` segment crossing one further page
+boundary, and 118,144 is `__LINKEDIT` carrying 3,692 fewer sha256 code-signature page
+hashes at 32 bytes each. Full workings in `evidence/half-precision-value-encoder.md`.
+
 Then re-check the promotion scoreboard **on the converted artifact**. Half precision is a
 packaging change, not a free one: it perturbs the encoder's rows in the last few
 thousandths, and an argmax over 244 classes is entitled to move. The gold re-score through
@@ -63,13 +70,30 @@ field it declares in the header and then writes as the empty string for every ro
 `_profile_column` returns `x-finetype-label` and nothing else. Two identical prediction
 files therefore establish **label**-invariance and nothing more: confidence, quality band,
 runner-up, disambiguation and detected locale can all move without shifting that file's
-sha256. Under half precision the confidences *do* move — on the last measurement, 144 of
-843 resolvable gold columns, maximum |Δ| 0.0006, with 0 label and 0 quality-band changes.
-That is the arithmetic consequence of the storage change and not a regression, but a
-release note that calls the output unchanged on the strength of that file is overstating
-what was measured. For a whole-record claim, diff the whole record: `finetype profile -o
-csv` over the fixture under each variant, or `scripts/compare_composed_records.py` for the
-fields Sharpen can move.
+sha256. Under half precision the confidences *do* move — **170 of 843** resolvable gold
+columns, maximum |Δ| **0.0007**, with **0** label and **0** quality-band changes, on fixture
+`gold-2026-07-14`. That is the arithmetic consequence of the storage change and not a
+regression, but a release note that calls the output unchanged on the strength of that file
+is overstating what was measured.
+
+For a whole-record claim, diff the whole record. `scripts/encoder_dtype_record_diff.py`
+does exactly that — it drives `finetype profile -o csv` once per gold column and compares
+every emitted field — and `evidence/half-precision-value-encoder.md` is the record it
+produced, with the committed diff JSONs beside it. Use
+`scripts/compare_composed_records.py` for the fields Sharpen can move.
+
+Two traps that measurement found, both of which will bite the next person:
+
+- **`detected_locale` is not run-to-run stable.** A same-binary, same-artifact repeat of the
+  whole 843-column sweep moved it on one column, and eight consecutive profiles of one
+  fixed column returned six distinct locales. Run the repeat *first* and subtract that
+  floor; a single locale flip attributed to a dtype change is noise about noise.
+- **The fast corpus-honest gate cannot see an encoder change at all.**
+  `scripts/corpus_honest_gate_fast.sh` builds its raw-Sense cache once, from the candidate
+  binary, then resharpens that one cache with both binaries — and `resharpen` composes from
+  cached sense labels without the value encode. Both arms therefore carry the *same*
+  encoder output whatever the artifact says, so the gate returns green by construction. Do
+  not quote it here.
 
 Use the `profile` path, not the offline one, and know why. The offline scorer,
 `predict_multibranch`, takes its branch features **precomputed** from an FTMB, so whether
