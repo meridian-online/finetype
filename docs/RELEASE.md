@@ -55,7 +55,21 @@ packaging change, not a free one: it perturbs the encoder's rows in the last few
 thousandths, and an argmax over 244 classes is entitled to move. The gold re-score through
 the real `profile` path (`scripts/score_gold_anchor.py predict … --binary
 ./target/release/finetype`, with `FINETYPE_MODEL` pointed at each variant) is what
-establishes it did not.
+establishes the **labels** did not.
+
+Know what that scorer can see, because it is less than it looks. `predict` writes one row
+per column — `file_content_sha256`, `column_name`, `predicted_label`, and a `confidence`
+field it declares in the header and then writes as the empty string for every row, because
+`_profile_column` returns `x-finetype-label` and nothing else. Two identical prediction
+files therefore establish **label**-invariance and nothing more: confidence, quality band,
+runner-up, disambiguation and detected locale can all move without shifting that file's
+sha256. Under half precision the confidences *do* move — on the last measurement, 144 of
+843 resolvable gold columns, maximum |Δ| 0.0006, with 0 label and 0 quality-band changes.
+That is the arithmetic consequence of the storage change and not a regression, but a
+release note that calls the output unchanged on the strength of that file is overstating
+what was measured. For a whole-record claim, diff the whole record: `finetype profile -o
+csv` over the fixture under each variant, or `scripts/compare_composed_records.py` for the
+fields Sharpen can move.
 
 Use the `profile` path, not the offline one, and know why. The offline scorer,
 `predict_multibranch`, takes its branch features **precomputed** from an FTMB, so whether
