@@ -438,8 +438,7 @@ fn ptc_tightening_compact_dmy_rejects_eight_digit_figures_and_keys() {
         // survive: DD-MM-YYYY is the ordering most of the world writes.
         &[
             // The taxonomy's own declared samples.
-            "15012024", "31122019",
-            // Ordinary day-first dates.
+            "15012024", "31122019", // Ordinary day-first dates.
             "28021996", "17081947", "23111963", "09051945", "25121980",
             // NINETEENTH- AND EIGHTEENTH-CENTURY DATES. These are the values
             // that refute a century year window on this leaf, the same way an

@@ -1433,11 +1433,7 @@ fn assert_full_record(profile: &Value, column_name: &str, expected: Value, why: 
         .filter(|(k, _)| k.as_str() != "confidence")
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
-    assert_eq!(
-        Value::Object(actual),
-        expected,
-        "{column_name}: {why}"
-    );
+    assert_eq!(Value::Object(actual), expected, "{column_name}: {why}");
     let confidence = col["confidence"].as_f64().unwrap_or_else(|| {
         panic!(
             "{column_name}: confidence must be a number, got {:?}",
@@ -1544,9 +1540,7 @@ fn golden_profile_compact_dmy_rejects_sequential_ids() {
 #[test]
 #[ignore]
 fn golden_profile_compact_dmy_vetoes_round_hundred_share_counts() {
-    let profile = run_profile_json(&fixture_path(
-        "compact_dmy_round_hundred_share_counts.csv",
-    ));
+    let profile = run_profile_json(&fixture_path("compact_dmy_round_hundred_share_counts.csv"));
     assert_full_record(
         &profile,
         "sharesOutstanding",
@@ -1578,9 +1572,7 @@ fn golden_profile_compact_dmy_vetoes_round_hundred_share_counts() {
 #[test]
 #[ignore]
 fn golden_profile_compact_dmy_leaves_unconstrained_eight_digit_alone() {
-    let profile = run_profile_json(&fixture_path(
-        "compact_dmy_unconstrained_eight_digit.csv",
-    ));
+    let profile = run_profile_json(&fixture_path("compact_dmy_unconstrained_eight_digit.csv"));
     assert_full_record(
         &profile,
         "value",
@@ -1653,9 +1645,7 @@ fn golden_profile_compact_dmy_change_leaves_genuine_ymd_dates_alone() {
 #[test]
 #[ignore]
 fn golden_profile_compact_dmy_change_leaves_genuine_day_first_dates_alone() {
-    let profile = run_profile_json(&fixture_path(
-        "compact_dmy_genuine_day_first_dates.csv",
-    ));
+    let profile = run_profile_json(&fixture_path("compact_dmy_genuine_day_first_dates.csv"));
     assert_full_record(
         &profile,
         "date",
