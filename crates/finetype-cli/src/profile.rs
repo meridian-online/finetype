@@ -17,7 +17,7 @@ use rayon::prelude::*;
 const QUALITY_HIGH_THRESHOLD: f32 = 0.85;
 const QUALITY_LOW_THRESHOLD: f32 = 0.70;
 
-fn quality_band_label(confidence: f32) -> &'static str {
+pub(crate) fn quality_band_label(confidence: f32) -> &'static str {
     if confidence >= QUALITY_HIGH_THRESHOLD {
         "high"
     } else if confidence >= QUALITY_LOW_THRESHOLD {
@@ -30,7 +30,11 @@ fn quality_band_label(confidence: f32) -> &'static str {
 /// The second-best vote, surfaced only on the `low` band (and only when it
 /// differs from the emitted label). `vote_distribution` is empty on rule/veto
 /// paths, which sit above the low threshold anyway, so this is `None` there.
-fn low_band_runner_up(label: &str, confidence: f32, votes: &[(String, f32)]) -> Option<String> {
+pub(crate) fn low_band_runner_up(
+    label: &str,
+    confidence: f32,
+    votes: &[(String, f32)],
+) -> Option<String> {
     if confidence >= QUALITY_LOW_THRESHOLD {
         return None;
     }
@@ -134,8 +138,8 @@ pub(crate) fn cmd_profile(
         column_classifier.set_taxonomy(taxonomy);
     }
 
-    // Wire Model2Vec + sibling context for the multi-branch header enrichment.
-    wire_model2vec_and_siblings(&mut column_classifier);
+    // Wire the shared Model2Vec encoder the multi-branch header branch needs.
+    wire_model2vec(&mut column_classifier);
 
     // Diagnostic: skip Sharpen post-processing for ablation studies
     if raw_model {
@@ -312,18 +316,22 @@ pub(crate) fn cmd_profile(
             invalid_samples: Vec<String>,
         }
 
-        // Assigned by exactly one of the two classification paths below, each of
-        // which builds the whole vector in column order.
-        let profiles: Vec<ColProfile>;
-
-        // When sibling-context attention is available, classify all columns
-        // together so each column benefits from cross-column context.
-        if column_classifier.has_sibling_context() && !no_header_hint {
-            // Build column descriptors for all non-empty columns
-            let mut col_inputs: Vec<(usize, Vec<String>, String, String, usize)> = Vec::new(); // (index, values, header_hint, name, null_count)
-            let mut empty_profiles: Vec<(usize, ColProfile)> = Vec::new();
-
-            for (i, col_values) in columns.iter().enumerate() {
+        // Per-column classification.
+        //
+        // One column's profile depends on nothing but that column, so the loop
+        // is data-parallel. `par_iter().enumerate()` is an INDEXED parallel
+        // iterator and `collect::<Result<Vec<_>, _>>()` from one yields results
+        // in input order — the emitted column sequence still matches the input
+        // file's column sequence, which eval fixtures and the DuckDB extension
+        // both depend on. Nothing here may collect into an unordered container.
+        //
+        // There used to be a second, cross-column path here, taken whenever a
+        // sibling-context model happened to be on disk. No released binary ever
+        // embedded that model, so no user ever took it.
+        let profiles: Vec<ColProfile> = columns
+            .par_iter()
+            .enumerate()
+            .map(|(i, col_values)| -> anyhow::Result<ColProfile> {
                 let name = headers
                     .get(i)
                     .cloned()
@@ -331,268 +339,109 @@ pub(crate) fn cmd_profile(
                 let null_count = row_count - col_values.len();
 
                 if col_values.is_empty() {
-                    empty_profiles.push((
-                        i,
-                        ColProfile {
-                            name,
-                            label: "unknown".to_string(),
-                            quality_band: "low",
-                            runner_up: None,
-                            confidence: 0.0,
-                            samples_used: 0,
-                            non_null_count: 0,
-                            null_count,
-                            disambiguation_applied: false,
-                            disambiguation_rule: None,
-                            detected_locale: None,
-                            broad_type: None,
-                            format_string: None,
-                            transform: None,
-                            is_generic: false,
-                            quality: None,
-                            unique_values: None,
-                            validation_pass_rate: None,
-                            validation_vetoed: false,
-                            validation_advisory_low: false,
-                            vetoed_type: None,
-                            enum_domain: None,
-                        },
-                    ));
-                } else {
-                    let header_hint = if is_json_input {
-                        path_leaf(&name)
-                    } else {
-                        name.clone()
-                    };
-                    col_inputs.push((i, col_values.clone(), header_hint, name, null_count));
-                }
-            }
-
-            // Classify all non-empty columns with sibling context
-            let context_columns: Vec<(Vec<String>, String)> = col_inputs
-                .iter()
-                .map(|(_, values, header, _, _)| (values.clone(), header.clone()))
-                .collect();
-            let context_results =
-                column_classifier.classify_columns_with_context(&context_columns)?;
-
-            // Merge results back in original order.
-            //
-            // The per-column tail — validation veto, veto fallback, taxonomy
-            // contract lookup, categorical/enum-domain detection — is independent
-            // per column and reads only shared immutable state, so it runs in
-            // parallel. `par_iter` over a `Vec` is an INDEXED parallel iterator and
-            // `collect::<Vec<_>>()` from one preserves input order; the explicit
-            // `sort_by_key` below then puts the empty-column entries back in place.
-            // Column order is contract (eval fixtures and the DuckDB extension read
-            // it positionally), so nothing here may collect into an unordered
-            // container.
-            let mut all_entries: Vec<(usize, ColProfile)> = Vec::new();
-            all_entries.extend(empty_profiles);
-            let merged: Vec<(usize, ColProfile)> = col_inputs
-                .into_par_iter()
-                .zip(context_results)
-                .map(|((idx, values, _, name, null_count), result)| {
-                    let (vp_rate, vetoed, advisory_low) = col_validation_veto(
-                        &result.label,
-                        &values,
-                        enrichment_taxonomy.as_ref(),
-                        &veto_safe,
-                        veto_enabled,
-                    );
-                    let (final_label, vetoed_type, fallback_rule) =
-                        resolve_veto_outcome(vetoed, &result.label, &values);
-                    let mut result = result;
-                    if let Some(rule) = fallback_rule {
-                        result.disambiguation_applied = true;
-                        result.disambiguation_rule = Some(rule.to_string());
-                    }
-                    let (broad_type, format_string, transform) =
-                        if let Some(ref taxonomy) = enrichment_taxonomy {
-                            if let Some(def) = taxonomy.get(&final_label) {
-                                (
-                                    def.broad_type.clone(),
-                                    def.format_string.clone(),
-                                    def.transform.clone(),
-                                )
-                            } else {
-                                (None, None, None)
-                            }
-                        } else {
-                            (None, None, None)
-                        };
-                    let unique_values =
-                        collect_unique_values_if_categorical(&final_label, &values, enum_threshold);
-                    let enum_domain =
-                        detect_enum_domain(&final_label, &values, &EnumConfig::default());
-                    let quality_band = quality_band_label(result.confidence);
-                    let runner_up = low_band_runner_up(
-                        &final_label,
-                        result.confidence,
-                        &result.vote_distribution,
-                    );
-                    (
-                        idx,
-                        ColProfile {
-                            name,
-                            label: final_label,
-                            quality_band,
-                            runner_up,
-                            confidence: result.confidence,
-                            samples_used: result.samples_used,
-                            non_null_count: values.len(),
-                            null_count,
-                            disambiguation_applied: result.disambiguation_applied,
-                            disambiguation_rule: result.disambiguation_rule,
-                            detected_locale: result.detected_locale,
-                            broad_type,
-                            format_string,
-                            transform,
-                            is_generic: result.is_generic,
-                            quality: None,
-                            unique_values,
-                            validation_pass_rate: vp_rate,
-                            validation_vetoed: vetoed,
-                            validation_advisory_low: advisory_low,
-                            vetoed_type,
-                            enum_domain,
-                        },
-                    )
-                })
-                .collect();
-            all_entries.extend(merged);
-            all_entries.sort_by_key(|(idx, _)| *idx);
-            profiles = all_entries.into_iter().map(|(_, p)| p).collect();
-        } else {
-            // Per-column classification (standard path).
-            //
-            // One column's profile depends on nothing but that column, so the loop
-            // is data-parallel. `par_iter().enumerate()` is an INDEXED parallel
-            // iterator and `collect::<Result<Vec<_>, _>>()` from one yields results
-            // in input order — the emitted column sequence still matches the input
-            // file's column sequence, which eval fixtures and the DuckDB extension
-            // both depend on. Nothing here may collect into an unordered container.
-            profiles = columns
-                .par_iter()
-                .enumerate()
-                .map(|(i, col_values)| -> anyhow::Result<ColProfile> {
-                    let name = headers
-                        .get(i)
-                        .cloned()
-                        .unwrap_or_else(|| format!("col_{}", i));
-                    let null_count = row_count - col_values.len();
-
-                    if col_values.is_empty() {
-                        return Ok(ColProfile {
-                            name,
-                            label: "unknown".to_string(),
-                            quality_band: "low",
-                            runner_up: None,
-                            confidence: 0.0,
-                            samples_used: 0,
-                            non_null_count: 0,
-                            null_count,
-                            disambiguation_applied: false,
-                            disambiguation_rule: None,
-                            detected_locale: None,
-                            broad_type: None,
-                            format_string: None,
-                            transform: None,
-                            is_generic: false,
-                            quality: None,
-                            unique_values: None,
-                            validation_pass_rate: None,
-                            validation_vetoed: false,
-                            validation_advisory_low: false,
-                            vetoed_type: None,
-                            enum_domain: None,
-                        });
-                    }
-
-                    // For JSON paths, extract the leaf as header hint (e.g., "users[].email" → "email")
-                    let header_hint = if is_json_input {
-                        path_leaf(&name)
-                    } else {
-                        name.clone()
-                    };
-
-                    let result = if no_header_hint {
-                        column_classifier.classify_column(col_values)?
-                    } else {
-                        column_classifier.classify_column_with_header(col_values, &header_hint)?
-                    };
-
-                    let (vp_rate, vetoed, advisory_low) = col_validation_veto(
-                        &result.label,
-                        col_values,
-                        enrichment_taxonomy.as_ref(),
-                        &veto_safe,
-                        veto_enabled,
-                    );
-                    let (final_label, vetoed_type, fallback_rule) =
-                        resolve_veto_outcome(vetoed, &result.label, col_values);
-                    let mut result = result;
-                    if let Some(rule) = fallback_rule {
-                        result.disambiguation_applied = true;
-                        result.disambiguation_rule = Some(rule.to_string());
-                    }
-
-                    // Look up taxonomy contract fields for the (possibly vetoed) label
-                    let (broad_type, format_string, transform) =
-                        if let Some(ref taxonomy) = enrichment_taxonomy {
-                            if let Some(def) = taxonomy.get(&final_label) {
-                                (
-                                    def.broad_type.clone(),
-                                    def.format_string.clone(),
-                                    def.transform.clone(),
-                                )
-                            } else {
-                                (None, None, None)
-                            }
-                        } else {
-                            (None, None, None)
-                        };
-
-                    let unique_values = collect_unique_values_if_categorical(
-                        &final_label,
-                        col_values,
-                        enum_threshold,
-                    );
-                    let enum_domain =
-                        detect_enum_domain(&final_label, col_values, &EnumConfig::default());
-                    let quality_band = quality_band_label(result.confidence);
-                    let runner_up = low_band_runner_up(
-                        &final_label,
-                        result.confidence,
-                        &result.vote_distribution,
-                    );
-                    Ok(ColProfile {
+                    return Ok(ColProfile {
                         name,
-                        label: final_label,
-                        quality_band,
-                        runner_up,
-                        confidence: result.confidence,
-                        samples_used: result.samples_used,
-                        non_null_count: col_values.len(),
+                        label: "unknown".to_string(),
+                        quality_band: "low",
+                        runner_up: None,
+                        confidence: 0.0,
+                        samples_used: 0,
+                        non_null_count: 0,
                         null_count,
-                        disambiguation_applied: result.disambiguation_applied,
-                        disambiguation_rule: result.disambiguation_rule,
-                        detected_locale: result.detected_locale,
-                        broad_type,
-                        format_string,
-                        transform,
-                        is_generic: result.is_generic,
+                        disambiguation_applied: false,
+                        disambiguation_rule: None,
+                        detected_locale: None,
+                        broad_type: None,
+                        format_string: None,
+                        transform: None,
+                        is_generic: false,
                         quality: None,
-                        unique_values,
-                        validation_pass_rate: vp_rate,
-                        validation_vetoed: vetoed,
-                        validation_advisory_low: advisory_low,
-                        vetoed_type,
-                        enum_domain,
-                    })
+                        unique_values: None,
+                        validation_pass_rate: None,
+                        validation_vetoed: false,
+                        validation_advisory_low: false,
+                        vetoed_type: None,
+                        enum_domain: None,
+                    });
+                }
+
+                // For JSON paths, extract the leaf as header hint (e.g., "users[].email" → "email")
+                let header_hint = if is_json_input {
+                    path_leaf(&name)
+                } else {
+                    name.clone()
+                };
+
+                let result = if no_header_hint {
+                    column_classifier.classify_column(col_values)?
+                } else {
+                    column_classifier.classify_column_with_header(col_values, &header_hint)?
+                };
+
+                let (vp_rate, vetoed, advisory_low) = col_validation_veto(
+                    &result.label,
+                    col_values,
+                    enrichment_taxonomy.as_ref(),
+                    &veto_safe,
+                    veto_enabled,
+                );
+                let (final_label, vetoed_type, fallback_rule) =
+                    resolve_veto_outcome(vetoed, &result.label, col_values);
+                let mut result = result;
+                if let Some(rule) = fallback_rule {
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(rule.to_string());
+                }
+
+                // Look up taxonomy contract fields for the (possibly vetoed) label
+                let (broad_type, format_string, transform) =
+                    if let Some(ref taxonomy) = enrichment_taxonomy {
+                        if let Some(def) = taxonomy.get(&final_label) {
+                            (
+                                def.broad_type.clone(),
+                                def.format_string.clone(),
+                                def.transform.clone(),
+                            )
+                        } else {
+                            (None, None, None)
+                        }
+                    } else {
+                        (None, None, None)
+                    };
+
+                let unique_values =
+                    collect_unique_values_if_categorical(&final_label, col_values, enum_threshold);
+                let enum_domain =
+                    detect_enum_domain(&final_label, col_values, &EnumConfig::default());
+                let quality_band = quality_band_label(result.confidence);
+                let runner_up =
+                    low_band_runner_up(&final_label, result.confidence, &result.vote_distribution);
+                Ok(ColProfile {
+                    name,
+                    label: final_label,
+                    quality_band,
+                    runner_up,
+                    confidence: result.confidence,
+                    samples_used: result.samples_used,
+                    non_null_count: col_values.len(),
+                    null_count,
+                    disambiguation_applied: result.disambiguation_applied,
+                    disambiguation_rule: result.disambiguation_rule,
+                    detected_locale: result.detected_locale,
+                    broad_type,
+                    format_string,
+                    transform,
+                    is_generic: result.is_generic,
+                    quality: None,
+                    unique_values,
+                    validation_pass_rate: vp_rate,
+                    validation_vetoed: vetoed,
+                    validation_advisory_low: advisory_low,
+                    vetoed_type,
+                    enum_domain,
                 })
-                .collect::<anyhow::Result<Vec<_>>>()?;
-        } // end else (per-column path)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         // Output results
         match output {

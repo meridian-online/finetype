@@ -143,17 +143,16 @@ fn download_models() -> PathBuf {
         &["model.safetensors", "tokenizer.json"],
     );
 
-    // Header branch + semantic classifier: the shared Model2Vec (potion-4M)
-    // encoder. Required — the multi-branch header branch depends on it.
+    // Header branch: the shared Model2Vec (potion-4M) encoder. Required — the
+    // multi-branch header branch depends on it. `type_embeddings.safetensors`
+    // and `label_index.json` used to be fetched here for the semantic header
+    // classifier; that classifier had no reachable construction site outside
+    // tests and is gone, and neither file was ever `include_bytes!`-embedded,
+    // so fetching them only slowed the build.
     download_model_group(
         &models_dir,
         "model2vec",
-        &[
-            "model.safetensors",
-            "type_embeddings.safetensors",
-            "tokenizer.json",
-            "label_index.json",
-        ],
+        &["model.safetensors", "tokenizer.json"],
     );
 
     // Create models/default symlink -> the multi-branch default.

@@ -5,6 +5,73 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Removed
+
+- **Two unreachable classifiers and a header-hint classifier no user could run
+  (−2,777 lines).** `SemanticHintClassifier` (`semantic.rs`) had no construction
+  site outside `#[cfg(test)]` code — `ColumnClassifier::set_semantic_hint` had no
+  caller at all — so the `semantic_hint` field was `None` in every binary ever
+  shipped and the Model2Vec header matching it advertised never ran. `Classifier`
+  and `CharClassifier` in `inference.rs` had no construction site anywhere,
+  tests included, taking their `post_process` / `pattern_validate` tails and
+  `extract_validation_patterns` with them; multi-branch is the only inference
+  path (choice 0107 removed its callers, not the code). `InferenceError`,
+  `ClassificationResult` and the `ValueClassifier` trait stay — `ColumnClassifier`
+  still holds a `Box<dyn ValueClassifier>`. `build.rs` and the CI model download
+  no longer fetch `type_embeddings.safetensors` / `label_index.json`: they were
+  the semantic classifier's artifacts and were never `include_bytes!`-embedded.
+- **One header-hint family, and it is unreachable rather than unused.**
+  `header_hint_fallback` — confidence under 0.3 with the hint absent from the
+  votes, promoting the hinted type at 0.4 — closed the header-hint else-if
+  chain. Reaching it required the arm above it to decline, and that arm fires
+  for every hardcoded hint not in the votes; with the Model2Vec hint source gone
+  (see above), every hint that reaches the chain IS hardcoded. So the fallback
+  needed the hint to be simultaneously present and absent from the votes. It was
+  live only through the semantic classifier no released binary contained. Its
+  removal moves nothing on the 837,625-column stratified sample: not the label,
+  the confidence, the quality band, the runner-up, or the rule.
+
+  Four other families on the same measured-dead list — `header_hint_measurement`,
+  `header_hint_sci_measurement`, `header_hint_geo_override` and
+  `header_hint_person_override` — are **kept**, all four on evidence. They are
+  reachable, and removing any of them changes what `finetype profile` prints:
+
+  | family | corpus columns moved | reproduction |
+  |---|---|---|
+  | `header_hint_geo_override` | 294 (rule) | a `city` column at 0.80 becomes 0.50, band `medium` -> `low`, runner-up surfaced |
+  | `header_hint_person_override` | 133 (label + rule) | `authors`, `LastName`, `Surname`, `billing_lastname` columns revert to city/region/word |
+  | `header_hint_measurement` | 0 | a `height` column at 0.90 becomes 0.50, band `high` -> `low`, runner-up surfaced |
+  | `header_hint_sci_measurement` | 0 | a `temperature` column at 0.80 becomes 0.90 or 0.60, band moves either way |
+
+  The two that move zero corpus columns are not therefore inert — the stratified
+  sample simply contains no height/weight column, and `header_hint_coord_veto`
+  (added later) shadows the scientific-measurement arm whenever a coordinate
+  column's values are numeric, which is nearly always. Zero hits on a corpus
+  measures the corpus, not the rule.
+
+### Changed
+
+- **`finetype resharpen` emits the whole composed record**, not just the label:
+  `id`, label, confidence, quality band, runner-up, disambiguation rule. A
+  label-only diff cannot see a rule that keeps the answer and halves the
+  confidence, and that is exactly the failure mode this verb is used to rule
+  out. `scripts/compare_composed_records.py` diffs two such passes and reports
+  per-field and per-transition counts. `detected_locale` is excluded: it is not
+  yet run-to-run stable on a fixed binary.
+
+
+- **The dev binary and the released binary now classify the same way.**
+  `finetype profile` used to load `models/sibling-context/model.safetensors`
+  whenever that directory happened to exist and run a 396,800-parameter
+  cross-column attention layer over the headers before the multi-branch header
+  branch. `build.rs` never embedded that artifact, so no released binary could
+  do this — every number measured from a repo checkout described a pipeline no
+  user runs. Inference no longer loads it. The artifact is still trained and is
+  still loaded frozen by the multi-branch trainer, which is where it earns its
+  keep.
+
 ## [0.6.53] - 2026-07-18
 
 ### Fixed
