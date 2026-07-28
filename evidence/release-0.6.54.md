@@ -1,0 +1,76 @@
+> Generated from `evidence/fixtures.json` by `scripts/evidence.py render-release --binary 0.6.54`. Do not hand-edit — `scripts/evidence.py verify` re-renders this file and fails if it has drifted from the manifest.
+
+# finetype 0.6.54 — what it measured at
+
+**Every score below names the gold fixture version it was measured on.** A score without a fixture version is not evidence: ground truth moves under a bar, and a float remembered without its fixture becomes a false-rejection generator. Two scores measured on different fixture versions are not comparable, and this report refuses to subtract them rather than presenting the difference as a result.
+
+## Headline
+
+| Fixture version | Taxonomy | Model | Pipeline | Correct / scored | Accuracy | Measured |
+|---|---|---|---|---:|---:|---|
+| `gold-2026-06-28` | `tax-a8494466d9c1` | `m2v8m-s43` | predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe | 805 / 931 | **0.865** | 2026-07-28 |
+| `gold-2026-06-28` | `tax-a8494466d9c1` | `m2v8m-s43` | predict_multibranch -> reshape -> score_gold_anchor --reframe (no Sharpen) | 499 / 931 | **0.536** | 2026-07-28 |
+| `gold-2026-07-14` | `tax-e0baf2e4b3bd` | `m2v8m-s43` | predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe | 819 / 931 | **0.880** | 2026-07-28 |
+| `gold-2026-07-14` | `tax-e0baf2e4b3bd` | `m2v8m-s43` | predict_multibranch -> reshape -> score_gold_anchor --reframe (no Sharpen) | 492 / 931 | **0.528** | 2026-07-28 |
+
+- `gold-2026-06-28` · `m2v8m-s43/composed-reframe/0.6.54` — The historical fixture, re-measured on the 0.6.54 tree so the pre-0.6.41 bar keeps a current comparator. Materialise the blob with: git show f903a2c:eval/gold/gold_corpus.tsv > output/gold-fixtures/gold_2026-06-28.tsv — the tracked corpus is not touched.
+- `gold-2026-06-28` · `m2v8m-s43/sense-reframe/0.6.54` — Standalone Sense on the historical fixture. No 0.6.53 counterpart was recorded on this pair, so it carries no delta here; it is recorded so the next release has one.
+- `gold-2026-07-14` · `m2v8m-s43/composed-reframe/0.6.54` — Composed end-to-end on the 0.6.54 tree, both compact-date leaves range-carrying and the value encoder in half precision: compose_predictions.py runs finetype profile once per column, so this path reads the converted artifact and the on-disk taxonomy.
+- `gold-2026-07-14` · `m2v8m-s43/sense-reframe/0.6.54` — Standalone Sense, before composition. This path takes branch features precomputed from the FTMB and never opens the value encoder, so it cannot see the half-precision conversion.
+
+## Same-fixture comparison
+
+A delta is only meaningful when the fixture version and the pipeline are held fixed and the binary is the only thing that moved. These are the pairs in the manifest that satisfy that.
+
+| Fixture version | Pipeline | Against | Then | Now | Δ columns | Δ accuracy |
+|---|---|---|---:|---:|---:|---:|
+| `gold-2026-06-28` | predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe | `0.6.53` | 805/931 = 0.865 | 805/931 = 0.865 | +0 | +0.000 |
+| `gold-2026-06-28` | predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe | `pre-0.6.41` | 794/931 = 0.853 | 805/931 = 0.865 | +11 | +0.012 |
+| `gold-2026-07-14` | predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe | `0.6.53` | 819/931 = 0.880 | 819/931 = 0.880 | +0 | +0.000 |
+| `gold-2026-07-14` | predict_multibranch -> reshape -> score_gold_anchor --reframe (no Sharpen) | `0.6.53` | 492/931 = 0.528 | 492/931 = 0.528 | +0 | +0.000 |
+
+### Refused comparisons
+
+Same pipeline, different ground truth. The difference between these numbers is not a measurement of anything, so it is not stated as one.
+
+- `gold-2026-06-28` 805/931 = 0.865 vs `gold-2026-07-14` 819/931 = 0.880 (`m2v8m-s43/composed-reframe/0.6.53`) — different fixture versions.
+- `gold-2026-06-28` 805/931 = 0.865 vs `gold-2026-07-14` 819/931 = 0.880 (`m2v8m-s43/composed-reframe/0.6.54`) — different fixture versions.
+- `gold-2026-06-28` 499/931 = 0.536 vs `gold-2026-07-14` 492/931 = 0.528 (`m2v8m-s43/sense-reframe/0.6.53`) — different fixture versions.
+- `gold-2026-06-28` 499/931 = 0.536 vs `gold-2026-07-14` 492/931 = 0.528 (`m2v8m-s43/sense-reframe/0.6.54`) — different fixture versions.
+- `gold-2026-07-14` 819/931 = 0.880 vs `gold-2026-06-28` 805/931 = 0.865 (`m2v8m-s43/composed-reframe/0.6.53`) — different fixture versions.
+- `gold-2026-07-14` 819/931 = 0.880 vs `gold-2026-06-28` 794/931 = 0.853 (`m2v8m-s43/composed-reframe/pre-0.6.41`) — different fixture versions.
+
+## Fixture versions cited
+
+| Version | Rows | Taxonomy | Types | Content hash (sha256) | Path |
+|---|---:|---|---:|---|---|
+| `gold-2026-06-28` | 931 | `tax-a8494466d9c1` | 245 | `9dbbcd3abeed9f4477166673772c36b7ffacfc8e5619921eae00737194215edb` | `eval/gold/gold_corpus.tsv` |
+| `gold-2026-07-14` | 1037 | `tax-e0baf2e4b3bd` | 251 | `760ee4ace67064edd465d245103677e30171a9ce4bb07decc44bd69f914586a7` | `eval/gold/gold_corpus.tsv` |
+
+- `gold-2026-06-28` — Historical: the gold corpus as it stood when the clean-label go/no-go bar was written (git blob at f903a2c). Retained so the bar it carried stays attributable to the ground truth that produced it.
+- `gold-2026-07-14` — Gold corpus as of the technology.filesystem.filename adjudication; 106 columns added and 37 labels re-adjudicated since gold-2026-06-28.
+
+## Reproducing this
+
+Every score above cites its `source` in the manifest:
+
+- `gold-2026-06-28` · `m2v8m-s43/composed-reframe/0.6.54` — evidence/release-0.6.54-gold0628-headline.json, written by scripts/score_clean_label.sh with FINETYPE_GOLD=output/gold-fixtures/gold_2026-06-28.tsv
+- `gold-2026-06-28` · `m2v8m-s43/sense-reframe/0.6.54` — evidence/release-0.6.54-gold0628-headline.json, written by scripts/score_clean_label.sh with FINETYPE_GOLD=output/gold-fixtures/gold_2026-06-28.tsv
+- `gold-2026-07-14` · `m2v8m-s43/composed-reframe/0.6.54` — evidence/release-0.6.54-headline.json, written by scripts/score_clean_label.sh
+- `gold-2026-07-14` · `m2v8m-s43/sense-reframe/0.6.54` — evidence/release-0.6.54-headline.json, written by scripts/score_clean_label.sh
+
+The fixture is content-addressed, so a checkout can confirm it is holding the same ground truth before it measures anything:
+
+```sh
+scripts/evidence.py resolve-fixture --path eval/gold/gold_corpus.tsv
+scripts/evidence.py taxonomy-version
+scripts/evidence.py list
+```
+
+The run artefacts behind these numbers — FTMBs, prediction TSVs, per-column report tables — are regenerable and live in the ignored `output/`. What is tracked here is the part that cannot be regenerated: which ground truth this was, and what it came out as.
+
+## Which taxonomy is which
+
+The taxonomy column above is the vocabulary **the fixture was adjudicated under**, read from the commit in each fixture's `taxonomy.commit`. It is not the vocabulary the measuring binary was built with. The taxonomy is compiled into the binary by `include_str!`, so the two are separable and a run should stamp both.
+
+Every score above was measured by a binary built with taxonomy **`tax-48864103893f`**.

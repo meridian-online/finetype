@@ -2,7 +2,8 @@
   "schema": "finetype/evidence-fixtures@1",
   "description": "Fixture versions this repo measures against, content-addressed by sha256, with the baselines recorded on each. A bar belongs to a (model, fixture, binary) triple; it is never a constant in a script. Each fixture also records the taxonomy version its labels were adjudicated under — the content digest of labels/definitions_*.yaml at the commit named in taxonomy.commit — so a score stays attributable to a vocabulary even after the taxonomy moves.",
   "reports": [
-    "0.6.53"
+    "0.6.53",
+    "0.6.54"
   ],
   "fixtures": {
     "gold-2026-07-14": {
@@ -51,6 +52,30 @@
           "pipeline": "predict_multibranch -> reshape -> score_gold_anchor --reframe (no Sharpen)",
           "source": "docs/branch-ablation-m2v8m-s43.md, un-ablated control",
           "note": "Standalone Sense, before composition."
+        },
+        "m2v8m-s43/composed-reframe/0.6.54": {
+          "correct": 819,
+          "scored": 931,
+          "score": 0.88,
+          "measured": "2026-07-28",
+          "model": "m2v8m-s43",
+          "binary": "0.6.54",
+          "pipeline": "predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe",
+          "source": "evidence/release-0.6.54-headline.json, written by scripts/score_clean_label.sh",
+          "note": "Composed end-to-end on the 0.6.54 tree, both compact-date leaves range-carrying and the value encoder in half precision: compose_predictions.py runs finetype profile once per column, so this path reads the converted artifact and the on-disk taxonomy.",
+          "taxonomy_measured": "tax-48864103893f"
+        },
+        "m2v8m-s43/sense-reframe/0.6.54": {
+          "correct": 492,
+          "scored": 931,
+          "score": 0.528,
+          "measured": "2026-07-28",
+          "model": "m2v8m-s43",
+          "binary": "0.6.54",
+          "pipeline": "predict_multibranch -> reshape -> score_gold_anchor --reframe (no Sharpen)",
+          "source": "evidence/release-0.6.54-headline.json, written by scripts/score_clean_label.sh",
+          "note": "Standalone Sense, before composition. This path takes branch features precomputed from the FTMB and never opens the value encoder, so it cannot see the half-precision conversion.",
+          "taxonomy_measured": "tax-48864103893f"
         }
       }
     },
@@ -99,6 +124,30 @@
           "pipeline": "predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe",
           "source": "docs/branch-ablation-m2v8m-s43.md, attribution table",
           "note": "Same fixture as the pre-0.6.41 bar, current binary: the +11 columns are the 0.6.41/0.6.50/0.6.53 Sharpen typing guards."
+        },
+        "m2v8m-s43/composed-reframe/0.6.54": {
+          "correct": 805,
+          "scored": 931,
+          "score": 0.865,
+          "measured": "2026-07-28",
+          "model": "m2v8m-s43",
+          "binary": "0.6.54",
+          "pipeline": "predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe",
+          "source": "evidence/release-0.6.54-gold0628-headline.json, written by scripts/score_clean_label.sh with FINETYPE_GOLD=output/gold-fixtures/gold_2026-06-28.tsv",
+          "note": "The historical fixture, re-measured on the 0.6.54 tree so the pre-0.6.41 bar keeps a current comparator. Materialise the blob with: git show f903a2c:eval/gold/gold_corpus.tsv > output/gold-fixtures/gold_2026-06-28.tsv — the tracked corpus is not touched.",
+          "taxonomy_measured": "tax-48864103893f"
+        },
+        "m2v8m-s43/sense-reframe/0.6.54": {
+          "correct": 499,
+          "scored": 931,
+          "score": 0.536,
+          "measured": "2026-07-28",
+          "model": "m2v8m-s43",
+          "binary": "0.6.54",
+          "pipeline": "predict_multibranch -> reshape -> score_gold_anchor --reframe (no Sharpen)",
+          "source": "evidence/release-0.6.54-gold0628-headline.json, written by scripts/score_clean_label.sh with FINETYPE_GOLD=output/gold-fixtures/gold_2026-06-28.tsv",
+          "note": "Standalone Sense on the historical fixture. No 0.6.53 counterpart was recorded on this pair, so it carries no delta here; it is recorded so the next release has one.",
+          "taxonomy_measured": "tax-48864103893f"
         }
       }
     }

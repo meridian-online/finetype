@@ -20,16 +20,22 @@
 
 A delta is only meaningful when the fixture version and the pipeline are held fixed and the binary is the only thing that moved. These are the pairs in the manifest that satisfy that.
 
-| Fixture version | Against | Then | Now | Δ columns | Δ accuracy |
-|---|---|---:|---:|---:|---:|
-| `gold-2026-06-28` | `pre-0.6.41` | 794/931 = 0.853 | 805/931 = 0.865 | +11 | +0.012 |
+| Fixture version | Pipeline | Against | Then | Now | Δ columns | Δ accuracy |
+|---|---|---|---:|---:|---:|---:|
+| `gold-2026-06-28` | predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe | `0.6.54` | 805/931 = 0.865 | 805/931 = 0.865 | +0 | +0.000 |
+| `gold-2026-06-28` | predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe | `pre-0.6.41` | 794/931 = 0.853 | 805/931 = 0.865 | +11 | +0.012 |
+| `gold-2026-07-14` | predict_multibranch -> reshape -> compose_predictions (Sharpen) -> score_gold_anchor --reframe | `0.6.54` | 819/931 = 0.880 | 819/931 = 0.880 | +0 | +0.000 |
+| `gold-2026-07-14` | predict_multibranch -> reshape -> score_gold_anchor --reframe (no Sharpen) | `0.6.54` | 492/931 = 0.528 | 492/931 = 0.528 | +0 | +0.000 |
 
 ### Refused comparisons
 
 Same pipeline, different ground truth. The difference between these numbers is not a measurement of anything, so it is not stated as one.
 
 - `gold-2026-06-28` 805/931 = 0.865 vs `gold-2026-07-14` 819/931 = 0.880 (`m2v8m-s43/composed-reframe/0.6.53`) — different fixture versions.
+- `gold-2026-06-28` 805/931 = 0.865 vs `gold-2026-07-14` 819/931 = 0.880 (`m2v8m-s43/composed-reframe/0.6.54`) — different fixture versions.
+- `gold-2026-07-14` 819/931 = 0.880 vs `gold-2026-06-28` 805/931 = 0.865 (`m2v8m-s43/composed-reframe/0.6.54`) — different fixture versions.
 - `gold-2026-07-14` 819/931 = 0.880 vs `gold-2026-06-28` 794/931 = 0.853 (`m2v8m-s43/composed-reframe/pre-0.6.41`) — different fixture versions.
+- `gold-2026-07-14` 492/931 = 0.528 vs `gold-2026-06-28` 499/931 = 0.536 (`m2v8m-s43/sense-reframe/0.6.54`) — different fixture versions.
 
 ## Fixture versions cited
 
@@ -59,6 +65,12 @@ scripts/evidence.py list
 
 The run artefacts behind these numbers — FTMBs, prediction TSVs, per-column report tables — are regenerable and live in the ignored `output/`. What is tracked here is the part that cannot be regenerated: which ground truth this was, and what it came out as.
 
-## What this does not record
+## Which taxonomy is which
 
-The taxonomy column above is the vocabulary **the fixture was adjudicated under**, read from the commit in each fixture's `taxonomy.commit`. It is not the vocabulary the measuring binary was built with. The taxonomy is compiled into the binary by `include_str!`, so those are separable and a run should stamp both — but these scores predate the manifest, and the taxonomy of the binary that produced them was not captured at the time. It is not reconstructed here, because a stamp inferred after the fact is a guess wearing a hash. Measurements recorded from now on carry the taxonomy version they were measured under.
+The taxonomy column above is the vocabulary **the fixture was adjudicated under**, read from the commit in each fixture's `taxonomy.commit`. It is not the vocabulary the measuring binary was built with. The taxonomy is compiled into the binary by `include_str!`, so the two are separable and a run should stamp both.
+
+These scores do **not** carry it, and it is not reconstructed here, because a stamp inferred after the fact is a guess wearing a hash:
+
+- `gold-2026-06-28` · `m2v8m-s43/composed-reframe/0.6.53`
+- `gold-2026-07-14` · `m2v8m-s43/composed-reframe/0.6.53`
+- `gold-2026-07-14` · `m2v8m-s43/sense-reframe/0.6.53`

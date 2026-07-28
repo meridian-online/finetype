@@ -198,8 +198,12 @@ finding that got two earlier pull requests refused, and the reason
   signature term of the 122,240 is a Mach-O phenomenon that will not appear on either.
 - **The gold fixture is not adversarial.** It is curated ground truth, not a search for
   inputs where half precision changes an argmax.
-- **Nothing was published.** The converted artifact has not been uploaded to
-  `meridian-online/finetype-model`, so no `cargo install` and no CI run downloads it yet.
+- **Published 2026-07-28** as `meridian-online/finetype-model` commit `94cda10`. The hosted
+  file now serves 15,118,424 bytes, sha256 `16709ebe…214484f9`, verified by downloading it
+  back and confirming it is byte-identical to the local artifact. Every `cargo install` and
+  CI run from that point fetches the F16 encoder. The F32 original is preserved at
+  `output/model-artifact-backups/` (sha256 `f65d0f32…9a223de2`), so the publish is
+  reversible with one upload.
 
 ## Baseline drift — measured, not assumed
 

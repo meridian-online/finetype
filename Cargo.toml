@@ -19,7 +19,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.6.53"
+version = "0.6.54"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/meridian-online/finetype"

@@ -22,7 +22,10 @@ CASE=""
 ok()  { PASS=$((PASS + 1)); printf '  ok   %s\n' "$1"; }
 bad() { FAIL=$((FAIL + 1)); printf '  FAIL %s\n     %s\n' "$CASE" "$1"; }
 
-EV="scripts/evidence.py"
+# Overridable so a mutation harness can point this suite at a deliberately-broken copy
+# of the tool and check that a NAMED case reddens. A suite that cannot be aimed at a
+# wrong implementation has never been shown to detect one.
+EV="${FINETYPE_EVIDENCE_BIN:-scripts/evidence.py}"
 
 # ------------------------------------------------------------------ sandbox ----
 # A three-type taxonomy and a gold fixture that uses two of them.
@@ -255,6 +258,23 @@ CASE="a hand-edited number in the report"
 sed -i.bak 's|2 / 3|3 / 3|' "$SBOX/evidence/release-1.0.0.md" && rm -f "$SBOX/evidence/release-1.0.0.md.bak"
 expect_fail "has drifted from the manifest"
 
+# `verify` and `render-release --check` are two separate comparisons of the same two
+# things, and only one of them was ever exercised on a DRIFTED report. A build whose
+# --check short-circuits its diff returns "ok" for a report that has drifted, and every
+# caller that gates on --check — CI, the release runbook — is then gating on nothing.
+CASE="--check reddens on a drifted report, not just verify"
+sed -i.bak 's|2 / 3|3 / 3|' "$SBOX/evidence/release-1.0.0.md" && rm -f "$SBOX/evidence/release-1.0.0.md.bak"
+chk_rc=0
+"$EV" --manifest "$MAN" render-release --binary 1.0.0 --check >"$TMP/check.log" 2>&1 || chk_rc=$?
+if [ "$chk_rc" -eq 0 ]; then
+  bad "--check reported ok on a report whose number was edited by hand"
+elif grep -q 'has drifted from' "$TMP/check.log"; then
+  ok "--check names the drift and exits $chk_rc"
+else
+  bad "--check exited $chk_rc, said: $(tr "\n" " " < "$TMP/check.log" | cut -c1-200)"
+fi
+restore
+
 CASE="a manifest number changed without re-rendering"
 mutate <<'PY'
 import json, sys
@@ -297,9 +317,55 @@ CASE="same-fixture delta is still offered"
 "$EV" --manifest "$MAN" record-baseline --fixture sbox-v1 --key "m/p/0.9.0" \
   --correct 1 --scored 3 --model m --binary 0.9.0 --pipeline "p" --source "sandbox" >/dev/null
 "$EV" --manifest "$MAN" render-release --binary 1.0.0 >/dev/null
-if grep -q '^| `sbox-v1` | `0.9.0` |' "$REPORT"
-then ok "same fixture, same pipeline, different binary: the delta is stated"
+# The pipeline column is pinned too: two rows of one fixture (composed and Sense) are
+# indistinguishable without it, and a reader cannot tell which number is which path.
+if grep -q '^| `sbox-v1` | p | `0.9.0` |' "$REPORT"
+then ok "same fixture, same pipeline, different binary: the delta is stated, pipeline named"
 else bad "a legitimate same-fixture delta was refused too — the rule is over-broad"; fi
+restore
+
+# ------------------------------- the measuring binary's taxonomy, when it is known ----
+# Two different taxonomies, and a report that conflates them is asserting something it
+# did not measure: the one a fixture's labels were ADJUDICATED under, and the one the
+# MEASURING BINARY was compiled with. The renderer used to emit a blanket "not captured
+# at the time" for every release, which stopped being true the moment a run stamped it —
+# a generated file stating a falsehood about its own numbers.
+echo "== the report states the measuring binary's taxonomy only when the manifest carries it =="
+
+CASE="an unstamped baseline is named as unstamped"
+"$EV" --manifest "$MAN" render-release --binary 1.0.0 >/dev/null
+if grep -q '^- `sbox-v1` · `m/p/1.0.0`$' "$REPORT" \
+   && grep -q 'do \*\*not\*\* carry it' "$REPORT"
+then ok "the score with no taxonomy stamp is listed under the not-carried heading"
+else bad "an unstamped score was not declared unstamped"; fi
+
+CASE="an unstamped baseline is not claimed to be stamped"
+if grep -q 'measured by a binary built with taxonomy' "$REPORT"
+then bad "the report asserted a measuring taxonomy no baseline records"
+else ok "no measuring taxonomy is asserted when none was recorded"; fi
+
+CASE="a stamped baseline states its taxonomy"
+"$EV" --manifest "$MAN" record-baseline --force --fixture sbox-v1 --key "m/p/1.0.0" \
+  --correct 2 --scored 3 --model m --binary 1.0.0 --pipeline "p" --source "sandbox" \
+  --taxonomy tax-deadbeef1234 >/dev/null
+"$EV" --manifest "$MAN" render-release --binary 1.0.0 >/dev/null
+if grep -q 'measured by a binary built with taxonomy \*\*`tax-deadbeef1234`\*\*' "$REPORT"
+then ok "the recorded taxonomy is stated verbatim"
+else bad "the stamp was recorded but the report did not state it"; fi
+
+CASE="a stamped baseline is not also listed as unstamped"
+if grep -q 'do \*\*not\*\* carry it' "$REPORT"
+then bad "a stamped score is still being declared unstamped"
+else ok "the not-carried list is absent when every score carries a stamp"; fi
+
+CASE="a mixed manifest names which scores carry a stamp and which do not"
+"$EV" --manifest "$MAN" record-baseline --fixture sbox-v1 --key "m/q/1.0.0" \
+  --correct 1 --scored 3 --model m --binary 1.0.0 --pipeline "q" --source "sandbox" >/dev/null
+"$EV" --manifest "$MAN" render-release --binary 1.0.0 >/dev/null
+if grep -q '^- `sbox-v1` · `m/p/1.0.0` — measured under `tax-deadbeef1234`$' "$REPORT" \
+   && grep -q '^- `sbox-v1` · `m/q/1.0.0`$' "$REPORT"
+then ok "each score is attributed to the stamp it actually has"
+else bad "a mixed manifest was flattened into one blanket claim"; fi
 restore
 
 # ------------------------------------ a manifest that does not resolve stops it ----
@@ -553,17 +619,64 @@ else
   bad "got '$GOT', want 0.667"
 fi
 
-# ------------------------------------------------------------ the real report ----
-echo "== the committed 0.6.53 report is current =="
-CASE="repo release report"
-if "$EV" render-release --binary 0.6.53 --check >/dev/null 2>&1
-then ok "evidence/release-0.6.53.md matches evidence/fixtures.json"
-else bad "the committed report has drifted from the manifest"; fi
+# ------------------------------------------------------------ the real reports ----
+# Every release listed under `reports` in the real manifest, not a hardcoded
+# version. A per-release edit here is a step someone forgets, and the release it
+# is forgotten on is the one whose report goes unchecked.
+REPORTS=$(python3 -c 'import json;print(" ".join(json.load(open("'"$ROOT"'/evidence/fixtures.json")).get("reports",[])))')
+# What is on disk, independently. `verify` only re-renders the versions the
+# manifest lists, so a committed report the manifest forgot is a report nobody
+# checks — comparing the two sets is what surfaces that.
+ONDISK=$(ls "$ROOT"/evidence/release-*.md 2>/dev/null \
+  | sed -e 's#.*/release-##' -e 's#\.md$##' | sort | tr '\n' ' ')
 
-CASE="repo report names a fixture version beside every score"
-if [ "$(grep -c 'gold-2026-' "$ROOT/evidence/release-0.6.53.md")" -ge 3 ]
-then ok "every headline row carries its fixture version"
-else bad "the committed report quotes a score without a fixture version"; fi
+echo "== every committed release report is current =="
+CASE="the manifest lists at least one release report"
+if [ -n "$REPORTS" ]
+then ok "reports: $REPORTS"
+else bad "evidence/fixtures.json lists no release reports — nothing below is checked"; fi
+
+CASE="the manifest's report list matches the reports on disk"
+WANT=$(printf '%s\n' $REPORTS | sort | tr '\n' ' ')
+if [ "$WANT" = "$ONDISK" ]
+then ok "manifest and evidence/ agree: $ONDISK"
+else bad "manifest lists [$WANT] but evidence/ holds [$ONDISK] — an unlisted report is one verify never re-renders"; fi
+
+for V in $REPORTS; do
+  # The comparison is done HERE, against a freshly rendered copy, rather than by
+  # trusting `--check` to report on itself. `--check` is the thing under test: a build
+  # where its diff is short-circuited returns 0 for a drifted report, and a case that
+  # only asks `--check` passes on exactly that build. Measured — mutation 5 in
+  # scripts/test_evidence_mutations.sh survived this suite until this case stopped
+  # delegating its own verdict.
+  CASE="repo release report $V"
+  FRESH="$TMP/rendered-$V.md"
+  "$EV" --manifest "$ROOT/evidence/fixtures.json" render-release --binary "$V" \
+    --out "$FRESH" >/dev/null 2>&1
+  if cmp -s "$FRESH" "$ROOT/evidence/release-$V.md"
+  then ok "evidence/release-$V.md matches a fresh render from evidence/fixtures.json"
+       DRIFTED=0
+  else bad "evidence/release-$V.md has drifted from the manifest"; DRIFTED=1; fi
+
+  CASE="--check agrees with an independent diff for $V"
+  CHECK_RC=0
+  "$EV" --manifest "$ROOT/evidence/fixtures.json" render-release --binary "$V" --check \
+    >/dev/null 2>&1 || CHECK_RC=$?
+  if { [ "$DRIFTED" -eq 0 ] && [ "$CHECK_RC" -eq 0 ]; } \
+     || { [ "$DRIFTED" -eq 1 ] && [ "$CHECK_RC" -ne 0 ]; }
+  then ok "--check and the byte comparison reach the same verdict"
+  else bad "--check said rc=$CHECK_RC while the byte comparison said drifted=$DRIFTED"; fi
+
+  CASE="report $V names a fixture version beside every score"
+  # One `gold-` id per headline row, plus the rows of the fixture table. A report
+  # that quotes a score with no fixture id beside it is the thing evidence/ exists
+  # to stop, so the floor is the row count of its own headline table.
+  ROWS=$(awk '/^\| `gold-/ {n++} END {print n+0}' "$ROOT/evidence/release-$V.md")
+  IDS=$(grep -c 'gold-2026-' "$ROOT/evidence/release-$V.md")
+  if [ "$ROWS" -ge 1 ] && [ "$IDS" -ge "$ROWS" ]
+  then ok "$ROWS headline/fixture rows, $IDS fixture ids"
+  else bad "report $V quotes a score without a fixture version ($ROWS rows, $IDS ids)"; fi
+done
 
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
