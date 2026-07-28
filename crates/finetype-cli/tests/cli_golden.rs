@@ -1399,3 +1399,262 @@ fn golden_profile_compact_ymd_accepts_nineteenth_century_dates() {
         );
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPACT-DATE PRECISION — the DAY-FIRST leaf, where the year-first fix moved
+// the false positive to
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Assert a column's WHOLE emitted record, field for field, minus `confidence`.
+///
+/// `confidence` is a raw model score and is checked separately as a finite
+/// probability rather than pinned to a literal. Everything else is pinned —
+/// including `quality_band`, `is_generic` and the counts — because this family
+/// of tests exists to notice ANY field moving, and a label-only check cannot
+/// tell a fixed column from one that kept its date transform.
+fn assert_full_record(profile: &Value, column_name: &str, expected: Value, why: &str) {
+    let col = column_record(profile, column_name);
+    let actual: serde_json::Map<String, Value> = col
+        .as_object()
+        .expect("column record is an object")
+        .iter()
+        .filter(|(k, _)| k.as_str() != "confidence")
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    assert_eq!(
+        Value::Object(actual),
+        expected,
+        "{column_name}: {why}"
+    );
+    let confidence = col["confidence"].as_f64().unwrap_or_else(|| {
+        panic!(
+            "{column_name}: confidence must be a number, got {:?}",
+            col["confidence"]
+        )
+    });
+    assert!(
+        confidence.is_finite() && confidence > 0.0 && confidence <= 1.0,
+        "{column_name}: confidence must be a real probability, got {confidence}"
+    );
+}
+
+/// ROW 1 — the exact values the year-first tightening was written for.
+///
+/// The twenty corpus values in `compact_ymd`'s REJECT set. Before that change
+/// they typed `representation.numeric.integer_number` at 0.53. After it they
+/// typed `datetime.date.compact_dmy` at 0.91, quality band `high`, with
+/// `strptime({col}, '%d%m%Y')::DATE` attached — a low-confidence integer became
+/// a high-confidence date. The fix relocated its own defect.
+#[test]
+#[ignore]
+fn golden_profile_compact_dmy_rejects_the_year_first_reject_set() {
+    let profile = run_profile_json(&fixture_path("compact_dmy_ymd_reject_set.csv"));
+    assert_full_record(
+        &profile,
+        "value",
+        json!({
+            "column": "value",
+            "type": "representation.numeric.integer_number",
+            "broad_type": "BIGINT",
+            "quality_band": "low",
+            "runner_up": "datetime.component.year",
+            "transform": "CAST({col} AS BIGINT)",
+            "disambiguation_applied": true,
+            "disambiguation_rule": "veto_fallback:vocab",
+            "is_generic": true,
+            "validation_pass_rate": 0.0,
+            "validation_vetoed": true,
+            "vetoed_type": "datetime.component.year",
+            "samples_used": 20,
+            "non_null": 20,
+            "null": 0,
+        }),
+        "under a shape-only day-first validator this column is \
+         datetime.date.compact_dmy at 0.91, quality band high, carrying \
+         format_string %d%m%Y and transform strptime({col}, '%d%m%Y')::DATE. \
+         Neither key may reappear.",
+    );
+}
+
+/// ROW 2 — sequential eight-digit post ids.
+#[test]
+#[ignore]
+fn golden_profile_compact_dmy_rejects_sequential_ids() {
+    let profile = run_profile_json(&fixture_path("compact_dmy_sequential_ids.csv"));
+    assert_full_record(
+        &profile,
+        "PostId",
+        json!({
+            "column": "PostId",
+            "type": "representation.identifier.increment",
+            "broad_type": "BIGINT",
+            "quality_band": "low",
+            "runner_up": "representation.numeric.integer_number",
+            "transform": "CAST({col} AS BIGINT)",
+            "disambiguation_applied": true,
+            "disambiguation_rule": "numeric_sequential_detection",
+            "is_generic": true,
+            "validation_pass_rate": 1.0,
+            "samples_used": 8,
+            "non_null": 8,
+            "null": 0,
+        }),
+        "a run of consecutive surrogate keys typed datetime.date.compact_dmy \
+         at 0.81 with a %d%m%Y strptime transform under the shape-only \
+         validator. validation_pass_rate here is the INCREMENT label's, not \
+         the date label's — the date label is gone.",
+    );
+}
+
+/// ROW 3 — round-hundred share counts. THE ALLOWLIST'S OWN CASE.
+///
+/// This is the row the tightened pattern alone does not fix. With the pattern
+/// tightened but `datetime.date.compact_dmy` still absent from
+/// `labels/veto_safe.txt`, this column emitted `datetime.date.compact_dmy` at
+/// confidence 0.98, `quality_band` high, `validation_pass_rate` 0.0,
+/// `validation_advisory_low` true, `format_string` `%d%m%Y` and transform
+/// `strptime({col}, '%d%m%Y')::DATE` — the validator rejected every value in
+/// the column and nothing acted on the rejection. Remove the allowlist line and
+/// this test reddens; remove the pattern and it reddens; both halves are load
+/// bearing and this record is what says so.
+#[test]
+#[ignore]
+fn golden_profile_compact_dmy_vetoes_round_hundred_share_counts() {
+    let profile = run_profile_json(&fixture_path(
+        "compact_dmy_round_hundred_share_counts.csv",
+    ));
+    assert_full_record(
+        &profile,
+        "sharesOutstanding",
+        json!({
+            "column": "sharesOutstanding",
+            "type": "representation.numeric.integer_number",
+            "broad_type": "BIGINT",
+            "quality_band": "high",
+            "transform": "CAST({col} AS BIGINT)",
+            "disambiguation_applied": true,
+            "disambiguation_rule": "veto_fallback:vocab",
+            "is_generic": false,
+            "validation_pass_rate": 0.0,
+            "validation_vetoed": true,
+            "vetoed_type": "datetime.date.compact_dmy",
+            "samples_used": 8,
+            "non_null": 8,
+            "null": 0,
+        }),
+        "`validation_vetoed` true with `vetoed_type` datetime.date.compact_dmy \
+         is the whole point: the HARD veto fired. If this record instead shows \
+         type datetime.date.compact_dmy with validation_advisory_low true, the \
+         allowlist entry has been dropped and the validator's verdict is being \
+         computed and discarded.",
+    );
+}
+
+/// ROW 4 — unconstrained eight-digit numbers. Neither side may claim these.
+#[test]
+#[ignore]
+fn golden_profile_compact_dmy_leaves_unconstrained_eight_digit_alone() {
+    let profile = run_profile_json(&fixture_path(
+        "compact_dmy_unconstrained_eight_digit.csv",
+    ));
+    assert_full_record(
+        &profile,
+        "value",
+        json!({
+            "column": "value",
+            "type": "representation.numeric.integer_number",
+            "broad_type": "BIGINT",
+            "quality_band": "low",
+            "transform": "CAST({col} AS BIGINT)",
+            "disambiguation_applied": true,
+            "disambiguation_rule": "increment_substance_veto",
+            "is_generic": true,
+            "validation_pass_rate": 1.0,
+            "samples_used": 8,
+            "non_null": 8,
+            "null": 0,
+        }),
+        "this column is identical on both sides of the change and is here to \
+         catch a tightening that starts moving columns it was never aimed at.",
+    );
+}
+
+/// ROW 5 — genuine YYYYMMDD. The year-first leaf must be untouched.
+///
+/// Tightening a validator moves a MODEL INPUT: the per-label pass-rate vector
+/// feeds the multi-branch model's validation branch, so a day-first edit can
+/// reach a year-first column. This row is the guard against that.
+#[test]
+#[ignore]
+fn golden_profile_compact_dmy_change_leaves_genuine_ymd_dates_alone() {
+    let profile = run_profile_json(&fixture_path("compact_dmy_genuine_ymd_dates.csv"));
+    assert_full_record(
+        &profile,
+        "date",
+        json!({
+            "column": "date",
+            "type": "datetime.date.compact_ymd",
+            "broad_type": "DATE",
+            "quality_band": "high",
+            "format_string": "%Y%m%d",
+            "transform": "strptime({col}, '%Y%m%d')::DATE",
+            "is_generic": false,
+            "validation_pass_rate": 1.0,
+            "samples_used": 8,
+            "non_null": 8,
+            "null": 0,
+        }),
+        "a real YYYYMMDD date column must keep its label, its format string \
+         and its strptime transform. A day-first validator edit that reaches \
+         this column has moved the model off data it was never aimed at.",
+    );
+}
+
+/// ROW 6 — genuine DD-MM-YYYY dates, including three from before 1900.
+///
+/// The accept side. The tightening must not make this column worse, and it does
+/// not: the record is byte-identical on both sides of the change.
+///
+/// It also records something the corpus says and this fixture demonstrates: the
+/// engine does not type genuine day-first compact dates as
+/// `datetime.date.compact_dmy` AT ALL — here the column is vetoed off
+/// `datetime.timestamp.iso_8601` and emitted as `unknown`. In a 33,250-table
+/// pass the 972 columns typed `compact_dmy` are headed `game_id` (218), `id`
+/// (100), `minorityInterest` (58), `pos` (49), `trials` (33) — surrogate keys
+/// and financial figures. The label's real-world population in this corpus is
+/// zero, which is why tightening it costs nothing; the corpus is not date-poor
+/// either, holding 1,987 day-first columns on the separator-bearing leaves.
+/// If this record ever becomes `datetime.date.compact_dmy` at pass rate 1.0
+/// that is an IMPROVEMENT — update the expectation and delete this paragraph.
+#[test]
+#[ignore]
+fn golden_profile_compact_dmy_change_leaves_genuine_day_first_dates_alone() {
+    let profile = run_profile_json(&fixture_path(
+        "compact_dmy_genuine_day_first_dates.csv",
+    ));
+    assert_full_record(
+        &profile,
+        "date",
+        json!({
+            "column": "date",
+            "type": "unknown",
+            "broad_type": "—",
+            "quality_band": "medium",
+            "disambiguation_applied": true,
+            "disambiguation_rule": "header_hint_cross_domain:date",
+            "is_generic": false,
+            "validation_pass_rate": 0.0,
+            "validation_vetoed": true,
+            "vetoed_type": "datetime.timestamp.iso_8601",
+            "x-finetype-unknown-reason":
+                "validation rejected 'iso_8601': only 0% of values matched its format",
+            "samples_used": 8,
+            "non_null": 8,
+            "null": 0,
+        }),
+        "identical on both sides of the change. The day-first tightening must \
+         not touch a column of genuine day-first dates — and a century year \
+         window would, which is what a reviewer proved on the year-first leaf \
+         with 1865-1872 values.",
+    );
+}

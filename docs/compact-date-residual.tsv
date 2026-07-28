@@ -1,0 +1,20 @@
+# compact-date residual probe
+# binary\tfinetype 0.6.53
+# head_sha\t8d5335a40e466de43d5b2ff8ddfff013f68f6f07
+# base_ref\torigin/main\t672be49c749c7e50e54e4f68cc8c6c1a4903733e
+# taxonomy_version\ttax-48864103893f
+# baseline = day-first validator ^\d{8}$ ; candidate = day+month windows
+# locale is NOISE on this pipeline — do not read a locale difference as an effect
+fixture	side	column	type	confidence	quality_band	runner_up	broad_type	format_string	transform	is_generic	samples_used	non_null	null	disambiguation	locale	validation_pass_rate	validation_advisory_low
+compact_dmy_ymd_reject_set	baseline	value	representation.numeric.integer_number	0.4866	low	datetime.component.year	BIGINT		CAST({col} AS BIGINT)	true	20	20	0	veto_fallback:vocab		0.0	False
+compact_dmy_ymd_reject_set	candidate	value	representation.numeric.integer_number	0.4866	low	datetime.component.year	BIGINT		CAST({col} AS BIGINT)	true	20	20	0	veto_fallback:vocab		0.0	False
+compact_dmy_sequential_ids	baseline	PostId	representation.identifier.increment	0.4938	low	representation.numeric.integer_number	BIGINT		CAST({col} AS BIGINT)	true	8	8	0	numeric_sequential_detection		1.0	False
+compact_dmy_sequential_ids	candidate	PostId	representation.identifier.increment	0.4938	low	representation.numeric.integer_number	BIGINT		CAST({col} AS BIGINT)	true	8	8	0	numeric_sequential_detection		1.0	False
+compact_dmy_round_hundred_share_counts	baseline	sharesOutstanding	datetime.date.compact_dmy	0.9847	high		DATE	%d%m%Y	strptime({col}, '%d%m%Y')::DATE	false	8	8	0	multi-branch		0.0	True
+compact_dmy_round_hundred_share_counts	candidate	sharesOutstanding	representation.numeric.integer_number	0.9847	high		BIGINT		CAST({col} AS BIGINT)	false	8	8	0	veto_fallback:vocab		0.0	False
+compact_dmy_unconstrained_eight_digit	baseline	value	representation.numeric.integer_number	0.6000	low		BIGINT		CAST({col} AS BIGINT)	true	8	8	0	increment_substance_veto		1.0	False
+compact_dmy_unconstrained_eight_digit	candidate	value	representation.numeric.integer_number	0.6000	low		BIGINT		CAST({col} AS BIGINT)	true	8	8	0	increment_substance_veto		1.0	False
+compact_dmy_genuine_ymd_dates	baseline	date	datetime.date.compact_ymd	0.9972	high		DATE	%Y%m%d	strptime({col}, '%Y%m%d')::DATE	false	8	8	0	multi-branch		1.0	False
+compact_dmy_genuine_ymd_dates	candidate	date	datetime.date.compact_ymd	0.9972	high		DATE	%Y%m%d	strptime({col}, '%Y%m%d')::DATE	false	8	8	0	multi-branch		1.0	False
+compact_dmy_genuine_day_first_dates	baseline	date	unknown	0.7170	medium					false	8	8	0	header_hint_cross_domain:date		0.0	False
+compact_dmy_genuine_day_first_dates	candidate	date	unknown	0.7170	medium					false	8	8	0	header_hint_cross_domain:date		0.0	False

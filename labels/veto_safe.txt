@@ -12,14 +12,17 @@
 #
 # Documented exceptions (correct-veto residual just over the
 # ceiling, validation is precise): datetime.component.day_of_week.
-# Gate-validated exceptions (rare-starved here, but the corpus-honest
-# gate measured the hard-veto safe at scale — see
-# output/corpus-honest-gate/veto_statusbp_finding.md): datetime.component.periodicity, representation.numeric.decimal_number.
-# 71 labels total.
+# Gate-validated exceptions (rare-starved here, but MEASURED
+# hard-veto-safe at corpus scale elsewhere — per-label provenance is
+# in RESIDUAL_NOTES in the generator; the first two are
+# output/corpus-honest-gate/veto_statusbp_finding.md, the third is
+# docs/compact-dmy-corpus-family.json): datetime.component.periodicity, representation.numeric.decimal_number, datetime.date.compact_dmy.
+# 72 labels total.
 datetime.component.day_of_week
 datetime.component.periodicity
 datetime.component.year
 datetime.date.abbreviated_month
+datetime.date.compact_dmy
 datetime.date.compact_mdy
 datetime.date.compact_ymd
 datetime.date.dmy_dash_abbrev
