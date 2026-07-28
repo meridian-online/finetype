@@ -1,0 +1,155 @@
+# compact_dmy blast radius
+# head_sha  3eeb678cd3850cba9935becbb87f63d98a4e64f1
+# base_ref  origin/main  672be49c749c7e50e54e4f68cc8c6c1a4903733e
+# taxonomy_version  tax-48864103893f
+# tables    1723
+# side  ref  definitions_datetime.yaml_blob  veto_safe.txt_blob
+# base	origin/main	8935373b3f7377a2806470fd77aea6aa211ba342	f6c0380150a076c887ead0ceae034c19e5af151f
+# cand	working-tree	f0b3098a39f9a1dc89f8588255456b426f0f7e99	e2fb70fb5879a1f6205716cc4cd588c960625f4c
+┌────────────────────────┐
+│        section         │
+│        varchar         │
+├────────────────────────┤
+│ == columns profiled == │
+└────────────────────────┘
+┌──────────────────┬───────────────────┐
+│ baseline_columns │ candidate_columns │
+│      int64       │       int64       │
+├──────────────────┼───────────────────┤
+│            97599 │             97599 │
+└──────────────────┴───────────────────┘
+┌────────────────────────────────────────────┐
+│                  section                   │
+│                  varchar                   │
+├────────────────────────────────────────────┤
+│ == compact-date family, before -> after == │
+└────────────────────────────────────────────┘
+┌───────────────────────────┬────────┬────────┐
+│           label           │ n_base │ n_cand │
+│          varchar          │ int64  │ int64  │
+├───────────────────────────┼────────┼────────┤
+│ datetime.date.compact_dmy │    978 │     32 │
+│ datetime.date.compact_mdy │     92 │     71 │
+│ datetime.date.compact_ym  │    353 │    353 │
+│ datetime.date.compact_ymd │    230 │    162 │
+└───────────────────────────┴────────┴────────┘
+┌───────────────────────────────────────────────────┐
+│                      section                      │
+│                      varchar                      │
+├───────────────────────────────────────────────────┤
+│ == where the baseline compact_dmy columns went == │
+└───────────────────────────────────────────────────┘
+┌───────────────────────────────────────────┬───────┐
+│                  became                   │   n   │
+│                  varchar                  │ int64 │
+├───────────────────────────────────────────┼───────┤
+│ representation.numeric.integer_number     │   615 │
+│ unknown                                   │   187 │
+│ representation.identifier.numeric_code    │    76 │
+│ representation.text.word                  │    51 │
+│ datetime.date.compact_dmy                 │    32 │
+│ representation.identifier.increment       │    11 │
+│ representation.identifier.alphanumeric_id │     4 │
+│ datetime.date.compact_mdy                 │     2 │
+└───────────────────────────────────────────┴───────┘
+┌────────────────────────────────────────────┐
+│                  section                   │
+│                  varchar                   │
+├────────────────────────────────────────────┤
+│ == what became compact_dmy that was not == │
+└────────────────────────────────────────────┘
+┌─────────┬───────┐
+│   was   │   n   │
+│ varchar │ int64 │
+└─────────┴───────┘
+      0 rows     
+┌─────────────────────────────────────────────────────┐
+│                       section                       │
+│                       varchar                       │
+├─────────────────────────────────────────────────────┤
+│ == every label that moved by more than 5 columns == │
+└─────────────────────────────────────────────────────┘
+┌────────────────────────────────────────┬────────┬────────┬───────┐
+│                 label                  │ n_base │ n_cand │ delta │
+│                varchar                 │ int64  │ int64  │ int64 │
+├────────────────────────────────────────┼────────┼────────┼───────┤
+│ datetime.date.compact_dmy              │    978 │     32 │  -946 │
+│ representation.numeric.integer_number  │  25301 │  25926 │   625 │
+│ unknown                                │  10468 │  10727 │   259 │
+│ representation.identifier.numeric_code │    675 │    754 │    79 │
+│ datetime.date.compact_ymd              │    230 │    162 │   -68 │
+│ representation.text.word               │   4557 │   4609 │    52 │
+│ datetime.date.compact_mdy              │     92 │     71 │   -21 │
+│ representation.identifier.increment    │    416 │    432 │    16 │
+└────────────────────────────────────────┴────────┴────────┴───────┘
+┌───────────────────────────────────────────────────┐
+│                      section                      │
+│                      varchar                      │
+├───────────────────────────────────────────────────┤
+│ == columns that LOST datetime.date.compact_ymd == │
+└───────────────────────────────────────────────────┘
+┌──────────────────────────┬───────┐
+│          became          │   n   │
+│         varchar          │ int64 │
+├──────────────────────────┼───────┤
+│ unknown                  │    67 │
+│ representation.text.word │     1 │
+└──────────────────────────┴───────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                   section                                    │
+│                                   varchar                                    │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ == ...and were they GENUINE dates? (every sampled value a valid YYYYMMDD) == │
+└──────────────────────────────────────────────────────────────────────────────┘
+[90mWARNING:
+[00m[90mDeprecated lambda arrow (->) detected. Please transition to the new lambda syntax, i.e.., lambda x, i: x + i, before DuckDB's next release.
+Use SET lambda_syntax='ENABLE_SINGLE_ARROW' to revert to the deprecated behavior.
+For more information, see https://duckdb.org/docs/stable/sql/functions/lambda.html.
+
+[00m┌─────────┬───────────────────────────┬───────────────┐
+│ n_moved │ all_values_valid_yyyymmdd │ not_all_valid │
+│  int64  │           int64           │     int64     │
+├─────────┼───────────────────────────┼───────────────┤
+│      68 │                        68 │             0 │
+└─────────┴───────────────────────────┴───────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                            section                             │
+│                            varchar                             │
+├────────────────────────────────────────────────────────────────┤
+│ == ...under which headers (names only, never corpus values) == │
+└────────────────────────────────────────────────────────────────┘
+┌───────────┬───────┐
+│  header   │   n   │
+│  varchar  │ int64 │
+├───────────┼───────┤
+│ date      │    65 │
+│ game_date │     3 │
+└───────────┴───────┘
+┌────────────────────────────────────────────────┐
+│                    section                     │
+│                    varchar                     │
+├────────────────────────────────────────────────┤
+│ == same question for the compact_mdy losses == │
+└────────────────────────────────────────────────┘
+┌────────────────────────────────────────┬───────┐
+│                 became                 │   n   │
+│                varchar                 │ int64 │
+├────────────────────────────────────────┼───────┤
+│ unknown                                │     7 │
+│ representation.numeric.integer_number  │     6 │
+│ representation.identifier.increment    │     5 │
+│ representation.identifier.numeric_code │     3 │
+│ representation.text.word               │     2 │
+└────────────────────────────────────────┴───────┘
+┌─────────────────┐
+│     section     │
+│     varchar     │
+├─────────────────┤
+│ == THE TRADE == │
+└─────────────────┘
+┌──────────────────┬─────────────────┬──────────────────────────┬───────────────────────┐
+│ day_first_before │ day_first_after │ genuine_ymd_columns_lost │ newly_typed_day_first │
+│      int64       │      int64      │          int64           │         int64         │
+├──────────────────┼─────────────────┼──────────────────────────┼───────────────────────┤
+│              978 │              32 │                       68 │                     0 │
+└──────────────────┴─────────────────┴──────────────────────────┴───────────────────────┘

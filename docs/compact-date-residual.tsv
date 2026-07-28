@@ -1,0 +1,39 @@
+# compact-date residual probe
+# binary	finetype 0.6.53
+# head_sha	1d0baf009af825d265a30bf44e56e6f6b9964f04
+# taxonomy_version	tax-48864103893f
+# side	ref	commit-or-version	definitions_datetime.yaml_blob	veto_safe.txt_blob
+# shipped_release	/Users/hugh/.cargo/bin/finetype	finetype 0.6.53	(embedded)	(embedded)
+# pre_tightening	464c18f^	eaa64e2ed901f0bbf41fa379f762e65277fb58fa	77da51d1e26384a075533e654d5411ab84f37441	f6c0380150a076c887ead0ceae034c19e5af151f
+# main	origin/main	672be49c749c7e50e54e4f68cc8c6c1a4903733e	8935373b3f7377a2806470fd77aea6aa211ba342	f6c0380150a076c887ead0ceae034c19e5af151f
+# candidate	working-tree	1d0baf009af825d265a30bf44e56e6f6b9964f04	f0b3098a39f9a1dc89f8588255456b426f0f7e99	e2fb70fb5879a1f6205716cc4cd588c960625f4c
+# shipped_release = the released binary, embedded taxonomy, run outside the checkout
+# pre_tightening = both compact leaves ^\d{8}$
+# main           = year-first range-carrying, day-first still ^\d{8}$
+# candidate      = day-first range-carrying AND veto-safe
+# locale is NOISE on this pipeline — see docs/compact-date-residual.tsv.locale-control before reading any locale difference
+fixture	side	column	type	confidence	quality_band	runner_up	broad_type	format_string	transform	is_generic	samples_used	non_null	null	disambiguation	locale	validation_pass_rate	validation_advisory_low	validation_vetoed	vetoed_type
+compact_dmy_ymd_reject_set	shipped_release	value	datetime.date.compact_dmy	0.9878	high		DATE	%d%m%Y	strptime({col}, '%d%m%Y')::DATE	false	20	20	0	multi-branch		1.0	False	False	
+compact_dmy_ymd_reject_set	pre_tightening	value	datetime.date.compact_dmy	0.9878	high		DATE	%d%m%Y	strptime({col}, '%d%m%Y')::DATE	false	20	20	0	multi-branch		1.0	False	False	
+compact_dmy_ymd_reject_set	main	value	datetime.date.compact_dmy	0.9064	high		DATE	%d%m%Y	strptime({col}, '%d%m%Y')::DATE	false	20	20	0	multi-branch		1.0	False	False	
+compact_dmy_ymd_reject_set	candidate	value	representation.numeric.integer_number	0.4866	low	datetime.component.year	BIGINT		CAST({col} AS BIGINT)	true	20	20	0	veto_fallback:vocab		0.0	False	True	datetime.component.year
+compact_dmy_sequential_ids	shipped_release	PostId	datetime.date.compact_dmy	0.8341	medium		DATE	%d%m%Y	strptime({col}, '%d%m%Y')::DATE	false	8	8	0	multi-branch		1.0	False	False	
+compact_dmy_sequential_ids	pre_tightening	PostId	datetime.date.compact_dmy	0.8340	medium		DATE	%d%m%Y	strptime({col}, '%d%m%Y')::DATE	false	8	8	0	multi-branch		1.0	False	False	
+compact_dmy_sequential_ids	main	PostId	datetime.date.compact_dmy	0.8110	medium		DATE	%d%m%Y	strptime({col}, '%d%m%Y')::DATE	false	8	8	0	multi-branch		1.0	False	False	
+compact_dmy_sequential_ids	candidate	PostId	representation.identifier.increment	0.4938	low	representation.numeric.integer_number	BIGINT		CAST({col} AS BIGINT)	true	8	8	0	numeric_sequential_detection		1.0	False	False	
+compact_dmy_round_hundred_share_counts	shipped_release	sharesOutstanding	datetime.date.compact_dmy	0.9999	high		DATE	%d%m%Y	strptime({col}, '%d%m%Y')::DATE	false	8	8	0	multi-branch		1.0	False	False	
+compact_dmy_round_hundred_share_counts	pre_tightening	sharesOutstanding	datetime.date.compact_dmy	0.9999	high		DATE	%d%m%Y	strptime({col}, '%d%m%Y')::DATE	false	8	8	0	multi-branch		1.0	False	False	
+compact_dmy_round_hundred_share_counts	main	sharesOutstanding	datetime.date.compact_dmy	0.9996	high		DATE	%d%m%Y	strptime({col}, '%d%m%Y')::DATE	false	8	8	0	multi-branch		1.0	False	False	
+compact_dmy_round_hundred_share_counts	candidate	sharesOutstanding	representation.numeric.integer_number	0.9847	high		BIGINT		CAST({col} AS BIGINT)	false	8	8	0	veto_fallback:vocab		0.0	False	True	datetime.date.compact_dmy
+compact_dmy_unconstrained_eight_digit	shipped_release	value	representation.numeric.integer_number	0.6000	low		BIGINT		CAST({col} AS BIGINT)	true	8	8	0	increment_substance_veto		1.0	False	False	
+compact_dmy_unconstrained_eight_digit	pre_tightening	value	representation.numeric.integer_number	0.6000	low		BIGINT		CAST({col} AS BIGINT)	true	8	8	0	increment_substance_veto		1.0	False	False	
+compact_dmy_unconstrained_eight_digit	main	value	representation.numeric.integer_number	0.6000	low		BIGINT		CAST({col} AS BIGINT)	true	8	8	0	increment_substance_veto		1.0	False	False	
+compact_dmy_unconstrained_eight_digit	candidate	value	representation.numeric.integer_number	0.6000	low		BIGINT		CAST({col} AS BIGINT)	true	8	8	0	increment_substance_veto		1.0	False	False	
+compact_dmy_genuine_ymd_dates	shipped_release	date	datetime.date.compact_ymd	0.9992	high		DATE	%Y%m%d	strptime({col}, '%Y%m%d')::DATE	false	8	8	0	multi-branch		1.0	False	False	
+compact_dmy_genuine_ymd_dates	pre_tightening	date	datetime.date.compact_ymd	0.9992	high		DATE	%Y%m%d	strptime({col}, '%Y%m%d')::DATE	false	8	8	0	multi-branch		1.0	False	False	
+compact_dmy_genuine_ymd_dates	main	date	datetime.date.compact_ymd	0.9992	high		DATE	%Y%m%d	strptime({col}, '%Y%m%d')::DATE	false	8	8	0	multi-branch		1.0	False	False	
+compact_dmy_genuine_ymd_dates	candidate	date	datetime.date.compact_ymd	0.9972	high		DATE	%Y%m%d	strptime({col}, '%Y%m%d')::DATE	false	8	8	0	multi-branch		1.0	False	False	
+compact_dmy_genuine_day_first_dates	shipped_release	date	unknown	0.7354	medium					false	8	8	0	header_hint_cross_domain:date		0.0	False	True	datetime.timestamp.iso_8601
+compact_dmy_genuine_day_first_dates	pre_tightening	date	unknown	0.7354	medium					false	8	8	0	header_hint_cross_domain:date		0.0	False	True	datetime.timestamp.iso_8601
+compact_dmy_genuine_day_first_dates	main	date	unknown	0.7170	medium					false	8	8	0	header_hint_cross_domain:date		0.0	False	True	datetime.timestamp.iso_8601
+compact_dmy_genuine_day_first_dates	candidate	date	unknown	0.7170	medium					false	8	8	0	header_hint_cross_domain:date		0.0	False	True	datetime.timestamp.iso_8601

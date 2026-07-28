@@ -863,7 +863,34 @@ datetime.date.compact_dmy:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{8}$"
+    # Range-carrying, not shape-only — the same discipline the year-first
+    # sibling `compact_ymd` took, applied to the day-first leaf.
+    #
+    # Tightening ONLY `compact_ymd` did not remove the eight-digit false
+    # positive, it RELOCATED it. Under a shape-only `^\d{8}$` here the
+    # day-first leaf confirmed every eight-digit token, so the columns the
+    # year-first tightening pushed off `compact_ymd` landed on this label
+    # instead — and landed there with HIGHER confidence than the integer
+    # reading they had before. Profiled through the CLI: the twenty corpus
+    # values `compact_ymd`'s own REJECT set is built from typed
+    # `representation.numeric.integer_number` at 0.53 before that change and
+    # `datetime.date.compact_dmy` at 0.91 after it, with a `%d%m%Y` strptime
+    # transform attached. A low-confidence integer became a high-confidence
+    # date; for those values the fix was worse than the defect.
+    #
+    # DAY window 01-31 (leading pair), MONTH window 01-12 (middle pair).
+    # Those two carry the whole discrimination.
+    #
+    # The year stays `\d{4}` ON PURPOSE, for the reason a reviewer proved on
+    # `compact_ymd`: a century window (`(19|20)\d{2}`) hard-vetoes genuine
+    # nineteenth-century dates off the label, strips the strptime transform,
+    # and ships an archival date column as a confident integer. That is the
+    # same confident-and-wrong failure pointed the other way. `compact_ym` is
+    # likewise `^\d{4}(0[1-9]|1[0-2])$` — month window only, no year window.
+    #
+    # Deliberately NOT per-month day counts — 31021999 still validates; a
+    # calendar-exact regex buys ~nothing over the windows.
+    pattern: "^(0[1-9]|[12]\\d|3[01])(0[1-9]|1[0-2])\\d{4}$"
     minLength: 8
     maxLength: 8
   tier: [DATE, date]

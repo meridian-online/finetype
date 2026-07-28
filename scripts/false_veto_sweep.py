@@ -79,6 +79,7 @@ VETO_SAFE_EXCEPTIONS = ["datetime.component.day_of_week"]
 GATE_VALIDATED_EXCEPTIONS = [
     "datetime.component.periodicity",
     "representation.numeric.decimal_number",
+    "datetime.date.compact_dmy",
 ]
 
 
@@ -107,6 +108,32 @@ RESIDUAL_NOTES: dict[str, str] = {
         "agrees). Corpus-honest gate (gate_veto-statusbp.json, GO): marginal "
         "1.9M->1.89M (ratio 0.996), net_contra_in -287 — the veto REMOVES "
         "oracle-refuted FPs, does not create them. No collapse.",
+    "datetime.date.compact_dmy":
+        "ZERO agreement columns in this corpus — the sweep cannot rate it at "
+        "all, which is why it was omitted while its two siblings "
+        "(compact_ymd, compact_mdy) were not. That omission is what let the "
+        "day-first leaf keep shipping a confident date after its own "
+        "validator scored the column 0.0: the pass rate was advisory, so "
+        "nothing acted on it. Measured instead on a 33,250-table profile "
+        "pass (docs/compact-dmy-corpus-family.json): of 963 columns typed "
+        "compact_dmy with samples, 922 fall below the veto threshold under "
+        "the range-carrying validator, and the label's header census reads "
+        "game_id (218), id (100), minorityInterest (58), pos (49), trials "
+        "(33), depreciation (32) — surrogate keys and financial figures, not "
+        "dates. The false-veto side is measurably empty: of the 62 columns "
+        "corpus-wide whose sampled values all read as DD-MM-YYYY, the "
+        "validator rejects 0. The corpus is not merely date-poor either — "
+        "it holds 1,987 day-first columns on the SEPARATOR-bearing leaves "
+        "(dmy_slash, dmy_dot, …), so day-first ordering is well "
+        "represented; the compact leaf is the one with no genuine members. "
+        "Blast radius (docs/compact-dmy-blast-radius.txt): 978 -> 32 columns "
+        "over a real two-sided profile pass of 1,723 tables, at a measured "
+        "cost of 68 genuine YYYYMMDD columns that lose compact_ymd and become "
+        "unknown — the validator pass-rate vector is a model input, so "
+        "tightening this leaf moves a feature on every eight-digit column. "
+        "That cost is real and is not a reason to skip the hard veto: an "
+        "advisory verdict here left 946 columns shipping a strptime transform "
+        "over financial figures.",
 }
 
 
@@ -211,9 +238,11 @@ def main() -> int:
         "#",
         "# Documented exceptions (correct-veto residual just over the",
         f"# ceiling, validation is precise): {', '.join(VETO_SAFE_EXCEPTIONS)}.",
-        "# Gate-validated exceptions (rare-starved here, but the corpus-honest",
-        "# gate measured the hard-veto safe at scale — see",
-        f"# output/corpus-honest-gate/veto_statusbp_finding.md): {', '.join(GATE_VALIDATED_EXCEPTIONS)}.",
+        "# Gate-validated exceptions (rare-starved here, but MEASURED",
+        "# hard-veto-safe at corpus scale elsewhere — per-label provenance is",
+        "# in RESIDUAL_NOTES in the generator; the first two are",
+        "# output/corpus-honest-gate/veto_statusbp_finding.md, the third is",
+        f"# docs/compact-dmy-corpus-family.json): {', '.join(GATE_VALIDATED_EXCEPTIONS)}.",
         f"# {len(veto_safe)} labels total.",
         "",
     ]

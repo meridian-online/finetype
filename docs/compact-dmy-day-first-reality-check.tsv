@@ -1,0 +1,14 @@
+# day-first reality check — does the tightening hurt genuine non-US date columns?
+# head_sha	ea5ddf2e4bbdf5f5408aff2a00469c2c70cfd1f8
+# base_ref	origin/main	672be49c749c7e50e54e4f68cc8c6c1a4903733e
+# taxonomy_version	tax-48864103893f
+# identical = the FULL emitted record is byte-for-byte the same on both sides
+fixture	identical	side	record
+compact_dmy_uk_date_of_birth	YES	base	"date_of_birth","representation.numeric.integer_number",0.6514,"low","","BIGINT","","CAST({col} AS BIGINT)",false,8,8,0,"veto_fallback:vocab","" 
+compact_dmy_uk_date_of_birth	YES	cand	"date_of_birth","representation.numeric.integer_number",0.6514,"low","","BIGINT","","CAST({col} AS BIGINT)",false,8,8,0,"veto_fallback:vocab","" 
+compact_dmy_genealogy_19th_century	YES	base	"birth_date","unknown",0.6143,"low","representation.numeric.integer_number","","","",false,8,8,0,"header_hint_cross_domain:birth_date","" 
+compact_dmy_genealogy_19th_century	YES	cand	"birth_date","unknown",0.6143,"low","representation.numeric.integer_number","","","",false,8,8,0,"header_hint_cross_domain:birth_date","" 
+compact_dmy_au_transaction_slash	YES	base	"transaction_date","datetime.date.dmy_slash",0.7885,"medium","","DATE","%d/%m/%Y","strptime({col}, '%d/%m/%Y')::DATE",false,8,8,0,"date_slash_disambiguation","" 
+compact_dmy_au_transaction_slash	YES	cand	"transaction_date","datetime.date.dmy_slash",0.7885,"medium","","DATE","%d/%m/%Y","strptime({col}, '%d/%m/%Y')::DATE",false,8,8,0,"date_slash_disambiguation","" 
+compact_dmy_de_invoice_dot	YES	base	"rechnungsdatum","datetime.date.dmy_dot",0.9997,"high","","DATE","%d.%m.%Y","strptime({col}, '%d.%m.%Y')::DATE",false,8,8,0,"multi-branch","" 
+compact_dmy_de_invoice_dot	YES	cand	"rechnungsdatum","datetime.date.dmy_dot",0.9997,"high","","DATE","%d.%m.%Y","strptime({col}, '%d.%m.%Y')::DATE",false,8,8,0,"multi-branch","" 
