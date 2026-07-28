@@ -49,6 +49,7 @@ import subprocess
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -442,6 +443,23 @@ def check(name: str, cond: bool) -> None:
         _FAILURES.append(name)
 
 
+def check_expr(name: str, fn: Callable[[], bool]) -> None:
+    """`check`, but an exception is this case failing rather than the run dying.
+
+    A case that raises kills the whole self-test with a traceback and no `FAIL`
+    line, so a mutation that makes it raise reads as undetected.  Attributing the
+    exception to the case that provoked it is what makes the mutation harness's
+    verdict trustworthy.
+    """
+    try:
+        ok = bool(fn())
+    except Exception as e:  # noqa: BLE001 - the exception IS the failure signal
+        print(f"  FAIL {name}  (raised {type(e).__name__}: {e})")
+        _FAILURES.append(name)
+        return
+    check(name, ok)
+
+
 def _rec(**kw: str) -> dict[str, str]:
     base = {f: "" for f in RECORD_FIELDS}
     base["file_content_sha256"] = "aa" * 32
@@ -497,6 +515,28 @@ def cmd_self_test(_args: argparse.Namespace) -> int:
         "identical records report no difference in any field",
         all(res.differ[f] == 0 for f in COMPARED_FIELDS)
         and res.whole_record_differ == 0,
+    )
+
+    # Two fields moving in ONE row is where "rows that moved" and "sum of the
+    # per-field counts" stop agreeing; every case above moves exactly one, so
+    # without this the two implementations are indistinguishable.
+    res = diff_records(
+        [_rec()], [_rec(confidence="0.4370", quality_band="low")]
+    )
+    check(
+        "two fields moving in one row is ONE whole-record difference, not two",
+        res.whole_record_differ == 1
+        and res.differ["confidence"] == 1
+        and res.differ["quality_band"] == 1,
+    )
+    res = diff_records(
+        [_rec(), _rec(column_name="c2", column="c2")],
+        [_rec(confidence="0.4370", quality_band="low"),
+         _rec(column_name="c2", column="c2")],
+    )
+    check(
+        "the whole-record count is rows that moved, not fields that moved",
+        res.whole_record_differ == 1,
     )
 
     # -- numeric magnitude ----------------------------------------------------
@@ -557,14 +597,21 @@ def cmd_self_test(_args: argparse.Namespace) -> int:
         '"amt","finance.money.amount",0.9000,"high","representation.numeric.decimal_number",'
         '"DOUBLE","#,##0.00","CAST({col} AS DOUBLE)",false,5,5,0,"currency_symbol","EN_US"'
     )
-    rec = parse_profile_csv(header + "\n" + body + "\n", "amt")
-    check(
+    check_expr(
         "a quoted field containing a comma does not shift the parse (format_string)",
-        rec["format_string"] == "#,##0.00",
+        lambda: parse_profile_csv(header + "\n" + body + "\n", "amt")[
+            "format_string"
+        ]
+        == "#,##0.00",
     )
-    check(
+
+    def _after_comma() -> bool:
+        r = parse_profile_csv(header + "\n" + body + "\n", "amt")
+        return r["locale"] == "EN_US" and r["disambiguation"] == "currency_symbol"
+
+    check_expr(
         "the fields after a comma-bearing one are still correct (locale)",
-        rec["locale"] == "EN_US" and rec["disambiguation"] == "currency_symbol",
+        _after_comma,
     )
 
     two_cols = (
@@ -579,12 +626,29 @@ def cmd_self_test(_args: argparse.Namespace) -> int:
         rec["type"] == "finance.money.amount",
     )
 
-    try:
-        parse_profile_csv("column,type\n\"a\",\"b\"\n", "a")
-        ok = False
-    except ProfileError:
-        ok = True
-    check("a changed CSV header is refused, not parsed into shifted fields", ok)
+    # A reordered header has the right arity, so the field-count check does not
+    # fire: only comparing the header itself catches it.  Without that, `type`
+    # would be read out of the confidence position and every field would shift.
+    swapped = list(PROFILE_FIELDS)
+    swapped[1], swapped[2] = swapped[2], swapped[1]
+    reordered = (
+        ",".join(swapped)
+        + "\n"
+        + '"a",0.9000,"finance.money.amount","high","","DOUBLE","","",false,5,5,0,"",""\n'
+    )
+
+    def _reordered() -> bool:
+        try:
+            parse_profile_csv(reordered, "a")
+        except ProfileError:
+            return True
+        return False
+
+    check_expr(
+        "a REORDERED header of the right length is refused, not parsed into "
+        "shifted fields",
+        _reordered,
+    )
 
     try:
         parse_profile_csv(header + "\n", "a")
@@ -636,10 +700,17 @@ def cmd_self_test(_args: argparse.Namespace) -> int:
         rows = [_rec(transform="CAST({col} AS VARCHAR)", format_string="#,##0.00")]
         write_tsv(p, rows, RECORD_FIELDS)
         back = load_tsv(p)
-        check(
+        check_expr(
             "every compared field survives the TSV round trip",
-            len(back) == 1
+            lambda: len(back) == 1
+            and all(f in back[0] for f in COMPARED_FIELDS)
             and all(back[0][f] == rows[0][f] for f in COMPARED_FIELDS),
+        )
+        check(
+            "the written header carries every compared field",
+            set(COMPARED_FIELDS).issubset(
+                set(p.read_text().splitlines()[0].split("\t"))
+            ),
         )
         res = diff_records(back, [_rec(transform="", format_string="#,##0.00")])
         check(
