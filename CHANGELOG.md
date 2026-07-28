@@ -27,13 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `tests/fixtures/precise_audit.tsv`.
 
   **The defect predates both fixes, and it was three column families, not one.**
-  An earlier draft of this entry said the year-first tightening *relocated* the
-  false positive onto the day-first leaf and left users worse off than 0.6.53.
-  That is false and measurement refuted it. A four-sided probe — the released
-  0.6.53 binary run outside the checkout, the parent of the year-first change,
-  the year-first change, and both leaves closed — put the released binary and
-  the pre-tightening parent record for record identical, and the released binary
-  *more* confident than the state blamed for the regression:
+  The day-first work was opened on the premise that tightening the year-first
+  leaf had *relocated* the false positive — a low-confidence integer becoming a
+  high-confidence date — and that premise is false. A four-sided probe settled
+  it: the released 0.6.53 binary run outside the checkout, the parent of the
+  year-first change, the year-first change, and both leaves closed. The released
+  binary and the pre-tightening parent agree record for record, and the released
+  binary is *more* confident than the state that was blamed:
 
   | probe fixture | released 0.6.53 | year-first fixed | both fixed (0.6.54) |
   |---|---|---|---|
