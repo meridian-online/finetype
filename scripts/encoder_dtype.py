@@ -24,7 +24,9 @@ rather than damages:
     hash while the tool printed "unchanged".
   * **permission bits are preserved.** An in-place conversion leaves the destination's
     mode alone; a new `--out` file is created at the umask default, not at the 0600 the
-    temporary file is born with.
+    temporary file is born with. A verbatim copy carries the source's mode.
+  * **`__metadata__` is carried through.** A published artifact that lost its provenance
+    block behind a successful-looking convert would be the quiet kind of damage.
 
 Rounding is IEEE 754 round-half-to-even, from CPython's `struct` `'e'` packer. That is
 fully specified by the standard and carries no libm dependence, so the same input file
@@ -50,7 +52,9 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -259,7 +263,10 @@ def cmd_to_f16(args: argparse.Namespace) -> int:
 
 
 def _build(
-    tensors: dict[str, tuple[str, list[int], bytes]], *, sort_header: bool = True
+    tensors: dict[str, tuple[str, list[int], bytes]],
+    *,
+    sort_header: bool = True,
+    metadata: dict[str, str] | None = None,
 ) -> bytes:
     """Serialise a safetensors file.
 
@@ -269,8 +276,14 @@ def _build(
     `{"embeddings":{"dtype":"F16","shape":[29528,128],"data_offsets":[0,7559168]}}`.
     Re-serialising that with `sort_keys=True` yields the same *length* and a different
     sha256, so a fixture built the tool's own way cannot detect the difference.
+
+    `metadata` writes a `__metadata__` block, which a real export puts first and which
+    carries no `data_offsets` — the shape every consumer of this file has to special-case.
     """
-    header, buf = {}, bytearray()
+    header: dict = {}
+    buf = bytearray()
+    if metadata is not None:
+        header["__metadata__"] = metadata
     for name, (dtype, shape, payload) in tensors.items():
         offset = len(buf)
         buf += payload
@@ -411,19 +424,148 @@ def cmd_self_test(args: argparse.Namespace) -> int:
             f"0o{mode:03o}",
         )
 
+        # 7b. the mode that is restored has to be the destination's own, not a constant.
+        #     Case 7 uses 0644, which is also the obvious constant to hardcode, so on its
+        #     own it cannot tell "read the destination's mode" from "chmod 0644" — and the
+        #     second of those silently *widens* a private artifact. 0600 is the mode a
+        #     model file lands in when someone converts it with an unlucky umask; this
+        #     case is the one that says the tool must not open it back up.
+        p6b = root / "perm_private.safetensors"
+        p6b.write_bytes(_build({"embeddings": ("F32", [2], struct.pack("<2f", 1.0, 2.0))}))
+        os.chmod(p6b, 0o600)
+        rc = cmd_to_f16(argparse.Namespace(path=p6b, out=None, tensor=["embeddings"]))
+        mode = stat.S_IMODE(os.stat(p6b).st_mode)
+        check(
+            "a 0600 artifact is not widened by an in-place conversion",
+            rc == 0 and mode == 0o600,
+            f"0o{mode:03o}",
+        )
+
         # 8. a brand-new `--out` destination is not born 0600 either — the same mkstemp
         #    default would otherwise ship a fresh artifact nobody else can read.
+        #    The umask is pinned and the expectation is a *literal*. Computing the
+        #    expectation from `_current_umask()` — the same helper the implementation
+        #    calls — would assert `impl == impl`: a stub returning 0 would satisfy both
+        #    sides and the case would pass on a broken tool.
         p7 = root / "perm_src.safetensors"
         p7.write_bytes(_build({"embeddings": ("F32", [2], struct.pack("<2f", 1.0, 2.0))}))
         fresh = root / "perm_new.safetensors"
-        rc = cmd_to_f16(argparse.Namespace(path=p7, out=fresh, tensor=["embeddings"]))
-        want = 0o666 & ~_current_umask()
-        mode = stat.S_IMODE(os.stat(fresh).st_mode)
+        prior_umask = os.umask(0o027)
+        try:
+            rc = cmd_to_f16(argparse.Namespace(path=p7, out=fresh, tensor=["embeddings"]))
+            mode = stat.S_IMODE(os.stat(fresh).st_mode)
+        finally:
+            os.umask(prior_umask)
         check(
             "a new destination gets the umask default, not 0600",
-            rc == 0 and mode == want,
-            f"0o{mode:03o} (umask default 0o{want:03o})",
+            rc == 0 and mode == 0o640,
+            f"0o{mode:03o} (umask 0o027 -> want 0o640)",
         )
+
+        # 9. the verbatim-copy path has its own mode to preserve. `shutil.copyfile` creates
+        #    the destination at the umask default, so without an explicit `copymode` a
+        #    `--out` copy of an already-F16 encoder silently changes the artifact's
+        #    permissions — the same defect as case 7, on the branch that does no work.
+        f16_src = root / "copy_mode_src.safetensors"
+        f16_src.write_bytes(
+            _build({"embeddings": ("F16", [2], struct.pack("<2e", 1.0, 2.0))}, sort_header=False)
+        )
+        os.chmod(f16_src, 0o600)
+        copy_dest = root / "copy_mode_out.safetensors"
+        prior_umask = os.umask(0o022)
+        try:
+            rc = cmd_to_f16(argparse.Namespace(path=f16_src, out=copy_dest, tensor=["embeddings"]))
+            mode = stat.S_IMODE(os.stat(copy_dest).st_mode)
+        finally:
+            os.umask(prior_umask)
+        check(
+            "a verbatim copy carries the source's mode, not the umask default",
+            rc == 0 and mode == 0o600,
+            f"0o{mode:03o}",
+        )
+
+        # 10. `__metadata__` survives the rewrite. It is the one header entry with no
+        #     `data_offsets`, so it has to be copied across explicitly — and dropping it
+        #     is invisible: the conversion still succeeds, the tensors are still right,
+        #     and a published artifact just quietly loses its provenance block. The
+        #     fixture is built the way a real export writes one (unsorted, metadata first).
+        meta = {"format": "pt", "produced_by": "finetype"}
+        p8 = root / "meta.safetensors"
+        p8.write_bytes(
+            _build(
+                {"embeddings": ("F32", [2], struct.pack("<2f", 1.0, 2.0))},
+                sort_header=False,
+                metadata=meta,
+            )
+        )
+        rc = cmd_to_f16(argparse.Namespace(path=p8, out=None, tensor=["embeddings"]))
+        h8, d8 = read_safetensors(p8)
+        check(
+            "__metadata__ survives the conversion",
+            rc == 0 and h8.get("__metadata__") == meta,
+            repr(h8.get("__metadata__")),
+        )
+        check(
+            "the converted tensor is still right alongside __metadata__",
+            list(struct.unpack("<2e", d8)) == [1.0, 2.0] and h8["embeddings"]["dtype"] == "F16",
+        )
+
+        # 10b. `inspect` is the sub-command a release engineer runs first, on exactly the
+        #      kind of file case 10 builds. Without its `__metadata__` arm it reaches for
+        #      `data_offsets` on a block that has none and dies with a traceback.
+        inspected: object
+        try:
+            inspected = main(["inspect", str(p8)])
+        except BaseException as exc:  # noqa: BLE001 — the point is that nothing escapes
+            inspected = f"raised {type(exc).__name__}"
+        check("inspect handles a file that carries __metadata__", inspected == 0, f"{inspected!r}")
+
+        # 11. a target tensor that is not float at all. `to_dtype`-style conversion would
+        #     reinterpret 8-byte integers as pairs of floats and write a plausible-looking
+        #     matrix of garbage; the same silent-reinterpretation the Rust loader's dtype
+        #     guard exists to stop, on the writing side.
+        p9 = root / "ints.safetensors"
+        p9.write_bytes(_build({"embeddings": ("I64", [2], struct.pack("<2q", 1, 2))}))
+        rc = cmd_to_f16(argparse.Namespace(path=p9, out=None, tensor=["embeddings"]))
+        check("a non-F32 target tensor is refused, not reinterpreted", rc == 2, f"rc={rc}")
+
+        # 12. underflow is *reported*. The module docstring promises elements that round
+        #     to zero are counted and printed — a promise about what the operator is told,
+        #     which only a case that reads stdout can hold.
+        p10 = root / "tiny.safetensors"
+        p10.write_bytes(_build({"embeddings": ("F32", [3], struct.pack("<3f", 1.0, 1e-9, -1e-9))}))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = cmd_to_f16(argparse.Namespace(path=p10, out=None, tensor=["embeddings"]))
+        printed = buf.getvalue()
+        check(
+            "elements that round to zero are counted and reported",
+            rc == 0 and "2 element(s) rounded to zero" in printed,
+            printed.replace("\n", " | ").strip(),
+        )
+
+        # 13. the header is padded so the tensor buffer starts 8-byte aligned, which the
+        #     safetensors format requires and which no other case would notice: this
+        #     tool's own reader slices by offset and does not care.
+        for aligned_path in (p, p4):
+            (hlen,) = struct.unpack_from("<Q", aligned_path.read_bytes(), 0)
+            check(
+                f"{aligned_path.name}: the tensor buffer starts 8-byte aligned",
+                (8 + hlen) % 8 == 0,
+                f"header {hlen} bytes",
+            )
+
+        # 14. a file too short to hold a length prefix is a clean exit 2 with a message,
+        #     not a traceback. `docs/RELEASE.md` invites this tool at a directory the
+        #     operator is unsure about, so a corrupt file is an expected input.
+        stub = root / "truncated.safetensors"
+        stub.write_bytes(b"\x01\x02\x03")
+        outcome: object
+        try:
+            outcome = main(["to-f16", str(stub)])
+        except BaseException as exc:  # noqa: BLE001 — a traceback here is the failure
+            outcome = f"raised {type(exc).__name__}"
+        check("a truncated file exits 2 with a message, not a traceback", outcome == 2, f"{outcome!r}")
 
     print()
     if failures:
