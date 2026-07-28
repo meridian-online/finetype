@@ -207,19 +207,43 @@ The F32 binary built here is **67,388,816** bytes; the figure this change was pr
 against is 67,541,712. The F16 side lands the same 152,896 bytes low, so the shift is in the
 *baseline*, not in the conversion, and the 15,240,576-byte saving is unaffected.
 
-**What accounts for the 152,896 is NOT established.** Settling it needs a build of the
-pre-merge commit, which means moving this shared checkout off its branch, and that was not
-done. What is on the record instead is circumstantial and pointed both ways:
+**Closed by the review — it is the intervening merges, and the figure reproduces exactly.**
+Checking out `c1a6e61` (the pre-merge state this change was proposed from, based on `#78`
+and therefore without the three merges that landed after it), restoring the F32 artifact
+and running the same `cargo build --release -p finetype-cli --bin finetype` produces
+**67,541,712** bytes — the proposed figure, to the byte. So the 152,896 is source drift
+across those merges and has nothing to do with the dtype.
 
-- the earlier figure predates three merges into `main` — one of them deleted 2,745 lines
-  across `finetype-model` and `finetype-cli`, including all of `semantic.rs` and 1,276
-  lines of `inference.rs`, which under `lto = true` is a plausible six-figure reduction;
-- but the same window **grew** `labels/definitions_datetime.yaml` by 1,045 bytes, and that
-  file is `include_str!`-embedded, so it pushes the other way.
+The circumstantial reading that pointed both ways was the right one on balance: the window
+deleted 2,745 lines across `finetype-model` and `finetype-cli`, including all of
+`semantic.rs` and 1,276 lines of `inference.rs`, against 1,045 bytes added to the
+`include_str!`-embedded `labels/definitions_datetime.yaml`.
 
-A reviewer who wants this closed can build `finetype-cli` at the merge base with the F32
-artifact restored from `.finetype-model-backups/` and read the size. Until someone does,
-"the intervening merges account for it" is a hypothesis, not a measurement.
+Both endpoints of the release claim reproduce byte for byte from a cold rebuild on the same
+machine: F32 restored → 67,388,816, sha256 `fbbc9071…30007f43`; F16 → 52,148,240, sha256
+`7caff565…79b60c3a`. The backup at
+`output/model-artifact-backups/value_encoder_m2v8m-s43_F32_original.safetensors` is what was
+restored, so the conversion is reversible in practice and not only on paper.
+
+## Two things the self-test does not cover
+
+Both were found by mutating the tool a second time during review, and both would produce a
+**false null** — which is why neither can have manufactured the result above, since the
+result is 170 and not 0. Each is re-derived by making the named edit and running
+`scripts/encoder_dtype_record_diff.py self-test`, which still passes:
+
+- **`cmd_emit`'s environment is untested.** Delete `env["FINETYPE_MODEL"] = str(args.model)`
+  and every case still passes; both arms would then read `models/default` and every
+  comparison would report 0 / 843. The 48 cases are pure-Python over CSV text and never
+  reach the subprocess.
+- **`only_b` is untested.** Replace `only_b = sorted(k for k in b_by if k not in a_by)` with
+  `only_b = []` and every case still passes; a row present only on the B side would vanish
+  from the report. The unmatched-row case exercises `only_a` only. In this measurement
+  `rows_a = rows_b = common = 843` in all five diffs, so nothing was hidden.
+
+Three further mutations — comparing confidence with a `1e-3` tolerance, rounding it to 3 dp
+before comparing, and excluding a declared-unstable field from the whole-record count — were
+each killed by a named case.
 
 ## Reproducing this
 
