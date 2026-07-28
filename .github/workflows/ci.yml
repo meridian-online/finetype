@@ -75,6 +75,26 @@ jobs:
         # Stdlib only.
         run: scripts/encoder_dtype.py self-test
 
+      - name: The record diff compares the whole record, not just the label
+        # The instrument that says a model-artifact change did not alter the
+        # output has to be able to SEE the output. Two pull requests were refused
+        # for citing a prediction file whose confidence column is the empty
+        # string on every row, so the cases here are one per emitted field, plus
+        # identity-keyed row matching (a positional zip silently compares
+        # unrelated columns when an emit partially fails) and CSV parsing that
+        # survives a format string containing a comma.
+        run: scripts/encoder_dtype_record_diff.py self-test
+
+      - name: ...and eleven wrong implementations of it do not pass
+        # A self-test that a broken tool passes is a structural guard, which this
+        # repository has collected fifteen instances of. Each mutation is the
+        # implementation a competent author would plausibly write — label-only
+        # comparison, positional row matching, a naive split on commas, a
+        # max-delta that records the last delta — and must be killed by a NAMED
+        # case. Four of these passed when they were first written; the harness is
+        # what caught that, and it exits non-zero if any mutation survives again.
+        run: scripts/encoder_dtype_record_diff_mutations.py
+
   fmt:
     name: Format
     runs-on: ubuntu-latest
