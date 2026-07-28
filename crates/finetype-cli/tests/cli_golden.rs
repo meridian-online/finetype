@@ -1401,8 +1401,20 @@ fn golden_profile_compact_ymd_accepts_nineteenth_century_dates() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// COMPACT-DATE PRECISION — the DAY-FIRST leaf, where the year-first fix moved
-// the false positive to
+// COMPACT-DATE PRECISION — the DAY-FIRST leaf, which shipped a confident wrong
+// date for as long as it has existed
+//
+// These six columns are one per row of the residual table in
+// `docs/compact-date-residual.tsv`, and they are the reason that table exists:
+// the corpus-honest gate certified the year-first tightening and could not see
+// this. Its sample is ~3% of GitTables, it is non-adversarial, and it scores
+// label transitions in AGGREGATE — while the defect here is one column family
+// moving from an integer to a high-confidence date with a `strptime` transform
+// attached. A gate verdict is not coverage.
+//
+// Every one of these asserts the FULL emitted record. A label-only assertion
+// sails straight past the defect, because the damage is the `format_string` and
+// `transform` keys riding along with the label.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Assert a column's WHOLE emitted record, field for field, minus `confidence`.
@@ -1440,11 +1452,15 @@ fn assert_full_record(profile: &Value, column_name: &str, expected: Value, why: 
 
 /// ROW 1 — the exact values the year-first tightening was written for.
 ///
-/// The twenty corpus values in `compact_ymd`'s REJECT set. Before that change
-/// they typed `representation.numeric.integer_number` at 0.53. After it they
-/// typed `datetime.date.compact_dmy` at 0.91, quality band `high`, with
-/// `strptime({col}, '%d%m%Y')::DATE` attached — a low-confidence integer became
-/// a high-confidence date. The fix relocated its own defect.
+/// The twenty corpus values in `compact_ymd`'s REJECT set. Measured through the
+/// CLI on four sides (`docs/compact-date-residual.tsv`), this column typed
+/// `datetime.date.compact_dmy` at 0.9878, quality band `high`, carrying
+/// `format_string` `%d%m%Y` and `transform` `strptime({col}, '%d%m%Y')::DATE`
+/// on the RELEASED binary, and 0.9064 with the same label and the same
+/// transform after the year-first tightening. Twenty eight-digit financial
+/// figures, shipped as confident dates, on both.
+///
+/// Neither the label nor either of those two keys may reappear.
 #[test]
 #[ignore]
 fn golden_profile_compact_dmy_rejects_the_year_first_reject_set() {
@@ -1470,9 +1486,9 @@ fn golden_profile_compact_dmy_rejects_the_year_first_reject_set() {
             "null": 0,
         }),
         "under a shape-only day-first validator this column is \
-         datetime.date.compact_dmy at 0.91, quality band high, carrying \
-         format_string %d%m%Y and transform strptime({col}, '%d%m%Y')::DATE. \
-         Neither key may reappear.",
+         datetime.date.compact_dmy at 0.9878 released / 0.9064 on main, quality \
+         band high, carrying format_string %d%m%Y and transform \
+         strptime({col}, '%d%m%Y')::DATE. Neither key may reappear.",
     );
 }
 
@@ -1500,23 +1516,31 @@ fn golden_profile_compact_dmy_rejects_sequential_ids() {
             "null": 0,
         }),
         "a run of consecutive surrogate keys typed datetime.date.compact_dmy \
-         at 0.81 with a %d%m%Y strptime transform under the shape-only \
-         validator. validation_pass_rate here is the INCREMENT label's, not \
-         the date label's — the date label is gone.",
+         at 0.8341 released / 0.8110 on main, with a %d%m%Y strptime transform, \
+         under the shape-only validator. validation_pass_rate here is the \
+         INCREMENT label's, not the date label's — the date label is gone.",
     );
 }
 
 /// ROW 3 — round-hundred share counts. THE ALLOWLIST'S OWN CASE.
 ///
-/// This is the row the tightened pattern alone does not fix. With the pattern
-/// tightened but `datetime.date.compact_dmy` still absent from
-/// `labels/veto_safe.txt`, this column emitted `datetime.date.compact_dmy` at
-/// confidence 0.98, `quality_band` high, `validation_pass_rate` 0.0,
-/// `validation_advisory_low` true, `format_string` `%d%m%Y` and transform
-/// `strptime({col}, '%d%m%Y')::DATE` — the validator rejected every value in
-/// the column and nothing acted on the rejection. Remove the allowlist line and
-/// this test reddens; remove the pattern and it reddens; both halves are load
-/// bearing and this record is what says so.
+/// This is the row the tightened pattern ALONE does not fix, and the reason the
+/// allowlist line is half the change rather than tidying.
+///
+/// `datetime.date.compact_dmy` was absent from `labels/veto_safe.txt` while
+/// both its siblings were on it, so its validator's verdict was ADVISORY: the
+/// profile path computed the pass rate and then let the label stand, `strptime`
+/// transform and all. Tighten the pattern and leave the allowlist alone and
+/// this column still emits `datetime.date.compact_dmy` at high confidence with
+/// `validation_pass_rate` 0.0 and `validation_advisory_low` true — the
+/// validator rejects every value in the column and nothing acts on the
+/// rejection. A validator whose verdict nothing acts on is not a validator.
+///
+/// That is not an argument, it is a row of
+/// `docs/compact-dmy-mutation-matrix.md`: the `drop_allowlist_entry` mutation
+/// leaves both windows intact, removes only the allowlist line, and kills this
+/// test. `revert_whole_change` kills it too. Both halves are load bearing and
+/// the matrix is what says so.
 #[test]
 #[ignore]
 fn golden_profile_compact_dmy_vetoes_round_hundred_share_counts() {

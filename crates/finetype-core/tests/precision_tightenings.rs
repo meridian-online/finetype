@@ -383,16 +383,25 @@ fn ptc_compact_ymd_veto_fires_on_financial_column_and_stays_inert_on_dates() {
 /// Tightening 2 — `datetime.date.compact_dmy` carries day and month windows,
 /// not just eight-digit shape.
 ///
-/// Tightening the year-first leaf alone did not remove the eight-digit false
-/// positive, it RELOCATED it onto this one. `^\d{8}$` here confirmed every
-/// eight-digit token, so the columns the `compact_ymd` tightening pushed off
-/// that label landed on `compact_dmy` instead — and landed with HIGHER
-/// confidence than the integer reading they had before. Measured through the
-/// CLI (`scripts/probe_compact_date_residual.sh`,
-/// `docs/compact-date-residual.tsv`): the twenty corpus values
-/// `ptc_tightening_compact_ymd_rejects_eight_digit_figures_and_keys` is built
-/// from went `representation.numeric.integer_number` 0.53 →
-/// `datetime.date.compact_dmy` 0.91 with a `%d%m%Y` strptime attached.
+/// THE DEFECT IS OLDER THAN THE CHANGE IT WAS BLAMED ON. This tightening was
+/// opened on the premise that tightening the year-first leaf had RELOCATED an
+/// eight-digit false positive onto this one — a low-confidence integer becoming
+/// a high-confidence date. A four-sided probe refutes that
+/// (`scripts/probe_compact_date_residual.sh`,
+/// `docs/compact-date-residual.tsv`): the released binary and the PARENT of the
+/// year-first tightening agree record for record, and three column families
+/// already emitted `datetime.date.compact_dmy` at high confidence with a
+/// `%d%m%Y` strptime attached before that change existed.
+///
+///   fixture                      released       after the year-first fix
+///   ymd_reject_set               0.9878 high    0.9064 high
+///   sequential_ids               0.8341 medium  0.8110 medium
+///   round_hundred_share_counts   0.9999 high    0.9996 high
+///
+/// The year-first change moved the confidence slightly and the label not at
+/// all. So this is not a repair of a regression — it is the first fix the
+/// day-first leaf has had, and it is worth more than the premise claimed: three
+/// families, not one, stop shipping a confident wrong date.
 ///
 /// The windows sit on the FIRST two fields here, because the ordering is
 /// day-month-year: day `0[1-9]|[12]\d|3[01]`, month `0[1-9]|1[0-2]`.
