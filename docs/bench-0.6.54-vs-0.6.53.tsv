@@ -1,0 +1,25 @@
+# finetype profile A/B — wall clock, alternated runs
+# date	2026-07-28T10:33:43Z
+# files	eval/bench/multicolumn-38.txt	(38 inputs)
+# repeats	5
+# a	v0.6.53-shipped	/opt/homebrew/Cellar/finetype/0.6.53/bin/finetype	finetype 0.6.53	45d93cf9a19192dec1755409e2dcd2004b08400ae695b8bfe9de2c04c8429c20
+# b	0.6.54-local	./target/release/finetype	finetype 0.6.54	157bba98e7e32edd0b65d55266d6889701541a712d2921f456019ba15519d0c8
+# the whole `profile` invocation is timed — model load, duckdb shell-out,
+# classification, serialisation — and the two binaries differ by everything that
+# landed between them, not by any one change.
+binary	repeat	seconds
+v0.6.53-shipped	1	3.6614
+0.6.54-local	1	1.7580
+v0.6.53-shipped	2	3.6667
+0.6.54-local	2	1.7638
+v0.6.53-shipped	3	3.6581
+0.6.54-local	3	1.7626
+v0.6.53-shipped	4	3.6654
+0.6.54-local	4	1.7575
+v0.6.53-shipped	5	3.6875
+0.6.54-local	5	1.7823
+# summary	median_s	mean_s	min_s	max_s
+# v0.6.53-shipped	3.6654	3.6678	3.6581	3.6875
+# 0.6.54-local	1.7626	1.7648	1.7575	1.7823
+# speedup	median	2.0795
+# speedup	mean	2.0783

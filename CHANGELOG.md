@@ -7,6 +7,279 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.54] - 2026-07-28
+
+### Fixed
+
+- **Eight-digit numbers no longer type as confident dates — on either compact
+  leaf.** Both `datetime.date.compact_ymd` (year-first) and
+  `datetime.date.compact_dmy` (day-first) validated on `^\d{8}$`, so each
+  confirmed *every* eight-digit token at 100% and the hard validation veto had
+  nothing to push back with. Financial figures (`grossProfit` 71132000,
+  `sharesOutstanding` 25012600) and surrogate keys (an NBA `GAME_ID` 21601092, a
+  `PostId` 18502653) came back as confident dates **with a `strptime` transform
+  attached** — a downstream consumer that follows the transform does not get a
+  wrong label, it gets a corrupted column. Both validators now carry day, month
+  and year windows, the shape their `compact_ym` sibling has always had. Not
+  per-month day counts: `20240230` still validates, and the windows carry the
+  discrimination the corpus needs. `compact_mdy` is the honest remainder — still
+  `^\d{8}$`, still imprecise, and recorded as such in
+  `tests/fixtures/precise_audit.tsv`.
+
+  **The defect predates both fixes, and it was three column families, not one.**
+  An earlier draft of this entry said the year-first tightening *relocated* the
+  false positive onto the day-first leaf and left users worse off than 0.6.53.
+  That is false and measurement refuted it. A four-sided probe — the released
+  0.6.53 binary run outside the checkout, the parent of the year-first change,
+  the year-first change, and both leaves closed — put the released binary and
+  the pre-tightening parent record for record identical, and the released binary
+  *more* confident than the state blamed for the regression:
+
+  | probe fixture | released 0.6.53 | year-first fixed | both fixed (0.6.54) |
+  |---|---|---|---|
+  | `compact_dmy_ymd_reject_set` | `compact_dmy` 0.9878 high, `%d%m%Y` | `compact_dmy` 0.9064 high, `%d%m%Y` | `integer_number` 0.4866 low |
+  | `compact_dmy_sequential_ids` | `compact_dmy` 0.8341 medium, `%d%m%Y` | `compact_dmy` 0.8110 medium, `%d%m%Y` | `increment` 0.4938 low |
+  | `compact_dmy_round_hundred_share_counts` | `compact_dmy` 0.9999 high, `%d%m%Y` | `compact_dmy` 0.9996 high, `%d%m%Y` | `integer_number` 0.9847 high |
+  | `compact_dmy_genuine_ymd_dates` (control) | `compact_ymd` 0.9992 high | `compact_ymd` 0.9992 high | `compact_ymd` 0.9972 high |
+  | `compact_dmy_unconstrained_eight_digit` (control) | `integer_number` 0.6000 | `integer_number` 0.6000 | `integer_number` 0.6000 |
+
+  Full emitted record for all four sides, six fixtures:
+  `docs/compact-date-residual.tsv`, regenerate with
+  `scripts/probe_compact_date_residual.sh`. Each side is built **and run** inside
+  its own label state, because `profile` resolves `labels/` against the working
+  directory and prefers it over its embedded copy — the first version of this
+  probe ran every baseline side against the candidate taxonomy and reported the
+  shape-only sides as already fixed. Locale is noise on this pipeline
+  (`docs/compact-date-residual.tsv.locale-control`), so no locale claim is made.
+
+- **The day-first fix costs 68 genuine `YYYYMMDD` columns their type, and that is
+  in the ledger next to what it buys.** A two-sided profile pass over **1,723
+  tables / 97,599 columns**, each side built and run inside its own label state
+  (`docs/compact-dmy-blast-radius.txt`, `scripts/compact_dmy_blast_radius.sh`):
+
+  | label | before | after |
+  |---|---:|---:|
+  | `datetime.date.compact_dmy` | 978 | **32** |
+  | `datetime.date.compact_ymd` | 230 | **162** |
+  | `datetime.date.compact_mdy` | 92 | 71 |
+  | `datetime.date.compact_ym` | 353 | 353 |
+
+  Of the 946 columns that left `compact_dmy`: 615 → `integer_number`, 187 →
+  `unknown`, 76 → `numeric_code`, 51 → `word`, 11 → `increment`. **Zero columns
+  were newly typed `compact_dmy`.**
+
+  The `compact_ymd` row is the cost, and it is collateral rather than intent: a
+  validator's per-label pass rate is an **input** to the multi-branch model's
+  validation branch, so tightening the day-first leaf moves a feature on every
+  eight-digit column including year-first ones — a genuine `YYYYMMDD` value
+  scores 1.0 on the day-first validator before the change and 0.0 after it,
+  because its middle pair is a day-of-month and overflows the month window. All
+  **68** of the columns that moved have **every sampled value a valid
+  `YYYYMMDD`**; they are headed `date` (65) and `game_date` (3); 67 became
+  `unknown` and 1 became `representation.text.word`. So: **946 confidently-wrong
+  dates removed against 68 correct ones downgraded to `unknown`.** The trade is
+  favourable on this product's stance — a confident picture that is wrong is the
+  failure class, and `unknown` is honest rather than wrong — but it is a real
+  precision loss and it is one row of the report so it cannot be quoted
+  selectively.
+
+- **Every clause of the day-first change is defended by a test that dies without
+  it.** Six mutations, each deleting one clause, both suites run for each
+  (`docs/compact-dmy-mutation-matrix.md`): `revert_whole_change` kills 8 of 14,
+  each of the three windows kills 6, the allowlist entry kills 3, and *adding* a
+  century year window kills 6 — so the year staying `\d{4}` is an enforced
+  decision rather than an omission. The three control rows stay green under
+  `revert_whole_change`, which is what makes them controls.
+
+- **The day-first change touches no genuine non-US date column.** Four realistic
+  fixtures — compact day-first with every day 13–31, compact day-first from
+  1844–1880, `DD/MM/YYYY`, and `DD.MM.YYYY` under a German header — profiled on
+  both sides and compared on the full emitted record, all four byte-identical
+  (`docs/compact-dmy-day-first-reality-check.tsv`). The world writes day-first
+  *with separators*, and those columns are served by `dmy_slash` and `dmy_dot`,
+  which keep their labels, format strings and transforms untouched. An honest
+  second finding this surfaced, which the change neither causes nor worsens: a
+  genuine compact `DDMMYYYY` column where month-first is arithmetically
+  impossible for every value is typed `integer_number` on **both** sides — the
+  compact day-first leaf does not recognise its own family. That is a separate
+  recall defect.
+
+- **NAICS sector codes published as hyphenated ranges now validate.** The US
+  Census publishes three NAICS sectors as hyphenated pairs — **31-33**
+  Manufacturing, **44-45** Retail Trade, **48-49** Transportation and
+  Warehousing — and they appear verbatim in business reference data. The
+  canonical `identity.industry.naics` pattern admitted only sector-prefixed
+  digit runs, so all three rejected and downstream contracts had to hand-widen
+  their own copy of the pattern to compensate. Widened by literal alternation
+  (`|^(31-33|44-45|48-49)$`), not by a general `(-[0-9]{2})?` suffix — that
+  would admit `11-99`, which is not a published sector range. There are exactly
+  three, and the pattern now names all three and nothing else (Precision
+  Principle). `labels/sets/naics_codes.txt` is untouched: it deliberately
+  expands the three ranges into individual 2-digit codes, so a column consisting
+  only of hyphenated ranges is still not *detected* as NAICS. This fixes the
+  contract you validate against, not the detection of a column of range labels.
+
+- The stale "NAICS/SIC industry codes" clause is struck from
+  `representation.identifier.numeric_code`'s description. Industry codes moved
+  to `identity.industry.*` in the 2026-07-04 carve-out; `numeric_code` had been
+  advertising a home NAICS no longer has, and now defers explicitly.
+
+### Changed
+
+- **Column typing is about twice as fast on multi-column tables.** Two
+  independent fixes. The ≥90% validation gate that Sharpen and the deterministic
+  fast path both consult was calling the error-**collecting** validator once per
+  value and reading one boolean off the result — every failing value formatted a
+  human-readable message that was dropped on the next line. The gate now
+  resolves the leaf's validator once, calls the boolean-only path, and stops
+  scanning as soon as the 0.9 bar is arithmetically out of reach. Then
+  per-column classification runs in parallel — one column's answer depends on
+  nothing but that column, and the process was leaving cores idle.
+
+  Re-derived end to end against the **published `v0.6.53` macOS arm64 binary**
+  (sha256 `45d93cf9…`), five alternating repeats over
+  `eval/bench/multicolumn-38.txt`, two independent sittings:
+
+  | sitting | v0.6.53 median | 0.6.54 median | speedup (median) |
+  |---|---:|---:|---:|
+  | 1 (`docs/bench-0.6.54-vs-0.6.53.tsv`) | 3.6654 s | 1.7626 s | **2.08×** |
+  | 2 (`docs/bench-0.6.54-vs-0.6.53.sitting-2.tsv`) | 3.6683 s | 1.7626 s | **2.08×** |
+
+  Reproduce with `scripts/bench_profile_ab.sh`, which now emits its provenance
+  header (both binaries' paths, versions and sha256) and its own summary block
+  into the same file, so the figure a note quotes is inside the artefact the note
+  points at. Runs are alternated rather than blocked: a blocked layout hands all
+  thermal drift to whichever binary ran second.
+
+  The speedup is workload-shaped. The gain comes from dropped error formatting
+  and from column parallelism, so a corpus of *single*-column files gives the
+  parallelism nothing to do and gains essentially nothing; wide tables are where
+  it lands. Both optimisations are answer-preserving and were diffed byte for
+  byte. The A/B spans everything that landed between the two releases, not this
+  change alone — which is what a user upgrading actually experiences.
+
+  Column order is contract — consumers read the emitted sequence positionally —
+  so every parallel collect is from an **indexed** iterator and the smoke suite
+  asserts the emitted `column,type` *pairing* across repeated runs, not just the
+  column-name sequence. The first version of that assertion compared names only,
+  and a deliberately order-losing collect walked straight past it.
+
+- **The value encoder is stored in half precision, and the release binary is
+  ~22.6% smaller.** A Model2Vec encoder's `model.safetensors` is a lookup table,
+  and `Model2VecResources::from_bytes` up-casts it to F32 before a single token
+  is embedded — so F32 storage was packaging, costing twice the download and
+  twice the `include_bytes!` payload for nothing inference can see. The header
+  encoder in the same binary had always shipped F16; the dual-encoder value
+  branch had not. The artifact goes **30,236,760 → 15,118,424** bytes (sha256
+  `16709ebe…`, mode preserved). Held to a dtype-only A/B on one source state, the
+  macOS arm64 release binary goes **67,388,816 → 52,148,240**, **−22.6%**, both
+  endpoints reproduced from a cold rebuild; end to end, the published v0.6.53
+  binary is 67,424,752 bytes and this release builds to 52,148,256, **−22.7%**.
+
+  **This is label-invariant on the gold fixture, not output-invariant.** On
+  fixture `gold-2026-07-14`, over the 843 of 1037 gold columns that resolve from
+  the corpus parquet, through `finetype profile -o csv`: **0 / 843** on label,
+  quality band, runner-up, disambiguation, broad type, format string and
+  transform; **170 / 843** on `confidence`, maximum |Δ| **0.0007**; 171 / 843 on
+  the whole record. That is the arithmetic consequence of storing fewer bits, not
+  a regression — but it *is* a change to emitted output, and a note calling the
+  output unchanged would overstate what was measured. The one `detected_locale`
+  flip is excluded as noise: a same-binary, same-artifact repeat moves the same
+  column by itself. Full workings, including the byte-level accounting of the
+  binary delta: `evidence/half-precision-value-encoder.md`.
+
+- The loader now states the storage dtypes it accepts instead of trusting
+  `to_dtype`, which is a converter and not a validator: an integer tensor would
+  previously have loaded as a matrix of plausible-looking garbage.
+- **`finetype resharpen` emits the whole composed record**, not just the label:
+  `id`, label, confidence, quality band, runner-up, disambiguation rule. A
+  label-only diff cannot see a rule that keeps the answer and halves the
+  confidence, and that is exactly the failure mode this verb is used to rule
+  out. `scripts/compare_composed_records.py` diffs two such passes and reports
+  per-field and per-transition counts. `detected_locale` is excluded: it is not
+  yet run-to-run stable on a fixed binary.
+- **The dev binary and the released binary now classify the same way.**
+  `finetype profile` used to load `models/sibling-context/model.safetensors`
+  whenever that directory happened to exist and run a 396,800-parameter
+  cross-column attention layer over the headers before the multi-branch header
+  branch. `build.rs` never embedded that artifact, so no released binary could
+  do this — every number measured from a repo checkout described a pipeline no
+  user runs. Inference no longer loads it. The artifact is still trained and is
+  still loaded frozen by the multi-branch trainer, which is where it earns its
+  keep.
+
+### Added
+
+_Evaluation and release tooling. None of this changes what `finetype` outputs;
+it changes what a claim about that output has to survive before it is made._
+
+- **`evidence/` — the tracked record behind every accuracy number this repo
+  quotes**, and a manifest (`evidence/fixtures.json`) that enforces its own
+  rules. Gold fixture *versions* are content-addressed by sha256, baselines are
+  recorded per fixture version, and a comparison is only offered when the bar
+  and the candidate were measured on the same ground truth. The motivating
+  failure is on the record: a `0.853` bar written on 2026-06-28 survived 37
+  label re-adjudications and 106 added columns, and by 2026-07-25 the *unchanged
+  shipped model* scored 25 columns above it. The bar had gone stale, not the
+  model. `scripts/evidence.py verify` runs in CI.
+- **The release report is generated, never written.** `evidence/release-<v>.md`
+  is rendered from the manifest, and `verify` re-renders every committed report
+  and fails on a byte of drift — so a number in the prose that the manifest does
+  not carry cannot survive a PR. The renderer refuses to subtract two scores
+  measured on different fixture versions; it lists them as **refused
+  comparisons** with both fixture ids instead.
+- **A baseline now records the taxonomy its measuring binary was built with**
+  (`record-baseline --taxonomy`), which is a different fact from the
+  fixture-level taxonomy its labels were *adjudicated* under. The report states
+  the stamp per score and names the scores that lack one, rather than making a
+  blanket claim on behalf of all of them; a stamp inferred after the fact is a
+  guess wearing a hash, so pre-manifest scores stay unstamped.
+- **`scripts/test_evidence_mutations.sh`** — six realistic wrong
+  implementations of `evidence.py`, each of which must redden a case aimed at
+  it. Without it the evidence suite is known to pass and not known to detect.
+  Runs in CI.
+- **Branch ablation on the shipped model** — one `--zero-*` flag per branch of
+  the 5-branch multi-branch model, so each branch's inference-time contribution
+  is measurable on the model that actually ships
+  (`docs/branch-ablation-m2v8m-s43.md`).
+- **`scripts/encoder_dtype.py`** converts a Model2Vec encoder's lookup table
+  F32 → F16 for packaging. It refuses (exit 1, nothing written) rather than
+  storing a value F16 cannot hold as `inf`, reports elements that round to zero,
+  is a byte no-op on an already-converted file, and preserves the file's mode.
+  Rounding is IEEE round-half-to-even out of CPython's `struct`, so the same
+  input produces the same bytes on a laptop and on a CI runner — these bytes get
+  compiled into a binary, and a per-platform difference there is a byte-drift
+  failure waiting to happen.
+- **`scripts/encoder_dtype_record_diff.py`** drives `finetype profile -o csv`
+  once per gold column and diffs the **whole emitted record** — label,
+  confidence, quality band, runner-up, disambiguation, locale, format string,
+  transform. Two matching label-only prediction files establish label invariance
+  and nothing more, which is the finding that got two earlier pull requests
+  refused. Its 48 self-test cases and 11 mutation cases run in CI.
+- **`scripts/bench_profile_ab.sh`** — alternated wall-clock A/B of two binaries
+  over one file list, emitting provenance and summary into one artefact, so a
+  quoted speedup outlives the pull request that produced it.
+- **Compact-date instruments**: `scripts/probe_compact_date_residual.sh` (four
+  sides, whole emitted record, each side built *and run* in its own label
+  state), `scripts/compact_dmy_blast_radius.sh` (the genuine two-sided corpus
+  pass, `REPORT_ONLY=1` to re-derive the analysis without re-running it),
+  `scripts/compact_dmy_corpus_family.py` (year-policy scoring over 33,250 tables
+  / 820,173 columns) and `scripts/compact_dmy_mutation_matrix.sh`.
+- **`docs/compact-dmy-gate-coverage.md`** records that the fast corpus-honest
+  gate returned GO with zero triggers on the day-first change **and could not
+  see it**: the gate is a sharpen-rule instrument that computes the validator
+  pass-rate vector in the cached, shared Sense stage, so a validator edit cannot
+  propagate to either side of its comparison. A gate verdict is not coverage,
+  and here it is not even evidence.
+
+### Deprecated
+
+- **The `finetype-mcp` server role**, in favour of arcform's `arc mcp`
+  entrypoint. `FineTypeServer::new` and `serve_stdio` carry `#[deprecated]`
+  notes; `finetype mcp` still works. Non-breaking: the crate and all of its
+  library types are retained — the datapackage / JSON-schema emitters, taxonomy
+  resources and tool request/response types are untouched and remain supported.
+
 ### Removed
 
 - **Two unreachable classifiers and a header-hint classifier no user could run

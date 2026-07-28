@@ -125,10 +125,24 @@ Record a measurement as a reusable bar:
 ```sh
 scripts/evidence.py record-baseline --fixture gold-YYYY-MM-DD \
     --key "<model>/<pipeline>/<binary>" --correct 819 --scored 931 \
-    --model m2v8m-s43 --binary 0.6.53 --pipeline "…" --source "<where this was measured>"
+    --model m2v8m-s43 --binary 0.6.53 --pipeline "…" --source "<where this was measured>" \
+    --taxonomy "$(scripts/evidence.py taxonomy-version)"
 ```
 
 `--source` is required by `verify`: an unsourced bar is not evidence.
+
+`--taxonomy` records the vocabulary **the measuring binary was built with**, which is a
+different fact from the fixture-level taxonomy its labels were *adjudicated* under. Both
+matter and they drift apart: the taxonomy is compiled into the binary by `include_str!`,
+so a fixture adjudicated under one vocabulary is routinely scored by a binary carrying
+another. Pass it whenever the binary was built from the checkout you are measuring in —
+`scripts/evidence.py taxonomy-version` is exactly that value, and reading it from the
+checkout is only valid while `labels/` is unmodified since the build.
+
+It is optional, and deliberately so: a stamp inferred after the fact is a guess wearing a
+hash, so a score measured before this existed stays unstamped rather than being back-filled.
+The release report states the stamp per score and names the scores that lack one, instead
+of making a blanket claim on behalf of all of them.
 
 Score against a bar:
 

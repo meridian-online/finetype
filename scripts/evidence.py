@@ -52,7 +52,12 @@ EXIT_NO_FIXTURE = 3
 EXIT_NO_BASELINE = 4
 EXIT_INCONSISTENT = 5
 
-BASELINE_FIELDS = ("model", "binary", "pipeline", "source", "note")
+BASELINE_FIELDS = ("model", "binary", "pipeline", "source", "note", "taxonomy_measured")
+
+# The flag a human types, where it differs from the stored field name. A baseline's
+# `taxonomy_measured` is the vocabulary the MEASURING BINARY was built with, which is a
+# different fact from the fixture-level `taxonomy` its labels were adjudicated under.
+BASELINE_FLAGS = {"taxonomy_measured": "--taxonomy"}
 
 # The taxonomy is not a numbered artefact — it is the seven tracked
 # labels/definitions_*.yaml files, compiled into the binary by include_str!. So its
@@ -627,13 +632,17 @@ def render_release(doc: dict, binary: str) -> str:
                 continue
             pairs.append((fid, o, b))
     if pairs:
-        w("| Fixture version | Against | Then | Now | Δ columns | Δ accuracy |")
-        w("|---|---|---:|---:|---:|---:|")
+        # The pipeline is in the table because without it two rows of the same fixture —
+        # composed and Sense — are indistinguishable, and a reader cannot tell which
+        # number belongs to which path.
+        w("| Fixture version | Pipeline | Against | Then | Now | Δ columns | Δ accuracy |")
+        w("|---|---|---|---:|---:|---:|---:|")
         for fid, o, b in pairs:
             dc = b["correct"] - o["correct"]
             da = b["score"] - o["score"]
             w(
-                f"| `{fid}` | `{o.get('binary', '—')}` | {o['correct']}/{o['scored']} = "
+                f"| `{fid}` | {b.get('pipeline', '—')} | `{o.get('binary', '—')}` | "
+                f"{o['correct']}/{o['scored']} = "
                 f"{o['score']:.3f} | {b['correct']}/{b['scored']} = {b['score']:.3f} | "
                 f"{dc:+d} | {da:+.3f} |"
             )
@@ -719,19 +728,44 @@ def render_release(doc: dict, binary: str) -> str:
         "out as."
     )
     w("")
-    w("## What this does not record")
+    # Two taxonomies, and conflating them is the error this section exists to stop: the
+    # one a fixture's labels were ADJUDICATED under, and the one the MEASURING BINARY was
+    # built with. They are separable — the taxonomy is compiled in by include_str! — so a
+    # report states which of the two it actually knows, per score, rather than asserting a
+    # blanket "not captured" that stops being true the moment a run starts stamping it.
+    stamped = [(fid, key, b) for fid, _fx, key, b in rows if b.get("taxonomy_measured")]
+    unstamped = [(fid, key, b) for fid, _fx, key, b in rows if not b.get("taxonomy_measured")]
+    w("## Which taxonomy is which")
     w("")
     w(
         "The taxonomy column above is the vocabulary **the fixture was adjudicated under**, "
         "read from the commit in each fixture's `taxonomy.commit`. It is not the vocabulary "
         "the measuring binary was built with. The taxonomy is compiled into the binary by "
-        "`include_str!`, so those are separable and a run should stamp both — but these "
-        "scores predate the manifest, and the taxonomy of the binary that produced them was "
-        "not captured at the time. It is not reconstructed here, because a stamp inferred "
-        "after the fact is a guess wearing a hash. Measurements recorded from now on carry "
-        "the taxonomy version they were measured under."
+        "`include_str!`, so the two are separable and a run should stamp both."
     )
     w("")
+    if stamped:
+        measured_versions = sorted({b["taxonomy_measured"] for _fid, _key, b in stamped})
+        if len(measured_versions) == 1 and not unstamped:
+            w(
+                f"Every score above was measured by a binary built with taxonomy "
+                f"**`{measured_versions[0]}`**."
+            )
+        else:
+            w("The scores that carry the taxonomy their measuring binary was built with:")
+            w("")
+            for fid, key, b in stamped:
+                w(f"- `{fid}` · `{key}` — measured under `{b['taxonomy_measured']}`")
+        w("")
+    if unstamped:
+        w(
+            "These scores do **not** carry it, and it is not reconstructed here, because a "
+            "stamp inferred after the fact is a guess wearing a hash:"
+        )
+        w("")
+        for fid, key, _b in unstamped:
+            w(f"- `{fid}` · `{key}`")
+        w("")
     return "\n".join(out)
 
 
@@ -1029,7 +1063,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--correct", type=int, required=True)
     p.add_argument("--scored", type=int, required=True)
     for field in BASELINE_FIELDS:
-        p.add_argument(f"--{field}", default="")
+        p.add_argument(BASELINE_FLAGS.get(field, f"--{field}"), dest=field, default="")
     p.add_argument("--date")
     p.add_argument("--force", action="store_true")
     p.set_defaults(fn=cmd_record_baseline)

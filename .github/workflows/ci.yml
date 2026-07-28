@@ -45,6 +45,14 @@ jobs:
         run: scripts/evidence.py verify
       - name: evidence/ stays small, text-only and true to the manifest
         run: scripts/test_evidence.sh
+      - name: The evidence suite detects a wrong evidence.py
+        # Six realistic wrong implementations — a renderer that ignores a recorded
+        # taxonomy stamp, one that claims a stamp no baseline carries, a
+        # record-baseline that drops the flag, a delta table that loses the column
+        # telling two of its rows apart, and each of the TWO independent report-drift
+        # comparisons short-circuited. Each must redden a case aimed at it. Without
+        # this the suite above is only known to pass, never known to detect.
+        run: scripts/test_evidence_mutations.sh
       - name: Scorer propagates failures and stamps every score with its fixture
         run: scripts/test_score_clean_label.sh
 

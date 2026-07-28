@@ -1,0 +1,30 @@
+{
+  "tag": "release-0.6.54",
+  "model": "models/m2v8m-s43",
+  "gold_ftmb": "output/embed-frontier/gold_m2v8m.ftmb",
+  "fixture": {
+    "id": "gold-2026-07-14",
+    "sha256": "760ee4ace67064edd465d245103677e30171a9ce4bb07decc44bd69f914586a7",
+    "rows": 1037,
+    "path": "eval/gold/gold_corpus.tsv"
+  },
+  "sense": {
+    "correct": 492,
+    "scored": 931,
+    "score": 0.528
+  },
+  "composed": {
+    "correct": 819,
+    "scored": 931,
+    "score": 0.88
+  },
+  "measured": "2026-07-28T10:38:23Z",
+  "baseline": {
+    "key": "m2v8m-s43/composed-reframe/0.6.53",
+    "correct": 819,
+    "scored": 931,
+    "score": 0.88,
+    "delta_score": 0.0,
+    "delta_columns": 0
+  }
+}
