@@ -11,8 +11,9 @@ Four things change for anyone typing columns with finetype, and a larger set of 
 that only affect how this repository measures itself. The two are separated below,
 because a release note that mixes them makes internal work look like a product benefit.
 
-Every number here is re-derivable. Each claim names the committed script that produces it
-and the committed file that holds its output.
+Every number here is re-derivable, and the note says how: from a committed script and the
+committed file holding its output, from a release build you can make yourself, or from the
+published `v0.6.53` assets. Nothing is quoted from a pull-request body.
 
 ## What you get
 

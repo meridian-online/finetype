@@ -263,8 +263,8 @@ it changes what a claim about that output has to survive before it is made._
   sides, whole emitted record, each side built *and run* in its own label
   state), `scripts/compact_dmy_blast_radius.sh` (the genuine two-sided corpus
   pass, `REPORT_ONLY=1` to re-derive the analysis without re-running it),
-  `scripts/compact_dmy_corpus_family.py` (year-policy scoring over 33,250 tables
-  / 820,173 columns) and `scripts/compact_dmy_mutation_matrix.sh`.
+  `scripts/compact_dmy_corpus_family.py` (year-policy scoring over 820,173
+  profiled columns) and `scripts/compact_dmy_mutation_matrix.sh`.
 - **`docs/compact-dmy-gate-coverage.md`** records that the fast corpus-honest
   gate returned GO with zero triggers on the day-first change **and could not
   see it**: the gate is a sharpen-rule instrument that computes the validator
