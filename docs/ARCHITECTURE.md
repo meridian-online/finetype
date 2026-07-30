@@ -100,7 +100,7 @@ Pure Rust, no Python runtime, no external C++ dependencies. Integrates cleanly w
 | `finetype-model` | Flat CharCNN + Sense→Sharpen inference, feature extraction, column-mode disambiguation, Model2Vec | `candle-core`, `candle-nn` |
 | `finetype-cli` | Binary: CLI commands (infer, profile, load, check, generate, taxonomy, schema, train, mcp) | `clap`, `csv` |
 | `finetype-mcp` | MCP server library (rmcp, 6 tools, taxonomy resources) | `rmcp`, `tokio` |
-| `finetype-duckdb` | DuckDB extension: 5 scalar functions with embedded model | `duckdb`, `libduckdb-sys` |
+| `finetype-duckdb` | DuckDB extension: 13 scalar functions, 2 SQL table macros and 1 table function, with embedded model | `duckdb`, `libduckdb-sys` |
 | `finetype-eval` | Evaluation binaries (profile, actionability, GitTables, SOTAB) | `csv`, `duckdb`, `arrow` |
 | `finetype-train` | Pure Rust ML training (Sense, Entity, CharCNN, sibling-context attention, data pipeline) | `candle-core`, `candle-nn`, `duckdb` |
 | `finetype-build-tools` | Build utilities (DuckDB extension metadata) | — |
@@ -219,17 +219,25 @@ call forms of `ft_profile` and why it — not `ft_infer` — is the accurate pat
 | `ft_profile(list, header?)` | scalar → `STRUCT` | The column form the macro calls; use in a `SELECT`, not a `FROM` |
 | `ft_infer(value)` | scalar | Single-value probe — no column context, deliberately weaker |
 | `ft_validate_text(value, schema)` | scalar → `STRUCT` | Per-cell validation |
-| `ft_detail(value)` | scalar | Full detail (JSON) |
+| `ft_detail(value)` | scalar | Full detail (JSON). **Column-level**: the DuckDB chunk is the sample, so a whole chunk returns one answer |
+| `ft_detail(list, header?)` | scalar → JSON | The same detail with the sample given explicitly |
 | `ft_cast(value)` | scalar | Normalize value for `TRY_CAST` |
 | `ft_unpack(json)` | scalar | Recursively classify JSON fields |
 | `ft_version()` | scalar | Version string |
 
 Deprecated aliases, still registered so existing code keeps working but no longer taught:
 `finetype`, `finetype_detail`, `finetype_cast`, `finetype_unpack`, `finetype_validate`,
-`finetype_version`. Two migration traps: `finetype(value)` maps to `ft_infer` (the weak
-probe) — if you were typing a *column* with it you want `ft_profile`; and
-`finetype_validate` (scalar, returns a string) is **not** `ft_validate` (table macro), its
-counterpart is `ft_validate_text`, which returns a `STRUCT`.
+`finetype_version`. Two migration traps, neither of them a rename:
+
+- `finetype(value)` is **column**-level — it pools the DuckDB chunk as its sample, the same
+  way `ft_detail` does in scalar form. It is therefore *not* `ft_infer`, which types one
+  value at a sample size of one and answers differently. A column typed with `finetype()`
+  moves to `ft_profile`; only a genuine single-literal probe moves to `ft_infer`.
+- `finetype_validate` (scalar, returns a `STRUCT`) is **not** `ft_validate` (table macro).
+  Its counterpart is `ft_validate_text`.
+
+`finetype_detail` / `_cast` / `_unpack` / `_version` are true aliases of their `ft_` twins
+and are the only safe find-and-replace in the set.
 
 Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification (~2048-row chunks). Validation uses cached schema parsing for performance.
 

@@ -108,13 +108,16 @@ INSTALL finetype FROM community;
 LOAD finetype;
 ```
 
-> **Version note:** the community channel currently serves **0.6.36**, which lags this repo. To run
-> the latest, build from source with `make build-release` and load it unsigned — see
+> **Version note:** the community channel builds per DuckDB version, so what you get depends on
+> which DuckDB you run — and all of it lags this repo. Measured 2026-07-30 on `osx_arm64`:
+> DuckDB **1.5.4** → finetype 0.6.36; **1.5.3** → 0.6.23; **1.5.2** → no build published, and
+> `INSTALL` fails with an HTTP 404. Check what you actually got with `SELECT ft_version();`.
+> To run the latest, build from source with `make build-release` and load it unsigned — see
 > [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#duckdb-extension-build).
 
 ```sql
 -- Load a locally-built extension (DuckDB started with -unsigned)
-LOAD './target/release/finetype_duckdb.duckdb_extension';
+LOAD './target/release/finetype.duckdb_extension';
 
 -- Profile a whole table — one row per column. This is the everyday form.
 SELECT * FROM ft_profile('my_table');
@@ -122,7 +125,7 @@ SELECT * FROM ft_profile('my_table');
 -- │ column_name │ type                                  │ confidence │ duckdb_type │
 -- ├─────────────┼───────────────────────────────────────┼────────────┼─────────────┤
 -- │ age         │ representation.numeric.integer_number │      0.956 │ BIGINT      │
--- │ email       │ identity.person.email                 │      1.000 │ VARCHAR     │
+-- │ email       │ identity.person.email                 │      0.415 │ VARCHAR     │
 -- └─────────────┴───────────────────────────────────────┴────────────┴─────────────┘
 
 -- Validate a table against a JSON Schema (inline literal, variable, or file path)
@@ -133,9 +136,14 @@ SELECT * FROM ft_validate('my_table', 'schema.json');
 SELECT ft_infer('192.168.1.1');
 -- → 'technology.internet.ip_v4'
 
--- Detail for one value (type, confidence, DuckDB broad type)
+-- Full detail as JSON. Note this reads the COLUMN, not the one value in front
+-- of it: in scalar form the DuckDB processing chunk (~2048 rows) is the sample,
+-- so every row of a chunk returns the same answer. Use the list() overload to
+-- control the sample explicitly.
 SELECT ft_detail(value) FROM my_table;
--- → '{"type":"datetime.date.mdy_slash","confidence":0.98,"broad_type":"DATE"}'
+-- → {"type": "datetime.date.mdy_slash", "confidence": 0.733, "duckdb_type": "DATE",
+--    "samples": 1, "disambiguation": "date_slash_disambiguation",
+--    "votes": {"datetime.date.mdy_slash": 0.733}}
 
 -- Normalize values for safe TRY_CAST (dates → ISO, booleans → true/false)
 SELECT ft_cast(value) FROM my_table;
@@ -152,9 +160,16 @@ SELECT ft_unpack(json_col) FROM my_table;
 > **Deprecated:** the un-prefixed scalars (`finetype()`, `finetype_detail()`,
 > `finetype_cast()`, `finetype_unpack()`, `finetype_validate()`, `finetype_version()`)
 > are still registered as aliases but are no longer the taught surface — they have
-> been superseded by the `ft_` verbs since 0.6.23. Note that `finetype(value)` maps to
-> `ft_infer(value)`, the *weak* probe; if you were typing a column with it, move to
-> `ft_profile` rather than `ft_infer`.
+> been superseded by the `ft_` verbs since 0.6.23.
+>
+> **None of these is a plain rename — check each one.** `finetype(value)` pools the DuckDB
+> chunk as its sample, exactly as `ft_detail` does in scalar form, so it is *column*-level;
+> `ft_infer` types a single value at a sample size of one and will give you different, weaker
+> answers. If you were typing a column with `finetype()`, the replacement is **`ft_profile`**,
+> and `ft_infer` only if you really were probing one literal. Separately, `finetype_validate`
+> (a scalar returning a `STRUCT`) is **not** `ft_validate` (a table macro); its counterpart is
+> **`ft_validate_text`**. `finetype_detail` / `_cast` / `_unpack` / `_version` are true aliases
+> of their `ft_` twins and are the only safe find-and-replace in the set.
 
 On first use, the extension downloads model weights from HuggingFace and caches them locally. Set `FINETYPE_MODEL_DIR` to use a local model path instead.
 

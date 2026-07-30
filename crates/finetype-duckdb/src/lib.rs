@@ -20,19 +20,29 @@
 //! - `ft_infer(value)` — single-value probe. **Deliberately weaker**: the model is
 //!   column-oriented, so one value is "profile with sample size 1".
 //! - `ft_validate_text(value, schema)` — per-cell validation, returns a `STRUCT`.
-//! - `ft_detail(value)` — JSON with type, confidence and DuckDB type.
+//! - `ft_detail(value)` — JSON with type, confidence, DuckDB type, sample size,
+//!   disambiguation and vote spread. **Column-level, not per-value**: in scalar
+//!   form the DuckDB processing chunk (~2048 rows) is the sample, so every row
+//!   of a chunk returns the same answer. Also `(list)` / `(list, header)`, which
+//!   give the sample explicitly.
 //! - `ft_cast(value)` — normalize for safe `TRY_CAST` (dates → ISO, booleans → true/false).
 //! - `ft_unpack(json)` — recursively classify JSON fields, returns annotated JSON.
 //! - `ft_version()` — extension version.
 //!
 //! ## Deprecated aliases
-//! Kept registered so the v0.6.22 community install keeps working; not taught.
+//! Kept registered so existing community installs keep working; not taught. The
+//! channel builds per DuckDB version and lags this repo — 0.6.36 on DuckDB 1.5.4
+//! and 0.6.23 on 1.5.3, measured 2026-07-30.
 //! `finetype(value)` / `(list)` / `(list, header)`, `finetype_detail`,
 //! `finetype_cast`, `finetype_unpack`, `finetype_validate`, `finetype_version`.
-//! Note the asymmetry when migrating: `finetype(value)` maps to `ft_infer`, the
-//! weak probe — a caller typing a *column* with it wants `ft_profile`. And
+//!
+//! **Migrating is not renaming.** `finetype(value)` pools the DuckDB chunk as its
+//! sample, so it is *column*-level — it is not `ft_infer`, which types one value
+//! at sample size 1 and answers differently. A caller typing a column with it
+//! wants `ft_profile`; `ft_infer` only for a genuine single-literal probe. And
 //! `finetype_validate` (scalar) is not `ft_validate` (table macro); its scalar
 //! counterpart is `ft_validate_text`, which returns a `STRUCT` rather than a string.
+//! `finetype_detail` / `_cast` / `_unpack` / `_version` are true aliases.
 
 use duckdb::core::{DataChunkHandle, Inserter, LogicalTypeHandle, LogicalTypeId};
 use duckdb::vscalar::{ScalarFunctionSignature, VScalar};
@@ -971,8 +981,11 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
 
     // ── ft_ converged surface (spec 2026-06-03-duckdb-extension-table-verbs) ──
     // The un-prefixed scalars above stay registered as aliases for one release
-    // so the v0.6.22 community install keeps working; new docs teach the ft_
-    // names. ft_infer (single-value probe) and ft_profile (column, the accurate
+    // so existing community installs keep working; new docs teach the ft_ names.
+    // ("one release" was written at 0.6.23 and this tree is well past it — the
+    // sunset is tracked, not forgotten.) The channel serves per DuckDB version:
+    // 0.6.36 on 1.5.4, 0.6.23 on 1.5.3, nothing on 1.5.2, measured 2026-07-30.
+    // ft_infer (single-value probe) and ft_profile (column, the accurate
     // path) are genuinely new; ft_validate_text returns a STRUCT; ft_detail /
     // ft_cast / ft_unpack / ft_version alias the existing scalar impls.
     con.register_scalar_function::<FineTypeVersion>("ft_version")
