@@ -103,7 +103,14 @@ duckdb out.db -c "SELECT column_name, error_type, constraint_failed, expected_ty
 
 ### DuckDB Extension
 
-> **Install:** the signed community build (`INSTALL finetype FROM community;`) is being republished and is currently unavailable on recent DuckDB versions. Until it lands, build the extension from this repo with `make build-release` and load it unsigned — see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#duckdb-extension-build).
+```sql
+INSTALL finetype FROM community;
+LOAD finetype;
+```
+
+> **Version note:** the community channel currently serves **0.6.36**, which lags this repo. To run
+> the latest, build from source with `make build-release` and load it unsigned — see
+> [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#duckdb-extension-build).
 
 ```sql
 -- Load a locally-built extension (DuckDB started with -unsigned)
