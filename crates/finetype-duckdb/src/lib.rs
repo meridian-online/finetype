@@ -23,10 +23,12 @@
 //! - `ft_detail(value)` — JSON with type, confidence, DuckDB type, sample size,
 //!   disambiguation and vote spread. **Column-level, not per-value**: in scalar
 //!   form the DuckDB processing chunk is the POOLING BOUNDARY, so every row
-//!   of a chunk returns the same answer — sampling
-//!   at most 100 values (`PROFILE_SAMPLE_CAP` in `column_fn.rs`) within it, which is what the
-//!   `samples` field reports. The chunk size is not the sample size. Also
-//!   `(list)` / `(list, header)`, which give the sample explicitly.
+//!   of a chunk returns the same answer — taking a STRIDED sample of at most
+//!   100 values across it (`ColumnConfig::sample_size`), which is what the
+//!   `samples` field reports. The chunk size is not the sample size. The
+//!   `(list)` / `(list, header)` overloads sample differently: they truncate to
+//!   the FIRST 100 (`PROFILE_SAMPLE_CAP`), so on a chunk whose leading rows are
+//!   unrepresentative the two paths genuinely disagree.
 //! - `ft_cast(value)` — normalize for safe `TRY_CAST` (dates → ISO, booleans → true/false).
 //! - `ft_unpack(json)` — recursively classify JSON fields, returns annotated JSON.
 //! - `ft_version()` — extension version.
@@ -259,10 +261,11 @@ impl VScalar for FineTypeVersion {
 /// Classifies data as a semantic type (e.g. "datetime.date.iso", "identity.person.email").
 ///
 /// In scalar mode (`finetype(col)`), the DuckDB processing chunk (~2048 rows) is
-/// the pooling boundary for column-level disambiguation, and at most
-/// at most 100 values (`PROFILE_SAMPLE_CAP` in `column_fn.rs`) within it are sampled. The
+/// the pooling boundary for column-level disambiguation, and a STRIDED sample of
+/// at most 100 values across it is classified (`ColumnConfig::sample_size`). The
 /// chunk size is not the sample size — saying so put a 20x-wrong figure into the
-/// user-facing README before it was caught.
+/// user-facing README, and naming `PROFILE_SAMPLE_CAP` here put a wrong
+/// attribution in after it: that constant governs the `list()` path only.
 /// This means majority vote + disambiguation rules (date formats, coordinates,
 /// boolean subtypes, categorical detection, numeric range, etc.) are applied
 /// even without an explicit `list()` wrapper.
@@ -360,9 +363,10 @@ impl VScalar for FineType {
 /// - `votes`: top vote distribution (label → fraction)
 ///
 /// In scalar mode, the DuckDB processing chunk (~2048 rows) is the pooling
-/// boundary and at most 100 values (`PROFILE_SAMPLE_CAP` in `column_fn.rs`) within it
-/// are sampled; `samples` in the JSON reports the count actually used. The
-/// `list()` overload gives explicit control over the sample.
+/// boundary and a strided sample of at most 100 values across it is classified
+/// (`ColumnConfig::sample_size`); `samples` in the JSON reports the count
+/// actually used. The `list()` overload truncates to the first 100
+/// (`PROFILE_SAMPLE_CAP`) and so gives explicit control over the sample.
 struct FineTypeDetail;
 
 impl VScalar for FineTypeDetail {

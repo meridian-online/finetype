@@ -125,7 +125,7 @@ finetype-train (depends on core + model — training pipelines)
 ```
 finetype/
 ├── crates/                         # Rust workspace members (see Crates above)
-├── labels/                         # Taxonomy definitions (247 types, 7 domains, YAML)
+├── labels/                         # Taxonomy definitions (251 types, 7 domains, YAML)
 ├── models/                         # Pre-trained models (Sense, CharCNN, Model2Vec, Entity)
 ├── eval/                           # Evaluation infrastructure (gold corpus, GitTables, SOTAB)
 ├── docs/                           # Architecture and development guides
@@ -134,7 +134,7 @@ finetype/
 
 ## Taxonomy Definitions
 
-Each of the 247 types is defined in YAML under `labels/`:
+Each of the 251 types is defined in YAML under `labels/`:
 
 ```yaml
 datetime.timestamp.iso_8601:
@@ -204,7 +204,7 @@ Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
 
 ### Current taxonomy
 
-247 definitions across 7 domains (container: 12, datetime: 87, finance: 28, geography: 25, identity: 34, representation: 32, technology: 29). Labels: `domain.category.type`. Definitions in `labels/definitions_*.yaml`. (The shipped model predicts 244 labels; leaves added after the last retrain — e.g. `identity.industry.naics`, `container.object.s_expression` — are taxonomy-live and recovered at `profile` time by deterministic Sharpen guards.)
+251 definitions across 7 domains (container: 12, datetime: 89, finance: 29, geography: 25, identity: 34, representation: 32, technology: 30) — the counts `finetype check` prints. Labels: `domain.category.type`. Definitions in `labels/definitions_*.yaml`. (The shipped model predicts 244 labels; leaves added after the last retrain — e.g. `identity.industry.naics`, `container.object.s_expression` — are taxonomy-live and recovered at `profile` time by deterministic Sharpen guards.)
 
 ## DuckDB Extension
 
@@ -219,7 +219,7 @@ call forms of `ft_profile` and why it — not `ft_infer` — is the accurate pat
 | `ft_profile(list, header?)` | scalar → `STRUCT` | The column form the macro calls; use in a `SELECT`, not a `FROM` |
 | `ft_infer(value)` | scalar | Single-value probe — no column context, deliberately weaker |
 | `ft_validate_text(value, schema)` | scalar → `STRUCT` | Per-cell validation |
-| `ft_detail(value)` | scalar | Full detail (JSON). **Column-level**: the DuckDB chunk is the pooling boundary, so a whole chunk returns one answer, sampling up to `PROFILE_SAMPLE_CAP` (100) values within it |
+| `ft_detail(value)` | scalar | Full detail (JSON). **Column-level**: the DuckDB chunk is the pooling boundary, so a whole chunk returns one answer, taking a strided sample of up to 100 values within it (`ColumnConfig.sample_size`) |
 | `ft_detail(list, header?)` | scalar → JSON | The same detail with the sample given explicitly |
 | `ft_cast(value)` | scalar | Normalize value for `TRY_CAST` |
 | `ft_unpack(json)` | scalar | Recursively classify JSON fields |
@@ -242,7 +242,7 @@ Deprecated aliases, still registered so existing code keeps working but no longe
 `finetype_detail` / `_cast` / `_unpack` / `_version` are true aliases of their `ft_` twins
 and are the only safe find-and-replace in the set.
 
-Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification: the DuckDB processing chunk (~2048 rows) is the pooling boundary, and within it at most `PROFILE_SAMPLE_CAP` (100, `column_fn.rs`) values are sampled — the `samples` field in `ft_detail`'s JSON reports the count actually used. Validation uses cached schema parsing for performance.
+Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification: the DuckDB processing chunk (~2048 rows) is the pooling boundary, and within it a strided sample of at most 100 values is taken (`ColumnConfig.sample_size`); the `ft_profile(list)` path instead truncates to the first 100 (`PROFILE_SAMPLE_CAP`) — the `samples` field in `ft_detail`'s JSON reports the count actually used. Validation uses cached schema parsing for performance.
 
 ## MCP Server
 

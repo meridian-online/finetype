@@ -4,7 +4,7 @@
 
 > **Early Release** — FineType is under active development. Expect breaking changes to taxonomy labels, CLI arguments, library APIs, and model formats between releases. Pin to a specific version if stability matters for your use case.
 
-Precision format detection for text data. FineType classifies strings into a rich taxonomy of 245 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
+Precision format detection for text data. FineType classifies strings into a rich taxonomy of 251 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
 
 ```
 # Point it at a whole column — the accurate path. A column types more
@@ -27,7 +27,7 @@ identity.person.email
 
 ## Features
 
-- **245 semantic types** across 7 domains — dates, times, IPs, emails, UUIDs, financial identifiers, currencies, geospatial formats, medical codes, and more
+- **251 semantic types** across 7 domains — dates, times, IPs, emails, UUIDs, financial identifiers, currencies, geospatial formats, medical codes, and more
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing. 99.9% actionability across 120 tested types.
 - **Locale-aware** — validates 65+ locales for postal codes, 46+ for phone numbers, 32+ for month/day names
 - **MCP server** — `finetype mcp` exposes type inference to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/)
@@ -118,7 +118,8 @@ LOAD finetype;
 > | 1.5.3 | `finetype 0.6.23` |
 > | 1.5.2 | no build published — `INSTALL` fails with HTTP 404 |
 >
-> Always check what you actually got with `SELECT ft_version();` rather than assuming.
+> Rows are the 1.5 line. The 1.4 maintenance line has the same gaps — 1.4.4 is served, 1.4.5 is
+> not — so always check what you actually got with `SELECT ft_version();` rather than assuming.
 > To run the latest, build from source with `make build-release` and load it unsigned — see
 > [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#duckdb-extension-build).
 
@@ -128,15 +129,21 @@ LOAD './target/release/finetype.duckdb_extension';
 
 -- Profile a whole table — one row per column. This is the everyday form.
 SELECT * FROM ft_profile('my_table');
--- ┌─────────────┬───────────────────────────────────────┬─────────────────────┬─────────────┐
--- │ column_name │ type                                  │ confidence          │ duckdb_type │
--- ├─────────────┼───────────────────────────────────────┼─────────────────────┼─────────────┤
--- │ age         │ representation.numeric.integer_number │                 1.0 │ BIGINT      │
--- │ email       │ identity.person.email                 │ 0.41478848457336426 │ VARCHAR     │
--- └─────────────┴───────────────────────────────────────┴─────────────────────┴─────────────┘
--- `confidence` is a raw DOUBLE — ft_profile does not round it, so expect the
--- full value rather than the tidy 3dp that ft_detail's JSON prints. Exact
--- figures are data-dependent; these are from three rows.
+-- ┌─────────────┬───────────────────────────────────────┬────────────────────┬─────────────┐
+-- │ column_name │                 type                  │     confidence     │ duckdb_type │
+-- │   varchar   │                varchar                │       double       │   varchar   │
+-- ├─────────────┼───────────────────────────────────────┼────────────────────┼─────────────┤
+-- │ age         │ representation.numeric.integer_number │                1.0 │ BIGINT      │
+-- │ email       │ identity.person.email                 │ 0.4147885739803314 │ VARCHAR     │
+-- └─────────────┴───────────────────────────────────────┴────────────────────┴─────────────┘
+-- Box captured verbatim from a real run, type row and all. `confidence` is a
+-- raw DOUBLE — ft_profile does not round it, so expect the full value rather
+-- than the tidy 3dp that ft_detail's JSON prints.
+--
+-- Do not expect the confidence DIGITS to reproduce. Three runs of this exact
+-- query gave 0.4147885739803314, 0.41478848457336426 and 0.41843265295028687 —
+-- it varies with the build and the model weights. The column names, the
+-- duckdb_type values and the type labels are the stable part.
 
 -- Validate a table against a JSON Schema (inline literal, variable, or file path)
 SELECT * FROM ft_validate('my_table', 'schema.json');
@@ -148,9 +155,13 @@ SELECT ft_infer('192.168.1.1');
 
 -- Full detail as JSON. Note this reads the COLUMN, not the one value in front
 -- of it: the DuckDB processing chunk is the pooling boundary, so every row of a
--- chunk returns the SAME answer. Within that chunk it samples up to 100 values
--- (PROFILE_SAMPLE_CAP) — the `samples` field always tells you how many it
--- actually used. Use the list() overload to control the sample explicitly.
+-- chunk returns the SAME answer. Within that chunk it takes a STRIDED sample of
+-- up to 100 values (ColumnConfig.sample_size) — evenly spaced across the chunk,
+-- not the first 100 — and `samples` reports how many it used.
+--
+-- The list() overload samples differently: it TRUNCATES to the first 100
+-- (PROFILE_SAMPLE_CAP). Over a chunk whose first rows are unrepresentative the
+-- two genuinely disagree, so reach for list() when you want to choose.
 SELECT ft_detail(value) FROM my_table;   -- 5-row date column
 -- → {"type": "datetime.date.mdy_slash", "confidence": 0.538, "duckdb_type": "DATE",
 --    "samples": 5, "disambiguation": "date_slash_disambiguation",
@@ -227,7 +238,7 @@ println!("{} (confidence: {:.2})", result.label, result.confidence);
 
 ## Taxonomy
 
-FineType recognizes **245 types** across **7 domains**:
+FineType recognizes **251 types** across **7 domains**:
 
 | Domain | Types | Examples |
 |--------|-------|----------|
