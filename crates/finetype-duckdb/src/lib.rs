@@ -22,17 +22,20 @@
 //! - `ft_validate_text(value, schema)` — per-cell validation, returns a `STRUCT`.
 //! - `ft_detail(value)` — JSON with type, confidence, DuckDB type, sample size,
 //!   disambiguation and vote spread. **Column-level, not per-value**: in scalar
-//!   form the DuckDB processing chunk (~2048 rows) is the sample, so every row
-//!   of a chunk returns the same answer. Also `(list)` / `(list, header)`, which
-//!   give the sample explicitly.
+//!   form the DuckDB processing chunk is the POOLING BOUNDARY, so every row
+//!   of a chunk returns the same answer — sampling
+//!   at most 100 values (`PROFILE_SAMPLE_CAP` in `column_fn.rs`) within it, which is what the
+//!   `samples` field reports. The chunk size is not the sample size. Also
+//!   `(list)` / `(list, header)`, which give the sample explicitly.
 //! - `ft_cast(value)` — normalize for safe `TRY_CAST` (dates → ISO, booleans → true/false).
 //! - `ft_unpack(json)` — recursively classify JSON fields, returns annotated JSON.
 //! - `ft_version()` — extension version.
 //!
 //! ## Deprecated aliases
 //! Kept registered so existing community installs keep working; not taught. The
-//! channel builds per DuckDB version and lags this repo — 0.6.36 on DuckDB 1.5.4
-//! and 0.6.23 on 1.5.3, measured 2026-07-30.
+//! channel builds per DuckDB version and lags this repo — 0.6.36 on DuckDB 1.5.5
+//! and 1.5.4, 0.6.23 on 1.5.3, and no build at all on 1.5.2 (`INSTALL` 404s).
+//! Measured 2026-07-30 on `osx_arm64`.
 //! `finetype(value)` / `(list)` / `(list, header)`, `finetype_detail`,
 //! `finetype_cast`, `finetype_unpack`, `finetype_validate`, `finetype_version`.
 //!
@@ -255,8 +258,11 @@ impl VScalar for FineTypeVersion {
 ///
 /// Classifies data as a semantic type (e.g. "datetime.date.iso", "identity.person.email").
 ///
-/// In scalar mode (`finetype(col)`), the function automatically uses the DuckDB
-/// processing chunk (~2048 rows) as a sample for column-level disambiguation.
+/// In scalar mode (`finetype(col)`), the DuckDB processing chunk (~2048 rows) is
+/// the pooling boundary for column-level disambiguation, and at most
+/// at most 100 values (`PROFILE_SAMPLE_CAP` in `column_fn.rs`) within it are sampled. The
+/// chunk size is not the sample size — saying so put a 20x-wrong figure into the
+/// user-facing README before it was caught.
 /// This means majority vote + disambiguation rules (date formats, coordinates,
 /// boolean subtypes, categorical detection, numeric range, etc.) are applied
 /// even without an explicit `list()` wrapper.
@@ -353,8 +359,10 @@ impl VScalar for FineType {
 /// - `disambiguation`: name of disambiguation rule applied (if any)
 /// - `votes`: top vote distribution (label → fraction)
 ///
-/// In scalar mode, the DuckDB processing chunk (~2048 rows) is used as the
-/// column sample. The `list()` overload gives explicit control over the sample.
+/// In scalar mode, the DuckDB processing chunk (~2048 rows) is the pooling
+/// boundary and at most 100 values (`PROFILE_SAMPLE_CAP` in `column_fn.rs`) within it
+/// are sampled; `samples` in the JSON reports the count actually used. The
+/// `list()` overload gives explicit control over the sample.
 struct FineTypeDetail;
 
 impl VScalar for FineTypeDetail {
@@ -984,7 +992,8 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
     // so existing community installs keep working; new docs teach the ft_ names.
     // ("one release" was written at 0.6.23 and this tree is well past it — the
     // sunset is tracked, not forgotten.) The channel serves per DuckDB version:
-    // 0.6.36 on 1.5.4, 0.6.23 on 1.5.3, nothing on 1.5.2, measured 2026-07-30.
+    // 0.6.36 on 1.5.5 and 1.5.4, 0.6.23 on 1.5.3, nothing on 1.5.2 (404),
+    // measured 2026-07-30 on osx_arm64.
     // ft_infer (single-value probe) and ft_profile (column, the accurate
     // path) are genuinely new; ft_validate_text returns a STRUCT; ft_detail /
     // ft_cast / ft_unpack / ft_version alias the existing scalar impls.

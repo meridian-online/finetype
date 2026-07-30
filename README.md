@@ -110,8 +110,15 @@ LOAD finetype;
 
 > **Version note:** the community channel builds per DuckDB version, so what you get depends on
 > which DuckDB you run — and all of it lags this repo. Measured 2026-07-30 on `osx_arm64`:
-> DuckDB **1.5.4** → finetype 0.6.36; **1.5.3** → 0.6.23; **1.5.2** → no build published, and
-> `INSTALL` fails with an HTTP 404. Check what you actually got with `SELECT ft_version();`.
+>
+> | DuckDB | `SELECT ft_version()` |
+> |---|---|
+> | 1.5.5 | `finetype 0.6.36` |
+> | 1.5.4 | `finetype 0.6.36` |
+> | 1.5.3 | `finetype 0.6.23` |
+> | 1.5.2 | no build published — `INSTALL` fails with HTTP 404 |
+>
+> Always check what you actually got with `SELECT ft_version();` rather than assuming.
 > To run the latest, build from source with `make build-release` and load it unsigned — see
 > [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#duckdb-extension-build).
 
@@ -121,12 +128,15 @@ LOAD './target/release/finetype.duckdb_extension';
 
 -- Profile a whole table — one row per column. This is the everyday form.
 SELECT * FROM ft_profile('my_table');
--- ┌─────────────┬───────────────────────────────────────┬────────────┬─────────────┐
--- │ column_name │ type                                  │ confidence │ duckdb_type │
--- ├─────────────┼───────────────────────────────────────┼────────────┼─────────────┤
--- │ age         │ representation.numeric.integer_number │      0.956 │ BIGINT      │
--- │ email       │ identity.person.email                 │      0.415 │ VARCHAR     │
--- └─────────────┴───────────────────────────────────────┴────────────┴─────────────┘
+-- ┌─────────────┬───────────────────────────────────────┬─────────────────────┬─────────────┐
+-- │ column_name │ type                                  │ confidence          │ duckdb_type │
+-- ├─────────────┼───────────────────────────────────────┼─────────────────────┼─────────────┤
+-- │ age         │ representation.numeric.integer_number │                 1.0 │ BIGINT      │
+-- │ email       │ identity.person.email                 │ 0.41478848457336426 │ VARCHAR     │
+-- └─────────────┴───────────────────────────────────────┴─────────────────────┴─────────────┘
+-- `confidence` is a raw DOUBLE — ft_profile does not round it, so expect the
+-- full value rather than the tidy 3dp that ft_detail's JSON prints. Exact
+-- figures are data-dependent; these are from three rows.
 
 -- Validate a table against a JSON Schema (inline literal, variable, or file path)
 SELECT * FROM ft_validate('my_table', 'schema.json');
@@ -137,13 +147,16 @@ SELECT ft_infer('192.168.1.1');
 -- → 'technology.internet.ip_v4'
 
 -- Full detail as JSON. Note this reads the COLUMN, not the one value in front
--- of it: in scalar form the DuckDB processing chunk (~2048 rows) is the sample,
--- so every row of a chunk returns the same answer. Use the list() overload to
--- control the sample explicitly.
-SELECT ft_detail(value) FROM my_table;
--- → {"type": "datetime.date.mdy_slash", "confidence": 0.733, "duckdb_type": "DATE",
---    "samples": 1, "disambiguation": "date_slash_disambiguation",
---    "votes": {"datetime.date.mdy_slash": 0.733}}
+-- of it: the DuckDB processing chunk is the pooling boundary, so every row of a
+-- chunk returns the SAME answer. Within that chunk it samples up to 100 values
+-- (PROFILE_SAMPLE_CAP) — the `samples` field always tells you how many it
+-- actually used. Use the list() overload to control the sample explicitly.
+SELECT ft_detail(value) FROM my_table;   -- 5-row date column
+-- → {"type": "datetime.date.mdy_slash", "confidence": 0.538, "duckdb_type": "DATE",
+--    "samples": 5, "disambiguation": "date_slash_disambiguation",
+--    "votes": {"datetime.date.mdy_slash": 0.538}}
+-- Every row returns that identical object. Note `SELECT … LIMIT 1` reports
+-- "samples": 1, because the limit shrinks the chunk — not because it read one value.
 
 -- Normalize values for safe TRY_CAST (dates → ISO, booleans → true/false)
 SELECT ft_cast(value) FROM my_table;
@@ -166,10 +179,16 @@ SELECT ft_unpack(json_col) FROM my_table;
 > chunk as its sample, exactly as `ft_detail` does in scalar form, so it is *column*-level;
 > `ft_infer` types a single value at a sample size of one and will give you different, weaker
 > answers. If you were typing a column with `finetype()`, the replacement is **`ft_profile`**,
-> and `ft_infer` only if you really were probing one literal. Separately, `finetype_validate`
-> (a scalar returning a `STRUCT`) is **not** `ft_validate` (a table macro); its counterpart is
-> **`ft_validate_text`**. `finetype_detail` / `_cast` / `_unpack` / `_version` are true aliases
-> of their `ft_` twins and are the only safe find-and-replace in the set.
+> and `ft_infer` only if you really were probing one literal.
+>
+> Separately, `finetype_validate` is **not** `ft_validate` (a table macro); its counterpart is
+> **`ft_validate_text`** — and that swap **changes the return type**. `finetype_validate` returns
+> a `VARCHAR`, the bare string `'valid'` or an error message; `ft_validate_text` returns a
+> `STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR)`. Code doing
+> `WHERE finetype_validate(...) = 'valid'` must become `WHERE ft_validate_text(...).valid`.
+>
+> `finetype_detail` / `_cast` / `_unpack` / `_version` are true aliases of their `ft_` twins and
+> are the only safe find-and-replace in the set.
 
 On first use, the extension downloads model weights from HuggingFace and caches them locally. Set `FINETYPE_MODEL_DIR` to use a local model path instead.
 

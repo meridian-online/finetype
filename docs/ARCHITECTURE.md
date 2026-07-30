@@ -219,7 +219,7 @@ call forms of `ft_profile` and why it — not `ft_infer` — is the accurate pat
 | `ft_profile(list, header?)` | scalar → `STRUCT` | The column form the macro calls; use in a `SELECT`, not a `FROM` |
 | `ft_infer(value)` | scalar | Single-value probe — no column context, deliberately weaker |
 | `ft_validate_text(value, schema)` | scalar → `STRUCT` | Per-cell validation |
-| `ft_detail(value)` | scalar | Full detail (JSON). **Column-level**: the DuckDB chunk is the sample, so a whole chunk returns one answer |
+| `ft_detail(value)` | scalar | Full detail (JSON). **Column-level**: the DuckDB chunk is the pooling boundary, so a whole chunk returns one answer, sampling up to `PROFILE_SAMPLE_CAP` (100) values within it |
 | `ft_detail(list, header?)` | scalar → JSON | The same detail with the sample given explicitly |
 | `ft_cast(value)` | scalar | Normalize value for `TRY_CAST` |
 | `ft_unpack(json)` | scalar | Recursively classify JSON fields |
@@ -233,13 +233,16 @@ Deprecated aliases, still registered so existing code keeps working but no longe
   way `ft_detail` does in scalar form. It is therefore *not* `ft_infer`, which types one
   value at a sample size of one and answers differently. A column typed with `finetype()`
   moves to `ft_profile`; only a genuine single-literal probe moves to `ft_infer`.
-- `finetype_validate` (scalar, returns a `STRUCT`) is **not** `ft_validate` (table macro).
-  Its counterpart is `ft_validate_text`.
+- `finetype_validate` is **not** `ft_validate` (table macro). Its counterpart is
+  `ft_validate_text`, and the swap **changes the return type**: `finetype_validate` returns
+  `VARCHAR` (the bare string `'valid'`, or an error message), while `ft_validate_text` returns
+  `STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR)`. A predicate
+  `finetype_validate(...) = 'valid'` becomes `ft_validate_text(...).valid`.
 
 `finetype_detail` / `_cast` / `_unpack` / `_version` are true aliases of their `ft_` twins
 and are the only safe find-and-replace in the set.
 
-Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification (~2048-row chunks). Validation uses cached schema parsing for performance.
+Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification: the DuckDB processing chunk (~2048 rows) is the pooling boundary, and within it at most `PROFILE_SAMPLE_CAP` (100, `column_fn.rs`) values are sampled — the `samples` field in `ft_detail`'s JSON reports the count actually used. Validation uses cached schema parsing for performance.
 
 ## MCP Server
 
