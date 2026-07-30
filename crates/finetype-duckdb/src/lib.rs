@@ -1,14 +1,38 @@
 //! FineType DuckDB Extension
 //!
-//! Provides scalar functions for semantic type classification:
-//! - `finetype_version()` — Returns the extension version
-//! - `finetype(value)` — Classify a single value, returns the semantic type label
-//! - `finetype(list(values))` — Column-level classification with disambiguation
-//! - `finetype(list(values), header)` — Column-level classification with header hint
-//! - `finetype_detail(value)` — Classify with detail: returns JSON with type, confidence, DuckDB type
-//! - `finetype_detail(list(values))` — Column-level classification with full JSON detail
-//! - `finetype_cast(value)` — Normalize a value for safe TRY_CAST (dates → ISO, booleans → true/false, etc.)
-//! - `finetype_unpack(json)` — Recursively classify JSON fields, returns annotated JSON
+//! A `profile → schema → validate` surface in SQL, mirroring the CLI. **The
+//! `ft_` verbs are the taught surface** (since 0.6.23, spec
+//! `2026-06-03-duckdb-extension-table-verbs`); the un-prefixed scalars below
+//! remain registered as aliases. Full prose, including why `ft_profile` and not
+//! `ft_infer` is the accurate path, lives in `docs/DEVELOPMENT.md` under
+//! *DuckDB Extension SQL Surface*.
+//!
+//! ## Table verbs (SQL macros, registered at `LOAD`)
+//! - `ft_profile(table)` — one row per column: `{column_name, type, confidence, duckdb_type}`.
+//!   The everyday form. Bakes in `USING SAMPLE 100 ROWS`.
+//! - `ft_validate(table, schema)` — per-column `total` / `rejects` / `sample_message`
+//!   against a JSON Schema. The one `schema` argument auto-detects an inline JSON
+//!   literal, a `getvariable` value, or a file path.
+//!
+//! ## Scalars
+//! - `ft_profile(list(values))` — the column form the macro calls internally;
+//!   also `(list, header)`. Reach for it directly only with a list in hand.
+//! - `ft_infer(value)` — single-value probe. **Deliberately weaker**: the model is
+//!   column-oriented, so one value is "profile with sample size 1".
+//! - `ft_validate_text(value, schema)` — per-cell validation, returns a `STRUCT`.
+//! - `ft_detail(value)` — JSON with type, confidence and DuckDB type.
+//! - `ft_cast(value)` — normalize for safe `TRY_CAST` (dates → ISO, booleans → true/false).
+//! - `ft_unpack(json)` — recursively classify JSON fields, returns annotated JSON.
+//! - `ft_version()` — extension version.
+//!
+//! ## Deprecated aliases
+//! Kept registered so the v0.6.22 community install keeps working; not taught.
+//! `finetype(value)` / `(list)` / `(list, header)`, `finetype_detail`,
+//! `finetype_cast`, `finetype_unpack`, `finetype_validate`, `finetype_version`.
+//! Note the asymmetry when migrating: `finetype(value)` maps to `ft_infer`, the
+//! weak probe — a caller typing a *column* with it wants `ft_profile`. And
+//! `finetype_validate` (scalar) is not `ft_validate` (table macro); its scalar
+//! counterpart is `ft_validate_text`, which returns a `STRUCT` rather than a string.
 
 use duckdb::core::{DataChunkHandle, Inserter, LogicalTypeHandle, LogicalTypeId};
 use duckdb::vscalar::{ScalarFunctionSignature, VScalar};

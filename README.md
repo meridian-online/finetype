@@ -31,7 +31,7 @@ identity.person.email
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing. 99.9% actionability across 120 tested types.
 - **Locale-aware** — validates 65+ locales for postal codes, 46+ for phone numbers, 32+ for month/day names
 - **MCP server** — `finetype mcp` exposes type inference to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/)
-- **DuckDB extension** — `finetype()`, `finetype_detail()`, `finetype_cast()`, `finetype_unpack()`, `finetype_validate()` scalar functions
+- **DuckDB extension** — a `profile → schema → validate` surface in SQL: `ft_profile()` types every column of a table, `ft_validate()` checks a table against a JSON Schema, plus `ft_infer()` / `ft_detail()` / `ft_cast()` / `ft_unpack()` scalars
 - **Schema-driven validation** — `finetype validate data.csv schema.json --db out.db --table orders` materialises typed DuckDB tables (per-column transforms applied) plus a `finetype_reject_errors` sidecar in a single pass
 - **Pure Rust** — no Python runtime or dependencies
 
@@ -109,20 +109,45 @@ duckdb out.db -c "SELECT column_name, error_type, constraint_failed, expected_ty
 -- Load a locally-built extension (DuckDB started with -unsigned)
 LOAD './target/release/finetype_duckdb.duckdb_extension';
 
--- Classify a single value
-SELECT finetype('192.168.1.1');
+-- Profile a whole table — one row per column. This is the everyday form.
+SELECT * FROM ft_profile('my_table');
+-- ┌─────────────┬───────────────────────────────────────┬────────────┬─────────────┐
+-- │ column_name │ type                                  │ confidence │ duckdb_type │
+-- ├─────────────┼───────────────────────────────────────┼────────────┼─────────────┤
+-- │ age         │ representation.numeric.integer_number │      0.956 │ BIGINT      │
+-- │ email       │ identity.person.email                 │      1.000 │ VARCHAR     │
+-- └─────────────┴───────────────────────────────────────┴────────────┴─────────────┘
+
+-- Validate a table against a JSON Schema (inline literal, variable, or file path)
+SELECT * FROM ft_validate('my_table', 'schema.json');
+
+-- Probe a single literal. No column context, so this is deliberately weaker
+-- than ft_profile — reach for it to check one value, not to type a column.
+SELECT ft_infer('192.168.1.1');
 -- → 'technology.internet.ip_v4'
 
--- Classify a column with detailed output (type, confidence, DuckDB broad type)
-SELECT finetype_detail(value) FROM my_table;
+-- Detail for one value (type, confidence, DuckDB broad type)
+SELECT ft_detail(value) FROM my_table;
 -- → '{"type":"datetime.date.mdy_slash","confidence":0.98,"broad_type":"DATE"}'
 
 -- Normalize values for safe TRY_CAST (dates → ISO, booleans → true/false)
-SELECT finetype_cast(value) FROM my_table;
+SELECT ft_cast(value) FROM my_table;
 
 -- Recursively classify JSON fields
-SELECT finetype_unpack(json_col) FROM my_table;
+SELECT ft_unpack(json_col) FROM my_table;
 ```
+
+> **The model is column-oriented**, so `ft_profile` over a column is the accurate
+> path and `ft_infer` over one literal is "profile with a sample size of one".
+> Full surface, including the two table macros and the `profile → schema → validate`
+> flow, in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#duckdb-extension-sql-surface-ft_-verbs).
+
+> **Deprecated:** the un-prefixed scalars (`finetype()`, `finetype_detail()`,
+> `finetype_cast()`, `finetype_unpack()`, `finetype_validate()`, `finetype_version()`)
+> are still registered as aliases but are no longer the taught surface — they have
+> been superseded by the `ft_` verbs since 0.6.23. Note that `finetype(value)` maps to
+> `ft_infer(value)`, the *weak* probe; if you were typing a column with it, move to
+> `ft_profile` rather than `ft_infer`.
 
 On first use, the extension downloads model weights from HuggingFace and caches them locally. Set `FINETYPE_MODEL_DIR` to use a local model path instead.
 

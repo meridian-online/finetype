@@ -208,16 +208,30 @@ Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
 
 ## DuckDB Extension
 
-| Function | Purpose |
-|---|---|
-| `finetype(col)` / `finetype(list, header?)` | Column-level classification |
-| `finetype_detail(col)` / `finetype_detail(list, header?)` | Full detail (JSON) |
-| `finetype_cast(value)` | Normalize value for TRY_CAST |
-| `finetype_unpack(json)` | Recursively classify JSON fields |
-| `finetype_validate(value, schema_json)` | Schema-driven validation (returns 'valid' or error message) |
-| `finetype_version()` | Version string |
+The `ft_` verbs are the taught surface (since 0.6.23). Full prose, including the two
+call forms of `ft_profile` and why it — not `ft_infer` — is the accurate path, is in
+[DEVELOPMENT.md](DEVELOPMENT.md#duckdb-extension-sql-surface-ft_-verbs).
 
-Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification (~2048-row chunks). `finetype_validate` uses cached schema parsing for performance.
+| Function | Kind | Purpose |
+|---|---|---|
+| `ft_profile(table)` | SQL table macro | One row per column: `{column_name, type, confidence, duckdb_type}` |
+| `ft_validate(table, schema)` | SQL table macro | Per-column `total` / `rejects` / `sample_message` against a JSON Schema |
+| `ft_profile(list, header?)` | scalar → `STRUCT` | The column form the macro calls; use in a `SELECT`, not a `FROM` |
+| `ft_infer(value)` | scalar | Single-value probe — no column context, deliberately weaker |
+| `ft_validate_text(value, schema)` | scalar → `STRUCT` | Per-cell validation |
+| `ft_detail(value)` | scalar | Full detail (JSON) |
+| `ft_cast(value)` | scalar | Normalize value for `TRY_CAST` |
+| `ft_unpack(json)` | scalar | Recursively classify JSON fields |
+| `ft_version()` | scalar | Version string |
+
+Deprecated aliases, still registered so existing code keeps working but no longer taught:
+`finetype`, `finetype_detail`, `finetype_cast`, `finetype_unpack`, `finetype_validate`,
+`finetype_version`. Two migration traps: `finetype(value)` maps to `ft_infer` (the weak
+probe) — if you were typing a *column* with it you want `ft_profile`; and
+`finetype_validate` (scalar, returns a string) is **not** `ft_validate` (table macro), its
+counterpart is `ft_validate_text`, which returns a `STRUCT`.
+
+Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification (~2048-row chunks). Validation uses cached schema parsing for performance.
 
 ## MCP Server
 
