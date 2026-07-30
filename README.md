@@ -140,10 +140,12 @@ SELECT * FROM ft_profile('my_table');
 -- raw DOUBLE — ft_profile does not round it, so expect the full value rather
 -- than the tidy 3dp that ft_detail's JSON prints.
 --
--- Do not expect the confidence DIGITS to reproduce. Three runs of this exact
--- query gave 0.4147885739803314, 0.41478848457336426 and 0.41843265295028687 —
--- it varies with the build and the model weights. The column names, the
--- duckdb_type values and the type labels are the stable part.
+-- Do not expect the confidence DIGITS to reproduce, and note the box GEOMETRY
+-- moves with them: a value one character longer widens the column and shifts
+-- every border. Observed across this work: 0.4147885739803314,
+-- 0.41478848457336426 and 0.41843265295028687 on different builds, and float
+-- jitter in the low-order digits between runs of a single build. The column
+-- names, the duckdb_type values and the type labels are the stable part.
 
 -- Validate a table against a JSON Schema (inline literal, variable, or file path)
 SELECT * FROM ft_validate('my_table', 'schema.json');
@@ -155,13 +157,15 @@ SELECT ft_infer('192.168.1.1');
 
 -- Full detail as JSON. Note this reads the COLUMN, not the one value in front
 -- of it: the DuckDB processing chunk is the pooling boundary, so every row of a
--- chunk returns the SAME answer. Within that chunk it takes a STRIDED sample of
--- up to 100 values (ColumnConfig.sample_size) — evenly spaced across the chunk,
--- not the first 100 — and `samples` reports how many it used.
+-- chunk returns the SAME answer. It takes a STRIDED sample of up to 100 values
+-- (ColumnConfig.sample_size) — evenly spaced, not the first 100 — and `samples`
+-- reports how many it used. ft_detail(list(...)) samples the same way, so the
+-- two agree.
 --
--- The list() overload samples differently: it TRUNCATES to the first 100
--- (PROFILE_SAMPLE_CAP). Over a chunk whose first rows are unrepresentative the
--- two genuinely disagree, so reach for list() when you want to choose.
+-- ft_profile is the one that differs: its list form truncates to the FIRST 100
+-- (PROFILE_SAMPLE_CAP). Over a column whose leading rows are unrepresentative
+-- that is a real disagreement — 2000 rows whose first 200 are IPv4 and the rest
+-- emails give ft_detail a hostname/email answer and ft_profile ip_v4.
 SELECT ft_detail(value) FROM my_table;   -- 5-row date column
 -- → {"type": "datetime.date.mdy_slash", "confidence": 0.538, "duckdb_type": "DATE",
 --    "samples": 5, "disambiguation": "date_slash_disambiguation",
@@ -242,13 +246,13 @@ FineType recognizes **251 types** across **7 domains**:
 
 | Domain | Types | Examples |
 |--------|-------|----------|
-| `datetime` | 87 | ISO 8601, RFC 2822, Unix timestamps, CJK dates, Apache CLF, timezones, month/day names (32+ locales) |
+| `datetime` | 89 | ISO 8601, RFC 2822, Unix timestamps, CJK dates, Apache CLF, timezones, month/day names (32+ locales) |
 | `representation` | 32 | Integers, floats, booleans, numeric codes, hex colors, JSON, CAS numbers, SMILES, InChI |
-| `technology` | 29 | IPv4/v6, MAC, URLs, UUIDs, ULIDs, DOIs, hashes, JWTs, AWS ARNs, Docker refs, CIDRs, git SHAs |
-| `identity` | 33 | Names, emails, phone numbers (46+ locales), credit cards, SSNs, VINs, medical codes (ICD-10, CPT, LOINC) |
-| `finance` | 28 | IBAN, SWIFT/BIC, ISIN, CUSIP, SEDOL, LEI, FIGI, currency amounts (7 format variants), routing numbers |
+| `technology` | 30 | IPv4/v6, MAC, URLs, UUIDs, ULIDs, DOIs, hashes, JWTs, AWS ARNs, Docker refs, CIDRs, git SHAs |
+| `identity` | 34 | Names, emails, phone numbers (46+ locales), credit cards, SSNs, VINs, medical codes (ICD-10, CPT, LOINC) |
+| `finance` | 29 | IBAN, SWIFT/BIC, ISIN, CUSIP, SEDOL, LEI, FIGI, currency amounts (7 format variants), routing numbers |
 | `geography` | 25 | Lat/lon, countries, cities, postal codes (65+ locales), WKT, GeoJSON, H3, geohash, Plus Codes, MGRS |
-| `container` | 11 | JSON objects, CSV rows, query strings, key-value pairs |
+| `container` | 12 | JSON objects, CSV rows, query strings, key-value pairs |
 
 Each type is a **transformation contract** — if FineType predicts `datetime.date.mdy_slash`, that guarantees `strptime(value, '%m/%d/%Y')::DATE` will succeed.
 

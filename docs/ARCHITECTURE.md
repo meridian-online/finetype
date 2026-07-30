@@ -242,7 +242,7 @@ Deprecated aliases, still registered so existing code keeps working but no longe
 `finetype_detail` / `_cast` / `_unpack` / `_version` are true aliases of their `ft_` twins
 and are the only safe find-and-replace in the set.
 
-Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification: the DuckDB processing chunk (~2048 rows) is the pooling boundary, and within it a strided sample of at most 100 values is taken (`ColumnConfig.sample_size`); the `ft_profile(list)` path instead truncates to the first 100 (`PROFILE_SAMPLE_CAP`) — the `samples` field in `ft_detail`'s JSON reports the count actually used. Validation uses cached schema parsing for performance.
+Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification: the DuckDB processing chunk (~2048 rows) is the pooling boundary, and within it a strided sample of at most 100 values is taken (`ColumnConfig.sample_size`); `ft_detail`'s list form samples the same way, and `ft_profile`'s list form is the sole user of `PROFILE_SAMPLE_CAP`, truncating to the first 100 instead — the `samples` field in `ft_detail`'s JSON reports the count actually used. Validation uses cached schema parsing for performance.
 
 ## MCP Server
 

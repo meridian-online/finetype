@@ -26,9 +26,9 @@
 //!   of a chunk returns the same answer — taking a STRIDED sample of at most
 //!   100 values across it (`ColumnConfig::sample_size`), which is what the
 //!   `samples` field reports. The chunk size is not the sample size. The
-//!   `(list)` / `(list, header)` overloads sample differently: they truncate to
-//!   the FIRST 100 (`PROFILE_SAMPLE_CAP`), so on a chunk whose leading rows are
-//!   unrepresentative the two paths genuinely disagree.
+//!   `(list)` / `(list, header)` overloads sample the SAME way — `ft_profile`'s
+//!   list form is the only caller of `PROFILE_SAMPLE_CAP`, and the only one that
+//!   truncates to the first 100 instead.
 //! - `ft_cast(value)` — normalize for safe `TRY_CAST` (dates → ISO, booleans → true/false).
 //! - `ft_unpack(json)` — recursively classify JSON fields, returns annotated JSON.
 //! - `ft_version()` — extension version.
@@ -365,8 +365,9 @@ impl VScalar for FineType {
 /// In scalar mode, the DuckDB processing chunk (~2048 rows) is the pooling
 /// boundary and a strided sample of at most 100 values across it is classified
 /// (`ColumnConfig::sample_size`); `samples` in the JSON reports the count
-/// actually used. The `list()` overload truncates to the first 100
-/// (`PROFILE_SAMPLE_CAP`) and so gives explicit control over the sample.
+/// actually used. The `list()` overload lets the caller choose WHICH values are
+/// offered, but samples them the same strided way once offered — only
+/// `ft_profile`'s list form truncates to the first 100 (`PROFILE_SAMPLE_CAP`).
 struct FineTypeDetail;
 
 impl VScalar for FineTypeDetail {
