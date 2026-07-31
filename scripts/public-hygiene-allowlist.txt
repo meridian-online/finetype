@@ -102,19 +102,10 @@ scripts/archive/generate_triage.py | .orbit/ | The default value of a `--triage`
 # behind `if p.exists()`.
 #
 # They are allowlisted anyway because the rule is about the KIND of string, not
-# its current resolvability — each of these is an argument to Path() or to
-# `[[ -f ... ]]`, so a sweep of them is a sweep of data.
+# its current resolvability: each is a path value the program hands to the
+# filesystem, not a sentence about one. A sweep of them is a sweep of data.
 #
-# A second reason stood here and was DELETED rather than narrowed, on the second
-# failed attempt to state it. It claimed all eight are read behind an existence
-# check, so a rewrite is silent. True of five — build_diagnostic_report.py's two
-# (`if p.exists()`) and the three overnight `[[ -f ... ]]` variables — and FALSE
-# of the three scripts/archive/*.py values, which fail loudly: two print
-# `error: ... not found` and return 2, and migrate_gold_reframe.py has no
-# existence check at all and raises FileNotFoundError. The reason above is true
-# of all eight and needs no case analysis, so it is the one that is kept.
-#
-# Per-entry silence, where it matters, is stated on the entry itself.
+# Per-entry detail is on the entry itself.
 #
 scripts/build_diagnostic_report.py | .orbit/ | The two MADR choice files whose SHAs compose cascade_version, which feeds corpus_pass_id. Read behind `if p.exists()`, so a rewrite silently drops them from the composite instead of erroring.
 scripts/archive/*.py | .orbit/ | Path() arguments in archived scripts: two argparse `--tsv`/`--labelled-eval` defaults and one json.load target. Values passed to the filesystem, not sentences about it.
