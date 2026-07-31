@@ -75,6 +75,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 DEFAULT_EXTENSION = "target/release/finetype.duckdb_extension"
@@ -572,7 +573,7 @@ def self_test(root: Path, catalog: dict) -> int:
     macros = len(catalog["table_macros"])
     profile_returns = catalog["scalars"]["ft_profile"]["return_type"]
 
-    cases: list[tuple[str, object, str]] = [
+    cases: list[tuple[str, Callable[[Path], None], str]] = [
         (
             "a function loses its row from the registry table",
             _drop_line("docs/ARCHITECTURE.md", "| `ft_cast(value)`"),
@@ -712,7 +713,7 @@ def _stage(root: Path, dest: Path) -> None:
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
     parser.add_argument(
         "--extension",

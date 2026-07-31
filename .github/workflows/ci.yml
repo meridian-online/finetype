@@ -272,6 +272,86 @@ jobs:
         run: .github/scripts/download-model.sh
       - run: cargo test
 
+  workspace-test:
+    # THE JOB THAT MAKES A GREEN BADGE MEAN SOMETHING.
+    #
+    # `cargo test` and `cargo clippy` above are BARE, so they build
+    # `default-members` — finetype-core, finetype-model, finetype-cli. That is
+    # three of the workspace's eight crates. finetype-mcp, finetype-duckdb,
+    # finetype-eval, finetype-train and finetype-build-tools are compiled by
+    # nothing in this file. A pull request touching only those five could show
+    # every check green while not one line of its diff had been through a
+    # compiler — which is worse than a red run, because it reads as verified.
+    # The DuckDB extension is among the five, and that is the artefact this
+    # repository ships.
+    #
+    # A SEPARATE JOB, not a `--workspace` flag on the two above, because the
+    # broad build pulls candle and a bundled duckdb into the fast path. Its own
+    # cache key keeps that cost off `test` and `clippy`, whose scope and runtime
+    # are deliberately unchanged.
+    #
+    # NON-REQUIRED ON PURPOSE, and note what that does and does not mean here:
+    # `main` currently carries no branch protection and no rulesets, so NO check
+    # in this file is required and a red run cannot block a merge today. When
+    # protection is introduced, this job stays off the required list until it has
+    # run green on main. There is deliberately no `continue-on-error` — a job that
+    # reports success while its command failed is the exact defect this job
+    # exists to remove.
+    name: Workspace Test (all eight crates)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Distinct from the `test`/`clippy`/`check` caches: this job's
+          # dependency graph is a superset (candle-transformers, libduckdb-sys,
+          # rmcp, ratatui) and sharing a key would evict theirs on every run.
+          prefix-key: v0-rust-workspace
+      - name: Download model from HuggingFace
+        # crates/finetype-cli/build.rs PANICS when models/default is absent or is
+        # not a multi-branch model, so the workspace does not compile at all
+        # without this step — it is not only the tests that need the model.
+        run: .github/scripts/download-model.sh
+      - run: cargo test --workspace
+
+  python-types:
+    # Every accuracy number this repository quotes is produced or adjudicated by
+    # Python, and until now CI type-checked none of it. scripts/evidence.py alone
+    # carried nine type errors on merged code — four possibly-unbound reads and
+    # five None-safety faults — in the file that resolves the BAR for every gated
+    # score comparison here. A None-safety fault there does not crash; it compares
+    # a fresh score against a blank bar and prints a plausible number.
+    #
+    # SCOPE: the gating and evaluation scripts, listed explicitly in
+    # pyrightconfig.json rather than globbed. The wider scripts/ tree is research
+    # code that imports numpy, pandas, duckdb, torch and pyarrow; type-checking it
+    # would require installing the whole ML stack on every PR to report mostly
+    # unresolved-import noise. The covered set is stdlib-only by construction, so
+    # this job needs no dependency install and the local run sees exactly what CI
+    # sees.
+    name: Python type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          # Pinned, and matched by pyrightconfig.json's pythonVersion. pyright
+          # infers reachability from the version, so an unpinned interpreter can
+          # silently change which branches it analyses.
+          python-version: "3.13"
+      - name: Install pyright
+        # Exact pin: pyright adds checks between minor releases, so an unpinned
+        # install turns an unrelated PR red for a rule nobody chose to adopt.
+        # Keep this in step with the version named in pyrightconfig.json's
+        # comment and in the Makefile's `types` target.
+        run: npm install -g pyright@1.1.411
+      - name: Type-check the evaluation and gate scripts
+        # No arguments: the file set is pyrightconfig.json's `include`, so a
+        # local `pyright` from the repo root checks exactly what CI checks. An
+        # argument here would silently override the config's file set.
+        run: pyright
+
   check:
     name: Taxonomy Check
     runs-on: ubuntu-latest

@@ -90,6 +90,7 @@ import re
 import shutil
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -173,6 +174,12 @@ def derive(root: Path) -> dict:
                 # inside a `locales: [` wrapped over several lines
                 flow_buf += " " + line.strip()
                 if "]" in flow_buf:
+                    if current is None:
+                        raise Fatal(
+                            f"{name}:{lineno}: a wrapped `locales: [` list closes "
+                            f"outside any definition — refusing to attribute its "
+                            f"count to a key this scanner cannot name"
+                        )
                     declared[current] = _flow_locales(flow_buf, f"{name}:{lineno}")
                     flow_buf = None
                 continue
@@ -1075,7 +1082,7 @@ def self_test(root: Path) -> int:
     a, b = sorted(per)[0], sorted(per)[1]
     calling = facts["locales:geography.contact.calling_code"]
 
-    cases: list[tuple[str, object, str]] = [
+    cases: list[tuple[str, Callable[[Path], object], str]] = [
         (
             "headline drifts from the data",
             _sub("README.md", f"taxonomy of {facts['total']} semantic types",
@@ -1298,7 +1305,7 @@ def _stage(root: Path, dest: Path) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
     parser.add_argument("--facts", action="store_true", help="print the derived numbers")
     parser.add_argument("--self-test", action="store_true", help="prove the gate detects")
