@@ -129,23 +129,24 @@ LOAD './target/release/finetype.duckdb_extension';
 
 -- Profile a whole table — one row per column. This is the everyday form.
 SELECT * FROM ft_profile('my_table');
--- ┌─────────────┬───────────────────────────────────────┬────────────────────┬─────────────┐
--- │ column_name │                 type                  │     confidence     │ duckdb_type │
--- │   varchar   │                varchar                │       double       │   varchar   │
--- ├─────────────┼───────────────────────────────────────┼────────────────────┼─────────────┤
--- │ age         │ representation.numeric.integer_number │                1.0 │ BIGINT      │
--- │ email       │ identity.person.email                 │ 0.4147885739803314 │ VARCHAR     │
--- └─────────────┴───────────────────────────────────────┴────────────────────┴─────────────┘
--- Box captured verbatim from a real run, type row and all. `confidence` is a
--- raw DOUBLE — ft_profile does not round it, so expect the full value rather
--- than the tidy 3dp that ft_detail's JSON prints.
+-- ┌─────────────┬─────────────────────────┬────────────────────┬─────────────┐
+-- │ column_name │          type           │     confidence     │ duckdb_type │
+-- │   varchar   │         varchar         │       double       │   varchar   │
+-- ├─────────────┼─────────────────────────┼────────────────────┼─────────────┤
+-- │ json_col    │ container.object.json   │ 0.7428288459777832 │ JSON        │
+-- │ value       │ datetime.date.mdy_slash │ 0.6156769394874573 │ DATE        │
+-- └─────────────┴─────────────────────────┴────────────────────┴─────────────┘
+-- Box captured verbatim from a real run, type row and all. `my_table` here is
+-- the 4-row demo table the later examples use: a date column `value` and a JSON
+-- column `json_col`. `confidence` is a raw DOUBLE — ft_profile does not round
+-- it, so expect the full value rather than the tidy 3dp that ft_detail's JSON
+-- prints.
 --
 -- Do not expect the confidence DIGITS to reproduce, and note the box GEOMETRY
 -- moves with them: a value one character longer widens the column and shifts
--- every border. Observed across this work: 0.4147885739803314,
--- 0.41478848457336426 and 0.41843265295028687 on different builds, and float
--- jitter in the low-order digits between runs of a single build. The column
--- names, the duckdb_type values and the type labels are the stable part.
+-- every border. Different builds disagree, and there is float jitter in the
+-- low-order digits between runs of a single build. The column names, the
+-- duckdb_type values and the type labels are the stable part.
 
 -- Validate a table against a JSON Schema (inline literal, variable, or file path)
 SELECT * FROM ft_validate('my_table', 'schema.json');

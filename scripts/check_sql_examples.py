@@ -708,7 +708,7 @@ def _sub(path_rel: str, old: str, new: str):
     These targets are fragments of prose, and matching them LITERALLY couples
     the self-test to the document's exact formatting. Collapsing an unparseable
     JSON result onto one line — a real fix, made so the gate could read it —
-    inserted a space after each `:`, and three mutations silently lost their
+    inserted a space after each `:`, and two mutations silently lost their
     target. The gate stayed green; its proof that it can fail went red.
 
     So whitespace is optional wherever JSON punctuation allows it. The mutation
