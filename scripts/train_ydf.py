@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Train the YDF lens for the gittables multi-lens corpus diagnostic.
 
-Spec: `.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/spec.yaml`
+Spec: `2026-05-20-gittables-multi-lens-diagnostic`
 ac-03 (YDF training pipeline + leakage audit).
 
 Training corpus: synthetic-generator output from

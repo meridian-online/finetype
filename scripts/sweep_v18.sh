@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/sweep_v18.sh — v18 multi-seed training sweep (data-seed discipline)
 #
-# Spec: .orbit/specs/2026-04-21-v18-retrain/spec.yaml (v1.3)
+# Spec: 2026-04-21-v18-retrain (v1.3)
 #   — ac-02 (sweep script skeleton + prep instrumentation)
 #   — ac-04 (row-hash firewall log markers)
 #   — ac-05 (3-seed sweep executes cleanly)

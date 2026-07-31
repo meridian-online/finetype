@@ -1,6 +1,6 @@
 # RHH Methodology — Rule-Based Header-Hint Removal Roadmap
 
-Companion document to spec `.orbit/specs/2026-04-24-remove-header-hints/`
+Companion document to spec `2026-04-24-remove-header-hints`
 (MADR 0042 execution). This doc explains how the diagnostics under
 `diagnostics/rhh_*.tsv` were produced — the threshold, the measurement
 approach, the instrumentation design, the known limitations, and the

@@ -1563,7 +1563,7 @@ hard, ambiguous columns, with no loss on the columns that were already right.
   `labels/definitions_*.yaml`** (same spec, ac-02). All 13 universal
   blocks audit clean; no contamination, no duplicates, no deprecated
   members in any locale-keyed enum either. Audit at
-  `.orbit/specs/2026-05-26-taxonomy-country-code-enum-cleanup/enum_audit.md`.
+  `spec 2026-05-26-taxonomy-country-code-enum-cleanup (enum_audit.md)`.
 
 ### Changed
 

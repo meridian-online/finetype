@@ -51,7 +51,7 @@
 #   results/eval-pack-sherlock-v13.tar.gz                   — Eval pack
 #   results/v13-transfer-bundle.tar.gz                      — All results for Beelink transfer
 #
-# Spec: .orbit/specs/2026-04-16-v13-retrain/spec.yaml
+# Spec: 2026-04-16-v13-retrain
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -99,7 +99,7 @@ echo "   - P4: Validation branch [128,64] → [192,128], gradient norms"
 echo "   - Types: 239 → 240 (+state_code)"
 echo ""
 echo " Target: ≥210/227 label accuracy (92.5%+)"
-echo " Spec: .orbit/specs/2026-04-16-v13-retrain/"
+echo " Spec: 2026-04-16-v13-retrain"
 echo "================================================================"
 echo ""
 
@@ -799,7 +799,7 @@ for f in "$MODEL_DIR/model.safetensors" "$MODEL_DIR/config.json" "$MODEL_DIR/lab
 done
 
 # Spec for reference
-SPEC=".orbit/specs/2026-04-16-v13-retrain/spec.yaml"
+SPEC="spec 2026-04-16-v13-retrain"
 [[ -f "$SPEC" ]] && BUNDLE_FILES+=("$SPEC")
 
 if [[ ${#BUNDLE_FILES[@]} -gt 0 ]]; then

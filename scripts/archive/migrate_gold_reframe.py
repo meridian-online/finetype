@@ -23,7 +23,7 @@ WORD = "representation.text.word"
 # (column_name, values-tuple) -> new label, from the off-categorical panel
 recat = json.load(open("/tmp/recat_input.json"))
 outc = json.load(open(str(Path(__file__).parent.parent /
-                       ".orbit/specs/2026-06-17-enum-accuracy-reframe/ac02-residual-labels.json")))
+                       "spec 2026-06-17-enum-accuracy-reframe (ac02-residual-labels.json)")))
 adj = {(r["column_name"], tuple(r["values"])): outc[str(r["idx"])]
        for r in recat if str(r["idx"]) in outc}
 

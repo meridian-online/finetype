@@ -1409,7 +1409,7 @@ representation.discrete.categorical:
     }
 
     // --- ac-01: Validation::is_precise() tests (spec:
-    // .orbit/specs/2026-04-21-sharpen-demotion-guard/spec.yaml) ---
+    // spec 2026-04-21-sharpen-demotion-guard) ---
     //
     // Prefix convention: dgd (Demotion Guard Disambiguation) per spec
     // metadata.test_prefix. Numbering ties tests back to ac-01's four

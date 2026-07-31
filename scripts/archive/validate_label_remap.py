@@ -32,7 +32,7 @@ Usage
 
 Spec reference
 --------------
-AC-05 of .orbit/specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3).
+AC-05 of spec 2026-04-20-distilled-data-relabel-7-types (v1.3).
 """
 from __future__ import annotations
 

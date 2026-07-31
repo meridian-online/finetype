@@ -400,7 +400,7 @@ pub(crate) fn cmd_validate_table(
         // Pipe SQL via stdin instead of `-c <script>` so large schemas
         // (many enum literals → multi-megabyte INSERT scripts) don't trip
         // the OS argv limit (E2BIG / "Argument list too long" on macOS at
-        // ~256KB). See .orbit/specs/2026-04-28-validate-precision-corpus/
+        // ~256KB). See spec 2026-04-28-validate-precision-corpus
         // (un_locode / rio2016_athletes baseline runs hit ARG_MAX).
         use std::io::Write as _;
         let duckdb_out = (|| -> std::io::Result<std::process::Output> {

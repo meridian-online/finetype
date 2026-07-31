@@ -32,11 +32,11 @@ the spec's failure-consequence procedure:
 Total demoted: **2726 of 64565 clusters (4.2%)**. The common failure
 pattern (cascade emits a too-specific mechanism token where the
 correct token is the generic `misclassification` or `unknown_no_fit`)
-is captured in `.orbit/memos/2026-05-23-cascade-precision-fanout.md`
+is captured in `the 2026-05-23-cascade-precision-fanout memo`
 as a v21+ follow-up.
 
 Full demotion rationale logged in
-`.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/progress.md`
+`spec 2026-05-20-gittables-multi-lens-diagnostic (progress.md)`
 under the 2026-05-23 entry.
 
 For each gap below, flip the verdict line to **PASS** or **FAIL**. A gap passes only if **all three** of the following hold:

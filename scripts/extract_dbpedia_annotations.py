@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Extract DBpedia / Schema.org annotations from every measure-half parquet.
 
-Spec: `.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/spec.yaml`
+Spec: `2026-05-20-gittables-multi-lens-diagnostic`
 ac-05 (DBpedia / Schema.org annotation extraction + mapping extension).
 
 Reads each parquet's Arrow KV-metadata footer (via pyarrow, no DuckDB

@@ -508,7 +508,7 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
     let h = h.trim();
 
     // RHH instrumentation hooks — see crate::rhh and
-    // .orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02. When the
+    // spec 2026-04-24-remove-header-hints ac-02. When the
     // `rhh-instrumentation` feature is off, all `disable_*` are constant
     // `false` and the optimiser eliminates the conjunctions; zero overhead.
     let disable_table = rhh::is_disabled("header_hint_table");
@@ -713,7 +713,7 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
             // These MUST precede the generic `h.contains("amount")` substring
             // matcher below — otherwise every variant header like `amount_comma`
             // collapses to the plain `finance.currency.amount` label. See spec
-            // .orbit/specs/2026-04-24-amount-variant-generators ac-01..04 for the
+            // spec 2026-04-24-amount-variant-generators ac-01..04 for the
             // diagnostic arc. Header normalisation replaces `_`/`-` with space.
             "amount accounting" | "amount acc" => {
                 return Some("finance.currency.amount_accounting");

@@ -24,7 +24,7 @@ codegen-units = 1`.
 
 Payload delta **15,118,336**. Mode preserved. `find models -type f ! -perm -044` returns
 nothing. Both versions are preserved outside the repository at
-`/Users/hugh/github/meridian-online/.finetype-model-backups/`.
+`../.finetype-model-backups/`, beside the checkout.
 
 ## The binary
 

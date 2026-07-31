@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Unit tests for the amvg (amount-variant generators) spec.
 
-Spec: .orbit/specs/2026-04-24-amount-variant-generators/spec.yaml (v1.3)
+Spec: 2026-04-24-amount-variant-generators (v1.3)
 test_prefix: amvg
 
 These tests assert the structural and consistency contracts declared in
 each AC's `verification` clause. They are the machine-checked regression
 guard for the diagnostic artefacts under
-`.orbit/specs/2026-04-24-amount-variant-generators/diagnostics/`.
+the 2026-04-24-amount-variant-generators spec's `diagnostics/` directory.
 
 The tests read committed artefacts; they do not regenerate them. The
 regeneration scripts (`scripts/amvg/ac0N_*.py`) are the producers. This

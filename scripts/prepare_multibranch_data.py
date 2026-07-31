@@ -4,7 +4,7 @@
 Train/eval leakage firewall
 ---------------------------
 This script enforces Layer 2 of the leakage-prevention contract defined
-in `.orbit/choices/0056-train-eval-leakage-prevention.md` (MADR 0056).
+in `choice 0056 (train-eval-leakage-prevention)` (MADR 0056).
 On every invocation it filters any training rows whose (header, value)
 pair collides with an eval row recorded in `eval/row_hashes.tsv`, using
 the shared normaliser at `scripts/eval_leakage/__init__.py` (ac-06 +
@@ -78,7 +78,7 @@ from pathlib import Path
 # ac-07 (spec 2026-04-21-eval-expansion): import shared leakage-prevention
 # normaliser + hasher. Lives in scripts/eval_leakage/ so both this filter
 # and scripts/compute_row_hashes.py use the same code path — per
-# .orbit/choices/0056-train-eval-leakage-prevention.md.
+# choice 0056 (train-eval-leakage-prevention).
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
@@ -3132,7 +3132,7 @@ def main():
     # reflects the post-firewall corpus.
     #
     # Active by default; --no-dedup is the escape hatch. See MADR 0056
-    # (.orbit/choices/0056-train-eval-leakage-prevention.md) for the
+    # (choice 0056 (train-eval-leakage-prevention)) for the
     # rationale + known blind spots.
     # ─── ac-04 instrumentation markers (v18 spec) ──────────────
     # Emit `corpus_base:` unconditionally (always) so downstream verification

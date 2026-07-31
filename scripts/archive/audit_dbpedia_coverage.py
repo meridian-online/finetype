@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Audit DBpedia → FineType mapping coverage against the corpus.
 
-Spec: `.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/spec.yaml`
+Spec: `2026-05-20-gittables-multi-lens-diagnostic`
 ac-05 verification.
 
 Reads `eval/gittables/corpus_pass/dbpedia_annotations.parquet` and

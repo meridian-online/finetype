@@ -163,7 +163,7 @@ roadmap for expanding validation coverage to more types and locales.
 
 ## References
 
-- **Decision record:** `.orbit/choices/0002-locale-detection-post-hoc-validation.md`
+- **Decision record:** `choice 0002 (locale-detection-post-hoc-validation)`
 - **Old prototype:** `hughcameron/finetype` (Python + Burn Transformer)
 - **Tiered-v3 training log:** implementation notes
 - **Precision Principle:** decision-001

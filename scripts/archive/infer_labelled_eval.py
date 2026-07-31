@@ -7,7 +7,7 @@ anti-pattern: "Do not consult the inference module's output for any
 row before assigning truth_inferred_type").
 
 Output:
-  .orbit/specs/2026-05-04-autonomous-type-inference/labelled_eval.module_predictions.tsv
+  spec 2026-05-04-autonomous-type-inference (labelled_eval.module_predictions.tsv)
 
 After hand-labelling produces labelled_eval.tsv, run
 compute_precision_on_labelled.py to join + report.

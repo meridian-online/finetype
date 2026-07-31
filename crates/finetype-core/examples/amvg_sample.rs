@@ -1,5 +1,5 @@
 //! amvg_sample — deterministic sample printer for the amount-variant-generators
-//! diagnostics (.orbit/specs/2026-04-24-amount-variant-generators).
+//! diagnostics (spec 2026-04-24-amount-variant-generators).
 //!
 //! Usage:
 //!   cargo run --example amvg_sample -- <key> <count> <seed>

@@ -9,7 +9,7 @@ inserts 11 exact-match arms for the variant headers BEFORE the destructive
 returns its specific `finance.currency.amount_<variant>` label instead of
 the plain parent `finance.currency.amount`.
 
-Post-fix assertion (verbatim from .orbit/choices/0065-amount-subtype-collapse-mechanism.md):
+Post-fix assertion (verbatim from choice 0065, amount-subtype-collapse-mechanism):
 
   "In diagnostics/predictions_post.tsv (profile run against models/default on
   eval/datasets/csv/coverage_closure_phase_ab.csv after the ac-06 fix lands),

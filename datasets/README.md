@@ -3,8 +3,7 @@
 Every dataset that contributes to FineType training or evaluation is
 recorded in `eval/datasets/sources.yaml` with verifiable integrity. This
 folder holds the contract (this README) and the per-source snapshot JSONs
-referenced from there. Per spec
-`.orbit/specs/2026-05-24-dataset-provenance-registry/`.
+referenced from there. Per spec `2026-05-24-dataset-provenance-registry`.
 
 ## What the registry tracks
 
@@ -18,7 +17,7 @@ Each entry in `eval/datasets/sources.yaml` records, for one dataset:
 | `attribution` | Human-readable credit + usage note | "GeoNames gazetteer … CC-BY 4.0" |
 | `fetched_date` | When the data was first registered | `2026-05-24` |
 | `datasets` | List of dataset names this entry contributes to | `[geonames]` |
-| `local_path` | Where the bytes live — `repo://…` for in-repo, absolute path for external | `/Users/hugh/datasets/geonames` |
+| `local_path` | Where the bytes live — `repo://…` for in-repo, absolute path for external | `$HOME/datasets/geonames` |
 | `snapshot` | Pointer to the JSON snapshot under `eval/datasets/snapshots/` | `eval/datasets/snapshots/geonames-2026-05-24.json` |
 | `dataset_version` | Stable identifier (date, release tag, or content hash) | `46.0.0`, `2026-05-24` |
 
@@ -30,7 +29,7 @@ The last three are the integrity extension added by spec
 
 1. Place the data on disk. In-repo data (small, under git) lives under
    the appropriate `data/` or `output/` subdirectory; large external data
-   lives under `/Users/hugh/datasets/<name>/`.
+   lives under `$HOME/datasets/<name>/`.
 2. Run the register script:
 
    ```bash
@@ -40,12 +39,12 @@ The last three are the integrity extension added by spec
      --attribution "<credit + usage note>"
 
    # External directory tree
-   python3 scripts/dataset_register.py <name> /Users/hugh/datasets/<name> \
+   python3 scripts/dataset_register.py <name> "$HOME/datasets/<name>" \
      --role train --licence CC-BY-4.0 \
      --attribution "<credit + usage note>"
 
    # Very-large path-list dataset (don't hash every file)
-   python3 scripts/dataset_register.py <name> /Users/hugh/datasets/<name> \
+   python3 scripts/dataset_register.py <name> "$HOME/datasets/<name>" \
      --mode index-only \
      --index-file path/to/index.txt \
      --role train --licence <SPDX> \
@@ -122,9 +121,9 @@ skips entries without a `snapshot` field.
 
 ## See also
 
-- `.orbit/choices/0056-train-eval-leakage-prevention.yaml` — the role
+- `choice 0056 (train-eval-leakage-prevention)` — the role
   manifest contract this extends.
-- `.orbit/choices/0090-dataset-provenance-pattern.yaml` — architectural
+- `choice 0090 (dataset-provenance-pattern)` — architectural
   record for the integrity extension and the index-only mode.
-- `.orbit/specs/2026-05-24-dataset-provenance-registry/spec.yaml` — the
+- `spec 2026-05-24-dataset-provenance-registry` — the
   spec that established this pattern.

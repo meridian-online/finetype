@@ -4,8 +4,8 @@
 # pre-screen script. Called (not re-derived) by ac-04's verification
 # of replace-flagged columns.
 #
-# Policy: .orbit/choices/0055-eval-realism-dimensions.md
-# Spec:   .orbit/specs/2026-04-21-eval-expansion/spec.yaml (ac-01, ac-04)
+# Policy: choice 0055 (eval-realism-dimensions)
+# Spec:   2026-04-21-eval-expansion (ac-01, ac-04)
 #
 # A column passes floors IFF every metric below passes its applicable
 # floor. Family overrides shadow defaults when a column's type falls
@@ -110,4 +110,4 @@ families:
 #   - When adding a new family, include the match_prefix in this file
 #     AND update MADR 0055's floors table snapshot.
 #   - If a floor is found to gatekeep real-world columns unfairly during
-#     ac-04, adjust here and note the movement in .orbit/specs/2026-04-21-eval-expansion/progress.md.
+#     ac-04, adjust here and note the movement in spec 2026-04-21-eval-expansion (progress.md).

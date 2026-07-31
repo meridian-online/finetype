@@ -4,7 +4,7 @@
 # Per spec 2026-05-24-v21-geonames-geography ac-01.
 #
 # Downloads the GeoNames dumps needed by the v21 geography generator to
-# /Users/hugh/datasets/geonames/<YYYY-MM-DD>/, extracts each, and invokes
+# $HOME/datasets/geonames/<YYYY-MM-DD>/, extracts each, and invokes
 # scripts/dataset_register.py to write the snapshot + sources.yaml entry.
 #
 # Idempotent: re-running with the same date is a no-op once every

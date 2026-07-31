@@ -2,7 +2,7 @@
 """Extend `dbpedia_finetype_mapping.tsv` to cover every DBpedia class
 that appears ≥10× in the measure-half corpus.
 
-Spec: `.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/spec.yaml`
+Spec: `2026-05-20-gittables-multi-lens-diagnostic`
 ac-05 (DBpedia / Schema.org annotation extraction + mapping extension).
 
 The base mapping was hand-curated for the 98 classes in ac-02's

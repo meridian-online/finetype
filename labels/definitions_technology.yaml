@@ -330,7 +330,7 @@ technology.internet.http_method:
     # them conjunctively (crates/finetype-core/src/validator.rs delegates to
     # jsonschema::Validator). (?i) on pattern alone does NOT help — enum is
     # exact-string, so "Get" would pass pattern but fail enum.
-    # See spec .orbit/specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3).
+    # See spec 2026-04-20-distilled-data-relabel-7-types (v1.3).
     pattern: "^(GET|Get|get|POST|Post|post|PUT|Put|put|DELETE|Delete|delete|PATCH|Patch|patch|HEAD|Head|head|OPTIONS|Options|options|TRACE|Trace|trace|CONNECT|Connect|connect)$"
     enum: [GET, Get, get, POST, Post, post, PUT, Put, put, DELETE, Delete, delete, PATCH, Patch, patch, HEAD, Head, head, OPTIONS, Options, options, TRACE, Trace, trace, CONNECT, Connect, connect]
   tier: [VARCHAR, internet]

@@ -103,8 +103,8 @@ def compute_frontmatter_shas(
     # composite of the two MADR file SHAs so the field tracks any
     # cascade-rule change without manual bumping.
     madr_paths = [
-        REPO / ".orbit/choices/0075-mechanism-cascade.yaml",
-        REPO / ".orbit/choices/0081-cascade-extended.yaml",
+        REPO / "choice 0075 (mechanism-cascade)",
+        REPO / "choice 0081 (cascade-extended)",
     ]
     cascade_h = hashlib.sha256()
     cascade_h.update(b"MADR-0075-0081|")
@@ -461,7 +461,7 @@ def main() -> int:
     out.append("")
     out.append(
         "This report is the deliverable of "
-        "`.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/`. "
+        "`spec 2026-05-20-gittables-multi-lens-diagnostic`. "
         "It surfaces and ranks; it does not fix. Runtime metadata "
         "(timings, error counts, version provenance beyond the "
         "frontmatter) lives in `progress.md` — by design, this "

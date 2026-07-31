@@ -1,6 +1,6 @@
 //! Regression tests for precision-corpus taxonomy widenings.
 //!
-//! Spec: `.orbit/specs/2026-04-28-validate-precision-corpus/spec.yaml` (ac-10).
+//! Spec: `2026-04-28-validate-precision-corpus` (ac-10).
 //!
 //! This file pins the validators that ac-10 widens. Each widening MUST satisfy
 //! MADR 0001 (precision principle): the widened pattern still rejects clearly
