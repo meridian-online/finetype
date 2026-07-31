@@ -108,7 +108,7 @@ scripts/archive/generate_triage.py | .orbit/ | The default value of a `--triage`
 # Per-entry detail is on the entry itself.
 #
 scripts/build_diagnostic_report.py | .orbit/ | The two MADR choice files whose SHAs compose cascade_version, which feeds corpus_pass_id. Read behind `if p.exists()`, so a rewrite silently drops them from the composite instead of erroring.
-scripts/archive/*.py | .orbit/ | Path() arguments in archived scripts: two argparse `--tsv`/`--labelled-eval` defaults and one json.load target. Values passed to the filesystem, not sentences about it.
+scripts/archive/*.py | .orbit/ | Two argparse `--tsv`/`--labelled-eval` defaults and one json.load target, in archived scripts. Values passed to the filesystem, not sentences about it.
 scripts/overnight_v11_retraining.sh | .orbit/ | A `PROGRESS=` path consumed by `[[ -f "$PROGRESS" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
 scripts/overnight_v12_retraining.sh | .orbit/ | A `PROGRESS=` path consumed by `[[ -f "$PROGRESS" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
 scripts/overnight_v13_retraining.sh | .orbit/ | A `SPEC=` path consumed by `[[ -f "$SPEC" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
