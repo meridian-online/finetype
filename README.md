@@ -167,8 +167,8 @@ SELECT ft_infer('192.168.1.1');
 -- (PROFILE_SAMPLE_CAP). Over a column whose leading rows are unrepresentative
 -- that is a real disagreement — 2000 rows whose first 200 are IPv4 and the rest
 -- emails give ft_detail a hostname/email answer and ft_profile ip_v4.
-SELECT ft_detail(value) FROM my_table;   -- 5-row date column
--- → {"type": "datetime.date.mdy_slash", "confidence": 0.538, "duckdb_type": "DATE", "samples": 5, "disambiguation": "date_slash_disambiguation", "votes": {"datetime.date.mdy_slash": 0.538}}
+SELECT ft_detail(value) FROM my_table;   -- 4-row date column
+-- → {"type": "datetime.date.mdy_slash", "confidence": 0.833, "duckdb_type": "DATE", "samples": 4, "disambiguation": "date_slash_disambiguation", "votes": {"datetime.date.mdy_slash": 0.833}}
 -- Every row returns that identical object. Note `SELECT … LIMIT 1` reports
 -- "samples": 1, because the limit shrinks the chunk — not because it read one value.
 

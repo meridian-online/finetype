@@ -706,10 +706,18 @@ def _sub(path_rel: str, old: str, new: str):
     """Mutate a documented snippet, tolerating how it happens to be spaced.
 
     These targets are fragments of prose, and matching them LITERALLY couples
-    the self-test to the document's exact formatting. Collapsing an unparseable
-    JSON result onto one line — a real fix, made so the gate could read it —
-    inserted a space after each `:`, and two mutations silently lost their
-    target. The gate stayed green; its proof that it can fail went red.
+    the self-test to the document's exact formatting. Two mutations matched on
+    exact spacing and lost their target when the surrounding prose was rewritten.
+    The gate stayed green; its proof that it can fail went red.
+
+    The causal explanation that stood here was DELETED rather than rewritten, on
+    the second failed attempt to state it. It blamed a specific commit for
+    inserting the spaces; independent checks placed the loss two commits earlier
+    and showed that commit expanding the JSON rather than collapsing it. Three
+    accounts of this one sentence have now been wrong. The count is measured and
+    kept; the causality is not reliably known from this tree, so it is not
+    asserted. What matters operationally is the rule below, which does not
+    depend on knowing which commit did it.
 
     So whitespace is optional wherever JSON punctuation allows it. The mutation
     is a claim about the document's MEANING; the spacing is not part of it.
