@@ -81,38 +81,57 @@ def crates() -> set[str]:
     return {p.name for p in d.iterdir() if p.is_dir()} if d.is_dir() else set()
 
 
+_CRATE_TEXT: dict[str, str] = {}
+
+
+def crate_text(crate: str) -> str:
+    """Every .rs byte in a crate, read once and cached.
+
+    Pure Python on purpose. This used to shell out to `grep -E`, where `\\s`
+    and `\\b` are GNU extensions: the self-test passed on macOS and failed on
+    the Linux runner, for the same tree. A gate whose verdict depends on which
+    grep is installed is worse than no gate, because it is only trustworthy
+    where nobody is looking.
+    """
+    if crate not in _CRATE_TEXT:
+        d = ROOT / "crates" / crate
+        parts = []
+        for f in sorted(d.glob("**/*.rs")):
+            if "target" in f.parts:
+                continue
+            try:
+                parts.append(f.read_text(errors="replace"))
+            except OSError:
+                pass
+        _CRATE_TEXT[crate] = "\n".join(parts)
+    return _CRATE_TEXT[crate]
+
+
 def defines(crate: str, symbol: str) -> bool:
     """Is `symbol` really a thing in `crate`?
 
     Three ways to be one, all found by measuring the false positives this gate
     produced on its first whole-tree run (5 of 7 hits were wrong):
 
-      1. an item definition — `const`/`fn`/`struct`/…
+      1. an item definition — `const`/`fn`/`struct`/…  (including in `build.rs`,
+         which is where the fixture that exposed the grep divergence lives)
       2. a MODULE or TEST FILE — "`X`'s `sampling` tests" names
          `crates/X/tests/sampling.rs`, not an item
       3. a reserved STRING LITERAL — "`X`'s `__some_alias` alias"
-         names a wire value that no crate can `const`-define twice
 
     A bare mention in prose still does not count, which is what keeps the
-    original defect (a const attributed to the crate that only *reads* the
-    literal) detectable.
+    original defect — a const attributed to a crate that only *reads* the
+    value — detectable.
     """
-    crate_dir = ROOT / "crates" / crate
-    if not crate_dir.is_dir():
+    d = ROOT / "crates" / crate
+    if not d.is_dir():
         return False
-
-    if any(crate_dir.glob(f"**/{symbol}.rs")):
+    if any(p for p in d.glob(f"**/{symbol}.rs") if "target" not in p.parts):
         return True
-
-    for pattern in (DEFN.format(sym=re.escape(symbol)), rf'"{re.escape(symbol)}"'):
-        out = subprocess.run(
-            ["grep", "-rEl", "--include=*.rs", pattern, str(crate_dir)],
-            capture_output=True,
-            text=True,
-        )
-        if (out.stdout or "").strip():
-            return True
-    return False
+    text = crate_text(crate)
+    if re.search(DEFN.format(sym=re.escape(symbol)), text):
+        return True
+    return f'"{symbol}"' in text
 
 
 def path_exists(ref: str) -> bool:
@@ -228,6 +247,12 @@ def self_test() -> int:
         for f in sorted((ROOT / "crates" / c).glob("**/*.rs")):
             for m in re.finditer(r"\bconst\s+([A-Z][A-Z0-9_]{4,})\b", f.read_text(errors="replace")):
                 cand = m.group(1)
+                # The fixture must be valid under the SAME resolver the test
+                # exercises, not merely under the regex that found it. When
+                # those two disagreed, the self-test passed locally and failed
+                # in CI, and the derivation had no way to notice.
+                if not defines(c, cand):
+                    continue
                 elsewhere = [k for k in known if k != c and defines(k, cand)]
                 if len(elsewhere) < len(known) - 1:
                     wrong = next((k for k in known if k != c and not defines(k, cand)), None)
