@@ -703,12 +703,27 @@ def _struct_fields(struct_type: str) -> list[str]:
 
 
 def _sub(path_rel: str, old: str, new: str):
+    """Mutate a documented snippet, tolerating how it happens to be spaced.
+
+    These targets are fragments of prose, and matching them LITERALLY couples
+    the self-test to the document's exact formatting. Two mutations once matched
+    on exact spacing and lost their target. The gate stayed green; its proof that
+    it can fail went red.
+
+    So whitespace is optional wherever JSON punctuation allows it. The mutation
+    is a claim about the document's MEANING; the spacing is not part of it.
+    """
+
+    pattern = re.compile(
+        re.escape(old).replace(":", r":\s*").replace(",", r",\s*")
+    )
+
     def apply(root: Path):
         path = root / path_rel
         text = path.read_text(encoding="utf-8")
-        if old not in text:
+        if not pattern.search(text):
             raise Fatal(f"self-test: mutation target not found in {path_rel}: {old!r}")
-        path.write_text(text.replace(old, new, 1), encoding="utf-8")
+        path.write_text(pattern.sub(lambda _: new, text, count=1), encoding="utf-8")
 
     return apply
 
@@ -735,8 +750,13 @@ def self_test(root: Path, extension: Path) -> int:
     cases: list[tuple[str, object, str | None, dict | None]] = [
         (
             "a documented query stops running",
-            _sub("README.md", "SELECT finetype_cast(value) FROM my_table;",
-                 "SELECT finetype_cast(value) FROM no_such_table;"),
+            # Breaks the TABLE, not one named example. Naming a specific
+            # query couples this to which functions the README happens to
+            # teach: it named a `finetype_cast` example, the docs moved to
+            # the `ft_` surface, and the mutation lost its target while the
+            # gate stayed green. Any documented query over the fixture will
+            # do, and there is always at least one.
+            _sub("README.md", "FROM my_table;", "FROM no_such_table;"),
             "the example does not run",
             None,
         ),
