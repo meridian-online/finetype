@@ -1,6 +1,6 @@
 //! Integration tests for `finetype validate` — the DuckDB-native reject pipeline.
 //!
-//! Covers spec `.orbit/specs/2026-04-22-duckdb-extension-ergonomics/` acceptance
+//! Covers spec `2026-04-22-duckdb-extension-ergonomics` acceptance
 //! criteria ac-06, ac-08, ac-09, ac-10, ac-11, ac-12, and ac-13 (test grid).
 //!
 //! These tests compile and invoke the `finetype` binary. They also shell out

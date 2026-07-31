@@ -8,7 +8,7 @@ allowed-tools: Bash, Read
 
 # Train a FineType model
 
-Run from the finetype repo root (`/Users/hugh/github/meridian-online/finetype`).
+Run from the finetype repo root.
 
 The shipped Sense-stage model is **multi-branch**; every retrain uses the
 `scripts/overnight_v*_*.sh` family. Multi-hour, multi-seed, kicked off in a

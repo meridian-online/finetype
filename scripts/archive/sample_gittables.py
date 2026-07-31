@@ -2,7 +2,7 @@
 """Sample GitTables parquet files and convert to CSV for LLM labelling.
 
 Usage:
-    python3 scripts/sample_gittables.py /home/hugh/datasets/gittables/topics data/csvs --max-files 500
+    python3 scripts/sample_gittables.py "$HOME/datasets/gittables/topics" data/csvs --max-files 500
 
 Selects parquet files across multiple topics for diversity,
 converts each to CSV (first 200 rows), and saves to the output directory.

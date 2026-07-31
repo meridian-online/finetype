@@ -36,9 +36,9 @@ setup:
 	@echo "✓ Rust updated, git hooks installed (pre-commit: fmt; pre-push: fmt+clippy)"
 
 # ─── CI (run locally before pushing) ─────────
-.PHONY: ci lint fmt clippy
+.PHONY: ci lint fmt clippy workspace-test types hygiene
 
-ci: fmt clippy test check
+ci: fmt clippy test check types hygiene
 	@echo "═══ All CI checks passed ═══"
 
 lint: fmt clippy
@@ -48,6 +48,29 @@ fmt:
 
 clippy:
 	cargo clippy -- -D warnings
+
+# The bare clippy/test above build `default-members` — three of the eight
+# workspace crates. This is the one that compiles the other five, including the
+# DuckDB extension this repo ships. Its own CI job, `workspace-test`, is separate
+# for the same reason it is separate here: it drags in candle and a bundled
+# duckdb and is much slower.
+workspace-test:
+	cargo test --workspace
+
+# Python type check over the scripts that resolve a bar, a score or a gate
+# verdict. The file set is pyrightconfig.json's `include`, so this and CI's
+# `python-types` job see exactly the same files. Version pinned to match the
+# workflow — an unpinned pyright adopts new checks between minor releases.
+types:
+	npx --yes pyright@1.1.411
+
+# Paths into the private planning repo, and absolute home paths, in tracked
+# files. Seconds, no toolchain. The gate's own regression test runs first: a
+# hygiene gate fails silently in BOTH directions, so "it still works" has to be
+# established before "the tree is clean" means anything.
+hygiene:
+	./scripts/check-public-hygiene-selftest.sh
+	./scripts/check-public-hygiene.sh
 
 # ─── CLI Tests ─────────────────────────────────
 .PHONY: test-smoke test-docs test-golden test-cli check-doc-counts

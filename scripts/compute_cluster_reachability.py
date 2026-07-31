@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """ac-02 — Compute per-cluster reachability scores for corroborated gaps.
 
-Spec: `.orbit/specs/2026-05-29-cluster-reachability-scoring/spec.yaml`
-Design: `.orbit/specs/2026-05-29-cluster-reachability-scoring/metric.md`
+Spec: `2026-05-29-cluster-reachability-scoring`
+Design: `spec 2026-05-29-cluster-reachability-scoring (metric.md)`
 
 For each gap_id in `eval/gittables/corpus_pass/corroborated_gaps.parquet`,
 build a value-shape embedding for every column in the cluster (defined

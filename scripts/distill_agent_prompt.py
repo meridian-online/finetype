@@ -145,7 +145,7 @@ For each column, output your blind classification. Think about:
 
 ### Step 2: Run FineType
 
-Run this command from the repo root (/home/hugh/github/meridian-online/finetype):
+Run this command from the repo root:
 
 ```bash
 cat <<'FINETYPE_INPUT' | finetype infer --mode column --batch -o json

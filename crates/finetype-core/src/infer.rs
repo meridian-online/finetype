@@ -1,6 +1,6 @@
 //! Autonomous type-inference triangulator (Phase 1).
 //!
-//! Implements the contract in `.orbit/specs/2026-05-04-autonomous-type-inference/spec.yaml`.
+//! Implements the contract in `spec 2026-05-04-autonomous-type-inference`.
 //! Given a column's `(column_name, predicted_type, samples)` tuple, scores every
 //! taxonomy type via two cheap signals — validator pass-rate and header-name
 //! match — fuses them via a locked weighted sum, and emits an inferred type +

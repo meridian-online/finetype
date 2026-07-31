@@ -39,9 +39,9 @@ Notes:
   - Sorted output ensures byte-deterministic regeneration.
 
 See:
-    .orbit/choices/0056-train-eval-leakage-prevention.md
-    .orbit/specs/2026-04-21-eval-expansion/spec.yaml (ac-06)
-    .orbit/specs/2026-04-28-validate-precision-corpus/spec.yaml (ac-03)
+    choice 0056 (train-eval-leakage-prevention)
+    spec 2026-04-21-eval-expansion (ac-06)
+    spec 2026-04-28-validate-precision-corpus (ac-03)
 """
 
 from __future__ import annotations
@@ -288,7 +288,7 @@ def main() -> int:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with open(args.output, "w", encoding="utf-8") as fh:
             fh.write(f"# normaliser_version: {NORMALISER_VERSION}\n")
-            fh.write("# See .orbit/choices/0056-train-eval-leakage-prevention.md\n")
+            fh.write("# See choice 0056 (train-eval-leakage-prevention)\n")
             fh.write("dataset\tcolumn_name\tnormalised_header\trow_hash\n")
             for tup in sorted_tuples:
                 fh.write("\t".join(tup) + "\n")

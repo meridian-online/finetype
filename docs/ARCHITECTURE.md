@@ -161,11 +161,16 @@ Architectural decisions (MADR format) live in the team's private planning repo, 
 repository — the `orbit`/`beads` PM tooling was retired. CLAUDE.md cites decisions inline by
 number/name (e.g. "choice 0104", "decision 0041"); resolve them there.
 
-Historical `.orbit/` paths still appear in code comments, docs, and one-off scripts
-(`.orbit/specs/`, `.orbit/choices/`, `.orbit/contracts/`, `.orbit/memos/`, `.orbit/cards/`).
-These are provenance breadcrumbs from that retired substrate; its content migrated to the
-team's private planning repo. The paths no longer resolve inside this repository — treat them
-as historical citations, not live files.
+Citations to that retired substrate used to appear throughout the comments, docs and one-off
+scripts here as raw paths. They have been rewritten in place as plain prose — "spec
+2026-04-24-amount-variant-generators", "choice 0065" — because the path resolved only inside
+the private planning repo and never inside this one. The slug is the durable part: it still
+names the record to look up. `scripts/check-public-hygiene.sh` keeps the raw form out.
+
+A handful of path VALUES survive, in research scripts that pass them to the filesystem and in
+two recorded measurement provenances. Those are listed with their reasons in
+`scripts/public-hygiene-allowlist.txt`: rewriting a string a program opens changes what it
+reads, which is not the same act as rewriting a sentence that describes it.
 
 ---
 

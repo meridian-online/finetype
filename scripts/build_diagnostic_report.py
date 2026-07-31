@@ -461,7 +461,7 @@ def main() -> int:
     out.append("")
     out.append(
         "This report is the deliverable of "
-        "`.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/`. "
+        "`spec 2026-05-20-gittables-multi-lens-diagnostic`. "
         "It surfaces and ranks; it does not fix. Runtime metadata "
         "(timings, error counts, version provenance beyond the "
         "frontmatter) lives in `progress.md` — by design, this "

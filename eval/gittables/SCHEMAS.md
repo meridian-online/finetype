@@ -9,7 +9,7 @@ state, exactly the m-19 manifest schema migration failure pattern
 referenced by the autonomy contract's load-bearing-paths registry.
 
 Editing this file requires updating every consumer in the same commit
-(see `.orbit/contracts/load-bearing-paths.yaml` once these paths are
+(see the load-bearing-paths contract once these paths are
 registered).
 
 ## File layout
@@ -126,7 +126,7 @@ Append-only NDJSON. One line per cycle. Required keys:
   "cycle_id": "<uuid>",
   "cycle_start": "<iso8601>",
   "cycle_end": "<iso8601>",
-  "contract_path": ".orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml",
+  "contract_path": "<repo>/scripts/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml",
   "contract_sha256": "<hex64>",
   "model_tag": "<symlink-target>",
   "model_sha256": "<hex64>",
@@ -175,6 +175,6 @@ intentional. Steps:
    eval/gittables/failure_log.tsv eval/gittables/working_slice_coverage.tsv`.
 5. **Re-enable cron**: `scripts/launchd/install.sh install`. The next
    cycle's preamble will record the new line counts and resume.
-6. **Tabletop**: file a memo at `.orbit/cards/memos/` describing the
+6. **Tabletop**: file a memo in the private planning repo describing the
    incident — the next pass-2 tabletop will decide whether to amend
    H08/H09 thresholds.

@@ -1628,7 +1628,7 @@ impl ColumnClassifier {
         // RHH instrumentation hooks (compile out when feature `rhh-instrumentation`
         // is off — every `disable_*` becomes a constant `false`, the optimiser
         // eliminates the conjunctions, and there is zero runtime overhead).
-        // See .orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02.
+        // See spec 2026-04-24-remove-header-hints ac-02.
         let disable_measurement = rhh::is_disabled("header_hint_measurement");
         let disable_sci_measurement = rhh::is_disabled("header_hint_sci_measurement");
         let disable_person_override = rhh::is_disabled("header_hint_person_override");

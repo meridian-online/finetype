@@ -12,7 +12,7 @@ categorical from free-text), confounding the encoder upgrade. Matching it makes 
 swap a true one-variable change: encoder only.
 
 Spec: 2026-06-20-gte-tiny-embed-branch-swap, ac-01.
-Audit: .orbit/specs/2026-06-20-gte-tiny-embed-branch-swap/ac00_audit.md
+Audit: spec 2026-06-20-gte-tiny-embed-branch-swap (ac00_audit.md)
 
 ## Why a monkeypatch and not a reimplementation
 The audit's load-bearing warning is that a misaligned binary does not crash — it

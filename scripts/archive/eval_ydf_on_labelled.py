@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Evaluate the trained YDF lens on labelled_eval.
 
-Spec: `.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/spec.yaml`
+Spec: `2026-05-20-gittables-multi-lens-diagnostic`
 ac-03 verification — asserts `top1_accuracy >= 0.70` on rows whose
 `truth_inferred_type` is in YDF's training-supported type set.
 

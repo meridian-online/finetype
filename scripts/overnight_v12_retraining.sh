@@ -38,7 +38,7 @@
 #   results/eval-pack-sherlock-v12.tar.gz                   — Eval pack
 #   results/v12-transfer-bundle.tar.gz                      — All results for Beelink transfer
 #
-# Spec: .orbit/specs/2026-04-15-validation-branch-v12/spec.yaml
+# Spec: 2026-04-15-validation-branch-v12
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -83,7 +83,7 @@ echo "   features. The 4-branch model hits ceiling at 201 — remaining"
 echo "   26 misclassifications are model-level confusions that"
 echo "   character/embedding/stats/header features can't resolve."
 echo ""
-echo " Spec: .orbit/specs/2026-04-15-validation-branch-v12/"
+echo " Spec: 2026-04-15-validation-branch-v12"
 echo "================================================================"
 echo ""
 

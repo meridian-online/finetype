@@ -354,12 +354,12 @@ is circular through the back door. B2 inherits this constraint.
 
 ## Cross-references
 
-- Spec: `.orbit/specs/2026-06-05-reference-data-inventory/spec.yaml`
-- Roadmap memo: `.orbit/memos/2026-06-05-precision-release-roadmap.md` (Line B / B0)
+- Spec: `2026-06-05-reference-data-inventory`
+- Roadmap memo: `the 2026-06-05-precision-release-roadmap memo` (Line B / B0)
 - Ingestion pattern: MADR `0092` (ac-05)
-- Card 0017: `.orbit/cards/0017-ydf-specialist-geography.yaml`
-- Gold eval anchor: `.orbit/specs/2026-06-05-gold-eval-anchor/spec.yaml`
-- Dataset provenance registry: `.orbit/choices/0090-dataset-provenance-pattern.yaml`,
+- Card 0017: `the ydf-specialist-geography card`
+- Gold eval anchor: `spec 2026-06-05-gold-eval-anchor`
+- Dataset provenance registry: `choice 0090 (dataset-provenance-pattern)`,
   `eval/datasets/sources.yaml`
 - Completeness template: `labels/definitions_geography.yaml:74` (full-249
   country_code enum)

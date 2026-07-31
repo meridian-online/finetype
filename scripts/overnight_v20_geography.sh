@@ -32,7 +32,7 @@
 #   models/sherlock-v20-geography-relu-s{42,43,44}/                    — Trained models
 #   results/overnight-v20-geography.log                                — Full log
 #
-# Spec: .orbit/specs/2026-05-23-ydf-specialist-geography/spec.yaml
+# Spec: 2026-05-23-ydf-specialist-geography
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -98,7 +98,7 @@ echo " Sweep:        ${#SEEDS[@]} seeds = ${#RUNS[@]} runs"
 echo " Seeds:        ${SEEDS[*]}"
 echo " Epochs:       $EPOCHS, patience: $PATIENCE, batch: $BATCH_SIZE"
 echo ""
-echo " Spec: .orbit/specs/2026-05-23-ydf-specialist-geography/"
+echo " Spec: 2026-05-23-ydf-specialist-geography"
 echo " ac-04: ≥20% row-count reduction in both geography cells of"
 echo "        eval/gittables/corpus_pass/report.md Part 1 — closed by"
 echo "        re-running the m-19 corpus pass with v20-relu-s42 as Sense."

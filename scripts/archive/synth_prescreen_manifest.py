@@ -22,7 +22,7 @@ Usage:
         --output /tmp/iter2_prescreen_metrics.tsv
 
 This is the load-bearing AC-06 deliverable for the iter-2 validate-corpus
-curation spec (.orbit/specs/2026-04-28-validate-corpus-curation/spec.yaml).
+curation spec (spec 2026-04-28-validate-corpus-curation).
 """
 
 from __future__ import annotations

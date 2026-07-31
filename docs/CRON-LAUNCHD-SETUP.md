@@ -3,7 +3,7 @@
 This document is the self-contained infrastructure handoff for setting up
 the macOS launchd plist that fires the autonomous FineType agent every
 2h, per the active autonomy contract at
-`.orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml`.
+`the 2026-05-03-gittables-90-percent-roundtrip contract`.
 
 It exists because the contract requires the cron-firing agent to run
 unattended on macOS, and `CronCreate` is REPL-bound (dies with the
@@ -42,7 +42,7 @@ escalation surfaces, then exits.
 
 A pinned trigger at `2026-05-09T20:03:00Z` (Sun May 10 06:03 AEST)
 fires the pass-2 brief preparation prompt at
-`.orbit/contracts/2026-05-10-pass2-prep-prompt.md`. Same launchd plist;
+`the 2026-05-10-pass2-prep-prompt contract`. Same launchd plist;
 either an additional `StartCalendarInterval` entry on the recurring
 plist, or a sibling plist file. Sibling plist is cleaner (separation of
 concerns) but either works.
@@ -58,11 +58,11 @@ Required keys:
 |---|---|---|
 | `Label` | `online.meridian.finetype-cron` | Reverse-DNS, matches filename |
 | `ProgramArguments` | array | `["/usr/local/bin/bash", "-lc", "<invocation>"]` to pick up user PATH; full path to `claude` if PATH isn't reliable under launchd |
-| `WorkingDirectory` | `/Users/hugh/github/meridian-online/finetype` | Cron prompt assumes this CWD |
+| `WorkingDirectory` | the absolute path of this checkout | Cron prompt assumes this CWD |
 | `StartInterval` | `7200` | 2h in seconds |
-| `EnvironmentVariables` | dict | At minimum: `PATH` including `/opt/homebrew/bin`, `/Users/hugh/.cargo/bin`, locations of `finetype` + `duckdb` + `bd` binaries; `HOME=/Users/hugh` |
-| `StandardOutPath` | `/Users/hugh/Library/Logs/finetype-cron/stdout.log` | Path must exist |
-| `StandardErrorPath` | `/Users/hugh/Library/Logs/finetype-cron/stderr.log` | Path must exist |
+| `EnvironmentVariables` | dict | At minimum: `PATH` including `/opt/homebrew/bin`, `$HOME/.cargo/bin`, locations of `finetype` + `duckdb` + `bd` binaries; `HOME` set to the operator's home |
+| `StandardOutPath` | `$HOME/Library/Logs/finetype-cron/stdout.log` | Path must exist |
+| `StandardErrorPath` | `$HOME/Library/Logs/finetype-cron/stderr.log` | Path must exist |
 | `RunAtLoad` | `false` | Don't fire immediately on `launchctl load` — let the next 2h boundary catch it |
 
 For the pass-2 one-shot, add (or use a sibling plist):
@@ -168,7 +168,7 @@ If wiring the recurring plist anyway, add the one-shot at the same time:
 - `StartCalendarInterval` pinned to 2026-05-10 06:03 AEST
 - `RunAtLoad: false`
 - `Program` invokes `claude -p` with the prompt body extracted from
-  `.orbit/contracts/2026-05-10-pass2-prep-prompt.md` (option B's
+  `the 2026-05-10-pass2-prep-prompt contract` (option B's
   invocation in that file shows the awk extraction)
 - After firing, the plist self-removes (pinned to a single date — won't
   fire again, but cleanliness suggests `rm` on the plist after the

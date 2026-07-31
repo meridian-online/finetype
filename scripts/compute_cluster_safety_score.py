@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """ac-02 — Compute per-cluster safety_score (v3 reachability advisory).
 
-Spec: `.orbit/specs/2026-05-31-reachability-safety-score/spec.yaml`
-Design: `.orbit/specs/2026-05-31-reachability-safety-score/metric.md`
+Spec: `2026-05-31-reachability-safety-score`
+Design: `spec 2026-05-31-reachability-safety-score (metric.md)`
 
   safety_score = clip(1 - risk, 0, 1)
   risk = mean over cluster columns of (

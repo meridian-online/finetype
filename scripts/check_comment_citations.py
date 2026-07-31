@@ -263,7 +263,7 @@ def self_test() -> int:
                 break
         if sym:
             break
-    if not sym:
+    if not sym or not home or not other:
         print("self-test: could not derive a crate-exclusive symbol")
         return 1
 

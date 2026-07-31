@@ -83,7 +83,7 @@ while IFS=, read -r dataset file_path column_name gt_label source_url licence fe
     if [ "$dataset" = "dataset" ]; then continue; fi
 
     # source_url, licence, fetched_date are read but unused in profile phase
-    # (they exist to document provenance — see .orbit/specs/2026-04-21-eval-expansion/)
+    # (they exist to document provenance — see spec 2026-04-21-eval-expansion)
     # The read spec lists all 7 fields so extra columns are not folded into gt_label.
 
     # Skip if already profiled this file

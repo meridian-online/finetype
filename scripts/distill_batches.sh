@@ -31,7 +31,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-SESSION_PROMPT='You are Nightingale, the FineType distillation specialist. Work in /home/hugh/github/meridian-online/finetype/.
+SESSION_PROMPT='You are Nightingale, the FineType distillation specialist. Work in this finetype checkout.
 
 ## Task: Continue the distillation v3 rolling pipeline
 
@@ -46,7 +46,7 @@ This prints JSON lines with batch_id, jsonl_path, offset, limit.
 ### Step 3: Generate prompts and launch agents
 For each batch from Step 3:
 1. Generate prompt: python3 scripts/distill_agent_prompt.py --batch-id <batch_id> --jsonl <jsonl_path> --offset <offset> --limit <limit> > /tmp/distill_prompt_<batch_num>.txt
-2. Launch agent: Agent(prompt="Read /tmp/distill_prompt_<batch_num>.txt and follow those instructions exactly. You are working in /home/hugh/github/meridian-online/finetype/. Complete all steps: blind classification, run finetype, adjudicate, write CSV and .done marker.", mode=bypassPermissions, model=sonnet, run_in_background=true)
+2. Launch agent: Agent(prompt="Read /tmp/distill_prompt_<batch_num>.txt and follow those instructions exactly. You are working in this finetype checkout. Complete all steps: blind classification, run finetype, adjudicate, write CSV and .done marker.", mode=bypassPermissions, model=sonnet, run_in_background=true)
 
 Launch ALL agents in a SINGLE message (parallel launch).
 

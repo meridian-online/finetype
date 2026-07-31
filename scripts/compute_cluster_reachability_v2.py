@@ -2,8 +2,8 @@
 """ac-02 — Compute per-cluster v2 reachability scores via neighbour-label
 composition.
 
-Spec: `.orbit/specs/2026-05-30-reachability-metric-v2/spec.yaml`
-Design: `.orbit/specs/2026-05-30-reachability-metric-v2/metric.md`
+Spec: `2026-05-30-reachability-metric-v2`
+Design: `spec 2026-05-30-reachability-metric-v2 (metric.md)`
 
 For each (fp_label, correct_label) pair from corroborated_gaps.parquet:
   1. Embed cluster columns + a 50,000-row stratified neighbour pool.

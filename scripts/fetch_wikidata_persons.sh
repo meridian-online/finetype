@@ -4,7 +4,7 @@
 # Per spec 2026-05-25-v22-boundary-training ac-01.
 #
 # Pulls three name primitives from Wikidata Query Service to
-# /Users/hugh/datasets/wikidata/<YYYY-MM-DD>/:
+# $HOME/datasets/wikidata/<YYYY-MM-DD>/:
 #   - given_names.tsv     instances of "given name" (Q202444) with English label
 #   - family_names.tsv    instances of "family name" (Q101352) with English label
 #   - persons.tsv         Q-id-ranged sample of Q5 (Human) entities with English label

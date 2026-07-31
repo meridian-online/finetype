@@ -6,7 +6,7 @@
 //!
 //! The full canonical family list is in
 //! `diagnostics/rhh_family_inventory.tsv` (ac-01 output of spec
-//! `.orbit/specs/2026-04-24-remove-header-hints/`).
+//! `spec 2026-04-24-remove-header-hints`).
 //!
 //! ## Compile-time behaviour
 //!

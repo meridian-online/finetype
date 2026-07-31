@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pre-screen eval corpus columns for realism (messiness + distributional fidelity).
 
-Implements ac-01 of .orbit/specs/2026-04-21-eval-expansion/spec.yaml.
+Implements ac-01 of spec 2026-04-21-eval-expansion.
 
 Reads eval/datasets/manifest.csv, loads each referenced CSV/JSON/NDJSON file,
 and emits per-column metrics plus a `pass_floors` boolean per column against
@@ -35,8 +35,8 @@ The `pass_floors` column is True iff every applicable floor passes.
 The `pass_notes` column records which floors were checked and any failures.
 
 See:
-    .orbit/choices/0055-eval-realism-dimensions.md  — policy + floors table
-    .orbit/specs/2026-04-21-eval-expansion/spec.yaml  — ac-01, ac-04
+    choice 0055 (eval-realism-dimensions)  — policy + floors table
+    spec 2026-04-21-eval-expansion  — ac-01, ac-04
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Full-corpus pass for the gittables multi-lens diagnostic.
 
-Spec: `.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/spec.yaml`
+Spec: `2026-05-20-gittables-multi-lens-diagnostic`
 ac-04 (corpus index + dry-run runtime budget); ac-06 (full execute).
 
 Extends `scripts/gittables_gate.py`'s per-file profile + validate

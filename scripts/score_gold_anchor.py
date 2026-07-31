@@ -104,13 +104,20 @@ def _profile_column(binary: Path, column_name: str, values: list[str],
     return defn.get("x-finetype-label", "") if isinstance(defn, dict) else ""
 
 
+# Memo for _open_row_identity, module-level rather than an attribute hung off the
+# function object: an attribute is untypeable and a misspelling of its name is a
+# silent cache miss on every call, not an error.
+_OPEN_ROW_CACHE: dict[str, dict] | None = None
+
+
 def _open_row_identity(r: dict) -> dict:
     """The open-rows CSV carries row_index into the llm TSV; resolve identity."""
+    global _OPEN_ROW_CACHE
     llm = Path("eval/gold/gold_review_queue_v1_llm.tsv")
-    if not hasattr(_open_row_identity, "_cache"):
-        _open_row_identity._cache = {
+    if _OPEN_ROW_CACHE is None:
+        _OPEN_ROW_CACHE = {
             row["row_index"]: row for row in load_gold(llm)} if llm.exists() else {}
-    row = _open_row_identity._cache.get(r["row_index"], {})
+    row = _OPEN_ROW_CACHE.get(r["row_index"], {})
     paths: dict[str, str] = {}
     for cand in (Path("eval/gold/gold_corpus_candidates.tsv"),
                  Path("eval/gold/gold_corpus_candidates_external.tsv")):
@@ -221,8 +228,8 @@ def cmd_build_gold(args: argparse.Namespace) -> int:
                 verdict = (r.get("human_verdict") or "").strip().lower()
                 if verdict not in ("correct", "wrong"):
                     continue
-                label = (r.get("proposed_label") if verdict == "correct"
-                         else r.get("correct_label_if_wrong") or "").strip()
+                label = ((r.get("proposed_label") if verdict == "correct"
+                          else r.get("correct_label_if_wrong")) or "").strip()
                 if not label:
                     continue
                 add({"family": "adjudicated:" + r.get("stratum", ""),
@@ -260,7 +267,10 @@ def _vendored_values(file_path: str, column_name: str, cap: int = 100) -> list[s
 
 
 def cmd_predict(args: argparse.Namespace) -> int:
-    import pyarrow.parquet as pq
+    # WAIVED: pyarrow is an eval-stack dependency, present wherever `predict`
+    # actually runs and deliberately not installed for the type-check job. The
+    # import is function-local so the rest of this module stays stdlib-only.
+    import pyarrow.parquet as pq  # type: ignore[reportMissingImports]
 
     gold = load_gold(args.gold)
     wanted = {(r["file_content_sha256"], r["column_name"]) for r in gold}

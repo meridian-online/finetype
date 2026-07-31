@@ -62,6 +62,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 DEFAULT_EXTENSION = "target/release/finetype.duckdb_extension"
@@ -305,7 +306,7 @@ ARROW_RE = re.compile(r"^--\s*(?:→|->)\s*(?P<body>.+?)\s*$")
 STRUCT_KEY_RE = re.compile(r"'(?P<key>[A-Za-z_][A-Za-z0-9_]*)'\s*:")
 
 
-def read_expectation(comments: list[str]) -> tuple[str, object] | None:
+def read_expectation(comments: list[str]) -> tuple[str, list[str] | str] | None:
     """The shape a comment block claims. Values are read and discarded."""
     for index, comment in enumerate(comments):
         if BOX_TOP_RE.match(comment):
@@ -747,7 +748,7 @@ def self_test(root: Path, extension: Path) -> int:
         )
     }
 
-    cases: list[tuple[str, object, str | None, dict | None]] = [
+    cases: list[tuple[str, Callable[[Path], None], str | None, dict | None]] = [
         (
             "a documented query stops running",
             # Breaks the TABLE, not one named example. Naming a specific
@@ -898,7 +899,7 @@ def _stage(root: Path, dest: Path) -> None:
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
     parser.add_argument("--extension", type=Path, default=None)
     parser.add_argument("--list", action="store_true", help="list the fences")

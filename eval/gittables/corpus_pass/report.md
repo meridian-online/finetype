@@ -9,7 +9,7 @@ corpus_pass_id: e5e9830d6023847d23e6f1d67c65282eaf1899eefe3c7a7fab41c1947693b808
 
 # Gittables multi-lens corpus diagnostic — report
 
-This report is the deliverable of `.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/`. It surfaces and ranks; it does not fix. Runtime metadata (timings, error counts, version provenance beyond the frontmatter) lives in `progress.md` — by design, this document carries no wall-clock timestamp so byte-identical re-runs are detectable via `corpus_pass_id`.
+This report is the deliverable of `spec 2026-05-20-gittables-multi-lens-diagnostic`. It surfaces and ranks; it does not fix. Runtime metadata (timings, error counts, version provenance beyond the frontmatter) lives in `progress.md` — by design, this document carries no wall-clock timestamp so byte-identical re-runs are detectable via `corpus_pass_id`.
 
 ## Part 1 — Corroborated gaps (the headline diagnostic)
 

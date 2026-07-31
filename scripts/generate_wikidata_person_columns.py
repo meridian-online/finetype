@@ -2,7 +2,7 @@
 """ac-02 — Generate synthetic `identity.person.full_name` training
 columns from Wikidata Q5 name primitives.
 
-Reads `/Users/hugh/datasets/wikidata/<date>/{given_names,family_names,persons}.tsv`
+Reads `$HOME/datasets/wikidata/<date>/{given_names,family_names,persons}.tsv`
 (produced by scripts/fetch_wikidata_persons.sh) and emits synthetic
 person-name columns in the sherlock_distilled schema. These are the
 synthetic hard negatives against `geography.location.city` — values
@@ -200,7 +200,7 @@ def make_column(
 def main() -> int:
     p = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     p.add_argument("--source", type=Path, default=DEFAULT_SOURCE,
-                   help="Root of /Users/hugh/datasets/wikidata; the most-recent dated subdir is used.")
+                   help="Root of the wikidata dataset tree; the most-recent dated subdir is used.")
     p.add_argument("--date", type=str, default=None,
                    help="Explicit dated subdir under --source (default: most recent).")
     p.add_argument("--out", type=Path, default=DEFAULT_OUT)

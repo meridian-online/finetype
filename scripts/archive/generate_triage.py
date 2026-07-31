@@ -19,8 +19,8 @@ Rationale per row records the exact failing metrics so Hugh can
 override the call in his human-review pass.
 
 See:
-  .orbit/specs/2026-04-21-eval-expansion/spec.yaml (ac-03)
-  .orbit/choices/0055-eval-realism-dimensions.md (triage schema)
+  spec 2026-04-21-eval-expansion (ac-03)
+  choice 0055, eval-realism-dimensions (triage schema)
 """
 
 from __future__ import annotations

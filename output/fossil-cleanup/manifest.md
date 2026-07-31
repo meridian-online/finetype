@@ -1,6 +1,6 @@
 # Fossil-cleanup retention manifest (ac-01)
 
-**Spec:** `.orbit/specs/2026-06-10-fossil-cleanup/spec.yaml` · **Drafted:** 2026-06-10 · **Status:** awaiting author signature — nothing has been moved.
+**Spec:** `spec 2026-06-10-fossil-cleanup` · **Drafted:** 2026-06-10 · **Status:** awaiting author signature — nothing has been moved.
 
 Classification rule: **keep** requires a live reference (CLAUDE.md, an open spec/task, the shipped-default symlink target, git tracking, the `build_rare_type_gold.py` MODELS table, a preserving memory, or pipeline-infrastructure consumption). **archive** = no live reference but forensically plausible or recoverable elsewhere. **delete** = clearly dead, verdict recorded elsewhere. Default on uncertainty is archive — never delete.
 

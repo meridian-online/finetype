@@ -516,7 +516,7 @@ provenance:
   facilitator: Hugh
   scribe: Nightingale
   methodology_source: |
-    ~/github/hughcameron/orbit/.orbit/cards/memos/2026-05-02-tabletop-autonomy-contract.md
+    the 2026-05-02 tabletop-autonomy-contract memo, in the private planning repo
   methodology_instance: 2 (first ran in another project on 2026-05-02)
 
   scenarios_walked:
@@ -527,7 +527,7 @@ provenance:
     - id: S2
       type: real
       source: iter-3 review-pr cycle 1→2 silent Edit failure
-              (.orbit/specs/2026-04-28-validate-corpus-iter3/ progress)
+              (spec 2026-04-28-validate-corpus-iter3 progress)
       surfaced: H02
     - id: S3
       type: real
@@ -536,7 +536,7 @@ provenance:
     - id: S4
       type: real
       source: m-19 manifest schema migration silent corruption
-              (.orbit/specs/2026-04-21-eval-expansion/ ac-15)
+              (spec 2026-04-21-eval-expansion ac-15)
       surfaced: B07, H03, H10
     - id: S7
       type: imagined
@@ -658,18 +658,18 @@ provenance:
        single source of truth; the cron is the convenience layer.
 
   references:
-    - .orbit/choices/0042-deprecate-regex-header-hints.md
-    - .orbit/choices/0048-value-based-rules-only.md
-    - .orbit/choices/0055-eval-realism-dimensions.md
-    - .orbit/choices/0056-train-eval-leakage-prevention.md
-    - .orbit/choices/0057-eval-coverage-floor.md
-    - .orbit/choices/0066-v19-retrain-hard-gate.md
-    - .orbit/choices/0076-validate-corpus-fixture-anti-regression-lock.md
-    - .orbit/choices/0078-validator-alternations-compose-canonical-sibling-patterns.md
-    - .orbit/cards/0014-profile-validate-precision.yaml
-    - .orbit/cards/0015-status-orderid-misclassification.yaml
-    - .orbit/specs/2026-04-21-eval-expansion/
-    - .orbit/specs/2026-04-29-validate-corpus-iter4/
+    - choice 0042 (deprecate-regex-header-hints)
+    - choice 0048 (value-based-rules-only)
+    - choice 0055 (eval-realism-dimensions)
+    - choice 0056 (train-eval-leakage-prevention)
+    - choice 0057 (eval-coverage-floor)
+    - choice 0066 (v19-retrain-hard-gate)
+    - choice 0076 (validate-corpus-fixture-anti-regression-lock)
+    - choice 0078 (validator-alternations-compose-canonical-sibling-patterns)
+    - the profile-validate-precision card
+    - the status-orderid-misclassification card
+    - spec 2026-04-21-eval-expansion
+    - spec 2026-04-29-validate-corpus-iter4
 
   next_tabletop:
     cadence: ~2026-05-10 (Hugh confirmed "in a few days")

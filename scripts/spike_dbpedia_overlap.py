@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """DBpedia / Schema.org overlap spike for gittables multi-lens diagnostic.
 
-Spec: `.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/spec.yaml`
+Spec: `2026-05-20-gittables-multi-lens-diagnostic`
 ac-02 (DBpedia overlap spike).
 
 Sample:

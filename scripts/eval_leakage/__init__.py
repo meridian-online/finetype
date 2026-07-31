@@ -8,7 +8,7 @@ spec used by both:
 
 Keeping both sides in one module prevents the classic drift bug where the
 hash-generator and the filter silently disagree on what counts as "the same
-row". See .orbit/choices/0056-train-eval-leakage-prevention.md for the
+row". See choice 0056 (train-eval-leakage-prevention) for the
 full rationale + enumerated blind spots.
 
 Normalisation spec (MUST match MADR 0056):

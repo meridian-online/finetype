@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ac-04 — Append safety_score column to corroborated_gaps.parquet.
 
-Spec: `.orbit/specs/2026-05-31-reachability-safety-score/spec.yaml`
+Spec: `2026-05-31-reachability-safety-score`
 
 In-place augmentation: reads
   - eval/gittables/corpus_pass/corroborated_gaps.parquet
