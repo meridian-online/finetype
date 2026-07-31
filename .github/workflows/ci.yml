@@ -56,6 +56,133 @@ jobs:
       - name: Scorer propagates failures and stamps every score with its fixture
         run: scripts/test_score_clean_label.sh
 
+      - name: Documented taxonomy counts match labels/definitions_*.yaml
+        # Nothing else in CI reads documentation, so a wrong number in prose is
+        # invisible to sixteen green checks. This derives the counts from the
+        # taxonomy files the build embeds and fails if a documented one differs —
+        # the headline AND the per-domain table, row by row, so the two cannot
+        # drift apart from each other or from the data. Bolted onto this job
+        # rather than given its own: it costs a stdlib-python second, and this is
+        # already the job that asks whether a document still agrees with the data
+        # it was generated from.
+        run: scripts/check_doc_taxonomy_counts.py
+
+      - name: ...and the count gate detects a wrong number
+        # A gate that is only known to pass is not known to detect. Twenty-five
+        # mutations against a scratch copy — a drifting headline, a drifting table
+        # row, two rows SWAPPED so the sum still matches the headline, a definition
+        # added or deleted behind the docs' back, a claim reworded out of the
+        # registry, a brand-new unregistered claim, a second table nothing reads,
+        # a domain file that ships without being counted, a locale table row that
+        # goes stale, a row corrected in its headline but not in its `[+N more]`
+        # remainder, a region heading that disagrees with its own list — each must
+        # redden a NAMED case, and the unmutated tree must pass or every "caught"
+        # above is noise.
+        run: scripts/check_doc_taxonomy_counts.py --self-test
+
+      - name: Comment citations resolve
+        # The count gates read documentation; this reads COMMENTS, which is the
+        # other place prose goes wrong. Two checks on the lines this branch
+        # ADDED: a symbol attributed to a named crate must actually be defined
+        # there, and a backticked repo path must exist. It found three stale
+        # citations on its first run here — two comments pointing at
+        # `scripts/train_entity_classifier.py` and one at
+        # `scripts/prepare_model2vec.py`, both rewritten in Rust under
+        # crates/finetype-train long ago, so a reader following either found
+        # nothing.
+        #
+        # fetch-depth 0: it diffs against origin/main and REFUSES to report
+        # success when it cannot resolve a merge base, rather than printing a
+        # pass over a diff it never read.
+        run: |
+          git fetch --no-tags --unshallow origin main || git fetch --no-tags origin main
+          scripts/check_comment_citations.py
+
+      - name: ...and the citation gate detects a wrong attribution
+        # Fixtures are DERIVED from this repo's own crates, not named: the first
+        # port of this script from the sibling repo failed six of ten cases
+        # purely because its cases named the other repo's crates. A const is
+        # found that one crate defines and another does not, and both the false
+        # and the true attribution are asserted.
+        run: scripts/check_comment_citations.py --self-test
+
+  doc-surface:
+    name: Documented DuckDB surface + SQL examples
+    runs-on: ubuntu-latest
+    steps:
+      # `submodules: recursive`, unlike every other job in this file, because
+      # this is the only one that runs `make build-extension`: the Makefile
+      # includes `extension-ci-tools/makefiles/…/base.Makefile`, which is a
+      # submodule. Without it the build dies with "No rule to make target"
+      # before either gate runs — a gate that CANNOT fail rather than one that
+      # passes. The extension-binary jobs live in MainDistributionPipeline.yml
+      # and do their own checkout.
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Install duckdb CLI
+        # Both gates below read the catalog / run the examples through this CLI.
+        # Same pin as the smoke job.
+        run: |
+          curl -fsSL -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
+          unzip -o duckdb.zip
+          sudo mv duckdb /usr/local/bin/duckdb
+          duckdb --version
+      - name: Build the extension
+        # Just the cdylib + the metadata stamp — not the CLI, eval binaries or
+        # trainer. `make build-release` would build all of them.
+        run: make build-extension
+
+      - name: The documented DuckDB surface matches duckdb_functions()
+        # Which functions exist, what kind each is and what each returns are
+        # asserted in prose in README.md, docs/ARCHITECTURE.md and the
+        # finetype-duckdb module doc — and prose is where they went wrong: a
+        # crate table said "5 scalar functions" against 13 scalars, 2 table
+        # macros and 1 table function. This LOADs the local build (hermetic
+        # extension_directory, and the loaded version must equal the tree's, so
+        # a community build installed on the runner cannot answer for it) and
+        # compares the catalog with the docs in both directions. No model
+        # needed: LOAD alone populates duckdb_functions().
+        run: scripts/check_duckdb_catalog.py
+
+      - name: ...and the catalog gate detects a wrong surface
+        # Eleven mutations: a function dropped from the registry table, a row
+        # for a function that does not exist, a STRUCT return documented as
+        # VARCHAR (the defect this was written for), an invented STRUCT field, a
+        # drifting scalar or macro count, the module doc out of step in either
+        # direction, a documented call to a function nobody registered, and the
+        # spike artefact taught as production surface.
+        run: scripts/check_duckdb_catalog.py --self-test
+
+      - name: Download model from HuggingFace
+        # Only the SQL examples need it. The catalog gate above ran without it,
+        # so a wrong surface reddens before this download is paid for.
+        run: .github/scripts/download-model.sh
+
+      - name: Every documented SQL example runs, and has the documented shape
+        # Extracts every ```sql fence from README.md and docs/*.md, prepends the
+        # document's fixture, injects a LOAD of the LOCAL build and runs it. A
+        # DuckDB error fails. Then SHAPE, read out of the fence's own trailing
+        # comment: an ASCII result box must name the columns the query returns,
+        # a documented STRUCT literal must carry the STRUCT's field names, and a
+        # documented JSON payload may not name a key the query never returns.
+        # NO confidence digit, label or score is ever compared — those move with
+        # the model, and a flaky gate is a gate that gets ignored.
+        run: scripts/check_sql_examples.py
+
+      - name: ...and the example gate detects a broken example
+        # Eight mutations that must fail — a query against a missing table, a
+        # call to a function that does not exist, a renamed result column, a
+        # renamed STRUCT field, a JSON key that is never returned, a LOAD of an
+        # artifact no build produces, a shell pipeline back inside a ```sql
+        # fence, a macro column TYPE that drifts — and two that must NOT: a
+        # moved confidence digit and a changed predicted label must leave it
+        # green. Without that second pair this gate could be pinning model
+        # output and nobody would find out until it flaked.
+        run: scripts/check_sql_examples.py --self-test
+
   encoder-dtype:
     name: Encoder half-precision packing
     runs-on: ubuntu-latest
