@@ -259,6 +259,60 @@ def self_test() -> int:
         (f"`{home}`'s `TotallyMadeUpThing_{abs(hash(sym)) % 97}` is used", False,
          "a symbol no crate defines at all"),
     ]
+    # --- the three PRECISION fixtures -------------------------------------
+    # Each was a false positive on this gate's first whole-tree run, when it
+    # scored 7 hits of which 5 were wrong. They are regression tests for the
+    # noise, and a gate that cries wolf gets switched off — so they are derived
+    # here too rather than named, which is how they went missing when this
+    # script was first ported to a second repo.
+    test_file = next(iter(sorted(ROOT.glob("crates/*/tests/*.rs"))), None)
+    if test_file is None:
+        print("self-test: no crates/*/tests/*.rs to derive the test-file case from")
+        return 1
+    test_crate, test_stem = test_file.parts[-3], test_file.stem
+
+    literal = lit_crate = None
+    for c in known:
+        for f in sorted((ROOT / "crates" / c).glob("**/*.rs")):
+            text = f.read_text(errors="replace")
+            m = re.search(r'"([a-z_][a-z0-9_]{4,})"', text)
+            # Wanted: a token present as a QUOTED STRING but not as an item.
+            # `defines()` resolves it through the literal branch, which is the
+            # behaviour under test — so check the item pattern directly here,
+            # not `defines()`, or the condition is circular and never holds.
+            if m and not re.search(
+                DEFN.format(sym=re.escape(m.group(1))),
+                text,
+            ):
+                literal, lit_crate = m.group(1), c
+                break
+        if literal:
+            break
+    if literal is None:
+        print("self-test: no crate-local string literal to derive the literal case from")
+        return 1
+
+    rel_path = None
+    for c in known:
+        for cand in ("src/lib.rs", "src/main.rs", "tests"):
+            if (ROOT / "crates" / c / cand).exists() and not (ROOT / cand).exists():
+                rel_path = cand
+                break
+        if rel_path:
+            break
+    if rel_path is None:
+        print("self-test: no crate-relative path to derive the path case from")
+        return 1
+
+    cases += [
+        (f"its own guard lives in `{test_crate}`'s `{test_stem}` tests", True,
+         f"STAYS GREEN: a test file, not an item ({test_crate}/tests/{test_stem}.rs)"),
+        (f"must match `{lit_crate}`'s `{literal}` alias", True,
+         f"STAYS GREEN: a string literal, not a const (\"{literal}\")"),
+        (f"read from `{rel_path}`", True,
+         f"STAYS GREEN: a crate-relative path, real under crates/*/{rel_path}"),
+    ]
+
     for name, why in list(ACKNOWLEDGED.items())[:1]:
         cases.append((f"`{name}` is called here", True,
                       f"STAYS GREEN: ACKNOWLEDGED as external ({why})"))
