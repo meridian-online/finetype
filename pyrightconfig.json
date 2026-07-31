@@ -1,27 +1,25 @@
+// Type-check configuration for the Python that produces and gates this repo's numbers.
+//
+// Checked in so a local `pyright` from the repo root and the CI `python-types`
+// job report the SAME set. Run it with the pinned version:  make types
+// Pinned version: pyright 1.1.411, named here, in .github/workflows/ci.yml and
+// in the Makefile's `types` target. Keep the three in step.
+//
+// WHY THE FILE SET IS LISTED AND NOT GLOBBED. scripts/ holds 112 Python files.
+// Most are research code that imports numpy, pandas, duckdb, pyarrow, torch or
+// ydf; checking them would need the whole ML stack installed on every pull
+// request to produce mostly unresolved-import noise (81 of the 126 errors a
+// tree-wide run reports are reportMissingImports). The files below are the ones
+// that DECIDE something — the fixture/bar resolver, the headline scorer, and the
+// gates CI already runs on every PR — and every one of them is stdlib-only, so
+// this configuration needs no dependency install and cannot drift from a local
+// run.
+//
+// Adding a script here is cheap and is the right move whenever a new script
+// starts resolving a bar, a score or a gate verdict. Adding one that imports a
+// third party is not: install it in the workflow first, or the job reports an
+// unresolved import instead of a type error.
 {
-  "//": [
-    "Type-check configuration for the Python that produces and gates this repo's numbers.",
-    "",
-    "Checked in so a local `pyright` from the repo root and the CI `python-types`",
-    "job report the SAME set. Run it with the pinned version:  make types",
-    "Pinned version: pyright 1.1.411, named here, in .github/workflows/ci.yml and",
-    "in the Makefile's `types` target. Keep the three in step.",
-    "",
-    "WHY THE FILE SET IS LISTED AND NOT GLOBBED. scripts/ holds 112 Python files.",
-    "Most are research code that imports numpy, pandas, duckdb, pyarrow, torch or",
-    "ydf; checking them would need the whole ML stack installed on every pull",
-    "request to produce mostly unresolved-import noise (81 of the 126 errors a",
-    "tree-wide run reports are reportMissingImports). The files below are the ones",
-    "that DECIDE something — the fixture/bar resolver, the headline scorer, and the",
-    "gates CI already runs on every PR — and every one of them is stdlib-only, so",
-    "this configuration needs no dependency install and cannot drift from a local",
-    "run.",
-    "",
-    "Adding a script here is cheap and is the right move whenever a new script",
-    "starts resolving a bar, a score or a gate verdict. Adding one that imports a",
-    "third party is not: install it in the workflow first, or the job reports an",
-    "unresolved import instead of a type error."
-  ],
   "include": [
     "scripts/evidence.py",
     "scripts/score_gold_anchor.py",

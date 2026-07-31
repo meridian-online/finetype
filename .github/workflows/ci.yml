@@ -320,6 +320,41 @@ jobs:
     # run green on main. There is deliberately no `continue-on-error` — a job that
     # reports success while its command failed is the exact defect this job
     # exists to remove.
+    #
+    # ── WHAT IT FINDS ON ITS FIRST RUN ──────────────────────────────────────
+    #
+    # All eight crates COMPILE: `cargo check --workspace --all-targets` and
+    # `cargo clippy --workspace --all-targets -- -D warnings` are both clean.
+    # 390 tests pass across the five crates that were invisible.
+    #
+    # ONE test fails, and it is pre-existing rather than anything this job does
+    # wrong:
+    #
+    #   finetype-eval, bin validate_corpus,
+    #   fixture_tests::vci3_fixture_attribution_regression_match
+    #   (crates/finetype-eval/src/bin/validate_corpus.rs:1779)
+    #
+    # 22 fixture-attribution mismatches against the harness: 9 columns the
+    # harness reports that the fixture does not carry at all (gdelt_events
+    # Actor1/Actor2 code and name columns, un_locode Coordinates, oecd_employment
+    # STRUCTURE_NAME and TRANSFORMATION, rio2016_athletes sport, fifa_players
+    # Body Type), and 13 where the fixture's expected attribution disagrees with
+    # what the Iter-3 cascade now produces — mostly Rule 2 (subtype drift inside
+    # one family) and Rule 6 (cross-domain prediction error) reclassifying rows
+    # the fixture recorded as format_diversity or misclassification.
+    #
+    # THE CAUSE is that the test's own escape hatch never fires. It skips the
+    # harness comparison when eval/eval_output/validate_corpus.md is missing —
+    # documented in the test as a fresh-checkout convenience — but that file is
+    # TRACKED, so on any real checkout the strict path always runs. The fixture
+    # and the harness have drifted apart and nothing could see it, because CI
+    # never compiled the crate. Regenerating the fixture (`make validate-corpus`)
+    # is an evaluation decision, not a CI one, and is deliberately left out of
+    # this change.
+    #
+    # So: this job goes red on day one, for a defect no pull request introduced.
+    # That is the whole reason it starts non-required. Promoting it is the
+    # deliverable that finishes the work, not this commit.
     name: Workspace Test (all eight crates)
     runs-on: ubuntu-latest
     steps:
