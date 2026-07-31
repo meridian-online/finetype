@@ -50,27 +50,59 @@ clippy:
 	cargo clippy -- -D warnings
 
 # ─── CLI Tests ─────────────────────────────────
-.PHONY: test-smoke test-docs test-golden test-cli
+.PHONY: test-smoke test-docs test-golden test-cli check-doc-counts
+.PHONY: check-duckdb-catalog check-sql-examples check-docs
 
 test-smoke:
 	./tests/smoke.sh --skip-build
 
+# INFORMATIONAL ONLY — doc_tests.sh always exits 0, so a successful
+# `make test-docs` says nothing about whether the documentation is correct.
+# The documentation checks that DO fail are `make check-docs`.
 test-docs:
 	./tests/doc_tests.sh --skip-build
 
 test-golden:
 	./tests/doc_tests.sh --skip-build --golden-only
 
+# Fails if a taxonomy count in the docs disagrees with labels/definitions_*.yaml.
+# Same two commands CI runs on the `evidence` job. Stdlib python, no build.
+check-doc-counts:
+	./scripts/check_doc_taxonomy_counts.py
+	./scripts/check_doc_taxonomy_counts.py --self-test
+
+# Fails if the documented DuckDB surface disagrees with duckdb_functions() of a
+# loaded LOCAL build — names, kinds, return types. Needs `make build-extension`
+# and the duckdb CLI. No model: LOAD populates the catalog on its own.
+check-duckdb-catalog: build-extension
+	./scripts/check_duckdb_catalog.py
+	./scripts/check_duckdb_catalog.py --self-test
+
+# Fails if a documented ```sql example does not run against the local build, or
+# does not have the shape its own comment claims. Needs the extension AND a
+# model (FINETYPE_MODEL_DIR, or models/default).
+check-sql-examples: build-extension
+	./scripts/check_sql_examples.py
+	./scripts/check_sql_examples.py --self-test
+
+# Every documentation gate. The three that fail; test-docs is not one of them.
+check-docs: check-doc-counts check-duckdb-catalog check-sql-examples
+
 test-cli: test-smoke test-docs
 
 # ─── Build ────────────────────────────────────
-.PHONY: build build-release check test generate
+.PHONY: build build-release build-extension check test generate
 
 build:
 	cargo build
 
-build-release:
+build-release: build-extension
 	cargo build --release
+
+# Just the DuckDB extension: the cdylib plus the metadata stamp. Split out of
+# build-release so a documentation gate can ask for the artifact it loads
+# without also building the CLI, the eval binaries and the trainer.
+build-extension:
 	cargo build -p finetype_duckdb --release
 	cargo build -p finetype-build-tools --release
 	@# Append DuckDB extension metadata to the cdylib (pure Rust, no Python).
@@ -88,14 +120,14 @@ build-release:
 		target/release/append-duckdb-metadata \
 			-l $$libpath \
 			-n finetype \
-			-o target/release/finetype.duckdb_extension \
+			-o $(EXTENSION) \
 			-p $$(echo "SELECT platform FROM pragma_platform();" | duckdb -noheader -csv 2>/dev/null || echo "$$([ "$$(uname -s)" = "Darwin" ] && echo "$$([ "$$(uname -m)" = "arm64" ] && echo osx_arm64 || echo osx_amd64)" || echo linux_amd64)") \
 			--duckdb-version v1.2.0 \
 			--extension-version $$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1) \
 			--abi-type C_STRUCT; \
 	else \
 		echo "⚠ append-duckdb-metadata not found — copying lib without metadata"; \
-		cp $$libpath target/release/finetype.duckdb_extension; \
+		cp $$libpath $(EXTENSION); \
 	fi
 
 check:

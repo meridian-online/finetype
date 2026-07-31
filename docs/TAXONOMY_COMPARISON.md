@@ -1,6 +1,6 @@
 # Taxonomy Comparison: FineType vs External Type Systems
 
-FineType's taxonomy of 250 types classifies data by **format** — the character-level structure of values. This document compares it to three external type systems that classify data by **semantics** — what the data represents.
+FineType's taxonomy of 251 types classifies data by **format** — the character-level structure of values. This document compares it to three external type systems that classify data by **semantics** — what the data represents.
 
 Understanding these differences helps users know what FineType can and can't detect, and where it fits in the broader data ecosystem.
 
@@ -11,7 +11,7 @@ Understanding these differences helps users know what FineType can and can't det
 | **Classifies by** | Format (character patterns) | Semantic meaning | Entity relationships | Semantic column role |
 | **Question answered** | "How is this value structured?" | "What does this value represent in web content?" | "What property of an entity is this?" | "What semantic type best describes this column?" |
 | **Scope** | Individual values or columns | Structured web data (JSON-LD, Microdata) | Knowledge graph triples | CSV table columns |
-| **Granularity** | 159 leaf types in 6 domains | ~800 types + ~1,400 properties | ~10,000+ properties | 59 schema.org + 122 DBpedia labels |
+| **Granularity** | 251 leaf types in 7 domains | ~800 types + ~1,400 properties | ~10,000+ properties | 59 schema.org + 122 DBpedia labels |
 | **Overlap with FineType** | N/A | ~15 direct format matches | ~10 direct format matches | ~12 format-detectable types |
 
 ### The Key Distinction
@@ -160,12 +160,12 @@ FineType covers many format-specific types that external systems don't distingui
 |---|---|---|
 | **Network** | `ip_v4`, `ip_v6`, `mac_address`, `hostname`, `port`, `slug`, `user_agent` | schema.org/Wikidata model network concepts differently |
 | **Cryptographic** | `uuid`, `hash`, `token_hex`, `jwt` | These are infrastructure formats, not semantic types |
-| **DateTime formats** | 46 types: `iso_8601`, `rfc_3339`, `rfc_2822`, `us_slash`, `eu_slash`, `short_dmy`, etc. | External systems have one "Date" or "DateTime" type |
+| **DateTime formats** | 89 types in the `datetime` domain: `iso_8601`, `rfc_3339`, `rfc_2822`, `us_slash`, `eu_slash`, `short_dmy`, etc. | External systems have one "Date" or "DateTime" type |
 | **Container formats** | `json_object`, `json_array`, `csv_row`, `key_value_pair`, `query_string` | External systems describe content, not container format |
 | **Scientific** | `dna_sequence`, `rna_sequence`, `protein_sequence` | Specialized formats not in general ontologies |
 | **Financial identifiers** | `isin`, `cusip`, `sedol`, `swift_bic`, `lei` | Wikidata has some (ISIN, ISSN); schema.org doesn't |
 
-**This is FineType's niche**: the 46 datetime formats, 35 technology formats, and 11 container formats have no equivalent in semantic type systems. They exist because FineType answers a different question — not "what does this mean?" but "how should this be parsed?"
+**This is FineType's niche**: the 89 datetime, 30 technology and 12 container types have no equivalent in semantic type systems. They exist because FineType answers a different question — not "what does this mean?" but "how should this be parsed?"
 
 ## Gaps and Opportunities
 
@@ -221,7 +221,7 @@ This layered approach is the direction FineType's column-name heuristic begins t
 
 ## References
 
-- [FineType Taxonomy](../labels/) — Full YAML definitions for all 250 types
+- [FineType Taxonomy](../labels/) — Full YAML definitions for all 251 types
 - [GitTables Benchmark](https://zenodo.org/record/5706316) — 1M+ tables with schema.org and DBpedia annotations
 - [schema.org Full Hierarchy](https://schema.org/docs/full.html) — Complete schema.org type system
 - [Wikidata Property Constraints](https://www.wikidata.org/wiki/Help:Property_constraints_portal) — Property format expectations

@@ -100,7 +100,7 @@ Pure Rust, no Python runtime, no external C++ dependencies. Integrates cleanly w
 | `finetype-model` | Flat CharCNN + Sense→Sharpen inference, feature extraction, column-mode disambiguation, Model2Vec | `candle-core`, `candle-nn` |
 | `finetype-cli` | Binary: CLI commands (infer, profile, load, check, generate, taxonomy, schema, train, mcp) | `clap`, `csv` |
 | `finetype-mcp` | MCP server library (rmcp, 6 tools, taxonomy resources) | `rmcp`, `tokio` |
-| `finetype-duckdb` | DuckDB extension: 13 scalar functions, 2 SQL table macros and 1 table function, with embedded model | `duckdb`, `libduckdb-sys` |
+| `finetype-duckdb` | DuckDB extension: 13 scalar functions + 2 table macros with embedded model | `duckdb`, `libduckdb-sys` |
 | `finetype-eval` | Evaluation binaries (profile, actionability, GitTables, SOTAB) | `csv`, `duckdb`, `arrow` |
 | `finetype-train` | Pure Rust ML training (Sense, Entity, CharCNN, sibling-context attention, data pipeline) | `candle-core`, `candle-nn`, `duckdb` |
 | `finetype-build-tools` | Build utilities (DuckDB extension metadata) | — |
@@ -204,45 +204,37 @@ Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
 
 ### Current taxonomy
 
-251 definitions across 7 domains (container: 12, datetime: 89, finance: 29, geography: 25, identity: 34, representation: 32, technology: 30) — the counts `finetype check` prints. Labels: `domain.category.type`. Definitions in `labels/definitions_*.yaml`. (The shipped model predicts 244 labels; leaves added after the last retrain — e.g. `identity.industry.naics`, `container.object.s_expression` — are taxonomy-live and recovered at `profile` time by deterministic Sharpen guards.)
+251 definitions across 7 domains (container: 12, datetime: 89, finance: 29, geography: 25, identity: 34, representation: 32, technology: 30). Labels: `domain.category.type`. Definitions in `labels/definitions_*.yaml`. (The shipped model predicts 244 labels; leaves added after the last retrain — e.g. `identity.industry.naics`, `container.object.s_expression` — are taxonomy-live and recovered at `profile` time by deterministic Sharpen guards.)
 
 ## DuckDB Extension
 
-The `ft_` verbs are the taught surface (since 0.6.23). Full prose, including the two
-call forms of `ft_profile` and why it — not `ft_infer` — is the accurate path, is in
-[DEVELOPMENT.md](DEVELOPMENT.md#duckdb-extension-sql-surface-ft_-verbs).
+Every row below is checked against `duckdb_functions()` of a loaded local build
+by `scripts/check_duckdb_catalog.py` — name, kind and return type. `ft_profile`
+appears twice because it is registered twice: a scalar over a `LIST`, and a table
+macro DuckDB routes to when the call sits in `FROM`.
 
-| Function | Kind | Purpose |
-|---|---|---|
-| `ft_profile(table)` | SQL table macro | One row per column: `{column_name, type, confidence, duckdb_type}` |
-| `ft_validate(table, schema)` | SQL table macro | Per-column `total` / `rejects` / `sample_message` against a JSON Schema |
-| `ft_profile(list, header?)` | scalar → `STRUCT` | The column form the macro calls; use in a `SELECT`, not a `FROM` |
-| `ft_infer(value)` | scalar | Single-value probe — no column context, deliberately weaker |
-| `ft_validate_text(value, schema)` | scalar → `STRUCT` | Per-cell validation |
-| `ft_detail(value)` | scalar | Full detail (JSON). **Column-level**: the DuckDB chunk is the pooling boundary, so a whole chunk returns one answer, taking a strided sample of up to 100 values within it (`ColumnConfig.sample_size`) |
-| `ft_detail(list, header?)` | scalar → JSON | The same detail with the sample given explicitly |
-| `ft_cast(value)` | scalar | Normalize value for `TRY_CAST` |
-| `ft_unpack(json)` | scalar | Recursively classify JSON fields |
-| `ft_version()` | scalar | Version string |
+The `ft_` names are the taught surface. The un-prefixed scalars stay registered
+as aliases for one release so a v0.6.22 community install keeps working.
 
-Deprecated aliases, still registered so existing code keeps working but no longer taught:
-`finetype`, `finetype_detail`, `finetype_cast`, `finetype_unpack`, `finetype_validate`,
-`finetype_version`. Two migration traps, neither of them a rename:
+| Function | Kind | Returns | Purpose |
+|---|---|---|---|
+| `ft_infer(value)` | scalar | VARCHAR | Single-value probe — profile with sample size 1 |
+| `ft_profile(list, header?)` | scalar | STRUCT("type" VARCHAR, confidence DOUBLE, duckdb_type VARCHAR) | Column-level classification over an assembled `LIST` |
+| `ft_profile(tbl)` | table macro | TABLE | One row per column of `tbl` — the everyday form |
+| `ft_validate(tbl, schema)` | table macro | TABLE | One row per column: totals, rejects, a sample message |
+| `ft_validate_text(value, schema)` | scalar | STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR) | Per-cell validation naming the failed constraint |
+| `ft_detail(col)` / `ft_detail(list, header?)` | scalar | VARCHAR | Full detail as a JSON string |
+| `ft_cast(value)` | scalar | VARCHAR | Normalize value for TRY_CAST |
+| `ft_unpack(json)` | scalar | VARCHAR | Recursively classify JSON fields |
+| `ft_version()` | scalar | VARCHAR | Version string |
+| `finetype(col)` / `finetype(list, header?)` | scalar | VARCHAR | Alias — column-level classification |
+| `finetype_detail(col)` / `finetype_detail(list, header?)` | scalar | VARCHAR | Alias of `ft_detail` |
+| `finetype_cast(value)` | scalar | VARCHAR | Alias of `ft_cast` |
+| `finetype_unpack(json)` | scalar | VARCHAR | Alias of `ft_unpack` |
+| `finetype_validate(value, schema_json)` | scalar | VARCHAR | Returns `'valid'` or an error message — NOT the `ft_validate_text` STRUCT |
+| `finetype_version()` | scalar | VARCHAR | Alias of `ft_version` |
 
-- `finetype(value)` is **column**-level — it pools the DuckDB chunk as its sample, the same
-  way `ft_detail` does in scalar form. It is therefore *not* `ft_infer`, which types one
-  value at a sample size of one and answers differently. A column typed with `finetype()`
-  moves to `ft_profile`; only a genuine single-literal probe moves to `ft_infer`.
-- `finetype_validate` is **not** `ft_validate` (table macro). Its counterpart is
-  `ft_validate_text`, and the swap **changes the return type**: `finetype_validate` returns
-  `VARCHAR` (the bare string `'valid'`, or an error message), while `ft_validate_text` returns
-  `STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR)`. A predicate
-  `finetype_validate(...) = 'valid'` becomes `ft_validate_text(...).valid`.
-
-`finetype_detail` / `_cast` / `_unpack` / `_version` are true aliases of their `ft_` twins
-and are the only safe find-and-replace in the set.
-
-Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification: the DuckDB processing chunk (~2048 rows) is the pooling boundary, and within it a strided sample of at most 100 values is taken (`ColumnConfig.sample_size`); `ft_detail`'s list form samples the same way, and `ft_profile`'s list form is the sole user of `PROFILE_SAMPLE_CAP`, truncating to the first 100 instead — the `samples` field in `ft_detail`'s JSON reports the count actually used. Validation uses cached schema parsing for performance.
+Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification (~2048-row chunks). `finetype_validate` uses cached schema parsing for performance.
 
 ## MCP Server
 

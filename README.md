@@ -29,9 +29,9 @@ identity.person.email
 
 - **251 semantic types** across 7 domains — dates, times, IPs, emails, UUIDs, financial identifiers, currencies, geospatial formats, medical codes, and more
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing. 99.9% actionability across 120 tested types.
-- **Locale-aware** — validates 65+ locales for postal codes, 46+ for phone numbers, 32+ for month/day names
+- **Locale-aware** — validates 65 locales for postal codes, 46 for phone numbers, 27 for month/day names
 - **MCP server** — `finetype mcp` exposes type inference to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/)
-- **DuckDB extension** — a `profile → schema → validate` surface in SQL: `ft_profile()` types every column of a table, `ft_validate()` checks a table against a JSON Schema, plus `ft_infer()` / `ft_detail()` / `ft_cast()` / `ft_unpack()` scalars
+- **DuckDB extension** — 13 scalar functions and 2 table macros, a `profile → schema → validate` surface in SQL: `ft_profile()` types every column of a table, `ft_validate()` checks a table against a JSON Schema, plus `ft_infer()` / `ft_detail()` / `ft_cast()` / `ft_unpack()` scalars. The full table, gated against the loaded extension's catalog, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#duckdb-extension)
 - **Schema-driven validation** — `finetype validate data.csv schema.json --db out.db --table orders` materialises typed DuckDB tables (per-column transforms applied) plus a `finetype_reject_errors` sidecar in a single pass
 - **Pure Rust** — no Python runtime or dependencies
 
@@ -167,9 +167,7 @@ SELECT ft_infer('192.168.1.1');
 -- that is a real disagreement — 2000 rows whose first 200 are IPv4 and the rest
 -- emails give ft_detail a hostname/email answer and ft_profile ip_v4.
 SELECT ft_detail(value) FROM my_table;   -- 5-row date column
--- → {"type": "datetime.date.mdy_slash", "confidence": 0.538, "duckdb_type": "DATE",
---    "samples": 5, "disambiguation": "date_slash_disambiguation",
---    "votes": {"datetime.date.mdy_slash": 0.538}}
+-- → {"type": "datetime.date.mdy_slash", "confidence": 0.538, "duckdb_type": "DATE", "samples": 5, "disambiguation": "date_slash_disambiguation", "votes": {"datetime.date.mdy_slash": 0.538}}
 -- Every row returns that identical object. Note `SELECT … LIMIT 1` reports
 -- "samples": 1, because the limit shrinks the chunk — not because it read one value.
 
@@ -246,12 +244,12 @@ FineType recognizes **251 types** across **7 domains**:
 
 | Domain | Types | Examples |
 |--------|-------|----------|
-| `datetime` | 89 | ISO 8601, RFC 2822, Unix timestamps, CJK dates, Apache CLF, timezones, month/day names (32+ locales) |
+| `datetime` | 89 | ISO 8601, RFC 2822, Unix timestamps, CJK dates, Apache CLF, timezones, month/day names (27 locales) |
 | `representation` | 32 | Integers, floats, booleans, numeric codes, hex colors, JSON, CAS numbers, SMILES, InChI |
 | `technology` | 30 | IPv4/v6, MAC, URLs, UUIDs, ULIDs, DOIs, hashes, JWTs, AWS ARNs, Docker refs, CIDRs, git SHAs |
-| `identity` | 34 | Names, emails, phone numbers (46+ locales), credit cards, SSNs, VINs, medical codes (ICD-10, CPT, LOINC) |
+| `identity` | 34 | Names, emails, phone numbers (46 locales), credit cards, SSNs, VINs, medical codes (ICD-10, CPT, LOINC) |
 | `finance` | 29 | IBAN, SWIFT/BIC, ISIN, CUSIP, SEDOL, LEI, FIGI, currency amounts (7 format variants), routing numbers |
-| `geography` | 25 | Lat/lon, countries, cities, postal codes (65+ locales), WKT, GeoJSON, H3, geohash, Plus Codes, MGRS |
+| `geography` | 25 | Lat/lon, countries, cities, postal codes (65 locales), WKT, GeoJSON, H3, geohash, Plus Codes, MGRS |
 | `container` | 12 | JSON objects, CSV rows, query strings, key-value pairs |
 
 Each type is a **transformation contract** — if FineType predicts `datetime.date.mdy_slash`, that guarantees `strptime(value, '%m/%d/%Y')::DATE` will succeed.

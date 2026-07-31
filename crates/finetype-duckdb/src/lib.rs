@@ -1,53 +1,35 @@
 //! FineType DuckDB Extension
 //!
-//! A `profile → schema → validate` surface in SQL, mirroring the CLI. **The
-//! `ft_` verbs are the taught surface** (since 0.6.23, spec
-//! `2026-06-03-duckdb-extension-table-verbs`); the un-prefixed scalars below
-//! remain registered as aliases. Full prose, including why `ft_profile` and not
-//! `ft_infer` is the accurate path, lives in `docs/DEVELOPMENT.md` under
-//! *DuckDB Extension SQL Surface*.
+//! The whole registered surface. Every name here is checked against
+//! `duckdb_functions()` of a loaded build by `scripts/check_duckdb_catalog.py`,
+//! in both directions — a function this list omits, and a name this list invents,
+//! each fail CI.
 //!
-//! ## Table verbs (SQL macros, registered at `LOAD`)
-//! - `ft_profile(table)` — one row per column: `{column_name, type, confidence, duckdb_type}`.
-//!   The everyday form. Bakes in `USING SAMPLE 100 ROWS`.
-//! - `ft_validate(table, schema)` — per-column `total` / `rejects` / `sample_message`
-//!   against a JSON Schema. The one `schema` argument auto-detects an inline JSON
-//!   literal, a `getvariable` value, or a file path.
+//! The `ft_` names are the taught surface; the un-prefixed `finetype*` scalars
+//! stay registered as aliases for one release so a v0.6.22 install keeps working.
 //!
-//! ## Scalars
-//! - `ft_profile(list(values))` — the column form the macro calls internally;
-//!   also `(list, header)`. Reach for it directly only with a list in hand.
-//! - `ft_infer(value)` — single-value probe. **Deliberately weaker**: the model is
-//!   column-oriented, so one value is "profile with sample size 1".
-//! - `ft_validate_text(value, schema)` — per-cell validation, returns a `STRUCT`.
-//! - `ft_detail(value)` — JSON with type, confidence, DuckDB type, sample size,
-//!   disambiguation and vote spread. **Column-level, not per-value**: in scalar
-//!   form the DuckDB processing chunk is the POOLING BOUNDARY, so every row
-//!   of a chunk returns the same answer — taking a STRIDED sample of at most
-//!   100 values across it (`ColumnConfig::sample_size`), which is what the
-//!   `samples` field reports. The chunk size is not the sample size. The
-//!   `(list)` / `(list, header)` overloads sample the SAME way — `ft_profile`'s
-//!   list form is the only caller of `PROFILE_SAMPLE_CAP`, and the only one that
-//!   truncates to the first 100 instead.
-//! - `ft_cast(value)` — normalize for safe `TRY_CAST` (dates → ISO, booleans → true/false).
-//! - `ft_unpack(json)` — recursively classify JSON fields, returns annotated JSON.
-//! - `ft_version()` — extension version.
-//!
-//! ## Deprecated aliases
-//! Kept registered so existing community installs keep working; not taught. The
-//! channel builds per DuckDB version and lags this repo — 0.6.36 on DuckDB 1.5.5
-//! and 1.5.4, 0.6.23 on 1.5.3, and no build at all on 1.5.2 (`INSTALL` 404s).
-//! Measured 2026-07-30 on `osx_arm64`.
-//! `finetype(value)` / `(list)` / `(list, header)`, `finetype_detail`,
-//! `finetype_cast`, `finetype_unpack`, `finetype_validate`, `finetype_version`.
-//!
-//! **Migrating is not renaming.** `finetype(value)` pools the DuckDB chunk as its
-//! sample, so it is *column*-level — it is not `ft_infer`, which types one value
-//! at sample size 1 and answers differently. A caller typing a column with it
-//! wants `ft_profile`; `ft_infer` only for a genuine single-literal probe. And
-//! `finetype_validate` (scalar) is not `ft_validate` (table macro); its scalar
-//! counterpart is `ft_validate_text`, which returns a `STRUCT` rather than a string.
-//! `finetype_detail` / `_cast` / `_unpack` / `_version` are true aliases.
+//! - `ft_infer(value)` — Single-value probe → VARCHAR label. Weaker than a column.
+//! - `ft_profile(list(values))` / `ft_profile(list(values), header)` — Column-level
+//!   classification → `STRUCT(type, confidence, duckdb_type)`. Also a table macro
+//!   `ft_profile(tbl)`: one row per column of `tbl`.
+//! - `ft_validate(tbl, schema)` — table macro: one row per column, with reject counts
+//! - `ft_validate_text(value, schema)` — Per-cell validation →
+//!   `STRUCT(valid, constraint, message)`
+//! - `ft_detail(value)` / `ft_detail(list(values))` / `ft_detail(list(values), header)`
+//!   — Classify with detail → a JSON string with type, confidence, DuckDB type
+//! - `ft_cast(value)` — Normalize a value for safe TRY_CAST (dates → ISO, booleans → true/false)
+//! - `ft_unpack(json)` — Recursively classify JSON fields, returns annotated JSON
+//! - `ft_version()` — Returns the extension version
+//! - `finetype(value)` / `finetype(list(values))` / `finetype(list(values), header)`
+//!   — Alias: classification → VARCHAR label
+//! - `finetype_detail(value)` — Alias of `ft_detail`
+//! - `finetype_cast(value)` — Alias of `ft_cast`
+//! - `finetype_unpack(json)` — Alias of `ft_unpack`
+//! - `finetype_validate(value, schema_json)` — Returns VARCHAR: `'valid'` or an
+//!   error message. NOT the STRUCT that `ft_validate_text` returns.
+//! - `finetype_version()` — Alias of `ft_version`
+//! - `finetype_spike(n)` — a spike artefact, not production surface; see the
+//!   comment on its registration in the entrypoint.
 
 use duckdb::core::{DataChunkHandle, Inserter, LogicalTypeHandle, LogicalTypeId};
 use duckdb::vscalar::{ScalarFunctionSignature, VScalar};
@@ -260,12 +242,8 @@ impl VScalar for FineTypeVersion {
 ///
 /// Classifies data as a semantic type (e.g. "datetime.date.iso", "identity.person.email").
 ///
-/// In scalar mode (`finetype(col)`), the DuckDB processing chunk (~2048 rows) is
-/// the pooling boundary for column-level disambiguation, and a STRIDED sample of
-/// at most 100 values across it is classified (`ColumnConfig::sample_size`). The
-/// chunk size is not the sample size — saying so put a 20x-wrong figure into the
-/// user-facing README, and naming `PROFILE_SAMPLE_CAP` here put a wrong
-/// attribution in after it: that constant governs the `list()` path only.
+/// In scalar mode (`finetype(col)`), the function automatically uses the DuckDB
+/// processing chunk (~2048 rows) as a sample for column-level disambiguation.
 /// This means majority vote + disambiguation rules (date formats, coordinates,
 /// boolean subtypes, categorical detection, numeric range, etc.) are applied
 /// even without an explicit `list()` wrapper.
@@ -362,12 +340,8 @@ impl VScalar for FineType {
 /// - `disambiguation`: name of disambiguation rule applied (if any)
 /// - `votes`: top vote distribution (label → fraction)
 ///
-/// In scalar mode, the DuckDB processing chunk (~2048 rows) is the pooling
-/// boundary and a strided sample of at most 100 values across it is classified
-/// (`ColumnConfig::sample_size`); `samples` in the JSON reports the count
-/// actually used. The `list()` overload lets the caller choose WHICH values are
-/// offered, but samples them the same strided way once offered — only
-/// `ft_profile`'s list form truncates to the first 100 (`PROFILE_SAMPLE_CAP`).
+/// In scalar mode, the DuckDB processing chunk (~2048 rows) is used as the
+/// column sample. The `list()` overload gives explicit control over the sample.
 struct FineTypeDetail;
 
 impl VScalar for FineTypeDetail {
@@ -994,12 +968,8 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
 
     // ── ft_ converged surface (spec 2026-06-03-duckdb-extension-table-verbs) ──
     // The un-prefixed scalars above stay registered as aliases for one release
-    // so existing community installs keep working; new docs teach the ft_ names.
-    // ("one release" was written at 0.6.23 and this tree is well past it — the
-    // sunset is tracked, not forgotten.) The channel serves per DuckDB version:
-    // 0.6.36 on 1.5.5 and 1.5.4, 0.6.23 on 1.5.3, nothing on 1.5.2 (404),
-    // measured 2026-07-30 on osx_arm64.
-    // ft_infer (single-value probe) and ft_profile (column, the accurate
+    // so the v0.6.22 community install keeps working; new docs teach the ft_
+    // names. ft_infer (single-value probe) and ft_profile (column, the accurate
     // path) are genuinely new; ft_validate_text returns a STRUCT; ft_detail /
     // ft_cast / ft_unpack / ft_version alias the existing scalar impls.
     con.register_scalar_function::<FineTypeVersion>("ft_version")

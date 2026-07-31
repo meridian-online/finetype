@@ -11,7 +11,7 @@
 //!   Classify:  MLP (BatchNorm → 3×Linear/ReLU → Linear) → 4 classes
 //!   Decision:  if max(non-person probs) > threshold → demote to entity_name
 //!
-//! Model artifacts are prepared by `scripts/train_entity_classifier.py` and stored
+//! Model artifacts are prepared by `crates/finetype-train/src/bin/train_entity.rs` and stored
 //! in `models/entity-classifier/`. At build time they can be embedded into the binary.
 
 use crate::inference::InferenceError;
@@ -411,7 +411,7 @@ impl EntityClassifier {
 
     /// Compute 44 statistical features for a column of string values.
     ///
-    /// Must match `compute_column_features()` in `scripts/train_entity_classifier.py`.
+    /// Must match `compute_column_features()` in `crates/finetype-train/src/bin/train_entity.rs`.
     /// Feature order matches `config.json:stat_feature_names`.
     fn compute_stat_features(&self, values: &[String]) -> Vec<f32> {
         let n = values.len() as f32;

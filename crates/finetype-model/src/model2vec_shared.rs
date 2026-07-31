@@ -7,7 +7,7 @@
 //! - `SenseClassifier` (column → broad category routing)
 //!
 //! This avoids loading the ~7.4MB embedding matrix multiple times.
-//! Artifacts are prepared by `scripts/prepare_model2vec.py` and stored
+//! Artifacts are prepared by `crates/finetype-train/src/bin/prepare_model2vec.rs` and stored
 //! in `models/model2vec/`.
 
 use crate::inference::InferenceError;

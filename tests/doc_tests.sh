@@ -1,13 +1,44 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════════
-# FineType Doc-Driven CLI Tests
+# FineType Doc-Driven CLI Tests — INFORMATIONAL ONLY. NOT A GATE.
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-# Parses fenced code blocks from docs/*.md, extracts `$ finetype` examples,
-# runs them against the actual CLI, and reports parity progress.
+# ┌────────────────────────────────────────────────────────────────────────────┐
+# │ NO CASE IN THIS SCRIPT CAN FAIL ANYTHING. The exit at the bottom is a      │
+# │ hardcoded 0, taken whether every case passed or every case failed. A       │
+# │ zero from here is NOT evidence that the documentation is correct and must  │
+# │ never be cited as such. (It does exit 1 before any case runs if the        │
+# │ release binary is missing — a setup error, never a verdict on the docs.)   │
+# └────────────────────────────────────────────────────────────────────────────┘
 #
-# These tests are INFORMATIONAL ONLY — they always exit 0.
-# They track convergence between documentation and CLI behaviour.
+# It is referenced by no workflow under .github/, so it does not run in CI at
+# all; it runs only from `make test-docs` / `make test-golden`. The hardcoded
+# `exit 0` at the bottom is deliberate rather than an oversight: there are
+# pre-existing failures here, and they are a separate problem from whatever
+# change is being reviewed.
+#
+# WHAT IT ACTUALLY LOOKS AT — much narrower than "doc tests" suggests:
+#   - `docs/*.md` ONLY. It has never read README.md, the crate READMEs, or any
+#     Rust doc comment — files that have carried documentation defects.
+#   - Within those, ```bash fences only, and within those, only lines starting
+#     `$ finetype`. SQL fences and plain prose are invisible to it.
+#   - Of the commands it does find, it skips any with a pipe or a redirect, and
+#     any naming a fixture file, `--mode column`, `profile` or `generate`.
+#   - It compares command OUTPUT. It cannot see a claim made in prose: a wrong
+#     return type, a wrong attribution, or a headline count that disagrees with
+#     the table underneath it.
+#
+# WHAT DOES GATE DOCUMENTATION (fails the build) — `make check-docs`:
+#   - scripts/check_doc_taxonomy_counts.py — derives every documented taxonomy
+#     and locale count from labels/definitions_*.yaml and fails on a mismatch,
+#     headline and per-domain table alike. CI job: `evidence`.
+#   - scripts/check_duckdb_catalog.py — loads the local extension build and
+#     compares duckdb_functions() with the documented surface: names, kinds and
+#     return types. CI job: `doc-surface`.
+#   - scripts/check_sql_examples.py — runs every ```sql fence in README.md and
+#     docs/*.md against that build and checks the shape its own comment claims.
+#     CI job: `doc-surface`.
+#   Each has a mutation self-test running beside it in the same job.
 #
 # Usage:
 #   ./tests/doc_tests.sh                  # build + test all
@@ -23,6 +54,25 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/helpers.sh"
+
+# ── Say it out loud, not just in a comment nobody opens ─────────────────────
+
+banner_informational() {
+    printf '\n'
+    printf '  ┌──────────────────────────────────────────────────────────────┐\n'
+    printf '  │ INFORMATIONAL ONLY. No case below can fail anything — the    │\n'
+    printf '  │ exit code is a hardcoded 0 whatever the results say, so a    │\n'
+    printf '  │ zero from here is NOT evidence that the docs are correct.    │\n'
+    printf '  │ It reads docs/*.md only, and within them only `$ finetype`   │\n'
+    printf '  │ lines inside ```bash fences. Prose is never checked.         │\n'
+    printf '  │ The documentation gates that DO fail the build are           │\n'
+    printf '  │ `make check-docs`: check_doc_taxonomy_counts.py (counts),    │\n'
+    printf '  │ check_duckdb_catalog.py (the extension surface) and          │\n'
+    printf '  │ check_sql_examples.py (every ```sql fence, run for real).    │\n'
+    printf '  └──────────────────────────────────────────────────────────────┘\n'
+}
+
+banner_informational
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 
@@ -314,6 +364,10 @@ fi
 
 print_summary "Doc Test Results"
 printf "  Parity: %d%%\n" "$PARITY"
+banner_informational
 
-# Always exit 0 — these tests track convergence, not block CI
+# Always exit 0 — see the banner above and the header of this file. This is a
+# convergence tracker, not a gate; the exit code below carries no verdict, so
+# nothing may cite a zero from here as evidence that the docs are correct.
+# Flipping it would redden CI for pre-existing failures rather than for a change.
 exit 0

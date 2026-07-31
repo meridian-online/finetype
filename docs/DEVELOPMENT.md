@@ -179,7 +179,7 @@ The two table verbs are symmetric — both take a table name: `ft_profile('t')` 
 The model is column-oriented (5-branch: char + embed + stats + header + validation, pooled across a column's values). A single value carries no column context, so `ft_infer(v)` is "profile with sample size 1" — strictly weaker. Reach for `ft_infer` only to probe one literal; use `ft_profile` over a column for a real answer.
 
 ```sql
-LOAD 'finetype.duckdb_extension';
+LOAD './target/release/finetype.duckdb_extension';
 
 -- Single-value probe (no column context — weak):
 SELECT ft_infer('jane.doe@company.co.uk');   -- identity.person.email
@@ -322,3 +322,31 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 ./scripts/eval.sh --model models/char-cnn-v13               # Evaluate a trained model
 ./scripts/package.sh models/char-cnn-v13                     # Package for distribution
 ```
+
+## Documentation gates
+
+Three checks fail the build when the documentation stops agreeing with the code.
+Run them all with `make check-docs`. Each derives its answer from the artefact
+rather than from a second copy of the prose, and each ships a `--self-test` that
+mutates a scratch tree and requires the gate to redden — a gate that is only
+known to pass is not known to detect.
+
+| Gate | Derives from | Catches | CI job |
+|---|---|---|---|
+| `scripts/check_doc_taxonomy_counts.py` | `labels/definitions_*.yaml`, via the `include_str!` list the build embeds | Every documented type, domain and locale count, headline and table row alike | `evidence` |
+| `scripts/check_duckdb_catalog.py` | `duckdb_functions()` of a **loaded local build** | Function names, kinds and return types — the STRUCT-documented-as-VARCHAR family, and any documented call to a function nobody registered | `doc-surface` |
+| `scripts/check_sql_examples.py` | running every ```sql fence against that build | An example that does not run, a result box naming a column the query does not return, a JSON key that is never emitted, a `LOAD` of an artifact no build produces | `doc-surface` |
+
+`tests/doc_tests.sh` is **not** one of them — it exits 0 unconditionally and its
+own banner says so.
+
+The two catalog gates need `make build-extension` (the cdylib plus its metadata
+stamp — not the whole workspace) and the `duckdb` CLI. `check_sql_examples.py`
+additionally needs a model: it uses `FINETYPE_MODEL_DIR` if set, otherwise
+`models/default`.
+
+**What the SQL gate deliberately does not assert:** no confidence digit, no
+predicted label, no score, no row count. Those move with a retrain and pinning
+one would make the gate flake and then be ignored. Its self-test proves the point
+by moving a confidence digit and a predicted label and requiring the gate to stay
+green.

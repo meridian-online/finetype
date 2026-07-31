@@ -7,7 +7,7 @@ timestamp?).
 
 This crate carries the pieces that don't need model weights:
 
-- **The type taxonomy** — 240+ semantic type definitions across seven domains
+- **The type taxonomy** — 251 semantic type definitions across seven domains
   (datetime, finance, geography, identity, representation, technology,
   container), each with a JSON-Schema validation fragment, DuckDB transform
   expressions, and format metadata. Load from YAML with [`Taxonomy`].
