@@ -1,0 +1,56 @@
+Innocent strings the public-hygiene gate must stay silent on.
+=============================================================
+
+This file is tracked, so scripts/check-public-hygiene.sh scans it like any other
+file in the tree. That is the whole point: every line below looks enough like a
+private planning path or an absolute home path to be a plausible false positive,
+and if a pattern is ever loosened until it bites one of them, the gate goes red
+on its own fixture instead of on somebody's honest prose six months later.
+
+Add a line here whenever a pattern is tightened, so the tightening stays fixed.
+Never add a line that is a genuine violation — this file is not an allowlist.
+The allowlist is scripts/public-hygiene-allowlist.txt and it is exempt from the
+scan; this file deliberately is not.
+
+URL path segments that look like a home directory
+--------------------------------------------------
+This shape cost the first cut of the rule: eval/datasets/csv carries thousands of
+generated rows containing URL paths of exactly this form, and a case-insensitive
+pattern with a digit-friendly user component matched every one of them.
+
+    https://api.example.com/users/862/sessions
+    https://api.example.com/users/9012
+    GET /users/2054/preferences HTTP/1.1
+    "endpoint": "/users/2590/audit"
+    /home/2001/records.json
+    referer=https://example.test/Users/4471
+
+Shared and system directories that are not somebody's home
+-----------------------------------------------------------
+    /Users/Shared/finetype-cache
+    /Users/shared/models
+
+The retired tool's name, without the directory prefix
+-------------------------------------------------------
+"orbit" is an ordinary English word and was also the name of the PM tool this
+repo's history mentions. Only the dotted directory prefix is a leak.
+
+    the orbit/beads PM tooling was retired
+    orbit/ was never a directory in this repository
+    a satellite in low orbit/high inclination
+    ORBIT_HOME is not set
+
+Relative and expanded paths, which are the fix, not the defect
+----------------------------------------------------------------
+    DEST_ROOT="$HOME/datasets/geonames"
+    GN = Path.home() / "datasets" / "wikidata"
+    lives under ~/datasets/<name>/
+    cd "$(git rev-parse --show-toplevel)"
+    | `StandardOutPath` | `$HOME/Library/Logs/finetype-cron/stdout.log` |
+
+Prose that names a spec or a choice without pointing into the planning tree
+-----------------------------------------------------------------------------
+    Spec: 2026-04-24-amount-variant-generators (v1.3)
+    Implements the contract in spec 2026-05-04-autonomous-type-inference.
+    verbatim from choice 0065, amount-subtype-collapse-mechanism
+    the 2026-05-10-pass2-prep-prompt contract

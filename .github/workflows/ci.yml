@@ -14,6 +14,29 @@ env:
   FINETYPE_CI_MODEL: m2v8m-s43
 
 jobs:
+  public-hygiene:
+    # Deliberately first, deliberately toolchain-free: it is `git grep` over
+    # tracked files and finishes in seconds, so a path into the private planning
+    # repo, or an absolute home directory, goes red long before the crate build
+    # has resolved a dependency.
+    #
+    # This was the only one of the three public repositories with no such gate,
+    # and the most to sweep — 175 planning-tree paths across 99 tracked files.
+    name: Private paths in tracked files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      # The gate's own regression test runs FIRST. A hygiene gate fails silently
+      # in both directions — it can stop matching, or start matching honest
+      # prose — so "the gate still works" has to be established before "the tree
+      # is clean" means anything. Both directions were live defects when this
+      # self-test was first run against the gate it tests.
+      - name: hygiene gate self-test
+        run: ./scripts/check-public-hygiene-selftest.sh
+      - name: private planning paths and absolute home paths
+        run: ./scripts/check-public-hygiene.sh
+
   download-model-test:
     name: download-model.sh tests
     runs-on: ubuntu-latest

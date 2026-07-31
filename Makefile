@@ -36,9 +36,9 @@ setup:
 	@echo "✓ Rust updated, git hooks installed (pre-commit: fmt; pre-push: fmt+clippy)"
 
 # ─── CI (run locally before pushing) ─────────
-.PHONY: ci lint fmt clippy workspace-test types
+.PHONY: ci lint fmt clippy workspace-test types hygiene
 
-ci: fmt clippy test check types
+ci: fmt clippy test check types hygiene
 	@echo "═══ All CI checks passed ═══"
 
 lint: fmt clippy
@@ -63,6 +63,14 @@ workspace-test:
 # workflow — an unpinned pyright adopts new checks between minor releases.
 types:
 	npx --yes pyright@1.1.411
+
+# Paths into the private planning repo, and absolute home paths, in tracked
+# files. Seconds, no toolchain. The gate's own regression test runs first: a
+# hygiene gate fails silently in BOTH directions, so "it still works" has to be
+# established before "the tree is clean" means anything.
+hygiene:
+	./scripts/check-public-hygiene-selftest.sh
+	./scripts/check-public-hygiene.sh
 
 # ─── CLI Tests ─────────────────────────────────
 .PHONY: test-smoke test-docs test-golden test-cli check-doc-counts
