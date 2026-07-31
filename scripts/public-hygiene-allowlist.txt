@@ -88,6 +88,34 @@ docs/compact-date-residual.tsv | /Users/hugh | A residual table whose first colu
 #
 scripts/amvg/*.py | .orbit/ | A filesystem path constant these diagnostics open; rewriting the string changes what they read, which is not the same act as rewriting a sentence about them.
 scripts/archive/generate_triage.py | .orbit/ | The default value of a `--triage` path argument, passed to Path() and opened.
+#
+# NOTE ON ORDERING: is_allowed() returns on its FIRST match, so a broad glob
+# placed above a narrower entry starves it and the narrow one is then reported as
+# a stale entry. The `scripts/archive/*.py` line below therefore sits AFTER the
+# generate_triage.py line above, not before it.
+#
+# THESE .orbit/ PATHS ARE DEAD, AND ARE STILL NOT PROSE. `.orbit/` was removed
+# from this repository in 470f78c4 ("chore(orbit): remove retired orbit PM
+# tooling", 2026-07-02, 976 files), so every path below resolves to nothing today
+# and rewriting one moves no number: build_diagnostic_report.py's cascade_version
+# is b931b5936a1e05d1 with these paths present or absent, because both are read
+# behind `if p.exists()`.
+#
+# They are allowlisted anyway, for two reasons. First, the rule is about the KIND
+# of string, not its current resolvability — each of these is an argument to
+# Path() or to `[[ -f ... ]]`, so a sweep of them is a sweep of data. Second, and
+# this is the sharper one: each is read behind an existence check, so a rewrite
+# is SILENT. The script does not fail, it takes the other branch — the diagnostic
+# drops a hash from a composite id, the retraining bundle omits a file — and the
+# result still looks well-formed. That is the exact failure mode this whole file
+# exists to prevent, and a dead pointer is the worst place to practise it,
+# because nothing reddens to tell you the sweep was wrong.
+#
+scripts/build_diagnostic_report.py | .orbit/ | The two MADR choice files whose SHAs compose cascade_version, which feeds corpus_pass_id. Read behind `if p.exists()`, so a rewrite silently drops them from the composite instead of erroring.
+scripts/archive/*.py | .orbit/ | Path() arguments in archived scripts: two argparse `--tsv`/`--labelled-eval` defaults and one json.load target. Values passed to the filesystem, not sentences about it.
+scripts/overnight_v11_retraining.sh | .orbit/ | A `PROGRESS=` path consumed by `[[ -f "$PROGRESS" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
+scripts/overnight_v12_retraining.sh | .orbit/ | A `PROGRESS=` path consumed by `[[ -f "$PROGRESS" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
+scripts/overnight_v13_retraining.sh | .orbit/ | A `SPEC=` path consumed by `[[ -f "$SPEC" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
 scripts/archive/*.py | /Users/hugh | A dataset-root constant these archived scripts open.
 scripts/probe_column_stats.py | /Users/hugh | A dataset-root constant this probe opens.
 scripts/probe_sibling_context.py | /Users/hugh | A dataset-root constant this probe opens; the comment beside it records that the gittables corpus lives there.

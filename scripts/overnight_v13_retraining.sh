@@ -799,7 +799,7 @@ for f in "$MODEL_DIR/model.safetensors" "$MODEL_DIR/config.json" "$MODEL_DIR/lab
 done
 
 # Spec for reference
-SPEC="spec 2026-04-16-v13-retrain"
+SPEC=".orbit/specs/2026-04-16-v13-retrain/spec.yaml"
 [[ -f "$SPEC" ]] && BUNDLE_FILES+=("$SPEC")
 
 if [[ ${#BUNDLE_FILES[@]} -gt 0 ]]; then

@@ -103,8 +103,8 @@ def compute_frontmatter_shas(
     # composite of the two MADR file SHAs so the field tracks any
     # cascade-rule change without manual bumping.
     madr_paths = [
-        REPO / "choice 0075 (mechanism-cascade)",
-        REPO / "choice 0081 (cascade-extended)",
+        REPO / ".orbit/choices/0075-mechanism-cascade.yaml",
+        REPO / ".orbit/choices/0081-cascade-extended.yaml",
     ]
     cascade_h = hashlib.sha256()
     cascade_h.update(b"MADR-0075-0081|")

@@ -51,7 +51,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     p.add_argument(
         "--labelled-eval", type=Path,
-        default=REPO / "spec 2026-05-04-autonomous-type-inference (labelled_eval.tsv)",
+        default=REPO / ".orbit/specs/2026-05-04-autonomous-type-inference/labelled_eval.tsv",
     )
     p.add_argument(
         "--corroborated", type=Path,

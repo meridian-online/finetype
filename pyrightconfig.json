@@ -11,9 +11,15 @@
 // request to produce mostly unresolved-import noise (81 of the 126 errors a
 // tree-wide run reports are reportMissingImports). The files below are the ones
 // that DECIDE something — the fixture/bar resolver, the headline scorer, and the
-// gates CI already runs on every PR — and every one of them is stdlib-only, so
+// gates CI already runs on every PR.
+//
+// The set is stdlib-only at module scope, which is the property that matters:
 // this configuration needs no dependency install and cannot drift from a local
-// run.
+// run. It is NOT third-party-free. score_gold_anchor.py has one function-local
+// `import pyarrow.parquet` inside cmd_predict, carrying an explicit
+// `# type: ignore[reportMissingImports]`. That is the shape any exception has to
+// take — deferred past import time and silenced at the line — and it is the only
+// one today.
 //
 // Adding a script here is cheap and is the right move whenever a new script
 // starts resolving a bar, a score or a gate verdict. Adding one that imports a

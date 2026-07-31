@@ -325,7 +325,23 @@ jobs:
     #
     # All eight crates COMPILE: `cargo check --workspace --all-targets` and
     # `cargo clippy --workspace --all-targets -- -D warnings` are both clean.
-    # 390 tests pass across the five crates that were invisible.
+    #
+    # WHAT IT DOES *NOT* ATTEST TO YET, and this is the point. `cargo test`
+    # fail-fasts: the first failing test binary ends the run. On this branch it
+    # halts at finetype-eval's validate_corpus (below), and the tally that
+    # reaches that point is 390 passed — but 361 of those are finetype-core
+    # (340) and finetype-cli (21), both `default-members` the pre-existing
+    # `test` job above already ran. Only 29 come from crates that were
+    # invisible: finetype-build-tools (9) and finetype-eval (20).
+    #
+    # And because the run stops there, finetype-duckdb, finetype-mcp,
+    # finetype-model and finetype-train execute NO tests at all — 724 between
+    # them, measured with `--no-fail-fast`. finetype-model is itself a
+    # `default-member`, so today this job runs strictly FEWER tests than bare
+    # `cargo test` does; it compiles everything and runs about a third of it.
+    # Compilation coverage is the whole of what this job buys until the failure
+    # below is resolved. Adding `--no-fail-fast` would widen it, and is left to
+    # the commit that promotes this job rather than smuggled in here.
     #
     # ONE test fails, and it is pre-existing rather than anything this job does
     # wrong:
@@ -334,14 +350,21 @@ jobs:
     #   fixture_tests::vci3_fixture_attribution_regression_match
     #   (crates/finetype-eval/src/bin/validate_corpus.rs:1779)
     #
-    # 22 fixture-attribution mismatches against the harness: 9 columns the
-    # harness reports that the fixture does not carry at all (gdelt_events
-    # Actor1/Actor2 code and name columns, un_locode Coordinates, oecd_employment
-    # STRUCTURE_NAME and TRANSFORMATION, rio2016_athletes sport, fifa_players
-    # Body Type), and 13 where the fixture's expected attribution disagrees with
-    # what the Iter-3 cascade now produces — mostly Rule 2 (subtype drift inside
-    # one family) and Rule 6 (cross-domain prediction error) reclassifying rows
-    # the fixture recorded as format_diversity or misclassification.
+    # It reports 42 rows compared OK and 21 mismatches, in two kinds:
+    #
+    #   12  the harness attributes a column the fixture does not carry at all
+    #       ("missing from fixture") — gdelt_events Actor1CountryCode,
+    #       Actor1Name, Actor1Type1Code, Actor1Type2Code, Actor2Name,
+    #       Actor2Type1Code and Actor2Type2Code; un_locode Coordinates;
+    #       oecd_employment STRUCTURE_NAME and TRANSFORMATION;
+    #       rio2016_athletes sport; fifa_players Body Type.
+    #
+    #    9  the fixture's expected attribution disagrees with what the Iter-3
+    #       cascade now produces ("fixture expected=… but harness actual=…").
+    #       By the rationale each carries: Rule 2 (subtype drift within one
+    #       family) x3, Rule 6 (cross-domain prediction error) x3, Rule 3
+    #       (exactly one side in CODE_TYPED_LABELS) x2, and one FIFA GT
+    #       sidecar case on fifa_players Value.
     #
     # THE CAUSE is that the test's own escape hatch never fires. It skips the
     # harness comparison when eval/eval_output/validate_corpus.md is missing —
@@ -375,19 +398,20 @@ jobs:
 
   python-types:
     # Every accuracy number this repository quotes is produced or adjudicated by
-    # Python, and until now CI type-checked none of it. scripts/evidence.py alone
-    # carried nine type errors on merged code — four possibly-unbound reads and
-    # five None-safety faults — in the file that resolves the BAR for every gated
-    # score comparison here. A None-safety fault there does not crash; it compares
-    # a fresh score against a blank bar and prints a plausible number.
+    # Python, and until now CI type-checked none of it. The class of fault that
+    # matters here does not crash: a None-safety slip in the file that resolves
+    # the BAR for a gated score comparison compares a fresh score against a blank
+    # bar and prints a plausible number.
     #
     # SCOPE: the gating and evaluation scripts, listed explicitly in
     # pyrightconfig.json rather than globbed. The wider scripts/ tree is research
     # code that imports numpy, pandas, duckdb, torch and pyarrow; type-checking it
     # would require installing the whole ML stack on every PR to report mostly
-    # unresolved-import noise. The covered set is stdlib-only by construction, so
-    # this job needs no dependency install and the local run sees exactly what CI
-    # sees.
+    # unresolved-import noise. The covered set is stdlib-only AT MODULE SCOPE — not
+    # third-party-free: score_gold_anchor.py defers one `import pyarrow.parquet`
+    # into cmd_predict behind a `# type: ignore[reportMissingImports]`. The
+    # consequence is what this job relies on and it holds either way: no dependency
+    # install, and the local run sees exactly what CI sees.
     name: Python type check
     runs-on: ubuntu-latest
     steps:

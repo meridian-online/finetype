@@ -640,7 +640,7 @@ for f in "$MODEL_DIR/model.safetensors" "$MODEL_DIR/config.json" "$MODEL_DIR/lab
 done
 
 # Progress file for session continuity
-PROGRESS="spec 2026-04-12-accuracy-gap-retraining (progress.md)"
+PROGRESS=".orbit/specs/2026-04-12-accuracy-gap-retraining/progress.md"
 [[ -f "$PROGRESS" ]] && BUNDLE_FILES+=("$PROGRESS")
 
 if [[ ${#BUNDLE_FILES[@]} -gt 0 ]]; then
