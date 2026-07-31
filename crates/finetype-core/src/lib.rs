@@ -3,7 +3,7 @@
 //! Core library for precision format detection taxonomy and data generation.
 //!
 //! - `taxonomy` — domain.category.type label format with transformation contracts
-//! - `generator` — synthetic data generation for all 151 types
+//! - `generator` — synthetic data generation for all 251 types
 //! - `checker` — taxonomy ↔ generator alignment validation
 //! - `tokenizer` — text tokenization for model training
 

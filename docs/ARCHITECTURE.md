@@ -125,7 +125,7 @@ finetype-train (depends on core + model — training pipelines)
 ```
 finetype/
 ├── crates/                         # Rust workspace members (see Crates above)
-├── labels/                         # Taxonomy definitions (247 types, 7 domains, YAML)
+├── labels/                         # Taxonomy definitions (251 types, 7 domains, YAML)
 ├── models/                         # Pre-trained models (Sense, CharCNN, Model2Vec, Entity)
 ├── eval/                           # Evaluation infrastructure (gold corpus, GitTables, SOTAB)
 ├── docs/                           # Architecture and development guides
@@ -134,7 +134,7 @@ finetype/
 
 ## Taxonomy Definitions
 
-Each of the 247 types is defined in YAML under `labels/`:
+Each of the 251 types is defined in YAML under `labels/`:
 
 ```yaml
 datetime.timestamp.iso_8601:
@@ -204,7 +204,7 @@ Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
 
 ### Current taxonomy
 
-247 definitions across 7 domains (container: 12, datetime: 87, finance: 28, geography: 25, identity: 34, representation: 32, technology: 29). Labels: `domain.category.type`. Definitions in `labels/definitions_*.yaml`. (The shipped model predicts 244 labels; leaves added after the last retrain — e.g. `identity.industry.naics`, `container.object.s_expression` — are taxonomy-live and recovered at `profile` time by deterministic Sharpen guards.)
+251 definitions across 7 domains (container: 12, datetime: 89, finance: 29, geography: 25, identity: 34, representation: 32, technology: 30). Labels: `domain.category.type`. Definitions in `labels/definitions_*.yaml`. (The shipped model predicts 244 labels; leaves added after the last retrain — e.g. `identity.industry.naics`, `container.object.s_expression` — are taxonomy-live and recovered at `profile` time by deterministic Sharpen guards.)
 
 ## DuckDB Extension
 

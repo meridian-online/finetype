@@ -133,22 +133,28 @@ architecture**. It should be revisited if:
 
 ## Current Locale Coverage
 
-`validation_by_locale` patterns exist for 5 types:
+`validation_by_locale` patterns exist for 6 types:
+
+The locale count is the number of keys under that type's `validation_by_locale`
+block; the parenthesised locales are the first few of them, not the whole list.
+`scripts/check_doc_taxonomy_counts.py` gates the counts in this table against
+`labels/definitions_*.yaml`.
 
 | Type | Locales | Source |
 |---|---|---|
-| phone_number | 15 (EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR, ZA) | libphonenumber (Apache 2.0) |
-| postal_code | 14 (US, GB, CA, DE, FR, AU, JP, BR, IN, IT, NL, ES, CH, SE) | Google libaddressinput (Apache 2.0) |
-| calling_code | 17 (EN, EN_US, EN_CA, EN_GB, EN_AU, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR, ZA) | ITU-T E.164 (public domain) |
-| month_name | 6 (EN, FR, DE, ES, IT, PT) | Unicode CLDR (Unicode License) |
-| day_of_week | 6 (EN, FR, DE, ES, IT, PT) | Unicode CLDR (Unicode License) |
+| phone_number | 46 (EN_US, EN_CA, EN_GB, EN_AU, DE, …) | libphonenumber (Apache 2.0) |
+| postal_code | 65 (EN_US, EN_GB, EN_AU, EN_CA, EN_IE, …) | Google libaddressinput (Apache 2.0) |
+| calling_code | 47 (EN, EN_US, EN_CA, EN_GB, EN_AU, …) | ITU-T E.164 (public domain) |
+| month_name | 27 (EN, FR, DE, ES, IT, …) | Unicode CLDR (Unicode License) |
+| day_of_week | 27 (EN, FR, DE, ES, IT, …) | Unicode CLDR (Unicode License) |
+| state_code | 3 (EN_US, EN_CA, EN_AU) | subdivision enums inline in `labels/definitions_geography.yaml` |
 
 The old prototype supported 36 Mimesis locales. The full locale list serves as a
 roadmap for expanding validation coverage to more types and locales.
 
 ### Expansion Roadmap
 
-22 types are designated `locale_specific` in the taxonomy. Of these, 5 now have
+28 types are designated `locale_specific` in the taxonomy. Of these, 6 now have
 `validation_by_locale` patterns. Priority candidates for future expansion:
 
 - **Addresses** (full_address, street_name) — complex, locale-specific ordering

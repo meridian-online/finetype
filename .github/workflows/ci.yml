@@ -56,6 +56,28 @@ jobs:
       - name: Scorer propagates failures and stamps every score with its fixture
         run: scripts/test_score_clean_label.sh
 
+      - name: Documented taxonomy counts match labels/definitions_*.yaml
+        # Nothing else in CI reads documentation, so a wrong number in prose is
+        # invisible to sixteen green checks. This derives the counts from the
+        # taxonomy files the build embeds and fails if a documented one differs —
+        # the headline AND the per-domain table, row by row, so the two cannot
+        # drift apart from each other or from the data. Bolted onto this job
+        # rather than given its own: it costs a stdlib-python second, and this is
+        # already the job that asks whether a document still agrees with the data
+        # it was generated from.
+        run: scripts/check_doc_taxonomy_counts.py
+
+      - name: ...and the count gate detects a wrong number
+        # A gate that is only known to pass is not known to detect. Sixteen
+        # mutations against a scratch copy — a drifting headline, a drifting table
+        # row, two rows SWAPPED so the sum still matches the headline, a definition
+        # added or deleted behind the docs' back, a claim reworded out of the
+        # registry, a brand-new unregistered claim, a second table nothing reads,
+        # a domain file that ships without being counted — each must redden a
+        # NAMED case, and the unmutated tree must pass or every "caught" above is
+        # noise.
+        run: scripts/check_doc_taxonomy_counts.py --self-test
+
   encoder-dtype:
     name: Encoder half-precision packing
     runs-on: ubuntu-latest

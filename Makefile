@@ -50,16 +50,25 @@ clippy:
 	cargo clippy -- -D warnings
 
 # ─── CLI Tests ─────────────────────────────────
-.PHONY: test-smoke test-docs test-golden test-cli
+.PHONY: test-smoke test-docs test-golden test-cli check-doc-counts
 
 test-smoke:
 	./tests/smoke.sh --skip-build
 
+# INFORMATIONAL ONLY — doc_tests.sh always exits 0, so a successful
+# `make test-docs` says nothing about whether the documentation is correct.
+# The documentation check that DOES fail is `make check-doc-counts`.
 test-docs:
 	./tests/doc_tests.sh --skip-build
 
 test-golden:
 	./tests/doc_tests.sh --skip-build --golden-only
+
+# Fails if a taxonomy count in the docs disagrees with labels/definitions_*.yaml.
+# Same two commands CI runs on the `evidence` job.
+check-doc-counts:
+	./scripts/check_doc_taxonomy_counts.py
+	./scripts/check_doc_taxonomy_counts.py --self-test
 
 test-cli: test-smoke test-docs
 
