@@ -100,7 +100,7 @@ Pure Rust, no Python runtime, no external C++ dependencies. Integrates cleanly w
 | `finetype-model` | Flat CharCNN + Sense→Sharpen inference, feature extraction, column-mode disambiguation, Model2Vec | `candle-core`, `candle-nn` |
 | `finetype-cli` | Binary: CLI commands (infer, profile, load, check, generate, taxonomy, schema, train, mcp) | `clap`, `csv` |
 | `finetype-mcp` | MCP server library (rmcp, 6 tools, taxonomy resources) | `rmcp`, `tokio` |
-| `finetype-duckdb` | DuckDB extension: 5 scalar functions with embedded model | `duckdb`, `libduckdb-sys` |
+| `finetype-duckdb` | DuckDB extension: 13 scalar functions + 2 table macros with embedded model | `duckdb`, `libduckdb-sys` |
 | `finetype-eval` | Evaluation binaries (profile, actionability, GitTables, SOTAB) | `csv`, `duckdb`, `arrow` |
 | `finetype-train` | Pure Rust ML training (Sense, Entity, CharCNN, sibling-context attention, data pipeline) | `candle-core`, `candle-nn`, `duckdb` |
 | `finetype-build-tools` | Build utilities (DuckDB extension metadata) | — |
@@ -208,14 +208,31 @@ Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
 
 ## DuckDB Extension
 
-| Function | Purpose |
-|---|---|
-| `finetype(col)` / `finetype(list, header?)` | Column-level classification |
-| `finetype_detail(col)` / `finetype_detail(list, header?)` | Full detail (JSON) |
-| `finetype_cast(value)` | Normalize value for TRY_CAST |
-| `finetype_unpack(json)` | Recursively classify JSON fields |
-| `finetype_validate(value, schema_json)` | Schema-driven validation (returns 'valid' or error message) |
-| `finetype_version()` | Version string |
+Every row below is checked against `duckdb_functions()` of a loaded local build
+by `scripts/check_duckdb_catalog.py` — name, kind and return type. `ft_profile`
+appears twice because it is registered twice: a scalar over a `LIST`, and a table
+macro DuckDB routes to when the call sits in `FROM`.
+
+The `ft_` names are the taught surface. The un-prefixed scalars stay registered
+as aliases for one release so a v0.6.22 community install keeps working.
+
+| Function | Kind | Returns | Purpose |
+|---|---|---|---|
+| `ft_infer(value)` | scalar | VARCHAR | Single-value probe — profile with sample size 1 |
+| `ft_profile(list, header?)` | scalar | STRUCT("type" VARCHAR, confidence DOUBLE, duckdb_type VARCHAR) | Column-level classification over an assembled `LIST` |
+| `ft_profile(tbl)` | table macro | TABLE | One row per column of `tbl` — the everyday form |
+| `ft_validate(tbl, schema)` | table macro | TABLE | One row per column: totals, rejects, a sample message |
+| `ft_validate_text(value, schema)` | scalar | STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR) | Per-cell validation naming the failed constraint |
+| `ft_detail(col)` / `ft_detail(list, header?)` | scalar | VARCHAR | Full detail as a JSON string |
+| `ft_cast(value)` | scalar | VARCHAR | Normalize value for TRY_CAST |
+| `ft_unpack(json)` | scalar | VARCHAR | Recursively classify JSON fields |
+| `ft_version()` | scalar | VARCHAR | Version string |
+| `finetype(col)` / `finetype(list, header?)` | scalar | VARCHAR | Alias — column-level classification |
+| `finetype_detail(col)` / `finetype_detail(list, header?)` | scalar | VARCHAR | Alias of `ft_detail` |
+| `finetype_cast(value)` | scalar | VARCHAR | Alias of `ft_cast` |
+| `finetype_unpack(json)` | scalar | VARCHAR | Alias of `ft_unpack` |
+| `finetype_validate(value, schema_json)` | scalar | VARCHAR | Returns `'valid'` or an error message — NOT the `ft_validate_text` STRUCT |
+| `finetype_version()` | scalar | VARCHAR | Alias of `ft_version` |
 
 Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification (~2048-row chunks). `finetype_validate` uses cached schema parsing for performance.
 

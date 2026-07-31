@@ -31,7 +31,7 @@ identity.person.email
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing. 99.9% actionability across 120 tested types.
 - **Locale-aware** — validates 65 locales for postal codes, 46 for phone numbers, 27 for month/day names
 - **MCP server** — `finetype mcp` exposes type inference to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/)
-- **DuckDB extension** — `finetype()`, `finetype_detail()`, `finetype_cast()`, `finetype_unpack()`, `finetype_validate()` scalar functions
+- **DuckDB extension** — 13 scalar functions and 2 table macros: `ft_profile()` over an assembled list or a whole table, `ft_validate()`, `ft_infer()`, `ft_detail()`, `ft_cast()`, `ft_unpack()`, `ft_validate_text()`, `ft_version()`, and the un-prefixed `finetype*` names as aliases. The full table, gated against the loaded extension's catalog, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#duckdb-extension)
 - **Schema-driven validation** — `finetype validate data.csv schema.json --db out.db --table orders` materialises typed DuckDB tables (per-column transforms applied) plus a `finetype_reject_errors` sidecar in a single pass
 - **Pure Rust** — no Python runtime or dependencies
 
@@ -107,15 +107,15 @@ duckdb out.db -c "SELECT column_name, error_type, constraint_failed, expected_ty
 
 ```sql
 -- Load a locally-built extension (DuckDB started with -unsigned)
-LOAD './target/release/finetype_duckdb.duckdb_extension';
+LOAD './target/release/finetype.duckdb_extension';
 
 -- Classify a single value
 SELECT finetype('192.168.1.1');
 -- → 'technology.internet.ip_v4'
 
--- Classify a column with detailed output (type, confidence, DuckDB broad type)
+-- Classify a column with detailed output (type, confidence, DuckDB type)
 SELECT finetype_detail(value) FROM my_table;
--- → '{"type":"datetime.date.mdy_slash","confidence":0.98,"broad_type":"DATE"}'
+-- → '{"type":"datetime.date.mdy_slash","confidence":0.98,"duckdb_type":"DATE","samples":4,"votes":{"datetime.date.mdy_slash":0.98}}'
 
 -- Normalize values for safe TRY_CAST (dates → ISO, booleans → true/false)
 SELECT finetype_cast(value) FROM my_table;

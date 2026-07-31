@@ -20,16 +20,26 @@ WHAT IS DERIVED (the source of truth)
         per-domain ....... the breakdown
         locale_specific .. definitions with `designation: locale_specific`
         validation_by_locale ... definitions carrying per-locale patterns
-        locales:<key> .... locales listed under one definition's
-                           `validation_by_locale` block
+        locale_specific_without_validation ... the difference: declared
+                           locale-specific, validated by one pattern
+        locales:<key> .... locales under one definition's
+                           `validation_by_locale` block — what VALIDATION
+                           distinguishes
+        locales_max ...... the widest of those
+        declared:<key> ... entries in one definition's `locales:` list — what
+                           GENERATION varies over (`generator/mod.rs:76` and
+                           `:120` read that field; grep says nothing else does)
 
 WHAT IS ASSERTED
     Each entry in CLAIMS names a file and a regex over its prose, and binds the
     captured number to one derived fact. A registered claim that no longer
     matches is a failure too — reworded prose must re-register, it must not fall
     silently out of the gate. The README domain table, the ARCHITECTURE inline
-    breakdown and the LOCALE_DETECTION coverage table are checked row by row AND
-    against their headline, so headline, table and data cannot drift apart.
+    breakdown (also in CLAUDE.md) and BOTH locale coverage tables are checked row
+    by row AND against their headline, so headline, table and data cannot drift
+    apart. The LOCALE_GUIDE table's sample cells are checked arithmetically too:
+    the locales shown plus its `[+N more]` must equal the derived count, which is
+    what caught a row whose headline and whose remainder were stale together.
 
 WHAT IS *NOT* ASSERTED (scope, stated plainly)
     Model-side counts — CharCNN classes, "the shipped model predicts N labels",
@@ -42,18 +52,27 @@ WHAT IS *NOT* ASSERTED (scope, stated plainly)
     are exempt (SNAPSHOT_FILES); rewriting them would falsify the record.
 
 KNOWN BLIND SPOTS (so nobody mistakes this for a general prose checker)
-    - The fail-closed scan recognises "N types", "N definitions" and "N domains".
-      It does NOT recognise "N formats", "N labels" or "N classes" — those read
-      as model-side vocabulary here, and admitting them would fill ACKNOWLEDGED
-      with entries this gate cannot check anyway. A NEW sentence phrased
-      "35 technology formats" would pass unseen unless it is registered.
+    - The fail-closed scan recognises "N types", "N definitions", "N domains" and
+      "N locales". It does NOT recognise "N formats", "N labels" or "N classes" —
+      those read as model-side vocabulary here, and admitting them would fill
+      ACKNOWLEDGED with entries this gate cannot check anyway. A NEW sentence
+      phrased "35 technology formats" would pass unseen unless it is registered.
+    - Coverage is per LINE. A second count-shaped phrase on a line that already
+      carries a registered claim is neither re-checked nor reported: appending
+      " really 999 types" to the registered headline line passes.
+    - In .rs files only the module doc (`//!`) is read. A `///` item doc or a
+      plain `//` comment carrying a wrong count passes. `profile.rs` and the
+      per-domain `generator/*.rs` headers are outside this gate for that reason.
     - It checks numbers, nothing else. Wrong return types, wrong attributions
-      and wrong prose of every other kind are outside it entirely.
+      and wrong prose of every other kind are outside it entirely. The DuckDB
+      surface — function names, kinds and return types — is gated separately by
+      scripts/check_duckdb_catalog.py against a loaded local build.
 
 FAIL-CLOSED
-    Any count-shaped phrase ("N types", "N definitions", "N domains") found in a
-    scanned, non-exempt file that is neither registered nor acknowledged is a
-    failure. A new wrong number cannot be added without CI noticing.
+    Any count-shaped phrase ("N types", "N definitions", "N domains",
+    "N locales") found in a scanned, non-exempt file that is neither registered
+    nor acknowledged is a failure. A new wrong number cannot be added without CI
+    noticing.
 
 USAGE
     scripts/check_doc_taxonomy_counts.py            # gate the working tree
@@ -84,6 +103,12 @@ BY_LOCALE_RE = re.compile(r"^ {2}validation_by_locale:\s*$")
 # Quoted keys are real: YAML 1.1 reads a bare NO as a boolean, so `"NO":` is how
 # Norway is spelled here. An unquoted-NO regex silently undercounts.
 LOCALE_KEY_RE = re.compile(r"""^ {4}(?P<q>["']?)(?P<locale>[A-Z][A-Z0-9_]*)(?P=q):\s*$""")
+
+# `locales:` — the GENERATION list, a different field from `validation_by_locale`
+# and a different number. Three spellings occur in labels/: a one-line flow
+# sequence, a flow sequence wrapped over several lines, and a block sequence.
+DECLARED_RE = re.compile(r"^ {2}locales:(?P<rest>.*)$")
+DECLARED_ITEM_RE = re.compile(r"^ {4}- \s*(?P<item>\S.*?)\s*$")
 
 TAXONOMY_RS = "crates/finetype-core/src/taxonomy.rs"
 
@@ -134,17 +159,28 @@ def derive(root: Path) -> dict:
     locale_specific = 0
     validation_by_locale = 0
     locales: dict[str, int] = {}
+    declared: dict[str, int] = {}
 
     for name in on_disk:
         path = labels_dir / name
         file_domain = name[len("definitions_") : -len(".yaml")]
         current = None
         in_locale_block = False
+        in_declared_seq = False
+        flow_buf = None
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if flow_buf is not None:
+                # inside a `locales: [` wrapped over several lines
+                flow_buf += " " + line.strip()
+                if "]" in flow_buf:
+                    declared[current] = _flow_locales(flow_buf, f"{name}:{lineno}")
+                    flow_buf = None
+                continue
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
             if line[0] not in " \t":
                 in_locale_block = False
+                in_declared_seq = False
                 if line.rstrip() in ("---", "..."):
                     continue
                 match = KEY_RE.match(line)
@@ -168,7 +204,31 @@ def derive(root: Path) -> dict:
                 per_domain[domain] = per_domain.get(domain, 0) + 1
                 current = key
             elif current is not None:
-                if LOCALE_SPECIFIC_RE.match(line):
+                if in_declared_seq:
+                    if DECLARED_ITEM_RE.match(line):
+                        declared[current] += 1
+                        continue
+                    in_declared_seq = False
+                declared_match = DECLARED_RE.match(line)
+                if declared_match:
+                    in_locale_block = False
+                    if current in declared:
+                        raise Fatal(f"{name}:{lineno}: {current} declares `locales:` twice")
+                    rest = declared_match.group("rest").strip()
+                    if not rest:
+                        declared[current] = 0
+                        in_declared_seq = True
+                    elif not rest.startswith("["):
+                        raise Fatal(
+                            f"{name}:{lineno}: `locales:` for {current} is neither a "
+                            f"flow sequence nor a block sequence — refusing to count "
+                            f"a form this scanner does not understand:\n    {line.rstrip()}"
+                        )
+                    elif "]" in rest:
+                        declared[current] = _flow_locales(rest, f"{name}:{lineno}")
+                    else:
+                        flow_buf = rest
+                elif LOCALE_SPECIFIC_RE.match(line):
                     locale_specific += 1
                     in_locale_block = False
                 elif BY_LOCALE_RE.match(line):
@@ -189,18 +249,51 @@ def derive(root: Path) -> dict:
                         )
                     locales[current] += 1
 
+        if flow_buf is not None:
+            raise Fatal(f"{name}: a `locales: [` flow sequence is never closed")
+
+    total = sum(per_domain.values())
+    # Every definition carries a `locales:` list. If one stops doing so this
+    # scanner has lost track of the file, and every declared:<key> below it is
+    # suspect — so refuse rather than report a subset.
+    if len(declared) != total:
+        missing = sorted(set(seen) - set(declared))
+        raise Fatal(
+            f"{len(declared)} of {total} definitions have a countable `locales:` "
+            f"list; the rest are unreadable to this scanner: {', '.join(missing[:5])}"
+        )
+
     facts = {
-        "total": sum(per_domain.values()),
+        "total": total,
         "domains": len(per_domain),
         "domain_files": len(on_disk),
         "per_domain": per_domain,
         "locale_specific": locale_specific,
         "validation_by_locale": validation_by_locale,
+        "locale_specific_without_validation": locale_specific - validation_by_locale,
         "locale_coverage": locales,
+        "locales_max": max(locales.values()) if locales else 0,
+        "declared_locales": declared,
     }
     facts.update({f"locales:{key}": count for key, count in locales.items()})
+    facts.update({f"declared:{key}": count for key, count in declared.items()})
     facts.update({f"per_domain:{key}": count for key, count in per_domain.items()})
     return facts
+
+
+def _flow_locales(buf: str, where: str) -> int:
+    """Count the entries in a `[A, B, C]` locale list, strictly."""
+    inner = buf[buf.index("[") + 1 : buf.rindex("]")]
+    items = [item.strip().strip("\"'") for item in inner.split(",")]
+    items = [item for item in items if item]
+    for item in items:
+        if not re.fullmatch(r"[A-Z][A-Z0-9_]*", item):
+            raise Fatal(
+                f"{where}: `locales:` entry {item!r} is not an uppercase locale "
+                f"token — refusing to count a list this scanner does not "
+                f"fully understand"
+            )
+    return len(items)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -271,6 +364,11 @@ CLAIMS: list[tuple[str, str, dict[str, str]]] = [
         {"n": "validation_by_locale"},
     ),
     (
+        "docs/LOCALE_DETECTION_ARCHITECTURE.md",
+        r"(?P<n>\d+) locale variants of phone_number",
+        {"n": "locales:identity.person.phone_number"},
+    ),
+    (
         "docs/TAXONOMY_COMPARISON.md",
         r"(?P<n>\d+) types in the `datetime` domain",
         {"n": "per_domain:datetime"},
@@ -312,6 +410,90 @@ CLAIMS: list[tuple[str, str, dict[str, str]]] = [
         r"postal codes \((?P<n>\d+) locales\)",
         {"n": "locales:geography.address.postal_code"},
     ),
+    # ── docs/LOCALE_GUIDE.md ──────────────────────────────────────────────────
+    # The reader-facing guide. Its coverage table shipped a stale `calling_code`
+    # row (17, derived 47) through a green gate because "N locales" was not a
+    # recognised count shape here at all. Every locale number in it is bound now.
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"per-locale validation patterns for (?P<v>\d+) types\.\s+The widest is\s+"
+        r"`postal_code`, at (?P<n>\d+) locales",
+        {"v": "validation_by_locale", "n": "locales:geography.address.postal_code"},
+    ),
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"(?P<n>\d+) locales, each with region-specific rules",
+        {"n": "locales:geography.address.postal_code"},
+    ),
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"validates against all (?P<n>\d+) patterns",
+        {"n": "locales:geography.address.postal_code"},
+    ),
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"(?P<n>\d+) locales with full month names",
+        {"n": "locales:datetime.component.month_name"},
+    ),
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"Phone numbers \((?P<n>\d+) locales\)",
+        {"n": "locales:identity.person.phone_number"},
+    ),
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"Postal codes \((?P<n>\d+) locales\)",
+        {"n": "locales:geography.address.postal_code"},
+    ),
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"Month names \((?P<m>\d+) locales\), day names \((?P<d>\d+) locales\)",
+        {
+            "m": "locales:datetime.component.month_name",
+            "d": "locales:datetime.component.day_of_week",
+        },
+    ),
+    # `locales:` (generation) vs `validation_by_locale:` (validation) are
+    # different fields with different numbers, and the guide had them inverted —
+    # it called the address types "Validation Only" when they are the opposite.
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"(?P<n>\d+) types are `designation: locale_specific`; the (?P<v>\d+) above\s+"
+        r"also\s+carry\s+`validation_by_locale`\s+patterns\.\s+The other (?P<r>\d+)",
+        {
+            "n": "locale_specific",
+            "v": "validation_by_locale",
+            "r": "locale_specific_without_validation",
+        },
+    ),
+    # "N each" over a group: one entry per member, same regex. Drop one member
+    # below the others and the word "each" stops being true — and one of these
+    # fires.
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"`street_name`\) — (?P<n>\d+) declared locales each",
+        {"n": "declared:geography.address.full_address"},
+    ),
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"`street_name`\) — (?P<n>\d+) declared locales each",
+        {"n": "declared:geography.address.street_name"},
+    ),
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"`last_name`\) — (?P<n>\d+) declared locales each",
+        {"n": "declared:identity.person.full_name"},
+    ),
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"`last_name`\) — (?P<n>\d+) declared locales each",
+        {"n": "declared:identity.person.first_name"},
+    ),
+    (
+        "docs/LOCALE_GUIDE.md",
+        r"`last_name`\) — (?P<n>\d+) declared locales each",
+        {"n": "declared:identity.person.last_name"},
+    ),
     (
         "crates/finetype-core/README.md",
         r"(?P<n>\d+) semantic type definitions across (?P<d>[a-z]+) domains",
@@ -332,17 +514,54 @@ TABLE_FILE = "README.md"
 TABLE_ROW_RE = re.compile(r"^\|\s*`(?P<domain>[a-z_]+)`\s*\|\s*(?P<n>\d+)\s*\|")
 TABLE_HEADER_RE = re.compile(r"^\|\s*Domain\s*\|\s*Types\s*\|", re.IGNORECASE)
 
-# The ARCHITECTURE inline breakdown: "N definitions across D domains (a: 1, b: 2, ...)"
-INLINE_FILE = "docs/ARCHITECTURE.md"
+# The inline breakdown: "N definitions across D domains (a: 1, b: 2, ...)".
+# CLAUDE.md carries the same sentence and is read as current fact by everyone
+# working here, so it is gated in the same breath rather than left as a second
+# home for a number nothing checks.
+INLINE_FILES = ["docs/ARCHITECTURE.md", "CLAUDE.md"]
 INLINE_RE = re.compile(
     r"(?P<n>\d+) definitions across (?P<d>\d+) domains \((?P<breakdown>[^)]*)\)"
 )
-INLINE_PAIR_RE = re.compile(r"([a-z_]+)\s*:\s*(\d+)")
+# `container: 12` (ARCHITECTURE) and `container 12` (CLAUDE.md) both parse.
+INLINE_PAIR_RE = re.compile(r"([a-z_]+)\s*:?\s*(\d+)")
 
-# The LOCALE_DETECTION coverage table: | <leaf type> | N (sample locales) | Source |
-LOCALE_TABLE_FILE = "docs/LOCALE_DETECTION_ARCHITECTURE.md"
-LOCALE_TABLE_HEADER_RE = re.compile(r"^\|\s*Type\s*\|\s*Locales\s*\|", re.IGNORECASE)
-LOCALE_TABLE_ROW_RE = re.compile(r"^\|\s*(?P<leaf>[a-z_]+)\s*\|\s*(?P<n>\d+)\b")
+# The per-type locale coverage tables. Both are checked row by row against
+# `validation_by_locale`, and every derived leaf must have a row — a type that
+# quietly loses its row is the same defect as one whose number goes stale.
+#
+#   samples_group  the row's example cell, if it enumerates locales. Its shown
+#                  count plus its `[+N more]` must equal the derived total: the
+#                  stale `calling_code` row was internally consistent (10 shown
+#                  + 7 more = 17) and only the comparison with labels/ caught it,
+#                  but a corrected headline with an uncorrected remainder would
+#                  otherwise pass, which is a real half-fix shape.
+LOCALE_TABLES = [
+    (
+        # | <leaf> | N (sample locales) | Source |
+        "docs/LOCALE_DETECTION_ARCHITECTURE.md",
+        re.compile(r"^\|\s*Type\s*\|\s*Locales\s*\|\s*Source\s*\|", re.IGNORECASE),
+        re.compile(r"^\|\s*(?P<leaf>[a-z_]+)\s*\|\s*(?P<n>\d+)\b"),
+        None,
+    ),
+    (
+        # | **<leaf>** | N locales | <region> (<value>), …, [+N more] |
+        "docs/LOCALE_GUIDE.md",
+        re.compile(r"^\|\s*Type\s*\|\s*Locales\s*\|\s*Example\s*\|", re.IGNORECASE),
+        re.compile(
+            r"^\|\s*\*\*(?P<leaf>[a-z_]+)\*\*\s*\|\s*(?P<n>\d+) locales?\s*\|"
+            r"(?P<samples>[^|]*)\|"
+        ),
+        "samples",
+    ),
+]
+MORE_RE = re.compile(r"\[\+(?P<n>\d+) more\]")
+
+# docs/LOCALE_GUIDE.md's "Locales by Region" headings: `### <Region> (N locales)`
+# followed by one bullet per locale. Self-consistency only — a regional grouping
+# of locale NAMES is not a per-definition locale count and labels/ cannot settle
+# it — but the heading and its own list must agree.
+REGION_FILE = "docs/LOCALE_GUIDE.md"
+REGION_HEADING_RE = re.compile(r"^###\s+(?P<region>.+?)\s+\((?P<n>\d+) locales?\)\s*$")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -350,11 +569,15 @@ LOCALE_TABLE_ROW_RE = re.compile(r"^\|\s*(?P<leaf>[a-z_]+)\s*\|\s*(?P<n>\d+)\b")
 # ══════════════════════════════════════════════════════════════════════════════
 
 def scanned_files(root: Path) -> list[Path]:
-    """Living documentation: prose a reader takes as current fact."""
+    """Living documentation: prose a reader takes as current fact.
+
+    `docs/*.md` is deliberately non-recursive — `docs/plans/` holds dated plans,
+    which are snapshots and would be exempt anyway.
+    """
     files: list[Path] = []
-    readme = root / "README.md"
-    if readme.is_file():
-        files.append(readme)
+    for rel in ("README.md", "CLAUDE.md"):
+        if (root / rel).is_file():
+            files.append(root / rel)
     files.extend(sorted((root / "docs").glob("*.md")))
     files.extend(sorted(root.glob("crates/*/README.md")))
     files.extend(sorted(root.glob("crates/*/src/lib.rs")))
@@ -370,7 +593,6 @@ SNAPSHOT_FILES = {
     "docs/compact-dmy-mutation-matrix.md": "mutation matrix — a snapshot of one run",
     "docs/mechanism-attribution.md": "attribution report — a snapshot of one run",
     "docs/RELEASE.md": "release runbook — quotes numbers from specific past releases",
-    "docs/plans": "dated plans — snapshots of intent at a date",
 }
 
 # Count-shaped phrases in scanned files that are NOT taxonomy sizes. Each entry
@@ -407,6 +629,16 @@ ACKNOWLEDGED: list[tuple[str, str, str]] = [
         "~800 types + ~1,400 properties",
         "external type systems' own sizes, not FineType's taxonomy",
     ),
+    (
+        "docs/LOCALE_DETECTION_ARCHITECTURE.md",
+        "The old prototype supported 36 Mimesis locales",
+        "a retired prototype's locale list, not this taxonomy's coverage",
+    ),
+    (
+        "docs/LOCALE_GUIDE.md",
+        "CLDR expansion to 50+ locales",
+        "a roadmap target under 'Phase 3: Extended Types (Future)', not shipped coverage",
+    ),
 ]
 
 
@@ -419,6 +651,15 @@ DISCOVERY_RES = [
     ),
     re.compile(
         r"(?<![\w.\-])\*{0,2}(?P<n>\d[\d,]*|six|seven|eight|nine|ten)\*{0,2}\s+domains?\b",
+        re.IGNORECASE,
+    ),
+    # "N locales" / "N locale variants" — added after a stale `calling_code | 17
+    # locales` row survived a green run of this gate because locale counts were
+    # not a recognised shape at all, while the same branch was correcting that
+    # very number elsewhere.
+    re.compile(
+        r"(?<![\w.\-])\*{0,2}(?P<n>\d[\d,]*)\*{0,2}\s*\+?\s*"
+        r"(?:\*\*)?(?:declared |distinct |supported )?locales?\b",
         re.IGNORECASE,
     ),
 ]
@@ -452,10 +693,17 @@ def check(root: Path) -> list[str]:
     failures: list[str] = []
     covered: set[tuple[str, int]] = set()
 
-    def cover(rel: str, text: str, start: int) -> int:
-        lineno = text.count("\n", 0, start) + 1
-        covered.add((rel, lineno))
-        return lineno
+    def cover(rel: str, text: str, start: int, end: int | None = None) -> int:
+        """Mark every line a match spans, not just its first.
+
+        A claim wrapped over two lines used to cover only line one, and the
+        fail-closed scan then reported line two as an unregistered claim.
+        """
+        first = text.count("\n", 0, start) + 1
+        last = first if end is None else text.count("\n", 0, end) + 1
+        for lineno in range(first, last + 1):
+            covered.add((rel, lineno))
+        return first
 
     # ── registered claims ────────────────────────────────────────────────────
     for rel, pattern, expects in CLAIMS:
@@ -473,7 +721,7 @@ def check(root: Path) -> list[str]:
             )
             continue
         for match in matches:
-            lineno = cover(rel, text, match.start())
+            lineno = cover(rel, text, match.start(), match.end())
             for group, fact_key in expects.items():
                 ok, got, want = _expect(match.group(group), fact_key, facts)
                 if not ok:
@@ -503,55 +751,56 @@ def check(root: Path) -> list[str]:
                 )
             )
 
-    # ── ARCHITECTURE inline breakdown ────────────────────────────────────────
-    inline_path = root / INLINE_FILE
-    if not inline_path.is_file():
-        failures.append(f"{INLINE_FILE}: missing — the inline breakdown cannot be checked")
-    else:
+    # ── inline breakdowns (ARCHITECTURE, CLAUDE.md) ──────────────────────────
+    for inline_file in INLINE_FILES:
+        inline_path = root / inline_file
+        if not inline_path.is_file():
+            failures.append(f"{inline_file}: missing — the inline breakdown cannot be checked")
+            continue
         text = inline_path.read_text(encoding="utf-8")
         matches = list(INLINE_RE.finditer(text))
         if not matches:
             failures.append(
-                f"{INLINE_FILE}: registered claim no longer matches — "
+                f"{inline_file}: registered claim no longer matches — "
                 f"/{INLINE_RE.pattern}/\n"
                 f"    The prose moved. Re-register it in {Path(__file__).name}."
             )
         for match in matches:
-            lineno = cover(INLINE_FILE, text, match.start())
+            lineno = cover(inline_file, text, match.start(), match.end())
             for group, fact_key in (("n", "total"), ("d", "domains")):
                 ok, got, want = _expect(match.group(group), fact_key, facts)
                 if not ok:
                     failures.append(
-                        f"{INLINE_FILE}:{lineno}: documented {fact_key} is {got}, "
+                        f"{inline_file}:{lineno}: documented {fact_key} is {got}, "
                         f"derived from labels/ it is {want}"
                     )
             rows = {d: int(n) for d, n in INLINE_PAIR_RE.findall(match.group("breakdown"))}
             failures.extend(
-                _compare_breakdown(f"{INLINE_FILE}:{lineno} inline breakdown", rows, facts)
+                _compare_breakdown(f"{inline_file}:{lineno} inline breakdown", rows, facts)
             )
 
-    # ── LOCALE_DETECTION per-type coverage table ─────────────────────────────
-    locale_path = root / LOCALE_TABLE_FILE
-    if not locale_path.is_file():
-        failures.append(f"{LOCALE_TABLE_FILE}: missing — the locale table cannot be checked")
-    else:
-        tables = _find_tables(
-            locale_path, LOCALE_TABLE_HEADER_RE, LOCALE_TABLE_ROW_RE, "leaf",
-            covered, LOCALE_TABLE_FILE,
+    # ── per-type locale coverage tables ──────────────────────────────────────
+    derived_leaves = {key.rsplit(".", 1)[-1]: n for key, n in facts["locale_coverage"].items()}
+    if len(derived_leaves) != len(facts["locale_coverage"]):
+        failures.append(
+            "two definitions with per-locale patterns share a leaf name; "
+            "the locale tables can no longer be matched by leaf"
+        )
+    for locale_file, header_re, row_re, samples_group in LOCALE_TABLES:
+        locale_path = root / locale_file
+        if not locale_path.is_file():
+            failures.append(f"{locale_file}: missing — the locale table cannot be checked")
+            continue
+        tables = _find_locale_tables(
+            locale_path, header_re, row_re, samples_group, covered, locale_file
         )
         if not tables:
             failures.append(
-                f"{LOCALE_TABLE_FILE}: the coverage table (a `| Type | Locales |` "
-                f"header) is gone — restore it or drop it from this gate deliberately"
-            )
-        derived_leaves = {key.rsplit(".", 1)[-1]: n for key, n in facts["locale_coverage"].items()}
-        if len(derived_leaves) != len(facts["locale_coverage"]):
-            failures.append(
-                "two definitions with per-locale patterns share a leaf name; "
-                "the locale table can no longer be matched by leaf"
+                f"{locale_file}: the coverage table (header /{header_re.pattern}/) "
+                f"is gone — restore it or drop it from this gate deliberately"
             )
         for header_line, rows in tables:
-            where = f"{LOCALE_TABLE_FILE}:{header_line} locale coverage table"
+            where = f"{locale_file}:{header_line} locale coverage table"
             missing = sorted(set(derived_leaves) - set(rows))
             extra = sorted(set(rows) - set(derived_leaves))
             if missing:
@@ -565,11 +814,28 @@ def check(root: Path) -> list[str]:
                     f"`validation_by_locale` block"
                 )
             for leaf in sorted(set(rows) & set(derived_leaves)):
-                if rows[leaf] != derived_leaves[leaf]:
+                documented, samples = rows[leaf]
+                if documented != derived_leaves[leaf]:
                     failures.append(
-                        f"{where}: `{leaf}` documented as {rows[leaf]} locales, "
+                        f"{where}: `{leaf}` documented as {documented} locales, "
                         f"derived from labels/ it is {derived_leaves[leaf]}"
                     )
+                if samples is not None:
+                    failures.extend(
+                        _sample_arithmetic(where, leaf, samples, derived_leaves[leaf])
+                    )
+
+    # ── "Locales by Region" headings vs their own bullet lists ───────────────
+    region_path = root / REGION_FILE
+    if not region_path.is_file():
+        failures.append(f"{REGION_FILE}: missing — the region headings cannot be checked")
+    else:
+        for lineno, region, stated, listed in _region_headings(region_path, covered, REGION_FILE):
+            if stated != listed:
+                failures.append(
+                    f"{REGION_FILE}:{lineno}: heading says {region} has {stated} "
+                    f"locales, the list below it has {listed} entries"
+                )
 
     # ── fail-closed: no unregistered count claims ────────────────────────────
     for path in scanned_files(root):
@@ -621,6 +887,82 @@ def _find_tables(
                 covered.add((rel, offset))
         tables.append((index + 1, rows))
     return tables
+
+
+def _find_locale_tables(
+    path: Path,
+    header_re: re.Pattern,
+    row_re: re.Pattern,
+    samples_group: str | None,
+    covered: set,
+    rel: str,
+) -> list[tuple[int, dict[str, tuple[int, str | None]]]]:
+    """Every locale coverage table in `path`: {leaf: (documented, samples)}."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    tables: list[tuple[int, dict[str, tuple[int, str | None]]]] = []
+    for index, line in enumerate(lines):
+        if not header_re.match(line):
+            continue
+        rows: dict[str, tuple[int, str | None]] = {}
+        for offset, row in enumerate(lines[index + 1 :], index + 2):
+            if not row.startswith("|"):
+                break
+            match = row_re.match(row)
+            if match:
+                samples = match.group(samples_group) if samples_group else None
+                rows[match.group("leaf")] = (int(match.group("n")), samples)
+                covered.add((rel, offset))
+        tables.append((index + 1, rows))
+    return tables
+
+
+def _sample_arithmetic(where: str, leaf: str, samples: str, derived: int) -> list[str]:
+    """The locales SHOWN in a sample cell plus its `[+N more]` must equal `derived`.
+
+    Each sample is `<something> (<something>)`, so the parenthesis count is the
+    shown count. A cell this cannot read fails rather than being skipped — a
+    silently-unread cell is exactly the hole this closes.
+    """
+    more = MORE_RE.search(samples)
+    head = samples[: more.start()] if more else samples
+    if "[" in head or "]" in head:
+        return [
+            f"{where}: `{leaf}` sample cell is not "
+            f"`<locale> (<value>), … [+N more]` — this gate cannot count it:\n"
+            f"    {samples.strip()[:120]}"
+        ]
+    shown = head.count("(")
+    if shown != head.count(")"):
+        return [f"{where}: `{leaf}` sample cell has unbalanced parentheses"]
+    if shown == 0:
+        return [f"{where}: `{leaf}` sample cell shows no `<locale> (<value>)` samples"]
+    accounted = shown + (int(more.group("n")) if more else 0)
+    if accounted != derived:
+        remainder = "" if not more else f" + `[+{more.group('n')} more]`"
+        return [
+            f"{where}: `{leaf}` sample cell accounts for {accounted} locales "
+            f"({shown} shown{remainder}), derived from labels/ it is {derived}"
+        ]
+    return []
+
+
+def _region_headings(path: Path, covered: set, rel: str) -> list[tuple[int, str, int, int]]:
+    """`### <Region> (N locales)` headings and the length of the list under each."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    out: list[tuple[int, str, int, int]] = []
+    for index, line in enumerate(lines):
+        match = REGION_HEADING_RE.match(line)
+        if not match:
+            continue
+        covered.add((rel, index + 1))
+        listed = 0
+        for row in lines[index + 1 :]:
+            if row.startswith("#"):
+                break
+            if row.startswith("- "):
+                listed += 1
+        out.append((index + 1, match.group("region"), int(match.group("n")), listed))
+    return out
 
 
 def _compare_breakdown(where: str, rows: dict[str, int], facts: dict) -> list[str]:
@@ -676,6 +1018,30 @@ def _append(path_rel: str, extra: str):
     return apply
 
 
+def _add_declared_locale(path_rel: str, key: str, locale: str):
+    """Append one entry to `key`'s `locales:` list, leaving every other list alone."""
+
+    def apply(root: Path):
+        path = root / path_rel
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        inside, done = False, False
+        for index, line in enumerate(lines):
+            if line.startswith(key + ":"):
+                inside = True
+                continue
+            if inside and line.strip() and not line[0].isspace():
+                break
+            if inside and line.startswith("  locales: [") and line.rstrip().endswith("]"):
+                lines[index] = line.rstrip()[:-1] + f", {locale}]\n"
+                done = True
+                break
+        if not done:
+            raise Fatal(f"self-test: no one-line `locales:` list for {key} in {path_rel}")
+        path.write_text("".join(lines), encoding="utf-8")
+
+    return apply
+
+
 def _drop_definition(path_rel: str, key: str):
     def apply(root: Path):
         path = root / path_rel
@@ -707,6 +1073,7 @@ def self_test(root: Path) -> int:
     facts = derive(root)
     per = facts["per_domain"]
     a, b = sorted(per)[0], sorted(per)[1]
+    calling = facts["locales:geography.contact.calling_code"]
 
     cases: list[tuple[str, object, str]] = [
         (
@@ -741,8 +1108,22 @@ def self_test(root: Path) -> int:
         (
             "a definition is added and the docs are not updated",
             _append("labels/definitions_container.yaml",
-                    "\ncontainer.object.selftest_probe:\n  designation: universal\n"),
+                    "\ncontainer.object.selftest_probe:\n"
+                    "  designation: universal\n  locales: [UNIVERSAL]\n"),
             "documented total is",
+        ),
+        (
+            "a definition arrives without a countable `locales:` list",
+            _append("labels/definitions_container.yaml",
+                    "\ncontainer.object.selftest_nolocales:\n  designation: universal\n"),
+            "unreadable to this scanner",
+        ),
+        (
+            "a `locales:` list this scanner cannot parse",
+            _sub("labels/definitions_geography.yaml",
+                 "geography.address.full_address:\n",
+                 "geography.address.full_address:\n  locales: not-a-list\n"),
+            "refusing to count a form this scanner does not understand",
         ),
         (
             "a locale-coverage table row drifts",
@@ -764,6 +1145,50 @@ def self_test(root: Path) -> int:
                  f"validates {facts['locales:geography.address.postal_code']} locales for postal codes",
                  "validates 12 locales for postal codes"),
             "documented locales:geography.address.postal_code is 12",
+        ),
+        # ── the LOCALE_GUIDE table: the row that shipped stale ────────────────
+        (
+            "the reader-facing guide's locale table goes stale (the observed defect)",
+            _sub("docs/LOCALE_GUIDE.md",
+                 f"| **calling_code** | {calling} locales |",
+                 "| **calling_code** | 17 locales |"),
+            "`calling_code` documented as 17 locales",
+        ),
+        (
+            "the guide's row is corrected but its `[+N more]` remainder is not",
+            _sub("docs/LOCALE_GUIDE.md", f"[+{calling - 10} more]", "[+7 more]"),
+            "`calling_code` sample cell accounts for 17 locales",
+        ),
+        (
+            "a type quietly loses its row from the guide's table",
+            _sub("docs/LOCALE_GUIDE.md",
+                 f"| **state_code** | {facts['locales:geography.location.state_code']} locales",
+                 "| ~~state_code~~ | 3 locales"),
+            "no row for state_code",
+        ),
+        (
+            "a region heading disagrees with the list under it",
+            _sub("docs/LOCALE_GUIDE.md", "### Western Europe (14 locales)",
+                 "### Western Europe (11 locales)"),
+            "the list below it has 14 entries",
+        ),
+        (
+            "a locale is added to one definition's generation list",
+            _add_declared_locale("labels/definitions_geography.yaml",
+                                 "geography.address.full_address", "ZZ_SELFTEST"),
+            "documented declared:geography.address.full_address is "
+            f"{facts['declared:geography.address.full_address']}",
+        ),
+        (
+            "CLAUDE.md's breakdown drifts from the taxonomy",
+            _sub("CLAUDE.md", f"container {per['container']},",
+                 f"container {per['container'] + 4},"),
+            f"inline breakdown: `container` documented as {per['container'] + 4}",
+        ),
+        (
+            "a brand-new unregistered LOCALE claim appears",
+            _append("docs/ARCHITECTURE.md", "\nFineType now validates 999 locales.\n"),
+            "neither gated nor acknowledged",
         ),
         (
             "a registered claim is reworded out of the gate",

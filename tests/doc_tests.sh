@@ -28,11 +28,17 @@
 #     return type, a wrong attribution, or a headline count that disagrees with
 #     the table underneath it.
 #
-# WHAT DOES GATE DOCUMENTATION (fails the build):
+# WHAT DOES GATE DOCUMENTATION (fails the build) — `make check-docs`:
 #   - scripts/check_doc_taxonomy_counts.py — derives every documented taxonomy
-#     count from labels/definitions_*.yaml and fails on a mismatch, headline and
-#     per-domain table alike. Runs in CI on the `evidence` job, with a mutation
-#     self-test alongside it.
+#     and locale count from labels/definitions_*.yaml and fails on a mismatch,
+#     headline and per-domain table alike. CI job: `evidence`.
+#   - scripts/check_duckdb_catalog.py — loads the local extension build and
+#     compares duckdb_functions() with the documented surface: names, kinds and
+#     return types. CI job: `doc-surface`.
+#   - scripts/check_sql_examples.py — runs every ```sql fence in README.md and
+#     docs/*.md against that build and checks the shape its own comment claims.
+#     CI job: `doc-surface`.
+#   Each has a mutation self-test running beside it in the same job.
 #
 # Usage:
 #   ./tests/doc_tests.sh                  # build + test all
@@ -59,8 +65,10 @@ banner_informational() {
     printf '  │ zero from here is NOT evidence that the docs are correct.    │\n'
     printf '  │ It reads docs/*.md only, and within them only `$ finetype`   │\n'
     printf '  │ lines inside ```bash fences. Prose is never checked.         │\n'
-    printf '  │ The documentation gate that DOES fail the build is           │\n'
-    printf '  │ scripts/check_doc_taxonomy_counts.py (CI job: evidence).     │\n'
+    printf '  │ The documentation gates that DO fail the build are           │\n'
+    printf '  │ `make check-docs`: check_doc_taxonomy_counts.py (counts),    │\n'
+    printf '  │ check_duckdb_catalog.py (the extension surface) and          │\n'
+    printf '  │ check_sql_examples.py (every ```sql fence, run for real).    │\n'
     printf '  └──────────────────────────────────────────────────────────────┘\n'
 }
 

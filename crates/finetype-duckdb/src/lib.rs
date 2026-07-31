@@ -1,14 +1,35 @@
 //! FineType DuckDB Extension
 //!
-//! Provides scalar functions for semantic type classification:
-//! - `finetype_version()` — Returns the extension version
-//! - `finetype(value)` — Classify a single value, returns the semantic type label
-//! - `finetype(list(values))` — Column-level classification with disambiguation
-//! - `finetype(list(values), header)` — Column-level classification with header hint
-//! - `finetype_detail(value)` — Classify with detail: returns JSON with type, confidence, DuckDB type
-//! - `finetype_detail(list(values))` — Column-level classification with full JSON detail
-//! - `finetype_cast(value)` — Normalize a value for safe TRY_CAST (dates → ISO, booleans → true/false, etc.)
-//! - `finetype_unpack(json)` — Recursively classify JSON fields, returns annotated JSON
+//! The whole registered surface. Every name here is checked against
+//! `duckdb_functions()` of a loaded build by `scripts/check_duckdb_catalog.py`,
+//! in both directions — a function this list omits, and a name this list invents,
+//! each fail CI.
+//!
+//! The `ft_` names are the taught surface; the un-prefixed `finetype*` scalars
+//! stay registered as aliases for one release so a v0.6.22 install keeps working.
+//!
+//! - `ft_infer(value)` — Single-value probe → VARCHAR label. Weaker than a column.
+//! - `ft_profile(list(values))` / `ft_profile(list(values), header)` — Column-level
+//!   classification → `STRUCT(type, confidence, duckdb_type)`. Also a table macro
+//!   `ft_profile(tbl)`: one row per column of `tbl`.
+//! - `ft_validate(tbl, schema)` — table macro: one row per column, with reject counts
+//! - `ft_validate_text(value, schema)` — Per-cell validation →
+//!   `STRUCT(valid, constraint, message)`
+//! - `ft_detail(value)` / `ft_detail(list(values))` / `ft_detail(list(values), header)`
+//!   — Classify with detail → a JSON string with type, confidence, DuckDB type
+//! - `ft_cast(value)` — Normalize a value for safe TRY_CAST (dates → ISO, booleans → true/false)
+//! - `ft_unpack(json)` — Recursively classify JSON fields, returns annotated JSON
+//! - `ft_version()` — Returns the extension version
+//! - `finetype(value)` / `finetype(list(values))` / `finetype(list(values), header)`
+//!   — Alias: classification → VARCHAR label
+//! - `finetype_detail(value)` — Alias of `ft_detail`
+//! - `finetype_cast(value)` — Alias of `ft_cast`
+//! - `finetype_unpack(json)` — Alias of `ft_unpack`
+//! - `finetype_validate(value, schema_json)` — Returns VARCHAR: `'valid'` or an
+//!   error message. NOT the STRUCT that `ft_validate_text` returns.
+//! - `finetype_version()` — Alias of `ft_version`
+//! - `finetype_spike(n)` — a spike artefact, not production surface; see the
+//!   comment on its registration in the entrypoint.
 
 use duckdb::core::{DataChunkHandle, Inserter, LogicalTypeHandle, LogicalTypeId};
 use duckdb::vscalar::{ScalarFunctionSignature, VScalar};

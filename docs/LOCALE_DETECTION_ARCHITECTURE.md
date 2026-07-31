@@ -75,7 +75,7 @@ and can't attend to the one ü that distinguishes DE from EN.
 
 **For phone numbers**, the locale distinction IS in character patterns (country codes,
 digit grouping), but it's subtle — +1 (202) 555-0100 vs +44 20 7946 0958. The
-CharCNN can partially learn this, but 17 locale variants of phone_number dilute
+CharCNN can partially learn this, but 46 locale variants of phone_number dilute
 the training signal. Meanwhile, a regex pattern distinguishes them with 100% precision.
 
 ## The Principle: Right Tool for Each Job

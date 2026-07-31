@@ -13,24 +13,37 @@ This guide explains what you can do with FineType's locale capabilities and how 
 
 ## Current Locale Coverage (v0.6)
 
-As of March 2026, FineType supports 65+ locales across validation and generation:
+FineType ships per-locale validation patterns for 6 types. The widest is
+`postal_code`, at 65 locales.
 
-### Fully Supported Types (Validation + Generation)
+### Types with per-locale validation
+
+The locale count is the number of keys under that type's `validation_by_locale`
+block in `labels/definitions_*.yaml`. Each sample pairs a region with one valid
+value; `[+N more]` is the count of locales not shown, so the samples plus the
+remainder always add up to the total.
 
 | Type | Locales | Example |
 |------|---------|---------|
 | **postal_code** | 65 locales | US (90210), GB (SW1A 1AA), CA (M5V 3A8), DE (10115), FR (75001), JP (100-0001), BR (01310-100), IN (110001), [+57 more] |
 | **phone_number** | 46 locales | US (+1 202 555 0100), DE (+49 30 12345678), FR (+33 1 42 68 53 00), KR (+82 2 1234 5678), ZA (+27 11 960 2000), [+41 more] |
+| **calling_code** | 47 locales | +1 (US/CA), +44 (GB), +49 (DE), +33 (FR), +39 (IT), +31 (NL), +34 (ES), +358 (FI), +46 (SE), +47 (NO), [+37 more] |
 | **month_name** | 27 locales | January (EN), janvier (FR), Januar (DE), enero (ES), gennaio (IT), janeiro (PT), январь (RU), январь (UK), Январь (BG), [+18 more] |
 | **day_of_week** | 27 locales | Monday (EN), lundi (FR), Montag (DE), lunes (ES), lunedì (IT), segunda-feira (PT), понедельник (RU), пн (UK), понеделник (BG), [+18 more] |
-| **calling_code** | 17 locales | +1 (US/CA), +44 (GB), +49 (DE), +33 (FR), +39 (IT), +31 (NL), +34 (ES), +358 (FI), +46 (SE), +47 (NO), [+7 more] |
+| **state_code** | 3 locales | EN_US (CA), EN_CA (ON), EN_AU (NSW) |
 
-### Partial Support (Validation Only)
+### Locale-specific for generation only
 
-These types have region-specific validation but no generation:
+`locales:` and `validation_by_locale:` are different fields with different
+numbers. `locales:` is the list the synthetic-data generator varies over;
+`validation_by_locale:` is what a value is checked against.
 
-- **address** (full_address, street_name) — 8 locales — validation patterns for major regions
-- **name types** — currently universal (not locale-specific), future expansion planned
+28 types are `designation: locale_specific`; the 6 above also carry
+`validation_by_locale` patterns. The other 22 declare a `locales:` list for
+generation but validate against a single pattern:
+
+- **address** (`full_address`, `street_name`) — 16 declared locales each, no per-locale validation patterns
+- **names** (`full_name`, `first_name`, `last_name`) — 16 declared locales each, no per-locale validation patterns
 
 ## How Locale Detection Works
 
@@ -74,16 +87,25 @@ Column: order_dates
 
 ### DuckDB Extension
 
+**The extension does not report a locale.** `finetype_detail` returns `type`,
+`confidence`, `duckdb_type`, `samples`, `votes` and — only when a disambiguation
+rule fired — `disambiguation`. There is no `locale` key; the CLI's
+`--output json` has one, the extension does not
+(`crates/finetype-duckdb/src/column_fn.rs`, `format_column_result_json`).
+
 ```sql
 SELECT finetype_detail(phone_number) FROM customers;
--- Returns JSON with type, confidence, AND locale
--- → {"type":"identity.person.phone_number","confidence":0.98,"locale":"US"}
+-- → {"type":"identity.person.phone_number","confidence":0.98,"duckdb_type":"VARCHAR","samples":4,"votes":{"identity.person.phone_number":0.98}}
 
--- Filter by detected locale
+-- Filter on the detected TYPE (the locale is not in this payload)
 SELECT customer_id, phone_number
 FROM customers
-WHERE json_extract_string(finetype_detail(phone_number), '$.locale') = 'DE';
+WHERE json_extract_string(finetype_detail(phone_number), '$.type')
+      = 'identity.person.phone_number';
 ```
+
+For a per-value locale, use the CLI — `finetype infer --output json` adds a
+`locale` field when one is detected.
 
 ## Locale-Specific Validation Examples
 
@@ -165,12 +187,19 @@ Useful for datasets with non-English date text:
 SELECT finetype(month_col) FROM french_dates;
 -- → datetime.component.month_name.FR (not EN)
 
--- Then extract and transform
+-- Then map the name to a month number, per locale. DuckDB's strptime('%B') is
+-- English-only, so a non-English locale needs its own list.
 SELECT
+  month_col,
   CASE finetype(month_col)
-    WHEN 'datetime.component.month_name.FR' THEN parse_fr_month(month_col)
-    WHEN 'datetime.component.month_name.EN' THEN strptime(month_col, '%B')
-  END as month
+    WHEN 'datetime.component.month_name.FR'
+      THEN list_position(
+             ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+              'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+             lower(month_col))
+    WHEN 'datetime.component.month_name.EN'
+      THEN month(try_strptime(month_col, '%B'))
+  END AS month_number
 FROM french_dates;
 ```
 
@@ -180,12 +209,17 @@ FROM french_dates;
 
 Extract phone numbers from a specific region:
 
-```sql
--- DuckDB
-SELECT * FROM customers
-WHERE json_extract_string(finetype_detail(phone_number), '$.locale') = 'US';
+In DuckDB, filter on the detected type (the extension reports no locale):
 
--- CLI (in a script)
+```sql
+SELECT * FROM customers
+WHERE json_extract_string(finetype_detail(phone_number), '$.type')
+      = 'identity.person.phone_number';
+```
+
+From the CLI, where a `locale` field IS emitted:
+
+```bash
 finetype infer -f phones.txt --output json \
   | jq 'select(.locale == "DE")' \
   | jq -r '.value'
@@ -240,7 +274,7 @@ FineType continuously expands locale support. The expansion roadmap includes:
 ### Phase 1: Core Types ✅ Complete
 - ✅ Phone numbers (46 locales)
 - ✅ Postal codes (65 locales)
-- ✅ Month/day names (27 locales each)
+- ✅ Month names (27 locales), day names (27 locales)
 
 ### Phase 2: Address Types (Planned)
 - Full addresses (street ordering, region-specific rules)
@@ -388,14 +422,16 @@ echo "Normalized to locale: $phone_locale"
 ### Example: Validate Multi-Region Dataset
 
 ```sql
--- DuckDB: Validate postal codes match expected regions
+-- DuckDB: are the postal codes in each region's partition actually postal codes?
+-- The extension reports a TYPE, not a locale, so this checks the type per group.
 SELECT
   region,
-  COUNT(*) as postal_codes,
+  COUNT(*) AS postal_codes,
   COUNT(CASE
-    WHEN json_extract_string(finetype_detail(postal_code), '$.locale') = region
+    WHEN json_extract_string(finetype_detail(postal_code), '$.type')
+         = 'geography.address.postal_code'
     THEN 1
-  END) as validated
+  END) AS validated
 FROM orders
 GROUP BY region
 ORDER BY validated DESC;
