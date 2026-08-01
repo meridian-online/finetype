@@ -189,8 +189,11 @@ fn pvc_widening_naics_accepts_hyphenated_sector_ranges() {
 /// LEI-shaped cannot stand in for one that is an LEI.
 ///
 /// REJECT-set: the boundary the widening must not overshoot — the check
-/// digits stay numeric, the alphabet stays uppercase ASCII, the length stays
-/// 20, and separators stay out.
+/// digits stay numeric, the length stays 20, and the alphabet stays uppercase
+/// ASCII. The alphabet cases are split by where the defect sits. Some put it
+/// outside characters 1-4, where the segments this widening left alone reject
+/// it; some put it inside, where the widened segment is what rejects it.
+/// Without that second group `^.{4}[A-Z0-9]{14}[0-9]{2}$` passes this test.
 #[test]
 fn pvc_widening_lei_accepts_alphanumeric_lou_prefix() {
     let accept = [
@@ -227,6 +230,13 @@ fn pvc_widening_lei_accepts_alphanumeric_lou_prefix() {
             "HWUP-R0MPOU8FGXBT394",  // separators are not in the alphabet
             "HWUPKR0MPOU8FGXBT 94",  // embedded space
             "HWUPKR0MPOU8FGXBTé94",  // non-ASCII
+            // Defect confined to characters 1-4. From character 5 onward each
+            // of these matches the segments this widening left alone, so the
+            // LOU prefix — the segment it moved — is what rejects them.
+            "hWUPKR0MPOU8FGXBT394", // lower case at character 1
+            "HW-PKR0MPOU8FGXBT394", // separator at character 3
+            "HWU KR0MPOU8FGXBT394", // space at character 4
+            "@#$%KR0MPOU8FGXBT394", // punctuation across characters 1-4
         ],
     );
 }
