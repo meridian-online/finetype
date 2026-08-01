@@ -1295,6 +1295,20 @@ mod report {
         Ok(())
     }
 
+    /// Read the harness report at `path`, parse it, reject a vacuous parse and
+    /// compare what it recovered against `fixture`.
+    ///
+    /// Panics when the report cannot be read, and when the parse compared
+    /// nothing for a reason that reads like a pass. Both fixture tests and
+    /// `vci3_report_absent_file_is_an_error` enter here, so the missing-report
+    /// case that test drives is the one the fixture tests run.
+    pub fn compare_report_file(path: &Path, fixture: &[FixtureRow]) -> (usize, Vec<String>) {
+        let report = read_harness_report(path).unwrap_or_else(|e| panic!("{e}"));
+        let parsed = parse_report(&report);
+        check_not_vacuous(&parsed).unwrap_or_else(|e| panic!("{} in {}", e, path.display()));
+        compare_to_fixture(&parsed.rows, fixture)
+    }
+
     /// Compare parsed attribution rows against the fixture. Returns the number
     /// of rows that matched their fixture entry, and one message per
     /// disagreement.
@@ -1955,14 +1969,7 @@ mod fixture_tests {
     #[test]
     fn vci3_fixture_attribution_regression_match() {
         let fixture = load();
-        let path = report::report_path();
-
-        let report = report::read_harness_report(&path).unwrap_or_else(|e| panic!("{e}"));
-        let parsed = report::parse_report(&report);
-        report::check_not_vacuous(&parsed)
-            .unwrap_or_else(|e| panic!("{} in {}", e, path.display()));
-
-        let (compared, failures) = report::compare_to_fixture(&parsed.rows, &fixture);
+        let (compared, failures) = report::compare_report_file(&report::report_path(), &fixture);
         assert!(
             failures.is_empty(),
             "Fixture-attribution regressions ({} compared OK):\n{}",
@@ -1984,9 +1991,6 @@ mod fixture_tests {
     /// A test that is already failing cannot redden, which is why coverage
     /// gets a verdict of its own here rather than riding on that one.
     ///
-    /// Mutation:
-    /// `git checkout origin/main -- eval/datasets/validate_corpus_expected_attributions.yaml`.
-    ///
     /// `check_not_vacuous` runs first for the reason it runs above: a report
     /// that parses no rows yields no message of either shape, so without it
     /// this assertion would pass on a renamed heading.
@@ -1995,12 +1999,7 @@ mod fixture_tests {
         let fixture = load();
         let path = report::report_path();
 
-        let report = report::read_harness_report(&path).unwrap_or_else(|e| panic!("{e}"));
-        let parsed = report::parse_report(&report);
-        report::check_not_vacuous(&parsed)
-            .unwrap_or_else(|e| panic!("{} in {}", e, path.display()));
-
-        let (_, failures) = report::compare_to_fixture(&parsed.rows, &fixture);
+        let (_, failures) = report::compare_report_file(&path, &fixture);
         let missing: Vec<&str> = failures
             .iter()
             .filter(|f| f.contains("missing from fixture"))
@@ -2022,15 +2021,13 @@ mod fixture_tests {
 // These drive `mod report` against reports produced by `render_report` in this
 // file and then mutated, so they hold whatever state the corpus is in and
 // whatever the nine open fixture adjudications settle to. Each mutation is one
-// a reader of the report would have to notice by eye: a renamed heading, a
-// dropped column, a dropped row, a renamed count cell, a report that is not
-// there at all.
+// a reader of the report would have to notice by eye.
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod report_tests {
     use super::attribute::Mechanism;
-    use super::report::{check_not_vacuous, parse_report, read_harness_report, report_path};
+    use super::report::{check_not_vacuous, compare_report_file, parse_report, report_path};
     use super::{render_report, DatasetResult};
     use std::collections::BTreeMap;
 
@@ -2281,7 +2278,15 @@ mod report_tests {
     }
 
     /// An absent report is an error, not a skip.
+    ///
+    /// Drives `compare_report_file`, the entry point both fixture tests call,
+    /// rather than `read_harness_report` on its own: a skip sitting anywhere
+    /// between the read and the verdict returns a verdict here instead of
+    /// panicking. The empty fixture is what makes that readable — a run that
+    /// reaches the comparison has nothing to compare against and returns
+    /// cleanly.
     #[test]
+    #[should_panic(expected = "make validate-corpus")]
     fn vci3_report_absent_file_is_an_error() {
         let missing = report_path().with_file_name("validate_corpus.absent-on-purpose.md");
         assert!(
@@ -2290,9 +2295,7 @@ mod report_tests {
             missing.display()
         );
 
-        let err = read_harness_report(&missing)
-            .expect_err("a missing harness report must be an error, not a skip");
-        assert!(err.contains("make validate-corpus"), "{err}");
+        compare_report_file(&missing, &[]);
     }
 }
 
