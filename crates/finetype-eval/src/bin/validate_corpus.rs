@@ -1299,9 +1299,13 @@ mod report {
     /// compare what it recovered against `fixture`.
     ///
     /// Panics when the report cannot be read, and when the parse compared
-    /// nothing for a reason that reads like a pass. Both fixture tests and
-    /// `vci3_report_absent_file_is_an_error` enter here, so the missing-report
-    /// case that test drives is the one the fixture tests run.
+    /// nothing for a reason that reads like a pass.
+    ///
+    /// Three tests enter here: `vci3_fixture_attribution_regression_match` and
+    /// `vci3_fixture_no_report_row_missing_from_fixture` with
+    /// `report_path()`, and `vci3_report_absent_file_is_an_error` with a path
+    /// that does not exist. The missing-report case that third test drives is
+    /// therefore the one the two fixture tests run.
     pub fn compare_report_file(path: &Path, fixture: &[FixtureRow]) -> (usize, Vec<String>) {
         let report = read_harness_report(path).unwrap_or_else(|e| panic!("{e}"));
         let parsed = parse_report(&report);
@@ -2279,12 +2283,12 @@ mod report_tests {
 
     /// An absent report is an error, not a skip.
     ///
-    /// Drives `compare_report_file`, the entry point both fixture tests call,
-    /// rather than `read_harness_report` on its own: a skip sitting anywhere
+    /// Drives `compare_report_file`, the entry point the two fixture tests
+    /// call, rather than `read_harness_report` on its own: a skip introduced
     /// between the read and the verdict returns a verdict here instead of
-    /// panicking. The empty fixture is what makes that readable — a run that
-    /// reaches the comparison has nothing to compare against and returns
-    /// cleanly.
+    /// panicking. The empty fixture keeps that legible — a run that reaches the
+    /// comparison has no fixture row to disagree with, so it returns cleanly
+    /// rather than failing for a second reason.
     #[test]
     #[should_panic(expected = "make validate-corpus")]
     fn vci3_report_absent_file_is_an_error() {
