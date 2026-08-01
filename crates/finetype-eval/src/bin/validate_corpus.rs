@@ -1064,6 +1064,244 @@ mod fixture {
 }
 
 // ---------------------------------------------------------------------------
+// Harness-report reading, parsing and vacuity checking
+//
+// Split out of `vci3_fixture_attribution_regression_match` so each step can be
+// driven from an in-memory `&str` and from a path that need not exist. `mod
+// report_tests` below drives them against reports built by `render_report` and
+// then mutated, which keeps those tests independent of the state of the
+// corpus.
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod report {
+    use super::fixture::FixtureRow;
+    use std::collections::BTreeMap;
+    use std::path::{Path, PathBuf};
+
+    /// The `## Per-column attributions` table's header cells, in order.
+    const ATTRIBUTION_HEADER: [&str; 4] = ["Dataset", "Column", "Mechanism", "Trigger"];
+
+    /// One data row of the `## Per-column attributions` table.
+    #[derive(Debug)]
+    pub struct AttributionRow {
+        pub dataset: String,
+        pub column: String,
+        pub mechanism: String,
+        pub trigger: String,
+    }
+
+    /// What one pass over a harness report recovered.
+    #[derive(Debug, Default)]
+    pub struct ReportParse {
+        /// Data rows of the `## Per-column attributions` table, in report order.
+        pub rows: Vec<AttributionRow>,
+        /// A `## Per-column attributions` heading was present.
+        pub saw_section: bool,
+        /// That section carried a header row matching `ATTRIBUTION_HEADER`.
+        pub saw_header: bool,
+        /// A `## Per-dataset` header row carrying a `Failing columns` cell was
+        /// present, so `declared_failing_columns` was read rather than left at
+        /// its default.
+        pub saw_per_dataset_header: bool,
+        /// Sum of the `## Per-dataset` table's `Failing columns` cells — the
+        /// report's own statement of how much work is failing.
+        pub declared_failing_columns: usize,
+    }
+
+    enum Section {
+        Other,
+        PerDataset,
+        PerColumn,
+    }
+
+    /// Resolve the harness report path relative to the crate's manifest dir
+    /// (`crates/finetype-eval`), matching `fixture::fixture_path`.
+    pub fn report_path() -> PathBuf {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        manifest_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|p| p.join("eval/eval_output/validate_corpus.md"))
+            .expect("workspace root resolvable from CARGO_MANIFEST_DIR")
+    }
+
+    /// Read the harness report at `path`.
+    ///
+    /// A missing file is an error rather than a signal to skip the
+    /// comparison: the report is tracked, so a read error means the path moved
+    /// or the working tree is damaged.
+    pub fn read_harness_report(path: &Path) -> Result<String, String> {
+        std::fs::read_to_string(path).map_err(|e| {
+            format!(
+                "read harness report {}: {} — this file is tracked, so a read error \
+                 means the path moved or the working tree is damaged. Regenerate with \
+                 `make validate-corpus`.",
+                path.display(),
+                e
+            )
+        })
+    }
+
+    /// Parse a harness report's `## Per-dataset` and `## Per-column
+    /// attributions` tables.
+    ///
+    /// Pipe-delimited rows split into `[_, c1, .., cN, _]` — the outer pipes
+    /// contribute a leading and a trailing empty field.
+    pub fn parse_report(report: &str) -> ReportParse {
+        let mut out = ReportParse::default();
+        let mut section = Section::Other;
+        let mut failing_idx: Option<usize> = None;
+
+        for line in report.lines() {
+            if line.starts_with("##") {
+                section = if line.starts_with("## Per-column attributions") {
+                    out.saw_section = true;
+                    Section::PerColumn
+                } else if line.starts_with("## Per-dataset") {
+                    Section::PerDataset
+                } else {
+                    Section::Other
+                };
+                continue;
+            }
+            if !line.starts_with('|') {
+                continue;
+            }
+            let cols: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
+
+            match section {
+                Section::PerDataset => {
+                    if cols.get(1) == Some(&"Dataset") {
+                        // Locate the count by name: a table that gains or
+                        // loses a column then moves the cell this reads
+                        // rather than changing what it reads.
+                        failing_idx = cols.iter().position(|c| *c == "Failing columns");
+                        out.saw_per_dataset_header = failing_idx.is_some();
+                        continue;
+                    }
+                    if let Some(n) = failing_idx
+                        .and_then(|i| cols.get(i))
+                        .and_then(|c| c.parse::<usize>().ok())
+                    {
+                        out.declared_failing_columns += n;
+                    }
+                }
+                Section::PerColumn => {
+                    if cols.len() < 6 {
+                        continue;
+                    }
+                    if cols[1] == "Dataset" {
+                        if cols[1..5] == ATTRIBUTION_HEADER {
+                            out.saw_header = true;
+                        }
+                        continue;
+                    }
+                    if cols[1].starts_with("---") {
+                        continue;
+                    }
+                    out.rows.push(AttributionRow {
+                        dataset: cols[1].to_string(),
+                        column: cols[2].to_string(),
+                        mechanism: cols[3].to_string(),
+                        trigger: cols[4].to_string(),
+                    });
+                }
+                Section::Other => {}
+            }
+        }
+        out
+    }
+
+    /// Reject a parse that compared nothing for a reason that reads like a
+    /// pass.
+    ///
+    /// The report's own `Failing columns` counts decide whether an absent
+    /// `## Per-column attributions` section is a defect: `render_report` emits
+    /// that section under `any_failing`, so a report whose per-dataset counts
+    /// sum to zero carries no section and leaves nothing to compare. Reading
+    /// that count is therefore itself required — a `## Per-dataset` table this
+    /// cannot read makes the two cases indistinguishable, and is an error.
+    pub fn check_not_vacuous(parse: &ReportParse) -> Result<(), String> {
+        if !parse.saw_per_dataset_header {
+            return Err(
+                "no `## Per-dataset` header row carrying a `Failing columns` cell — the \
+                 report's own count of failing work could not be read, so an absent \
+                 `## Per-column attributions` section cannot be told apart from a renamed one."
+                    .to_string(),
+            );
+        }
+        if parse.declared_failing_columns == 0 {
+            return Ok(());
+        }
+        if !parse.saw_section {
+            return Err(format!(
+                "the `## Per-dataset` table declares {} failing columns but the report has no \
+                 `## Per-column attributions` heading — nothing was compared, which reads \
+                 exactly like a pass.",
+                parse.declared_failing_columns
+            ));
+        }
+        if !parse.saw_header {
+            return Err(format!(
+                "the `## Per-column attributions` heading is present but its `| {} |` header \
+                 row is not — the table shape changed and nothing was compared.",
+                ATTRIBUTION_HEADER.join(" | ")
+            ));
+        }
+        if parse.rows.len() != parse.declared_failing_columns {
+            return Err(format!(
+                "the `## Per-dataset` table declares {} failing columns but the \
+                 `## Per-column attributions` table holds {} data rows — the two disagree, so \
+                 some attributions went uncompared.",
+                parse.declared_failing_columns,
+                parse.rows.len()
+            ));
+        }
+        Ok(())
+    }
+
+    /// Compare parsed attribution rows against the fixture. Returns the number
+    /// of rows that matched their fixture entry, and one message per
+    /// disagreement.
+    pub fn compare_to_fixture(
+        rows: &[AttributionRow],
+        fixture: &[FixtureRow],
+    ) -> (usize, Vec<String>) {
+        let by_key: BTreeMap<(&str, &str), &FixtureRow> = fixture
+            .iter()
+            .map(|r| ((r.dataset.as_str(), r.column.as_str()), r))
+            .collect();
+
+        let mut compared = 0;
+        let mut failures = Vec::new();
+        for row in rows {
+            match by_key.get(&(row.dataset.as_str(), row.column.as_str())) {
+                None => failures.push(format!(
+                    "(dataset={}, column={}) missing from fixture (harness reports {})",
+                    row.dataset, row.column, row.mechanism
+                )),
+                // Skip — these are awaiting upstream fixes (model improvement,
+                // taxonomy widening, value-shape signals) and may legitimately
+                // diverge from the iter-2-anchored expected_mechanism.
+                Some(f) if f.pending_escalation => {}
+                Some(f) if f.expected_mechanism != row.mechanism => failures.push(format!(
+                    "(dataset={}, column={}) fixture expected={} but harness actual={} \
+                     — rationale: {}",
+                    row.dataset,
+                    row.column,
+                    f.expected_mechanism,
+                    row.mechanism,
+                    f.rationale.trim()
+                )),
+                _ => compared += 1,
+            }
+        }
+        (compared, failures)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 //
 // Test naming convention (spec ac-07):
@@ -1071,6 +1309,7 @@ mod fixture {
 //   - `vci3_attribute_cascade_*`→ ordering / seam-table dispatch tests
 //   - `vci3_code_typed_*`       → CODE_TYPED_LABELS allowlist invariants
 //   - `vci3_fixture_*`          → fixture round-trip / regression tests
+//   - `vci3_report_*`           → harness-report reading / parsing / vacuity
 //
 // The legacy `pvc_attribute_rule_*` and `mechanism_attribution_*` test names
 // from iter-1 / iter-2 are dropped here in iter-3. Their semantic coverage is
@@ -1502,8 +1741,8 @@ mod attribute_tests {
 #[cfg(test)]
 mod fixture_tests {
     use super::fixture::{load, FixtureRow};
+    use super::report;
     use std::collections::BTreeMap;
-    use std::path::PathBuf;
 
     /// Pinned fixture row-count baseline (constraint 5). Matches the
     /// `metadata.fixture_baseline_rows` value in
@@ -1674,139 +1913,236 @@ mod fixture_tests {
     /// means the path moved or the working tree is damaged. Regenerate
     /// with `make validate-corpus`.
     ///
-    /// The parse also asserts it found the `## Per-column attributions`
-    /// heading and that table's header row, so a renamed heading
-    /// fails here instead of comparing nothing and
-    /// passing.
+    /// `report::check_not_vacuous` rejects a run that compared nothing for
+    /// a reason that reads like a pass — a renamed heading, a reshaped
+    /// table, an attributions row count disagreeing with the failing-column
+    /// count the report declares for itself. `mod report_tests` drives that
+    /// check, and the parse under it, against rendered-then-mutated reports.
     #[test]
     fn vci3_fixture_attribution_regression_match() {
         let fixture = load();
-        let by_key: BTreeMap<(String, String), &FixtureRow> = fixture
-            .iter()
-            .map(|r| ((r.dataset.clone(), r.column.clone()), r))
-            .collect();
+        let path = report::report_path();
 
-        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let report_path = manifest_dir
-            .parent()
-            .and_then(|p| p.parent())
-            .map(|p| p.join("eval/eval_output/validate_corpus.md"))
-            .expect("workspace root resolvable");
+        let report = report::read_harness_report(&path).unwrap_or_else(|e| panic!("{e}"));
+        let parsed = report::parse_report(&report);
+        report::check_not_vacuous(&parsed)
+            .unwrap_or_else(|e| panic!("{} in {}", e, path.display()));
 
-        let report = std::fs::read_to_string(&report_path).unwrap_or_else(|e| {
-            panic!(
-                "read harness report {}: {} — this file is tracked, so a read \
-                 error means the path moved or the working tree is damaged. \
-                 Regenerate with `make validate-corpus`.",
-                report_path.display(),
-                e
-            )
-        });
-
-        // Parse the per-column attributions table. Format:
-        //   ## Per-column attributions
-        //   | Dataset | Column | Mechanism | Trigger |
-        //   |---|---|---|---|
-        //   | dataset-name | col-name | mechanism | trigger |
-        //   ...
-        let mut in_section = false;
-        let mut in_table = false;
-        let mut saw_section = false;
-        let mut saw_header = false;
-        let mut compared = 0;
-        let mut failures = Vec::new();
-        for line in report.lines() {
-            if line.starts_with("## Per-column attributions") {
-                in_section = true;
-                saw_section = true;
-                continue;
-            }
-            if in_section && line.starts_with("##") {
-                break;
-            }
-            if !in_section {
-                continue;
-            }
-            if line.starts_with('|') {
-                in_table = true;
-            } else if in_table && line.trim().is_empty() {
-                break;
-            }
-            if !in_table {
-                continue;
-            }
-
-            let cols: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
-            // Pipe-delimited rows split into [_, c1, c2, c3, c4, _] (6
-            // entries with leading/trailing empty splits).
-            if cols.len() < 6 {
-                continue;
-            }
-            // Skip header + separator rows.
-            if cols[1] == "Dataset" {
-                saw_header = true;
-                continue;
-            }
-            if cols[1].starts_with("---") {
-                continue;
-            }
-
-            let dataset = cols[1];
-            let column = cols[2];
-            let mechanism = cols[3];
-
-            let key = (dataset.to_string(), column.to_string());
-            match by_key.get(&key) {
-                None => failures.push(format!(
-                    "(dataset={}, column={}) missing from fixture (harness reports {})",
-                    dataset, column, mechanism
-                )),
-                Some(row) if row.pending_escalation => {
-                    // Skip — these are awaiting upstream fixes and may
-                    // legitimately diverge from the iter-2-anchored
-                    // expected_mechanism.
-                }
-                Some(row) if row.expected_mechanism != mechanism => {
-                    failures.push(format!(
-                        "(dataset={}, column={}) fixture expected={} but harness actual={} \
-                         — rationale: {}",
-                        dataset,
-                        column,
-                        row.expected_mechanism,
-                        mechanism,
-                        row.rationale.trim()
-                    ));
-                }
-                _ => {
-                    compared += 1;
-                }
-            }
-        }
-
-        // Vacuity guards — assert the parse reached the table before
-        // asserting anything about its contents. Without these, a renamed
-        // heading or a reshaped table yields zero comparisons and an empty
-        // `failures`, which reads exactly like a pass.
-        assert!(
-            saw_section,
-            "No `## Per-column attributions` heading in {} — nothing was \
-             compared, so this test would otherwise pass vacuously.",
-            report_path.display()
-        );
-        assert!(
-            saw_header,
-            "Found the `## Per-column attributions` heading in {} but no \
-             `| Dataset | Column | Mechanism | Trigger |` header row — the \
-             table shape changed and nothing was compared.",
-            report_path.display()
-        );
-
+        let (compared, failures) = report::compare_to_fixture(&parsed.rows, &fixture);
         assert!(
             failures.is_empty(),
             "Fixture-attribution regressions ({} compared OK):\n{}",
             compared,
             failures.join("\n")
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Harness-report parsing tests
+//
+// These drive `mod report` against reports produced by `render_report` in this
+// file and then mutated, so they hold whatever state the corpus is in and
+// whatever the nine open fixture adjudications settle to. Each mutation is one
+// a reader of the report would have to notice by eye: a renamed heading, a
+// dropped column, a dropped row, a renamed count cell, a report that is not
+// there at all.
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod report_tests {
+    use super::attribute::Mechanism;
+    use super::report::{check_not_vacuous, parse_report, read_harness_report, report_path};
+    use super::{render_report, DatasetResult};
+    use std::collections::BTreeMap;
+
+    const ATTRIBUTION_HEADING: &str = "## Per-column attributions";
+
+    /// Render a report the way the harness does: dataset `alpha` clean,
+    /// dataset `beta` carrying `failing` as its failing columns.
+    fn rendered(failing: &[(&str, Mechanism, &'static str)]) -> String {
+        let mut failing_columns: BTreeMap<String, (Mechanism, &'static str)> = BTreeMap::new();
+        for (col, mech, trigger) in failing {
+            failing_columns.insert((*col).to_string(), (*mech, *trigger));
+        }
+        let results = vec![
+            DatasetResult {
+                dataset: "alpha".to_string(),
+                rows_total: 5,
+                rows_valid: 5,
+                pass_at_threshold: true,
+                failing_columns: BTreeMap::new(),
+            },
+            DatasetResult {
+                dataset: "beta".to_string(),
+                rows_total: 5,
+                rows_valid: 3,
+                pass_at_threshold: failing.is_empty(),
+                failing_columns,
+            },
+        ];
+        render_report(&results, 0.99, None)
+    }
+
+    fn two_failing() -> String {
+        rendered(&[
+            ("code", Mechanism::EnumOverfit, "enum-constraint"),
+            ("when", Mechanism::FormatDiversity, "path-b-prefix"),
+        ])
+    }
+
+    /// A report with the heading and a well-formed table parses the rows the
+    /// renderer wrote, and is not vacuous.
+    #[test]
+    fn vci3_report_well_formed_table_parses_its_rows() {
+        let parsed = parse_report(&two_failing());
+
+        assert!(parsed.saw_section, "attributions heading not found");
+        assert!(parsed.saw_header, "attributions header row not found");
+        assert!(
+            parsed.saw_per_dataset_header,
+            "per-dataset header row not found"
+        );
+        assert_eq!(
+            parsed.declared_failing_columns, 2,
+            "per-dataset failing-column counts did not sum to the two rendered"
+        );
+        assert_eq!(parsed.rows.len(), 2, "parsed rows: {:?}", parsed.rows);
+
+        // BTreeMap order: `code` before `when`.
+        assert_eq!(parsed.rows[0].dataset, "beta");
+        assert_eq!(parsed.rows[0].column, "code");
+        assert_eq!(parsed.rows[0].mechanism, "enum_overfit");
+        assert_eq!(parsed.rows[0].trigger, "enum-constraint");
+        assert_eq!(parsed.rows[1].dataset, "beta");
+        assert_eq!(parsed.rows[1].column, "when");
+        assert_eq!(parsed.rows[1].mechanism, "format_diversity");
+        assert_eq!(parsed.rows[1].trigger, "path-b-prefix");
+
+        check_not_vacuous(&parsed).expect("a well-formed report is not a vacuous one");
+    }
+
+    /// The goal state. `render_report` emits the attributions section under
+    /// `any_failing`, so a corpus with no failing column produces a report
+    /// with no such section — and that must pass, not fire the guard.
+    #[test]
+    fn vci3_report_no_failing_columns_needs_no_attributions() {
+        let report = rendered(&[]);
+        assert!(
+            !report.contains(ATTRIBUTION_HEADING),
+            "render_report emitted `{ATTRIBUTION_HEADING}` for a corpus with no failing \
+             column, so this test no longer exercises the goal state:\n{report}"
+        );
+
+        let parsed = parse_report(&report);
+        assert!(
+            !parsed.saw_section,
+            "found a heading the renderer did not write"
+        );
+        assert!(
+            parsed.saw_per_dataset_header,
+            "per-dataset header row not found"
+        );
+        assert_eq!(parsed.declared_failing_columns, 0);
+        assert!(parsed.rows.is_empty(), "parsed rows: {:?}", parsed.rows);
+
+        check_not_vacuous(&parsed)
+            .expect("a report declaring no failing column needs no attributions section");
+    }
+
+    /// A renamed heading parses no rows, and the guard fires.
+    #[test]
+    fn vci3_report_renamed_heading_is_caught() {
+        let report = two_failing().replace(ATTRIBUTION_HEADING, "## Attributions by column");
+        let parsed = parse_report(&report);
+
+        assert!(!parsed.saw_section);
+        assert!(parsed.rows.is_empty(), "parsed rows: {:?}", parsed.rows);
+        assert_eq!(parsed.declared_failing_columns, 2);
+
+        let err = check_not_vacuous(&parsed)
+            .expect_err("a renamed attributions heading must not pass the vacuity check");
+        assert!(
+            err.contains("no `## Per-column attributions` heading"),
+            "{err}"
+        );
+    }
+
+    /// An attributions table that lost its `Trigger` column parses no rows,
+    /// and the guard fires.
+    #[test]
+    fn vci3_report_table_missing_a_column_is_caught() {
+        let report = two_failing()
+            .replace(
+                "| Dataset | Column | Mechanism | Trigger |",
+                "| Dataset | Column | Mechanism |",
+            )
+            .replace(
+                "| beta | code | enum_overfit | enum-constraint |",
+                "| beta | code | enum_overfit |",
+            )
+            .replace(
+                "| beta | when | format_diversity | path-b-prefix |",
+                "| beta | when | format_diversity |",
+            );
+        let parsed = parse_report(&report);
+
+        assert!(parsed.saw_section, "the heading itself was not renamed");
+        assert!(!parsed.saw_header);
+        assert!(parsed.rows.is_empty(), "parsed rows: {:?}", parsed.rows);
+
+        let err = check_not_vacuous(&parsed)
+            .expect_err("a reshaped attributions table must not pass the vacuity check");
+        assert!(err.contains("header row is not"), "{err}");
+    }
+
+    /// An attributions table missing a row the per-dataset counts account for
+    /// leaves that attribution uncompared, and the guard fires.
+    #[test]
+    fn vci3_report_dropped_attribution_row_is_caught() {
+        let report =
+            two_failing().replace("| beta | when | format_diversity | path-b-prefix |\n", "");
+        let parsed = parse_report(&report);
+
+        assert!(parsed.saw_section);
+        assert!(parsed.saw_header);
+        assert_eq!(parsed.declared_failing_columns, 2);
+        assert_eq!(parsed.rows.len(), 1, "parsed rows: {:?}", parsed.rows);
+
+        let err = check_not_vacuous(&parsed)
+            .expect_err("an attributions table short of the declared count must not pass");
+        assert!(err.contains("went uncompared"), "{err}");
+    }
+
+    /// The signal the guard reads is itself guarded: a per-dataset table whose
+    /// failing-column cell has been renamed cannot say whether an absent
+    /// attributions section is the goal state or a rename, so it is an error.
+    #[test]
+    fn vci3_report_unreadable_failing_count_is_caught() {
+        let report = two_failing().replace("Failing columns", "Failures");
+        let parsed = parse_report(&report);
+
+        assert!(!parsed.saw_per_dataset_header);
+        assert_eq!(parsed.declared_failing_columns, 0);
+
+        let err = check_not_vacuous(&parsed)
+            .expect_err("an unreadable failing-column count must not pass the vacuity check");
+        assert!(err.contains("could not be read"), "{err}");
+    }
+
+    /// An absent report is an error, not a skip.
+    #[test]
+    fn vci3_report_absent_file_is_an_error() {
+        let missing = report_path().with_file_name("validate_corpus.absent-on-purpose.md");
+        assert!(
+            !missing.exists(),
+            "this test needs a path that does not exist: {}",
+            missing.display()
+        );
+
+        let err = read_harness_report(&missing)
+            .expect_err("a missing harness report must be an error, not a skip");
+        assert!(err.contains("make validate-corpus"), "{err}");
     }
 }
 
