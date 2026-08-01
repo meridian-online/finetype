@@ -1107,6 +1107,11 @@ mod report {
         /// Sum of the `## Per-dataset` table's `Failing columns` cells — the
         /// report's own statement of how much work is failing.
         pub declared_failing_columns: usize,
+        /// One entry per `## Per-dataset` data row whose `Failing columns`
+        /// cell did not parse as a count, so it contributed nothing to
+        /// `declared_failing_columns`. Each entry names the row's first cell
+        /// and what stood where the count belongs.
+        pub unreadable_failing_cells: Vec<String>,
     }
 
     enum Section {
@@ -1180,11 +1185,27 @@ mod report {
                         out.saw_per_dataset_header = failing_idx.is_some();
                         continue;
                     }
-                    if let Some(n) = failing_idx
-                        .and_then(|i| cols.get(i))
-                        .and_then(|c| c.parse::<usize>().ok())
-                    {
-                        out.declared_failing_columns += n;
+                    // Before the header row there is no cell to read; the
+                    // absent header is reported on its own by
+                    // `saw_per_dataset_header`.
+                    let Some(i) = failing_idx else { continue };
+                    // The alignment row (`|---|---:|…`) carries no counts.
+                    // Matched on the row's first cell, the same test
+                    // `Section::PerColumn` applies to its own.
+                    if cols.get(1).is_some_and(|c| c.starts_with("---")) {
+                        continue;
+                    }
+                    match cols.get(i).map(|c| (*c, c.parse::<usize>())) {
+                        Some((_, Ok(n))) => out.declared_failing_columns += n,
+                        Some((cell, Err(_))) => out.unreadable_failing_cells.push(format!(
+                            "row `{}` carries `{}`",
+                            cols.get(1).copied().unwrap_or_default(),
+                            cell
+                        )),
+                        None => out.unreadable_failing_cells.push(format!(
+                            "row `{}` has no cell in the `Failing columns` position",
+                            cols.get(1).copied().unwrap_or_default()
+                        )),
                     }
                 }
                 Section::PerColumn => {
@@ -1222,6 +1243,11 @@ mod report {
     /// sum to zero carries no section and leaves nothing to compare. Reading
     /// that count is therefore itself required — a `## Per-dataset` table this
     /// cannot read makes the two cases indistinguishable, and is an error.
+    ///
+    /// "Cannot read" covers two shapes, guarded here in order: a header row
+    /// with no `Failing columns` cell to locate, and a data row whose cell in
+    /// that position is not a count. The second contributes zero to the sum,
+    /// so left unguarded it drives the sum toward the goal state's own value.
     pub fn check_not_vacuous(parse: &ReportParse) -> Result<(), String> {
         if !parse.saw_per_dataset_header {
             return Err(
@@ -1230,6 +1256,14 @@ mod report {
                  `## Per-column attributions` section cannot be told apart from a renamed one."
                     .to_string(),
             );
+        }
+        if !parse.unreadable_failing_cells.is_empty() {
+            return Err(format!(
+                "the `## Per-dataset` table carries a `Failing columns` cell that is not a \
+                 count ({}) — those rows added nothing to the declared total, so a sum of \
+                 zero cannot be told apart from a corpus with no failing column.",
+                parse.unreadable_failing_cells.join("; ")
+            ));
         }
         if parse.declared_failing_columns == 0 {
             return Ok(());
@@ -1936,6 +1970,50 @@ mod fixture_tests {
             failures.join("\n")
         );
     }
+
+    /// vci3_fixture_no_report_row_missing_from_fixture (ac-04)
+    ///
+    /// Pins the fixture's *coverage* of the report: a per-column attribution
+    /// the harness emits that the fixture has no entry for.
+    ///
+    /// `compare_to_fixture` emits two message shapes and this reads one of
+    /// them — `missing from fixture`. The other,
+    /// `fixture expected=… but harness actual=…`, is a mechanism
+    /// disagreement, and the open adjudications hold
+    /// `vci3_fixture_attribution_regression_match` red on that shape alone.
+    /// A verdict already red pins nothing further, which is why coverage
+    /// gets a verdict of its own here rather than riding on that one.
+    ///
+    /// Mutation:
+    /// `git checkout origin/main -- eval/datasets/validate_corpus_expected_attributions.yaml`.
+    ///
+    /// `check_not_vacuous` runs first for the reason it runs above: a report
+    /// that parses no rows yields no message of either shape, so without it
+    /// this assertion would pass on a renamed heading.
+    #[test]
+    fn vci3_fixture_no_report_row_missing_from_fixture() {
+        let fixture = load();
+        let path = report::report_path();
+
+        let report = report::read_harness_report(&path).unwrap_or_else(|e| panic!("{e}"));
+        let parsed = report::parse_report(&report);
+        report::check_not_vacuous(&parsed)
+            .unwrap_or_else(|e| panic!("{} in {}", e, path.display()));
+
+        let (_, failures) = report::compare_to_fixture(&parsed.rows, &fixture);
+        let missing: Vec<&str> = failures
+            .iter()
+            .filter(|f| f.contains("missing from fixture"))
+            .map(String::as_str)
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "{} attribution row(s) in {} have no fixture entry:\n{}",
+            missing.len(),
+            path.display(),
+            missing.join("\n")
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -2128,6 +2206,78 @@ mod report_tests {
         let err = check_not_vacuous(&parsed)
             .expect_err("an unreadable failing-column count must not pass the vacuity check");
         assert!(err.contains("could not be read"), "{err}");
+    }
+
+    /// The header cell is not the whole of that signal: a `## Per-dataset`
+    /// *data* row whose count cell is not a number contributes zero to the
+    /// declared total, which is the goal state's own value.
+    ///
+    /// Two mutations, the second built on the first. `beta`'s count cell
+    /// alone drops the declared total to `alpha`'s zero. Rename the
+    /// attributions heading on top of that and the parse reaches the shape
+    /// the guard exists to reject: a header that was read, a total of zero,
+    /// no attributions section and no rows — which without this check is
+    /// `Ok(())`, and reads exactly like a clean corpus.
+    #[test]
+    fn vci3_report_unreadable_failing_cell_is_caught() {
+        let report = two_failing();
+        let malformed = report.replace(
+            "| beta | 5 | 3 | ✗ | 2 |",
+            "| beta | 5 | 3 | ✗ | 2 columns |",
+        );
+        assert_ne!(
+            malformed, report,
+            "the per-dataset row this test mutates is not in the rendered report:\n{report}"
+        );
+
+        let parsed = parse_report(&malformed);
+        assert!(
+            parsed.saw_per_dataset_header,
+            "the header cell is untouched by this mutation"
+        );
+        assert_eq!(
+            parsed.declared_failing_columns, 0,
+            "beta's count was expected to drop out of the sum, leaving alpha's zero"
+        );
+        let err = check_not_vacuous(&parsed)
+            .expect_err("an unreadable failing-column cell must not pass the vacuity check");
+        assert!(err.contains("2 columns"), "{err}");
+
+        let and_renamed = malformed.replace(ATTRIBUTION_HEADING, "## Attributions by column");
+        let parsed = parse_report(&and_renamed);
+        assert!(parsed.saw_per_dataset_header);
+        assert_eq!(parsed.declared_failing_columns, 0);
+        assert!(!parsed.saw_section);
+        assert!(parsed.rows.is_empty(), "parsed rows: {:?}", parsed.rows);
+
+        let err = check_not_vacuous(&parsed).expect_err(
+            "a report that compared no rows because its count cell was unreadable must \
+             not pass the vacuity check",
+        );
+        assert!(err.contains("2 columns"), "{err}");
+    }
+
+    /// The alignment row under the `## Per-dataset` header carries `---:` in
+    /// the count position and is not a malformed count. Without a skip for
+    /// it the guard fires on the report the harness itself writes, which
+    /// `vci3_report_well_formed_table_parses_its_rows` and
+    /// `vci3_report_no_failing_columns_needs_no_attributions` also hold —
+    /// this names the row so the reason is not inferred from their failure.
+    #[test]
+    fn vci3_report_alignment_row_is_not_an_unreadable_count() {
+        let report = two_failing();
+        assert!(
+            report.contains("|---|---:|---:|:---:|---:|---|"),
+            "the per-dataset alignment row this test names is not in the rendered \
+             report:\n{report}"
+        );
+
+        let parsed = parse_report(&report);
+        assert!(
+            parsed.unreadable_failing_cells.is_empty(),
+            "unreadable cells: {:?}",
+            parsed.unreadable_failing_cells
+        );
     }
 
     /// An absent report is an error, not a skip.

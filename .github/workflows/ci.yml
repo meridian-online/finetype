@@ -364,9 +364,8 @@ jobs:
     # (`make validate-corpus`) is an evaluation decision, not a CI one, and
     # stays out of this job.
     #
-    # So: this job is red for a defect no pull request introduced. That is the
-    # whole reason it is non-required. Promoting it is the deliverable that
-    # finishes the work.
+    # That is the whole reason it is non-required. Promoting it is the
+    # deliverable that finishes the work.
     name: Workspace Test (all eight crates)
     runs-on: ubuntu-latest
     steps:
