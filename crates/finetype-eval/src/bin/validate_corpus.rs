@@ -1016,11 +1016,20 @@ fn main() -> Result<()> {
 // `eval/datasets/validate_corpus_expected_attributions.yaml` is the
 // authoritative ground-truth for what every per-(dataset, column) failure
 // means under the iter-3 attribution cascade. Schema:
-//   - dataset             (string, required)
-//   - column              (string, required)
-//   - expected_mechanism  (string, required)
-//   - rationale           (string, required)
-//   - pending_escalation  (bool, optional, default false)
+//   - dataset               (string, required)
+//   - column                (string, required)
+//   - expected_mechanism    (string, required)
+//   - rationale             (string, required)
+//   - pending_escalation    (bool, optional, default false)
+//   - superseded_mechanism  (string, optional)
+//
+// `superseded_mechanism` is the `expected_mechanism` a row held before it was
+// re-locked to a later harness report, kept beside the value that replaced it so
+// the move is readable in the fixture rather than only in git history. It feeds
+// no comparison. `vci3_fixture_superseded_mechanism_recorded` requires a
+// re-locked row to carry one, and requires it to be well-formed and to differ
+// from the value that replaced it; whether it names the value the row held is
+// not something that test can see.
 //
 // The loader is exposed at module level so both unit tests and any future
 // CI script can resolve and parse it via the same code path.
@@ -1038,6 +1047,8 @@ mod fixture {
         pub rationale: String,
         #[serde(default)]
         pub pending_escalation: bool,
+        #[serde(default)]
+        pub superseded_mechanism: Option<String>,
     }
 
     /// Resolve the fixture path relative to the crate's manifest dir
@@ -1877,29 +1888,36 @@ mod fixture_tests {
         );
     }
 
-    /// vci3_fixture_anchor_count_3_hard_2_gap (ac-13, renamed from
-    /// _4_hard_1_gap to reflect iter-3 empirical reality).
+    /// vci3_fixture_anchor_count_2_hard_3_gap (ac-13).
     ///
-    /// **Why renamed.** The spec's original 4-hard / 1-gap framing assumed
-    /// the harness would attribute oecd_employment.REF_AREA to
-    /// code_vs_canonical. Iter-3 empirical reality differs: the v0.6.19
-    /// model mispredicts REF_AREA to `technology.internet.http_method`
-    /// (also in CODE_TYPED_LABELS), so cascade Rule 3's XOR=false and
-    /// Rule 6 (misclassification) fires. The cascade is principled
-    /// (cross-domain code disagreement = misclassification, not CvC).
-    /// REF_AREA is preserved as iter-2 truth in the fixture but with
-    /// `pending_escalation: true`, joining GICS Sector in the known-gap
-    /// set. The 3-hard / 2-gap framing pins this iter-3 reality. See
-    /// `progress.md` Findings: "Anchor reconciliation under iter-3
-    /// empirical reality" for the full rationale.
+    /// **What the counts mean.** "Hard" here is
+    /// `pending_escalation:false` — an iter-2 anchor whose adjudicated
+    /// mechanism is still what the harness reports, so it stays in the
+    /// regression comparison. "Gap" is `pending_escalation:true` — the
+    /// adjudicated mechanism is kept in `expected_mechanism` and the row is
+    /// carved out of that comparison, because the harness disagrees for a
+    /// reason that needs a decision upstream rather than a fixture edit.
+    /// `vci3_fixture_iter2_anchor_rows_present` uses "hard anchor" for
+    /// something else — the four tuples whose `expected_mechanism` it asserts
+    /// strictly — so the two tests partition the same five rows differently.
+    ///
+    /// Three anchors sit in the gap set, each for its own reason:
+    ///
+    /// - `sp500_constituents` / `GICS Sector` — taxonomy gap. No GICS label
+    ///   exists under v0.6.19, so neither side enters CODE_TYPED_LABELS.
+    /// - `oecd_employment` / `REF_AREA` — the v0.6.19 model mispredicts to
+    ///   `technology.internet.http_method`, which is ALSO in
+    ///   CODE_TYPED_LABELS, so Rule 3's XOR is false and Rule 6 fires.
+    /// - `fifa_players` / `Value` — the 2026-07-17 report reads
+    ///   `path-b-prefix`, so the prediction has left CODE_TYPED_LABELS and
+    ///   the GT-sidecar seam is no longer the seam the cascade sees. The
+    ///   fixture's own carve-out comment carries the detail.
     ///
     /// Asserts: of the 5 iter-2 anchor `(dataset, column)` tuples, exactly
-    /// 3 carry `pending_escalation:false` (hard anchors that survive
-    /// iter-3 attribution unchanged) AND exactly 2 carry
-    /// `pending_escalation:true` (REF_AREA awaits model improvement;
-    /// GICS Sector awaits taxonomy widening or value-shape signals).
+    /// 2 carry `pending_escalation:false` AND exactly 3 carry
+    /// `pending_escalation:true`.
     #[test]
-    fn vci3_fixture_anchor_count_3_hard_2_gap() {
+    fn vci3_fixture_anchor_count_2_hard_3_gap() {
         let rows = load();
         let by_key: BTreeMap<(String, String), &FixtureRow> = rows
             .iter()
@@ -1926,20 +1944,101 @@ mod fixture_tests {
 
         assert_eq!(
             hard.len(),
-            3,
-            "Expected exactly 3 hard anchors (pending_escalation:false) under \
-             iter-3 reality, got {}: {:?}",
+            2,
+            "Expected exactly 2 hard anchors (pending_escalation:false), got {}: {:?}",
             hard.len(),
             hard
         );
         assert_eq!(
             gap.len(),
-            2,
-            "Expected exactly 2 known-gap anchors (pending_escalation:true), \
+            3,
+            "Expected exactly 3 known-gap anchors (pending_escalation:true), \
              got {}: {:?}",
             gap.len(),
             gap
         );
+    }
+
+    /// vci3_fixture_superseded_mechanism_recorded
+    ///
+    /// Pins the re-lock of 2026-08-02: the eight rows whose fixture side was
+    /// generated cascade boilerplate rather than an adjudication were moved
+    /// onto the 2026-07-17 harness report, and each kept the value it moved
+    /// off in `superseded_mechanism`.
+    ///
+    /// Three things are asserted of each row in the list below: it carries a
+    /// record, that record differs from the value which replaced it, and that
+    /// record names a mechanism the cascade can emit.
+    ///
+    /// **What that does not reach.** A record which is present, well-formed
+    /// and different from the current value satisfies all three assertions
+    /// whether or not it names the value the row actually held. This test
+    /// pins the record, not its truth.
+    ///
+    /// A row NOT in this list may still carry `superseded_mechanism`; the
+    /// list pins presence, not exclusivity. What it rules out is a re-locked
+    /// row quietly losing the record of a value it used to hold.
+    #[test]
+    fn vci3_fixture_superseded_mechanism_recorded() {
+        use super::attribute::Mechanism;
+
+        let relocked: &[(&str, &str)] = &[
+            ("un_locode", "Function"),
+            ("gdelt_events", "ActionGeo_ADM1Code"),
+            ("gdelt_events", "Actor2Geo_ADM1Code"),
+            ("gdelt_events", "Actor2Geo_FeatureID"),
+            ("gdelt_events", "FractionDate"),
+            ("fifa_players", "Wage"),
+            ("oecd_employment", "SEX"),
+            ("oecd_employment", "STRUCTURE_ID"),
+        ];
+
+        let known: Vec<&str> = [
+            Mechanism::EnumOverfit,
+            Mechanism::FormatDiversity,
+            Mechanism::Misclassification,
+            Mechanism::CodeVsCanonical,
+            Mechanism::Unknown,
+            Mechanism::NoGt,
+        ]
+        .iter()
+        .map(|m| m.label())
+        .collect();
+
+        let rows = load();
+        let by_key: BTreeMap<(String, String), &FixtureRow> = rows
+            .iter()
+            .map(|r| ((r.dataset.clone(), r.column.clone()), r))
+            .collect();
+
+        for (d, c) in relocked {
+            let row = by_key
+                .get(&(d.to_string(), c.to_string()))
+                .unwrap_or_else(|| panic!("re-locked row ({}, {}) missing from fixture", d, c));
+            let superseded = row.superseded_mechanism.as_deref().unwrap_or_else(|| {
+                panic!(
+                    "re-locked row ({}, {}) has no `superseded_mechanism` — the value it \
+                     moved off is not recorded anywhere in the fixture",
+                    d, c
+                )
+            });
+            assert_ne!(
+                superseded, row.expected_mechanism,
+                "re-locked row ({}, {}) records `superseded_mechanism: {}` equal to its \
+                 `expected_mechanism` — either the re-lock was reverted and the record \
+                 left behind, or nothing moved",
+                d, c, superseded
+            );
+            assert!(
+                known.contains(&superseded),
+                "re-locked row ({}, {}) records `superseded_mechanism: {}`, which is not \
+                 a mechanism the cascade emits ({})",
+                d,
+                c,
+                superseded,
+                known.join(", ")
+            );
+        }
     }
 
     /// vci3_fixture_attribution_regression_match (ac-05)
