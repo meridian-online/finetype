@@ -653,8 +653,8 @@
 # The `attribute` cascade is byte-identical between the two reports, so
 # whatever moved these columns is upstream of the cascade. Reproduce with
 # `git show <rev>:crates/finetype-eval/src/bin/validate_corpus.rs |
-# sed -n '275,1028p' | shasum`, which is efaf65a0 at ce5db184, fe85510f,
-# 4d904719 and dc91e1f4.
+# sed -n '275,1028p' | shasum`, which is efaf65a0 at ce5db184, fe85510f
+# and 4d904719.
 # Each rationale states the GT label from the dataset's `.gt.yaml` sidecar
 # and what the report's trigger implies about the prediction. The
 # CODE_TYPED_LABELS list (validate_corpus.rs lines 337-380) carries entries

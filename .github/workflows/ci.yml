@@ -348,7 +348,7 @@ jobs:
     #
     #   finetype-eval, bin validate-corpus,
     #   fixture_tests::vci3_fixture_attribution_regression_match
-    #   (crates/finetype-eval/src/bin/validate_corpus.rs:1805)
+    #   (crates/finetype-eval/src/bin/validate_corpus.rs)
     #
     # It reports 54 rows compared OK and 9 mismatches, and the 9 are one kind:
     # the fixture's expected attribution disagrees with what the Iter-3 cascade

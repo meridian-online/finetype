@@ -1675,10 +1675,9 @@ mod fixture_tests {
     /// with `make validate-corpus`.
     ///
     /// The parse also asserts it found the `## Per-column attributions`
-    /// heading and that table's header row, so a renamed heading or a
-    /// reshaped table fails here instead of comparing nothing and
-    /// passing. It deliberately puts no floor on the number of data rows:
-    /// a report with no failing columns is the goal state, not a fault.
+    /// heading and that table's header row, so a renamed heading
+    /// fails here instead of comparing nothing and
+    /// passing.
     #[test]
     fn vci3_fixture_attribution_regression_match() {
         let fixture = load();
