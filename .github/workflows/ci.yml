@@ -336,7 +336,7 @@ jobs:
     # A fixture disagreement in finetype-eval's validate_corpus
     # (crates/finetype-eval/src/bin/validate_corpus.rs) is not fixed by
     # regenerating the fixture. `make validate-corpus` rewrites the harness
-    # report as well, which asserts the harness is right by construction — the
+    # report, which asserts the harness is right by construction — the
     # thing under test. Which side is authoritative is an evaluation decision,
     # not a CI one, and stays out of this job.
     name: Workspace Test (all eight crates)

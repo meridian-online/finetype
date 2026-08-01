@@ -2089,10 +2089,7 @@ mod fixture_tests {
     /// `compare_to_fixture` emits two message shapes and this reads one of
     /// them — `missing from fixture`. The other,
     /// `fixture expected=… but harness actual=…`, is a mechanism
-    /// disagreement, and the open adjudications hold
-    /// `vci3_fixture_attribution_regression_match` red on that shape alone.
-    /// A test that is already failing cannot redden, which is why coverage
-    /// gets a verdict of its own here rather than riding on that one.
+    /// disagreement. Coverage gets a verdict of its own here.
     ///
     /// `check_not_vacuous` runs first for the reason it runs above: a report
     /// that parses no rows yields no message of either shape, so without it
