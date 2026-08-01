@@ -267,7 +267,7 @@ fn pvc_widening_lei_validates_the_committed_registry_slice() {
 
     let all_digit_prefix = leis
         .iter()
-        .filter(|v| v.as_bytes().len() >= 4 && v.as_bytes()[..4].iter().all(u8::is_ascii_digit))
+        .filter(|v| v.len() >= 4 && v.as_bytes()[..4].iter().all(u8::is_ascii_digit))
         .count();
     assert_eq!(
         all_digit_prefix,
