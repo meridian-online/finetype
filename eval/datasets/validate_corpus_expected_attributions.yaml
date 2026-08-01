@@ -640,3 +640,114 @@
     Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
   pending_escalation: false
 
+
+# ---------------------------------------------------------------------------
+# Phase 3 — 12 rows for columns that were NOT failing at the iter-3 baseline
+# (the 2026-04-29 report) and ARE failing at the 2026-07-17 report. None of
+# the twelve appears in the April per-column attributions table, so each is a
+# new failure rather than a Phase-2 omission. `expected_mechanism` is the
+# 2026-07-17 harness output, per the anti-regression-lock framing in this
+# file's header — it records what the harness does now and is not a claim
+# that the mechanism is the right one.
+#
+# The `attribute` cascade is byte-identical between the two reports, so
+# whatever moved these columns is upstream of the cascade. Reproduce with
+# `git show <rev>:crates/finetype-eval/src/bin/validate_corpus.rs |
+# sed -n '275,1028p' | shasum`, which is efaf65a0 at ce5db184, fe85510f,
+# 4d904719 and dc91e1f4.
+# Each rationale states the GT label from the dataset's `.gt.yaml` sidecar
+# and what the report's trigger implies about the prediction. The
+# CODE_TYPED_LABELS list (validate_corpus.rs lines 337-380) carries entries
+# under geography., finance., identity. and technology. and none under
+# representation., so for a representation.* GT a `path-b-codetype` trigger
+# implies the predicted side is the code-typed one.
+# ---------------------------------------------------------------------------
+
+# --- rio2016_athletes (1 new row) ---
+- dataset: rio2016_athletes
+  column: sport
+  expected_mechanism: format_diversity
+  rationale: |
+    New failure since the 2026-04-29 baseline. GT representation.discrete.categorical; path-b-prefix means the prediction stayed inside representation.* and drifted on subtype.
+  pending_escalation: false
+
+# --- un_locode (1 new row) ---
+- dataset: un_locode
+  column: Coordinates
+  expected_mechanism: misclassification
+  rationale: |
+    New failure since the 2026-04-29 baseline. GT geography.coordinate.coordinates; prediction-error means no shared prefix and no code-typed side, so the prediction left geography.*.
+  pending_escalation: false
+
+# --- gdelt_events (7 new rows) ---
+- dataset: gdelt_events
+  column: Actor1CountryCode
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    New failure since the 2026-04-29 baseline. GT representation.discrete.categorical, which is not code-typed, so path-b-codetype puts the predicted side in CODE_TYPED_LABELS.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor1Name
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    New failure since the 2026-04-29 baseline. GT representation.text.entity_name against a code-typed prediction — a free-text actor name being read as a short-form code.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor1Type1Code
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    New failure since the 2026-04-29 baseline. GT representation.discrete.categorical; the primary actor type-code slot now predicts into CODE_TYPED_LABELS, giving Rule 3's XOR.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor1Type2Code
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    New failure since the 2026-04-29 baseline. Same seam as Actor1Type1Code on the secondary actor type-code slot: categorical GT, code-typed prediction.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor2Name
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    New failure since the 2026-04-29 baseline. Mirrors Actor1Name on the second actor: representation.text.entity_name GT against a code-typed prediction.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor2Type1Code
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    New failure since the 2026-04-29 baseline. Mirrors Actor1Type1Code on the second actor: categorical GT, code-typed prediction.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor2Type2Code
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    New failure since the 2026-04-29 baseline. Mirrors Actor1Type2Code on the second actor: categorical GT, code-typed prediction.
+  pending_escalation: false
+
+# --- fifa_players (1 new row) ---
+- dataset: fifa_players
+  column: Body Type
+  expected_mechanism: format_diversity
+  rationale: |
+    New failure since the 2026-04-29 baseline. GT representation.discrete.categorical; path-b-prefix means the prediction stayed in representation.* and disagreed only on subtype.
+  pending_escalation: false
+
+# --- oecd_employment (2 new rows) ---
+- dataset: oecd_employment
+  column: STRUCTURE_NAME
+  expected_mechanism: misclassification
+  rationale: |
+    New failure since the 2026-04-29 baseline. GT representation.text.plain_text; prediction-error means the prediction left representation.* and is not code-typed either.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: TRANSFORMATION
+  expected_mechanism: format_diversity
+  rationale: |
+    New failure since the 2026-04-29 baseline. GT representation.discrete.categorical; path-b-prefix means a representation.* prediction differing from the GT only on subtype.
+  pending_escalation: false

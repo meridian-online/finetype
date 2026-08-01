@@ -1669,11 +1669,16 @@ mod fixture_tests {
     /// signals). Failure messages include `(dataset, column, expected,
     /// actual, rationale)` for clear CI diff.
     ///
-    /// **Skips the harness comparison if the report file is missing**
-    /// (e.g. fresh checkout, CI before make-validate-corpus runs). The
-    /// fixture is still loaded so the loader-correctness aspect of ac-03
-    /// is exercised. To force a strict run, regenerate the report first:
-    /// `make validate-corpus`.
+    /// **A missing report file fails this test.** The report is tracked,
+    /// so no checkout reaches a state where it is absent; a read error
+    /// means the path moved or the working tree is damaged. Regenerate
+    /// with `make validate-corpus`.
+    ///
+    /// The parse also asserts it found the `## Per-column attributions`
+    /// heading and that table's header row, so a renamed heading or a
+    /// reshaped table fails here instead of comparing nothing and
+    /// passing. It deliberately puts no floor on the number of data rows:
+    /// a report with no failing columns is the goal state, not a fault.
     #[test]
     fn vci3_fixture_attribution_regression_match() {
         let fixture = load();
@@ -1689,19 +1694,15 @@ mod fixture_tests {
             .map(|p| p.join("eval/eval_output/validate_corpus.md"))
             .expect("workspace root resolvable");
 
-        let report = match std::fs::read_to_string(&report_path) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!(
-                    "vci3_fixture_attribution_regression_match: report missing at {}: {} \
-                     — skipping harness comparison (fixture loader still verified). Run \
-                     `make validate-corpus` to regenerate.",
-                    report_path.display(),
-                    e
-                );
-                return;
-            }
-        };
+        let report = std::fs::read_to_string(&report_path).unwrap_or_else(|e| {
+            panic!(
+                "read harness report {}: {} — this file is tracked, so a read \
+                 error means the path moved or the working tree is damaged. \
+                 Regenerate with `make validate-corpus`.",
+                report_path.display(),
+                e
+            )
+        });
 
         // Parse the per-column attributions table. Format:
         //   ## Per-column attributions
@@ -1711,11 +1712,14 @@ mod fixture_tests {
         //   ...
         let mut in_section = false;
         let mut in_table = false;
+        let mut saw_section = false;
+        let mut saw_header = false;
         let mut compared = 0;
         let mut failures = Vec::new();
         for line in report.lines() {
             if line.starts_with("## Per-column attributions") {
                 in_section = true;
+                saw_section = true;
                 continue;
             }
             if in_section && line.starts_with("##") {
@@ -1740,7 +1744,11 @@ mod fixture_tests {
                 continue;
             }
             // Skip header + separator rows.
-            if cols[1] == "Dataset" || cols[1].starts_with("---") {
+            if cols[1] == "Dataset" {
+                saw_header = true;
+                continue;
+            }
+            if cols[1].starts_with("---") {
                 continue;
             }
 
@@ -1775,6 +1783,24 @@ mod fixture_tests {
                 }
             }
         }
+
+        // Vacuity guards — assert the parse reached the table before
+        // asserting anything about its contents. Without these, a renamed
+        // heading or a reshaped table yields zero comparisons and an empty
+        // `failures`, which reads exactly like a pass.
+        assert!(
+            saw_section,
+            "No `## Per-column attributions` heading in {} — nothing was \
+             compared, so this test would otherwise pass vacuously.",
+            report_path.display()
+        );
+        assert!(
+            saw_header,
+            "Found the `## Per-column attributions` heading in {} but no \
+             `| Dataset | Column | Mechanism | Trigger |` header row — the \
+             table shape changed and nothing was compared.",
+            report_path.display()
+        );
 
         assert!(
             failures.is_empty(),
