@@ -25,6 +25,11 @@
 //!      The branch is exhaustive by construction, NOT a general
 //!      `(-[0-9]{2})?` suffix, which would admit non-ranges like `11-99`.
 //!
+//!   3. `finance.securities.lei` — the LOU prefix (characters 1-4) becomes
+//!      `[A-Z0-9]` rather than `[0-9]`, which is what ISO 17442 defines it as.
+//!      The check digits stay `[0-9]{2}` and the length stays 20, so the
+//!      widening is confined to one of the three parts.
+//!
 //! When future iterations add widenings, append additional `pvc_widening_*`
 //! tests in this file. The accept/reject fixtures double as living
 //! documentation of the boundary each pattern guards.
@@ -167,5 +172,135 @@ fn pvc_widening_naics_accepts_hyphenated_sector_ranges() {
             "12345678", // longer than a 6-digit national industry
             "31 - 33",  // spaced form is not the published notation
         ],
+    );
+}
+
+/// Widening 3 — `finance.securities.lei` accepts an alphanumeric LOU prefix.
+///
+/// ISO 17442 makes characters 1-4 of an LEI the LOU (Local Operating Unit)
+/// prefix, and alphanumeric. The pre-widening pattern
+/// `^[0-9]{4}[A-Z0-9]{14}[0-9]{2}$` required four digits there, so a
+/// letter-prefixed LEI failed validation while passing the ISO 7064 check
+/// digits the same taxonomy entry's `checksum:` directive names.
+///
+/// ACCEPT-set: the prior contract (digit-prefixed) plus values whose first
+/// four characters are not all digits. Each carries valid ISO 7064 check
+/// digits, asserted alongside the pattern below so a value that is merely
+/// LEI-shaped cannot stand in for one that is an LEI.
+///
+/// REJECT-set: the boundary the widening must not overshoot — the check
+/// digits stay numeric, the alphabet stays uppercase ASCII, the length stays
+/// 20, and separators stay out.
+#[test]
+fn pvc_widening_lei_accepts_alphanumeric_lou_prefix() {
+    let accept = [
+        // Pre-widening contract — digit-prefixed, must stay green.
+        "529900T8BM49AURSDO55",
+        "213800WSGIIZCXF1P572",
+        "549300MLUDYVRQOOXS22",
+        // Post-widening additions — characters 1-4 are not all digits.
+        "HWUPKR0MPOU8FGXBT394",
+        "001GPB6A9XPE8XJICC14",
+        "00EHHQ2ZHDCFXJCPCL46",
+    ];
+
+    let lei_checksum =
+        finetype_core::checksum::resolve("lei").expect("the `lei` checksum scheme resolves");
+    for value in &accept {
+        assert!(
+            lei_checksum(value),
+            "ACCEPT-set value {value:?} does not carry valid ISO 7064 check digits, so it \
+             cannot stand as evidence that the pattern accepts real LEIs"
+        );
+    }
+
+    assert_pattern_boundary(
+        "finance.securities.lei",
+        &accept,
+        // REJECT
+        &[
+            "",                      // empty
+            "529900T8BM49AURSDO5",   // 19 characters
+            "529900T8BM49AURSDO555", // 21 characters
+            "HWUPKR0MPOU8FGXBT39A",  // check digits are numeric, positions 19-20
+            "hwupkr0mpou8fgxbt394",  // lower case is not the LEI alphabet
+            "HWUP-R0MPOU8FGXBT394",  // separators are not in the alphabet
+            "HWUPKR0MPOU8FGXBT 94",  // embedded space
+            "HWUPKR0MPOU8FGXBTé94",  // non-ASCII
+        ],
+    );
+}
+
+/// Widening 3, measured over the registry slice this repository already ships:
+/// `eval/datasets/gold_external/gleif_entities.csv`, column `lei`.
+///
+/// The counts are asserted rather than narrated, so a revert of the pattern or
+/// a drift in the fixture reddens here:
+///
+///   - 200 rows;
+///   - 171 of them have an all-digit LOU prefix, which is the subset the
+///     pre-widening pattern `^[0-9]{4}[A-Z0-9]{14}[0-9]{2}$` could match;
+///   - 200 validate against the widened pattern;
+///   - 2 named values fail their own ISO 7064 check digits, which is what
+///     keeps pattern (shape) and checksum (substance) distinguishable here.
+#[test]
+fn pvc_widening_lei_validates_the_committed_registry_slice() {
+    let path = workspace_root().join("eval/datasets/gold_external/gleif_entities.csv");
+    let csv =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {}", path.display(), e));
+
+    let mut lines = csv.lines();
+    let header = lines.next().expect("the slice has a header row");
+    assert_eq!(
+        header.split(',').next(),
+        Some("lei"),
+        "`lei` is the first column of {}; this test reads field 0",
+        path.display()
+    );
+    // Field 0 only, so a quoted `name` containing a comma cannot shift it.
+    let leis: Vec<&str> = lines
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.split(',').next().expect("a row has a first field"))
+        .collect();
+
+    assert_eq!(leis.len(), 200, "row count of the committed slice");
+
+    let all_digit_prefix = leis
+        .iter()
+        .filter(|v| v.as_bytes().len() >= 4 && v.as_bytes()[..4].iter().all(u8::is_ascii_digit))
+        .count();
+    assert_eq!(
+        all_digit_prefix,
+        171,
+        "rows the pre-widening pattern could match; the other {} are what this widening buys",
+        leis.len() - all_digit_prefix
+    );
+
+    let tax = load_taxonomy();
+    let invalid: Vec<&&str> = leis
+        .iter()
+        .filter(|v| {
+            !validate_value_for_label(v, "finance.securities.lei", &tax)
+                .expect("the lei leaf exists")
+                .is_valid
+        })
+        .collect();
+    assert!(
+        invalid.is_empty(),
+        "{} of {} rows fail the widened pattern, e.g. {:?}",
+        invalid.len(),
+        leis.len(),
+        invalid.first()
+    );
+
+    let lei_checksum =
+        finetype_core::checksum::resolve("lei").expect("the `lei` checksum scheme resolves");
+    let checksum_failures: Vec<&str> = leis.iter().copied().filter(|v| !lei_checksum(v)).collect();
+    assert_eq!(
+        checksum_failures,
+        ["0292001629A3Q7XJ0D13", "0292001684F9TE5J9417"],
+        "the pattern is shape and the checksum is substance: these rows of {} match the \
+         widened pattern and still fail ISO 7064",
+        path.display()
     );
 }
