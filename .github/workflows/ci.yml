@@ -346,38 +346,26 @@ jobs:
     # ONE test fails, and it is pre-existing rather than anything this job does
     # wrong:
     #
-    #   finetype-eval, bin validate_corpus,
+    #   finetype-eval, bin validate-corpus,
     #   fixture_tests::vci3_fixture_attribution_regression_match
-    #   (crates/finetype-eval/src/bin/validate_corpus.rs:1779)
+    #   (crates/finetype-eval/src/bin/validate_corpus.rs)
     #
-    # It reports 42 rows compared OK and 21 mismatches, in two kinds:
+    # It reports 54 rows compared OK and 9 mismatches, and the 9 are one kind:
+    # the fixture's expected attribution disagrees with what the Iter-3 cascade
+    # now produces ("fixture expected=… but harness actual=…"). By the
+    # rationale each carries they enumerate as Rule 2 (subtype drift within one
+    # family) x3, Rule 6 (cross-domain prediction error) x3, Rule 3 (exactly
+    # one side in CODE_TYPED_LABELS) x2, and one FIFA GT sidecar case on
+    # fifa_players Value.
     #
-    #   12  the harness attributes a column the fixture does not carry at all
-    #       ("missing from fixture") — gdelt_events Actor1CountryCode,
-    #       Actor1Name, Actor1Type1Code, Actor1Type2Code, Actor2Name,
-    #       Actor2Type1Code and Actor2Type2Code; un_locode Coordinates;
-    #       oecd_employment STRUCTURE_NAME and TRANSFORMATION;
-    #       rio2016_athletes sport; fifa_players Body Type.
+    # Those 9 are open adjudications rather than a defect to patch: which side
+    # is authoritative is a judgement call, and settling it by preference is
+    # the move the fixture exists to prevent. Regenerating the fixture
+    # (`make validate-corpus`) is an evaluation decision, not a CI one, and
+    # stays out of this job.
     #
-    #    9  the fixture's expected attribution disagrees with what the Iter-3
-    #       cascade now produces ("fixture expected=… but harness actual=…").
-    #       By the rationale each carries: Rule 2 (subtype drift within one
-    #       family) x3, Rule 6 (cross-domain prediction error) x3, Rule 3
-    #       (exactly one side in CODE_TYPED_LABELS) x2, and one FIFA GT
-    #       sidecar case on fifa_players Value.
-    #
-    # THE CAUSE is that the test's own escape hatch never fires. It skips the
-    # harness comparison when eval/eval_output/validate_corpus.md is missing —
-    # documented in the test as a fresh-checkout convenience — but that file is
-    # TRACKED, so on any real checkout the strict path always runs. The fixture
-    # and the harness have drifted apart and nothing could see it, because CI
-    # never compiled the crate. Regenerating the fixture (`make validate-corpus`)
-    # is an evaluation decision, not a CI one, and is deliberately left out of
-    # this change.
-    #
-    # So: this job goes red on day one, for a defect no pull request introduced.
-    # That is the whole reason it starts non-required. Promoting it is the
-    # deliverable that finishes the work, not this commit.
+    # That is the whole reason it is non-required. Promoting it is the
+    # deliverable that finishes the work.
     name: Workspace Test (all eight crates)
     runs-on: ubuntu-latest
     steps:
