@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`finance.securities.lei` accepts the alphanumeric LOU prefix ISO 17442
+  defines.** The validation pattern required four digits at characters 1-4,
+  where the standard puts a 4-character alphanumeric LOU (Local Operating Unit)
+  prefix — so an LEI carrying a letter there failed validation while passing the
+  ISO 7064 check digits named by the same leaf's `checksum:` directive, and a
+  column of real LEIs could not be confirmed as LEIs. The pattern is now
+  `^[A-Z0-9]{4}[A-Z0-9]{14}[0-9]{2}$`; the check digits stay `[0-9]{2}` and the
+  length stays 20. Measured over `eval/datasets/gold_external/gleif_entities.csv`
+  (200 rows): 171 matched before, 200 match now — both counts asserted in
+  `crates/finetype-core/tests/precision_widenings.rs`, so a revert reddens a
+  named test.
+
 ## [0.6.54] - 2026-07-28
 
 ### Fixed

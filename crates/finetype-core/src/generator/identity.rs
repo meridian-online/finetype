@@ -371,13 +371,23 @@ impl Generator {
                 }
             }
             ("payment", "lei") => {
-                // LEI: 4-digit LOU prefix + 14 alphanumeric entity + 2 check digits (ISO 7064)
+                // LEI: 4-character alphanumeric LOU prefix + 14 alphanumeric
+                // entity + 2 check digits (ISO 17442; the check digits are
+                // ISO 7064 Mod 97-10). Characters 1-4 are alphanumeric, so the
+                // prefix is drawn from the full alphabet as well as from the
+                // digit-only prefixes listed here.
+                let alphanum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
                 let lou_prefixes = [
                     "5299", "2138", "5493", "3358", "8945", "9598", "7245", "6354", "3157", "2549",
                     "5067", "8156",
                 ];
-                let lou = lou_prefixes[self.rng.gen_range(0..lou_prefixes.len())];
-                let alphanum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                let lou: String = if self.rng.gen_bool(0.5) {
+                    lou_prefixes[self.rng.gen_range(0..lou_prefixes.len())].to_string()
+                } else {
+                    (0..4)
+                        .map(|_| alphanum.as_bytes()[self.rng.gen_range(0..alphanum.len())] as char)
+                        .collect()
+                };
                 let entity: String = (0..14)
                     .map(|_| alphanum.as_bytes()[self.rng.gen_range(0..alphanum.len())] as char)
                     .collect();

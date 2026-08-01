@@ -347,7 +347,7 @@ pub fn isin(value: &str) -> bool {
 ///
 /// The full 20 characters (letters A–Z = 10–35, expanded to two digits each)
 /// reduce to 1 mod 97. The taxonomy pattern checks shape
-/// (`^[0-9]{4}[A-Z0-9]{14}[0-9]{2}$`) but not the check digits. Spaces are
+/// (`^[A-Z0-9]{4}[A-Z0-9]{14}[0-9]{2}$`) but not the check digits. Spaces are
 /// stripped; any other length, or a non-`[A-Z0-9]` character, fails.
 pub fn lei(value: &str) -> bool {
     let chars: Vec<char> = value.trim().chars().filter(|c| *c != ' ').collect();
