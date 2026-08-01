@@ -1108,7 +1108,7 @@ mod report {
         /// report's own statement of how much work is failing.
         pub declared_failing_columns: usize,
         /// One entry per `## Per-dataset` data row whose `Failing columns`
-        /// cell did not parse as a count, so it contributed nothing to
+        /// cell did not parse as a count, so it contributed zero to
         /// `declared_failing_columns`. Each entry names the row's first cell
         /// and what stood where the count belongs.
         pub unreadable_failing_cells: Vec<String>,
@@ -1260,8 +1260,8 @@ mod report {
         if !parse.unreadable_failing_cells.is_empty() {
             return Err(format!(
                 "the `## Per-dataset` table carries a `Failing columns` cell that is not a \
-                 count ({}) — those rows added nothing to the declared total, so a sum of \
-                 zero cannot be told apart from a corpus with no failing column.",
+                 count ({}) — those rows added zero to the declared total, so the sum \
+                 cannot be told apart from a corpus with no failing column.",
                 parse.unreadable_failing_cells.join("; ")
             ));
         }
@@ -1981,7 +1981,7 @@ mod fixture_tests {
     /// `fixture expected=… but harness actual=…`, is a mechanism
     /// disagreement, and the open adjudications hold
     /// `vci3_fixture_attribution_regression_match` red on that shape alone.
-    /// A verdict already red pins nothing further, which is why coverage
+    /// A test that is already failing cannot redden, which is why coverage
     /// gets a verdict of its own here rather than riding on that one.
     ///
     /// Mutation:
