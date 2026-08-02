@@ -5,7 +5,7 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.55] - 2026-08-02
 
 ### Fixed
 
@@ -20,6 +20,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (200 rows): 171 matched before, 200 match now — both counts asserted in
   `crates/finetype-core/tests/precision_widenings.rs`, so a revert reddens a
   named test.
+
+  **`finetype generate` moves with the pattern.** The synthetic LEI generator
+  drew its LOU prefix from a digit-only list; it now draws from the full
+  alphanumeric alphabet as well, so the shape the widened pattern accepts is
+  exercised on every run. LEI output at a fixed `--seed` therefore differs from
+  0.6.54. Two letter-prefixed values were added to the leaf's shipped
+  `samples:`. (#92)
+
+- **Documented SQL that failed on paste.** Fenced SQL in `README.md` and the
+  `docs/` guides is now run against a locally built extension, which is what
+  caught it — among the examples fixed, a `LOAD` naming a filename the build does
+  not write (`Makefile:6` names `target/release/finetype.duckdb_extension`,
+  which `build-extension` writes at `Makefile:146`), a "filter by detected
+  locale" recipe in `docs/LOCALE_GUIDE.md` reading a `$.locale` key that is not
+  in the JSON `finetype_detail` builds
+  (`crates/finetype-duckdb/src/column_fn.rs:328` emits `type`, `confidence`,
+  `duckdb_type`, `samples`, `votes`, and `disambiguation` when a rule fires),
+  and a call to `parse_fr_month`, which the loaded catalog does not report.
+  (#88)
+
+- **Taxonomy sizes quoted in the documentation are checked against the shipped
+  taxonomy.** The headline and the per-domain table are compared, row by row,
+  against the seven `labels/definitions_*.yaml` files that `taxonomy.rs` embeds
+  with `include_str!` — 251 semantic types across 7 domains — and the documented
+  DuckDB registry is compared by name, kind and return type against
+  `duckdb_functions()` of a built extension. Gated by
+  `scripts/check_doc_taxonomy_counts.py`, `scripts/check_duckdb_catalog.py` and
+  `scripts/check_sql_examples.py` on the `evidence` and `doc-surface` CI jobs;
+  `make check-docs` runs them locally. (#88)
+
+### Changed
+
+- **The README teaches the `ft_` surface the extension registers, and the
+  community `INSTALL` is documented again.** The DuckDB section led with the
+  un-prefixed scalars, which `README.md:189-190` records as aliases superseded
+  by the `ft_` verbs since 0.6.23; the examples now open on `ft_profile()` over
+  a table and `ft_validate()` against a JSON Schema. The note that withdrew the
+  community build is replaced by `INSTALL finetype FROM community;` and a table,
+  measured 2026-07-30, of what that channel serves across four releases of the
+  DuckDB 1.5 line — one of which has no published build, where `INSTALL` returns
+  HTTP 404. A migration block names the swaps that are not renames:
+  `finetype()` pools the DuckDB chunk as its sample, so its replacement is
+  `ft_profile` rather than the single-value `ft_infer`; and `finetype_validate`
+  maps to `ft_validate_text`, which returns
+  `STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR)` where the
+  alias returned a `VARCHAR` — `WHERE finetype_validate(...) = 'valid'` becomes
+  `WHERE ft_validate_text(...).valid`.
 
 ## [0.6.54] - 2026-07-28
 
