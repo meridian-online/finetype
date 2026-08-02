@@ -39,27 +39,11 @@ pub fn classify_column(
     get_column_classifier().classify_column(values)
 }
 
-/// Sample cap for `ft_profile`. The classifier only pools `sample_size`
-/// (100) values, so reading more is wasted work; `ft_profile` stops reading the
-/// incoming LIST once it has this many non-empty values, bounding both the
-/// allocation and the model cost even if the analyst passes an unbounded
-/// `list(col)` over a huge column.
+/// Sample cap for the `ft_profile` aggregate. The classifier pools
+/// `sample_size` (100) values, so keeping more is wasted work: each group's
+/// state holds at most this many values however many rows it sees, which is
+/// what lets the aggregate run over a whole column without materialising it.
 pub const PROFILE_SAMPLE_CAP: usize = 100;
-
-/// Read up to `cap` non-empty, trimmed values from a LIST<VARCHAR> cell.
-///
-/// Like `read_list_varchar` but stops reading the child vector once `cap` values
-/// are collected, so a multi-million-row `list(col)` never materialises a
-/// multi-million-element Rust Vec just to discard all but the first
-/// `sample_size` the model pools. Returns None if the list cell itself is NULL.
-pub unsafe fn read_list_varchar_capped(
-    input: &mut DataChunkHandle,
-    col_idx: usize,
-    row_idx: usize,
-    cap: usize,
-) -> Option<Vec<String>> {
-    read_list_varchar_inner(input, col_idx, row_idx, cap)
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INPUT TYPE DETECTION

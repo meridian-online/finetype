@@ -160,19 +160,31 @@ The extension exposes a `profile → schema → validate` flow that mirrors the 
 |------|-------|-------------|-------------|
 | `ft_infer(value)` | one value | scalar | — (weak probe) |
 | `ft_profile(table)` | whole table | SQL table macro | `profile` |
-| `ft_profile(list(col))` | a column | scalar over `LIST` | `profile` |
+| `ft_profile(col)` / `ft_profile(col, header)` | a column | aggregate | `profile` |
 | `ft_validate_text(value, schema)` | one value / column | scalar → STRUCT | per-cell |
 | `ft_validate(table, schema)` | a table | SQL table macro | `validate` |
 | `ft_detail` / `ft_cast` / `ft_unpack` / `ft_version` | one value | scalar | utilities |
 
 The two table verbs are symmetric — both take a table name: `ft_profile('t')` and `ft_validate('t', schema)`. Each is a SQL table macro registered at `LOAD`, so it reaches the catalog via `query_table(name)` past the `BindInfo` wall that blocks Rust table functions on this pin (choice 0064).
 
-`ft_profile` is **one name covering two forms**, which DuckDB routes by call position:
+### One name per granularity
 
-- **`FROM ft_profile('t')`** — the table macro; one row per column `{column_name, type, confidence, duckdb_type}`. The everyday form.
-- **`ft_profile(list(col))` in a `SELECT`** — the underlying scalar over a `LIST`, with a 2-arg `(LIST, header)` overload. The table macro calls this scalar internally; reach for it directly only when you've already assembled a list.
+The surface is organised by *what you hand it*, not by how it is implemented:
 
-`ft_profile` ships as a scalar (plus a macro), not a true aggregate, because duckdb-rs `1.10503.1` exposes no aggregate-UDF registration API (the *aggregate wall*) — see choice 0064's 2026-06-03 addendum.
+| You have | Call | Kind |
+|---|---|---|
+| one value | `ft_infer('alice@example.com')` | scalar |
+| one column | `ft_profile(email)` | aggregate |
+| one column, and a name for it | `ft_profile(val, col)` with a `GROUP BY col` | aggregate |
+| a whole table | `FROM ft_profile('people')` | table macro |
+
+`ft_profile` is **one name covering both column forms and the table form**, which DuckDB routes by call position: a call in `FROM` binds the table macro, a call in a projection binds the aggregate.
+
+The header hint is the second argument. It feeds the model's header branch, which is why the table macro passes each column's own name: profiling a column called `email` is a different question from profiling the same values with no name attached.
+
+**An aggregate-level `ORDER BY` is not supported.** `ft_profile(col ORDER BY col)` reads out of bounds inside DuckDB. The fault is in the C API's shared update path, not in this aggregate: the sorted path makes the state vector constant, and `CAPIAggregateUpdate` flattens the input vectors without flattening the state — its `combine` and `finalize` siblings both do. It is reported upstream and deferred. Order the statement instead.
+
+`ft_profile` reached this shape by giving up a scalar. It was `ft_profile(list(col))`, a scalar over an assembled `LIST`, because duckdb-rs exposes no aggregate-UDF registration API. DuckDB's C API does, and the extension already talks to it directly — but an aggregate cannot be registered at a name a scalar already holds, so the `list()` forms retired to free the name. `ft_profile(list(col))` becomes `ft_profile(col)`, and `ft_profile(list(col), h)` becomes `ft_profile(col, h)`.
 
 ### Why `ft_profile`, not `ft_infer`, is the accurate path
 
@@ -184,6 +196,26 @@ LOAD './target/release/finetype.duckdb_extension';
 -- Single-value probe (no column context — weak):
 SELECT ft_infer('jane.doe@company.co.uk');   -- identity.person.email
 
+-- Profile ONE column. The aggregate pools the column's values into a single
+-- sample and returns one row:
+SELECT ft_profile(email) FROM people;
+-- {'type': identity.person.email, 'confidence': 0.502, 'duckdb_type': VARCHAR}
+
+-- With a header hint, which feeds the model's header branch:
+SELECT ft_profile(email, 'email') FROM people;
+-- {'type': identity.person.email, 'confidence': 0.677, 'duckdb_type': VARCHAR}
+
+-- It is a real aggregate, so GROUP BY works and each group is profiled on its
+-- own sample. One row per group, each carrying that group's own STRUCT.
+SELECT age > 30 AS older, ft_profile(email) AS profile
+FROM people GROUP BY older ORDER BY older;
+-- ┌─────────┬─────────┐
+-- │  older  │ profile │
+-- ├─────────┼─────────┤
+-- │ false   │ {…}     │
+-- │ true    │ {…}     │
+-- └─────────┴─────────┘
+
 -- Profile a whole table — one row per column (the everyday form):
 SELECT * FROM ft_profile('people');
 -- ┌─────────────┬───────────────────────────────────────┬────────────┬─────────────┐
@@ -193,8 +225,8 @@ SELECT * FROM ft_profile('people');
 -- │ email       │ identity.person.email                 │      1.000 │ VARCHAR     │
 -- │ phone       │ identity.person.phone_number          │      0.500 │ VARCHAR     │
 -- └─────────────┴───────────────────────────────────────┴────────────┴─────────────┘
--- The macro bakes in USING SAMPLE 100 ROWS, so it bounds the scan before
--- list() materialises a per-column array — safe on arbitrarily large tables.
+-- The macro bakes in USING SAMPLE 100 ROWS, so it reads a bounded number of
+-- rows rather than the whole table before grouping them by column.
 ```
 
 ### profile → schema → validate

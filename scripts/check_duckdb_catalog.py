@@ -4,9 +4,8 @@
 The extension's surface — which functions exist, what kind each is, what each
 returns — is asserted in prose in README.md, docs/ARCHITECTURE.md,
 docs/DEVELOPMENT.md and the `finetype-duckdb` module doc, and prose is where it
-has gone wrong: a crate table said "5 scalar functions" when the entrypoint
-registers 13 scalars, 2 table macros and 1 table function, and a return type was
-described as a STRUCT where the catalog says VARCHAR.
+has gone wrong: a return type was described as a STRUCT where the catalog says
+VARCHAR.
 
 DuckDB settles all of it mechanically. `duckdb_functions()` reports every
 function a loaded extension registered, with its kind, its overloads and its
@@ -17,9 +16,11 @@ WHAT IS DERIVED (the source of truth)
     `duckdb_functions()` after `LOAD <the local artifact>`, taken as:
 
         scalars ......... name → return type + the set of parameter-type tuples
+        aggregates ...... name → return type + the set of parameter-type tuples
         table functions . name → parameter-type tuples
         table macros .... name → parameter names
-        struct fields ... for a scalar returning STRUCT, its field names in order
+        struct fields ... for a scalar or aggregate returning STRUCT, its field
+                          names in order
 
     The load is hermetic and provably local: `extension_directory` is pointed at
     an empty temp dir, so an installed community build cannot be picked up, and
@@ -204,14 +205,16 @@ def derive(root: Path, extension: Path) -> dict:
         )
 
     scalars: dict[str, dict] = {}
+    aggregates: dict[str, dict] = {}
     table_functions: dict[str, list] = {}
     table_macros: dict[str, list] = {}
     for row in rows:
         name = row["function_name"]
         params = tuple(row["parameter_types"] or [])
         kind = row["function_type"]
-        if kind == "scalar":
-            entry = scalars.setdefault(
+        if kind in ("scalar", "aggregate"):
+            bucket = scalars if kind == "scalar" else aggregates
+            entry = bucket.setdefault(
                 name, {"return_type": row["return_type"], "overloads": []}
             )
             if entry["return_type"] != row["return_type"]:
@@ -231,13 +234,14 @@ def derive(root: Path, extension: Path) -> dict:
     if not scalars:
         raise Fatal("the catalog lists no finetype scalar functions at all")
 
-    for name, entry in scalars.items():
+    for entry in list(scalars.values()) + list(aggregates.values()):
         entry["overloads"].sort()
         entry["struct_fields"] = struct_fields(entry["return_type"])
 
     return {
         "version": info["extension_version"],
         "scalars": scalars,
+        "aggregates": aggregates,
         "table_functions": table_functions,
         "table_macros": table_macros,
     }
@@ -246,6 +250,7 @@ def derive(root: Path, extension: Path) -> dict:
 def all_names(catalog: dict) -> set[str]:
     return (
         set(catalog["scalars"])
+        | set(catalog["aggregates"])
         | set(catalog["table_functions"])
         | set(catalog["table_macros"])
     )
@@ -254,12 +259,16 @@ def all_names(catalog: dict) -> set[str]:
 def registrations(catalog: dict) -> set[tuple[str, str, str]]:
     """Every (name, kind, return type) the loaded extension registers.
 
-    A name can appear twice: `ft_profile` is a scalar over a LIST *and* a table
-    macro, and the docs have to be able to say both.
+    A name can appear twice: `ft_profile` is an aggregate over a column *and* a
+    table macro, and the docs have to be able to say both.
     """
     out = {
         (name, SCALAR, entry["return_type"])
         for name, entry in catalog["scalars"].items()
+    }
+    out |= {
+        (name, AGGREGATE, entry["return_type"])
+        for name, entry in catalog["aggregates"].items()
     }
     out |= {(name, TABLE_MACRO, "TABLE") for name in catalog["table_macros"]}
     out |= {(name, TABLE_FUNCTION, "TABLE") for name in catalog["table_functions"]}
@@ -272,8 +281,8 @@ def registrations(catalog: dict) -> set[tuple[str, str, str]]:
 
 # The registry table. Each row names a function, its kind and its return type;
 # the (name, kind, returns) triples must be exactly the catalog's. Three columns
-# rather than two because `ft_profile` is registered TWICE — as a scalar over a
-# LIST and as a table macro — and a one-row-per-name table cannot say that.
+# rather than two because `ft_profile` is registered TWICE — as an aggregate over
+# a column and as a table macro — and a one-row-per-name table cannot say that.
 SURFACE_FILE = "docs/ARCHITECTURE.md"
 SURFACE_HEADER_RE = re.compile(
     r"^\|\s*Function\s*\|\s*Kind\s*\|\s*Returns\s*\|", re.IGNORECASE
@@ -283,7 +292,8 @@ SURFACE_ROW_RE = re.compile(
     r"\s*(?P<returns>[^|]+?)\s*\|"
 )
 
-SCALAR, TABLE_MACRO, TABLE_FUNCTION = "scalar", "table macro", "table function"
+SCALAR, AGGREGATE = "scalar", "aggregate"
+TABLE_MACRO, TABLE_FUNCTION = "table macro", "table function"
 
 # The module doc's bullet list of the surface.
 MODULE_DOC_FILE = "crates/finetype-duckdb/src/lib.rs"
@@ -301,13 +311,14 @@ UNDOCUMENTED = {
 COUNT_CLAIMS: list[tuple[str, str, dict[str, str]]] = [
     (
         "docs/ARCHITECTURE.md",
-        r"DuckDB extension: (?P<s>\d+) scalar functions \+ (?P<m>\d+) table macros",
-        {"s": "scalars", "m": "table_macros"},
+        r"DuckDB extension: (?P<s>\d+) scalar functions \+ (?P<a>\d+) aggregate"
+        r" \+ (?P<m>\d+) table macros",
+        {"s": "scalars", "a": "aggregates", "m": "table_macros"},
     ),
     (
         "README.md",
-        r"(?P<s>\d+) scalar functions and (?P<m>\d+) table macros",
-        {"s": "scalars", "m": "table_macros"},
+        r"(?P<s>\d+) scalar functions, (?P<a>\d+) aggregate and (?P<m>\d+) table macros",
+        {"s": "scalars", "a": "aggregates", "m": "table_macros"},
     ),
 ]
 
@@ -337,7 +348,7 @@ NOT_FUNCTIONS = {
     "finetype_core": "a crate",
     "finetype_duckdb": "a crate (and the cargo package name)",
     "finetype_model": "a crate",
-    "finetype_init_c_api": "the C entrypoint symbol baked by the entrypoint macro",
+    "finetype_init_c_api": "the C entrypoint symbol",
     "finetype_reject_errors": "the sidecar TABLE the CLI writes, not a function",
 }
 
@@ -570,8 +581,9 @@ def _append(path_rel: str, extra: str):
 def self_test(root: Path, catalog: dict) -> int:
     """Mutate a scratch copy of the docs and require each mutation to be caught."""
     scalars = len(catalog["scalars"])
+    aggregates = len(catalog["aggregates"])
     macros = len(catalog["table_macros"])
-    profile_returns = catalog["scalars"]["ft_profile"]["return_type"]
+    profile_returns = catalog["aggregates"]["ft_profile"]["return_type"]
 
     cases: list[tuple[str, Callable[[Path], None], str]] = [
         (
@@ -602,19 +614,41 @@ def self_test(root: Path, catalog: dict) -> int:
             "the scalar count drifts",
             _sub(
                 "docs/ARCHITECTURE.md",
-                f"DuckDB extension: {scalars} scalar functions + {macros} table macros",
-                f"DuckDB extension: 5 scalar functions + {macros} table macros",
+                f"DuckDB extension: {scalars} scalar functions + {aggregates} aggregate"
+                f" + {macros} table macros",
+                f"DuckDB extension: 5 scalar functions + {aggregates} aggregate"
+                f" + {macros} table macros",
             ),
             f"documented 5 scalars, the loaded extension registers {scalars}",
+        ),
+        (
+            "the aggregate count drifts",
+            _sub(
+                "docs/ARCHITECTURE.md",
+                f"DuckDB extension: {scalars} scalar functions + {aggregates} aggregate"
+                f" + {macros} table macros",
+                f"DuckDB extension: {scalars} scalar functions + 4 aggregate"
+                f" + {macros} table macros",
+            ),
+            f"documented 4 aggregates, the loaded extension registers {aggregates}",
         ),
         (
             "the table-macro count drifts",
             _sub(
                 "README.md",
-                f"{scalars} scalar functions and {macros} table macros",
-                f"{scalars} scalar functions and 9 table macros",
+                f"{scalars} scalar functions, {aggregates} aggregate and {macros} table macros",
+                f"{scalars} scalar functions, {aggregates} aggregate and 9 table macros",
             ),
             f"documented 9 table_macros, the loaded extension registers {macros}",
+        ),
+        (
+            "the aggregate is documented as a scalar",
+            _sub(
+                "docs/ARCHITECTURE.md",
+                "| `ft_profile(col, header?)` | aggregate |",
+                "| `ft_profile(col, header?)` | scalar |",
+            ),
+            "no row for `ft_profile` as a aggregate",
         ),
         (
             "the module doc stops listing a function",
@@ -653,7 +687,8 @@ def self_test(root: Path, catalog: dict) -> int:
 
     print(
         f"self-test: catalog v{catalog['version']} — {scalars} scalars, "
-        f"{len(catalog['table_functions'])} table functions, {macros} table macros"
+        f"{aggregates} aggregates, {len(catalog['table_functions'])} table "
+        f"functions, {macros} table macros"
     )
 
     failed = 0
@@ -740,6 +775,11 @@ def main(argv: list[str]) -> int:
             print(f"  scalar       {name} -> {entry['return_type']}")
             for overload in entry["overloads"]:
                 print(f"                 ({', '.join(overload) or ''})")
+        for name in sorted(catalog["aggregates"]):
+            entry = catalog["aggregates"][name]
+            print(f"  aggregate    {name} -> {entry['return_type']}")
+            for overload in entry["overloads"]:
+                print(f"                 ({', '.join(overload) or ''})")
         for name in sorted(catalog["table_functions"]):
             print(f"  table fn     {name}")
         for name in sorted(catalog["table_macros"]):
@@ -758,6 +798,7 @@ def main(argv: list[str]) -> int:
         print(
             f"The documented DuckDB surface disagrees with the loaded extension "
             f"(v{catalog['version']}: {len(catalog['scalars'])} scalars, "
+            f"{len(catalog['aggregates'])} aggregates, "
             f"{len(catalog['table_functions'])} table functions, "
             f"{len(catalog['table_macros'])} table macros):\n",
             file=sys.stderr,
@@ -774,6 +815,7 @@ def main(argv: list[str]) -> int:
     print(
         f"The documented DuckDB surface matches the loaded extension: v"
         f"{catalog['version']}, {len(catalog['scalars'])} scalar functions, "
+        f"{len(catalog['aggregates'])} aggregate, "
         f"{len(catalog['table_macros'])} table macros, "
         f"{len(catalog['table_functions'])} table function."
     )

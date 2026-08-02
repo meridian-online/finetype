@@ -100,7 +100,7 @@ Pure Rust, no Python runtime, no external C++ dependencies. Integrates cleanly w
 | `finetype-model` | Flat CharCNN + Sense→Sharpen inference, feature extraction, column-mode disambiguation, Model2Vec | `candle-core`, `candle-nn` |
 | `finetype-cli` | Binary: CLI commands (infer, profile, load, check, generate, taxonomy, schema, train, mcp) | `clap`, `csv` |
 | `finetype-mcp` | MCP server library (rmcp, 6 tools, taxonomy resources) | `rmcp`, `tokio` |
-| `finetype-duckdb` | DuckDB extension: 13 scalar functions + 2 table macros with embedded model | `duckdb`, `libduckdb-sys` |
+| `finetype-duckdb` | DuckDB extension: 12 scalar functions + 1 aggregate + 2 table macros with embedded model | `duckdb`, `libduckdb-sys` |
 | `finetype-eval` | Evaluation binaries (profile, actionability, GitTables, SOTAB) | `csv`, `duckdb`, `arrow` |
 | `finetype-train` | Pure Rust ML training (Sense, Entity, CharCNN, sibling-context attention, data pipeline) | `candle-core`, `candle-nn`, `duckdb` |
 | `finetype-build-tools` | Build utilities (DuckDB extension metadata) | — |
@@ -215,8 +215,8 @@ Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
 
 Every row below is checked against `duckdb_functions()` of a loaded local build
 by `scripts/check_duckdb_catalog.py` — name, kind and return type. `ft_profile`
-appears twice because it is registered twice: a scalar over a `LIST`, and a table
-macro DuckDB routes to when the call sits in `FROM`.
+appears twice because it is registered twice: an aggregate over a column, and a
+table macro DuckDB routes to when the call sits in `FROM`.
 
 The `ft_` names are the taught surface. The un-prefixed scalars stay registered
 as aliases for one release so a v0.6.22 community install keeps working.
@@ -224,7 +224,7 @@ as aliases for one release so a v0.6.22 community install keeps working.
 | Function | Kind | Returns | Purpose |
 |---|---|---|---|
 | `ft_infer(value)` | scalar | VARCHAR | Single-value probe — profile with sample size 1 |
-| `ft_profile(list, header?)` | scalar | STRUCT("type" VARCHAR, confidence DOUBLE, duckdb_type VARCHAR) | Column-level classification over an assembled `LIST` |
+| `ft_profile(col, header?)` | aggregate | STRUCT("type" VARCHAR, confidence DOUBLE, duckdb_type VARCHAR) | Column-level classification over a column |
 | `ft_profile(tbl)` | table macro | TABLE | One row per column of `tbl` — the everyday form |
 | `ft_validate(tbl, schema)` | table macro | TABLE | One row per column: totals, rejects, a sample message |
 | `ft_validate_text(value, schema)` | scalar | STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR) | Per-cell validation naming the failed constraint |

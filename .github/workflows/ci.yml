@@ -161,9 +161,7 @@ jobs:
       - name: The documented DuckDB surface matches duckdb_functions()
         # Which functions exist, what kind each is and what each returns are
         # asserted in prose in README.md, docs/ARCHITECTURE.md and the
-        # finetype-duckdb module doc — and prose is where they went wrong: a
-        # crate table said "5 scalar functions" against 13 scalars, 2 table
-        # macros and 1 table function. This LOADs the local build (hermetic
+        # finetype-duckdb module doc. This LOADs the local build (hermetic
         # extension_directory, and the loaded version must equal the tree's, so
         # a community build installed on the runner cannot answer for it) and
         # compares the catalog with the docs in both directions. No model
@@ -171,12 +169,6 @@ jobs:
         run: scripts/check_duckdb_catalog.py
 
       - name: ...and the catalog gate detects a wrong surface
-        # Eleven mutations: a function dropped from the registry table, a row
-        # for a function that does not exist, a STRUCT return documented as
-        # VARCHAR (the defect this was written for), an invented STRUCT field, a
-        # drifting scalar or macro count, the module doc out of step in either
-        # direction, a documented call to a function nobody registered, and the
-        # spike artefact taught as production surface.
         run: scripts/check_duckdb_catalog.py --self-test
 
       - name: Download model from HuggingFace
