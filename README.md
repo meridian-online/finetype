@@ -31,7 +31,7 @@ identity.person.email
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing. 99.9% actionability across 120 tested types.
 - **Locale-aware** — validates 65 locales for postal codes, 46 for phone numbers, 27 for month/day names
 - **MCP server** — `finetype mcp` exposes type inference to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/)
-- **DuckDB extension** — 13 scalar functions and 2 table macros, a `profile → schema → validate` surface in SQL: `ft_profile()` types every column of a table, `ft_validate()` checks a table against a JSON Schema, plus `ft_infer()` / `ft_detail()` / `ft_cast()` / `ft_unpack()` scalars. The full table, gated against the loaded extension's catalog, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#duckdb-extension)
+- **DuckDB extension** — 12 scalar functions, 1 aggregate and 2 table macros, a `profile → schema → validate` surface in SQL: `ft_profile()` types a column or every column of a table, `ft_validate()` checks a table against a JSON Schema, plus `ft_infer()` / `ft_detail()` / `ft_cast()` / `ft_unpack()` scalars. The full table, gated against the loaded extension's catalog, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#duckdb-extension)
 - **Schema-driven validation** — `finetype validate data.csv schema.json --db out.db --table orders` materialises typed DuckDB tables (per-column transforms applied) plus a `finetype_reject_errors` sidecar in a single pass
 - **Pure Rust** — no Python runtime or dependencies
 
@@ -148,6 +148,14 @@ SELECT * FROM ft_profile('my_table');
 -- low-order digits between runs of a single build. The column names, the
 -- duckdb_type values and the type labels are the stable part.
 
+-- Profile ONE column. ft_profile is an aggregate, so this is the plain SQL
+-- shape: DuckDB pools the column into one sample and hands it over once.
+SELECT ft_profile(value) FROM my_table;
+-- {'type': datetime.date.mdy_slash, 'confidence': 0.61, 'duckdb_type': DATE}
+-- A second argument is a header hint, fed to the model's header branch:
+-- ft_profile(value, 'value'). GROUP BY, FILTER and DISTINCT all work; an
+-- aggregate-level ORDER BY inside the call does not — see docs/DEVELOPMENT.md.
+
 -- Validate a table against a JSON Schema (inline literal, variable, or file path)
 SELECT * FROM ft_validate('my_table', 'schema.json');
 
@@ -163,10 +171,11 @@ SELECT ft_infer('192.168.1.1');
 -- reports how many it used. ft_detail(list(...)) samples the same way, so the
 -- two agree.
 --
--- ft_profile is the one that differs: its list form truncates to the FIRST 100
--- (PROFILE_SAMPLE_CAP). Over a column whose leading rows are unrepresentative
--- that is a real disagreement — 2000 rows whose first 200 are IPv4 and the rest
--- emails give ft_detail a hostname/email answer and ft_profile ip_v4.
+-- ft_profile samples differently again, because an aggregate sees the rows one
+-- chunk at a time and cannot stride over a column it has not read yet: it keeps
+-- a reservoir of up to 100 values (PROFILE_SAMPLE_CAP), so every row of the
+-- group has the same chance of reaching the model. The two can therefore
+-- disagree on a column whose values are not homogeneous.
 SELECT ft_detail(value) FROM my_table;   -- 4-row date column
 -- → {"type": "datetime.date.mdy_slash", "confidence": 0.833, "duckdb_type": "DATE", "samples": 4, "disambiguation": "date_slash_disambiguation", "votes": {"datetime.date.mdy_slash": 0.833}}
 -- Every row returns that identical object. Note `SELECT … LIMIT 1` reports
