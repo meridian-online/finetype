@@ -321,51 +321,24 @@ jobs:
     # reports success while its command failed is the exact defect this job
     # exists to remove.
     #
-    # ── WHAT IT FINDS ON ITS FIRST RUN ──────────────────────────────────────
+    # ── WHAT IT ATTESTS TO ──────────────────────────────────────────────────
     #
-    # All eight crates COMPILE: `cargo check --workspace --all-targets` and
-    # `cargo clippy --workspace --all-targets -- -D warnings` are both clean.
+    # `cargo test --workspace` compiles every workspace member and its test
+    # targets, and — while this job is green — runs those tests as well.
     #
-    # WHAT IT DOES *NOT* ATTEST TO YET, and this is the point. `cargo test`
-    # fail-fasts: the first failing test binary ends the run. On this branch it
-    # halts at finetype-eval's validate_corpus (below), and the tally that
-    # reaches that point is 390 passed — but 361 of those are finetype-core
-    # (340) and finetype-cli (21), both `default-members` the pre-existing
-    # `test` job above already ran. Only 29 come from crates that were
-    # invisible: finetype-build-tools (9) and finetype-eval (20).
+    # The second half of that is conditional on the first, because `cargo test`
+    # fail-fasts: the first failing test binary ends the run, so on a red run
+    # the crates sequenced after the failure report nothing and the attestation
+    # narrows to compilation plus whatever ran before it. `--no-fail-fast` is
+    # what removes that narrowing; it is left to the commit that changes this
+    # job's required status rather than smuggled in here.
     #
-    # And because the run stops there, finetype-duckdb, finetype-mcp,
-    # finetype-model and finetype-train execute NO tests at all — 724 between
-    # them, measured with `--no-fail-fast`. finetype-model is itself a
-    # `default-member`, so today this job runs strictly FEWER tests than bare
-    # `cargo test` does; it compiles everything and runs about a third of it.
-    # Compilation coverage is the whole of what this job buys until the failure
-    # below is resolved. Adding `--no-fail-fast` would widen it, and is left to
-    # the commit that promotes this job rather than smuggled in here.
-    #
-    # ONE test fails, and it is pre-existing rather than anything this job does
-    # wrong:
-    #
-    #   finetype-eval, bin validate-corpus,
-    #   fixture_tests::vci3_fixture_attribution_regression_match
-    #   (crates/finetype-eval/src/bin/validate_corpus.rs)
-    #
-    # It reports 54 rows compared OK and 9 mismatches, and the 9 are one kind:
-    # the fixture's expected attribution disagrees with what the Iter-3 cascade
-    # now produces ("fixture expected=… but harness actual=…"). By the
-    # rationale each carries they enumerate as Rule 2 (subtype drift within one
-    # family) x3, Rule 6 (cross-domain prediction error) x3, Rule 3 (exactly
-    # one side in CODE_TYPED_LABELS) x2, and one FIFA GT sidecar case on
-    # fifa_players Value.
-    #
-    # Those 9 are open adjudications rather than a defect to patch: which side
-    # is authoritative is a judgement call, and settling it by preference is
-    # the move the fixture exists to prevent. Regenerating the fixture
-    # (`make validate-corpus`) is an evaluation decision, not a CI one, and
-    # stays out of this job.
-    #
-    # That is the whole reason it is non-required. Promoting it is the
-    # deliverable that finishes the work.
+    # A fixture disagreement in finetype-eval's validate_corpus
+    # (crates/finetype-eval/src/bin/validate_corpus.rs) is not fixed by
+    # regenerating the fixture. `make validate-corpus` rewrites the harness
+    # report, which asserts the harness is right by construction — the
+    # thing under test. Which side is authoritative is an evaluation decision,
+    # not a CI one, and stays out of this job.
     name: Workspace Test (all eight crates)
     runs-on: ubuntu-latest
     steps:

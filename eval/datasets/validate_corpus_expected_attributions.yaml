@@ -7,13 +7,23 @@
 # against these rows by `vci3_fixture_attribution_regression_match`.
 #
 # Schema (ac-03):
-#   - dataset             (string, required)
-#   - column              (string, required)
-#   - expected_mechanism  (string, required: enum_overfit | format_diversity
-#                                          | misclassification | code_vs_canonical
-#                                          | unknown | no_gt)
-#   - rationale           (string, required, ≤200 chars)
-#   - pending_escalation  (bool,   optional, default false)
+#   - dataset               (string, required)
+#   - column                (string, required)
+#   - expected_mechanism    (string, required: enum_overfit | format_diversity
+#                                            | misclassification | code_vs_canonical
+#                                            | unknown | no_gt)
+#   - rationale             (string, required, ≤200 chars)
+#   - pending_escalation    (bool,   optional, default false)
+#   - superseded_mechanism  (string, optional: the `expected_mechanism` this row
+#                                    held before it was re-locked, same enum)
+#
+# `superseded_mechanism` keeps a re-lock legible: the value a row used to hold
+# stays in the file beside the value it holds now, so the change is readable
+# without a git archaeology pass. `vci3_fixture_superseded_mechanism_recorded`
+# names the re-locked rows and requires each to carry a record, that record to
+# name a mechanism the cascade emits, and it to differ from the row's current
+# value. A record that meets those three and still names the wrong value passes:
+# presence and shape are what the test reaches, and content is not.
 #
 # Construction is **strict two-pass** (ac-03, ac-13). Phase 1 (this commit)
 # hand-writes the 4 hard anchor rows + 1 known taxonomy-gap row from the
@@ -25,6 +35,23 @@
 #
 # Source-of-truth precedence: GT sidecar `notes:` wins over iter-2 spec
 # illustrative table when they conflict.
+#
+# Re-lock of 2026-08-02
+# ---------------------
+# Nine rows disagreed with the 2026-07-17 harness report. They were split on
+# the provenance of the fixture side, not on which mechanism reads better:
+#
+#   * A row whose `rationale` is generated cascade boilerplate ("Iter-3 cascade
+#     Rule N: …") records an earlier harness run, not an adjudication. Re-locking
+#     it to the current report restores no judgement, because none was made. The
+#     eight such rows are re-locked, each carrying `superseded_mechanism`. They
+#     are listed in `vci3_fixture_superseded_mechanism_recorded`.
+#   * `fifa_players` / `Value` is hand-written from the GT sidecar's `notes:`
+#     item 2. It is NOT re-locked; see its row for the carve-out.
+#
+# What this costs if the split is wrong: a model regression hiding inside one of
+# the eight moves is locked in as expected. Each re-locked row keeps the value it
+# moved off, so the question stays answerable from this file.
 
 # ---------------------------------------------------------------------------
 # Phase 1 — 4 hard anchors + 1 known taxonomy-gap row
@@ -48,6 +75,19 @@
     Subtype drift within datetime.date.* prefix.
   pending_escalation: false
 
+# CARVE-OUT, 2026-08-02. This row is NOT re-locked, and it is the one row of the
+# nine that carries an adjudication rather than a generated cascade rationale —
+# it was hand-written from the GT sidecar's `notes:` item 2. The 2026-07-17
+# report attributes it via `path-b-prefix` (format_diversity), so the prediction
+# has left CODE_TYPED_LABELS for a representation.* subtype and the seam the
+# sidecar describes is no longer the seam the cascade sees.
+#
+# `pending_escalation: true` takes it out of the regression comparison in
+# `compare_to_fixture` while `expected_mechanism` keeps the adjudicated value, so
+# the disagreement stays on the record instead of being settled by preference.
+# Whether the sidecar thesis or the cascade is authoritative here is an
+# evaluation call, and it is open; it also moves an anchor count, which is why
+# `vci3_fixture_anchor_count_2_hard_3_gap` reads 2/3.
 - dataset: fifa_players
   column: Value
   expected_mechanism: code_vs_canonical
@@ -56,7 +96,10 @@
     currency with M/K abbreviation ('€110.5M', '€565K'). GT
     representation.text.plain_text vs harness-predicted
     finance.currency.amount (in CODE_TYPED_LABELS) → path-b-codetype.
-  pending_escalation: false
+    Carved out 2026-08-02: the 2026-07-17 report reads path-b-prefix
+    (format_diversity) instead, and the adjudicated value is kept rather
+    than re-locked. Wage shares this seam and WAS re-locked.
+  pending_escalation: true
 
 - dataset: oecd_employment
   column: REF_AREA
@@ -161,9 +204,10 @@
 
 - dataset: un_locode
   column: Function
-  expected_mechanism: format_diversity
+  expected_mechanism: code_vs_canonical
+  superseded_mechanism: format_diversity
   rationale: |
-    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+    Re-locked 2026-08-02 to the 2026-07-17 report, which attributes this column via `path-b-codetype`. GT representation.identifier.alphanumeric_id is not code-typed, so Rule 3's XOR puts the predicted side in CODE_TYPED_LABELS.
   pending_escalation: false
 
 - dataset: un_locode
@@ -206,9 +250,10 @@
 # --- gdelt_events (18 rows) ---
 - dataset: gdelt_events
   column: ActionGeo_ADM1Code
-  expected_mechanism: format_diversity
+  expected_mechanism: code_vs_canonical
+  superseded_mechanism: format_diversity
   rationale: |
-    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+    Re-locked 2026-08-02 to the 2026-07-17 report, which attributes this column via `path-b-codetype`. GT representation.discrete.categorical is not code-typed, so Rule 3's XOR puts the predicted side in CODE_TYPED_LABELS.
   pending_escalation: false
 
 - dataset: gdelt_events
@@ -283,9 +328,10 @@
 
 - dataset: gdelt_events
   column: Actor2Geo_ADM1Code
-  expected_mechanism: code_vs_canonical
+  expected_mechanism: format_diversity
+  superseded_mechanism: code_vs_canonical
   rationale: |
-    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+    Re-locked 2026-08-02 to the 2026-07-17 report, which attributes this column via `path-b-prefix`. GT representation.discrete.categorical, so the prediction stayed inside representation.* and drifted on subtype.
   pending_escalation: false
 
 - dataset: gdelt_events
@@ -297,9 +343,10 @@
 
 - dataset: gdelt_events
   column: Actor2Geo_FeatureID
-  expected_mechanism: format_diversity
+  expected_mechanism: code_vs_canonical
+  superseded_mechanism: format_diversity
   rationale: |
-    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+    Re-locked 2026-08-02 to the 2026-07-17 report, which attributes this column via `path-b-codetype`. GT representation.text.word is not code-typed, so Rule 3's XOR puts the predicted side in CODE_TYPED_LABELS.
   pending_escalation: false
 
 - dataset: gdelt_events
@@ -325,9 +372,10 @@
 
 - dataset: gdelt_events
   column: FractionDate
-  expected_mechanism: misclassification
+  expected_mechanism: format_diversity
+  superseded_mechanism: misclassification
   rationale: |
-    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+    Re-locked 2026-08-02 to the 2026-07-17 report, which attributes this column via `path-b-prefix`. GT representation.numeric.decimal_number. The 2026-04-29 report read `prediction-error`, which sits after Rules 2 and 3, so the prediction has moved into representation.* since.
   pending_escalation: false
 
 # --- fifa_players (31 rows) ---
@@ -543,9 +591,10 @@
 
 - dataset: fifa_players
   column: Wage
-  expected_mechanism: code_vs_canonical
+  expected_mechanism: format_diversity
+  superseded_mechanism: code_vs_canonical
   rationale: |
-    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+    Re-locked 2026-08-02 to the 2026-07-17 report, which attributes this column via `path-b-prefix`. GT representation.text.plain_text, so the prediction left CODE_TYPED_LABELS for a representation.* subtype. Same GT-sidecar seam as Value, which is carved out in Phase 1 above — read the two rows together.
   pending_escalation: false
 
 # --- oecd_employment (13 rows) ---
@@ -600,16 +649,18 @@
 
 - dataset: oecd_employment
   column: SEX
-  expected_mechanism: misclassification
+  expected_mechanism: format_diversity
+  superseded_mechanism: misclassification
   rationale: |
-    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+    Re-locked 2026-08-02 to the 2026-07-17 report, which attributes this column via `path-b-prefix`. GT representation.discrete.categorical. The 2026-04-29 report read `prediction-error`, which sits after Rules 2 and 3, so the prediction has moved into representation.* since.
   pending_escalation: false
 
 - dataset: oecd_employment
   column: STRUCTURE_ID
-  expected_mechanism: misclassification
+  expected_mechanism: format_diversity
+  superseded_mechanism: misclassification
   rationale: |
-    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+    Re-locked 2026-08-02 to the 2026-07-17 report, which attributes this column via `path-a-pattern`. That trigger requires predicted == expected, so the prediction now equals GT representation.text.word and a reject failed on `pattern` — a value-shape failure inside the right label, where the 2026-04-29 report read `prediction-error`.
   pending_escalation: false
 
 - dataset: oecd_employment
