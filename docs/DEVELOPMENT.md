@@ -173,10 +173,10 @@ The surface is organised by *what you hand it*, not by how it is implemented:
 
 | You have | Call | Kind |
 |---|---|---|
-| one value | `SELECT ft_infer('alice@example.com')` | scalar |
-| one column | `SELECT ft_profile(email) FROM people` | aggregate |
-| one column, and a name for it | `SELECT ft_profile(val, col) FROM melted GROUP BY col` | aggregate |
-| a whole table | `SELECT * FROM ft_profile('people')` | table macro |
+| one value | `ft_infer('alice@example.com')` | scalar |
+| one column | `ft_profile(email)` | aggregate |
+| one column, and a name for it | `ft_profile(val, col)` with a `GROUP BY col` | aggregate |
+| a whole table | `FROM ft_profile('people')` | table macro |
 
 `ft_profile` is **one name covering both column forms and the table form**, which DuckDB routes by call position: a call in `FROM` binds the table macro, a call in a projection binds the aggregate.
 

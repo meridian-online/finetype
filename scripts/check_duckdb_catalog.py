@@ -816,7 +816,7 @@ def main(argv: list[str]) -> int:
     print(
         f"The documented DuckDB surface matches the loaded extension: v"
         f"{catalog['version']}, {len(catalog['scalars'])} scalar functions, "
-        f"{len(catalog['aggregates'])} aggregate functions, "
+        f"{len(catalog['aggregates'])} aggregate, "
         f"{len(catalog['table_macros'])} table macros, "
         f"{len(catalog['table_functions'])} table function."
     )
