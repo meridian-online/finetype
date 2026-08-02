@@ -323,15 +323,17 @@ jobs:
     #
     # ── WHAT IT ATTESTS TO ──────────────────────────────────────────────────
     #
-    # `cargo test --workspace` compiles every workspace member and its test
-    # targets, and — while this job is green — runs those tests as well.
+    # `cargo test --workspace --no-fail-fast` compiles every workspace member
+    # and its test targets, then runs the test binaries it built — a failure in
+    # one does not stop the ones sequenced behind it. A red run therefore names
+    # the crates whose tests fail rather than the first one to fail, which is
+    # what a check standing between a pull request and the merge button has to
+    # hand the person reading it.
     #
-    # The second half of that is conditional on the first, because `cargo test`
-    # fail-fasts: the first failing test binary ends the run, so on a red run
-    # the crates sequenced after the failure report nothing and the attestation
-    # narrows to compilation plus whatever ran before it. `--no-fail-fast` is
-    # what removes that narrowing; it is left to the commit that changes this
-    # job's required status rather than smuggled in here.
+    # The flag governs what a red run REPORTS, not whether it is red: a failing
+    # test fails the command with the flag and without it. Its reach stops at
+    # compilation — a crate that fails to compile ends the run before a test
+    # binary is executed.
     #
     # A fixture disagreement in finetype-eval's validate_corpus
     # (crates/finetype-eval/src/bin/validate_corpus.rs) is not fixed by
@@ -355,7 +357,7 @@ jobs:
         # not a multi-branch model, so the workspace does not compile at all
         # without this step — it is not only the tests that need the model.
         run: .github/scripts/download-model.sh
-      - run: cargo test --workspace
+      - run: cargo test --workspace --no-fail-fast
 
   python-types:
     # Every accuracy number this repository quotes is produced or adjudicated by
