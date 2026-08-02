@@ -182,7 +182,7 @@ The surface is organised by *what you hand it*, not by how it is implemented:
 
 The header hint is the second argument. It feeds the model's header branch, which is why the table macro passes each column's own name: profiling a column called `email` is a different question from profiling the same values with no name attached.
 
-**An aggregate-level `ORDER BY` is not supported.** `ft_profile(col ORDER BY col)` reads out of bounds inside DuckDB — upstream, deferred, and reproducible with any C API aggregate. Order the statement instead.
+**An aggregate-level `ORDER BY` is not supported.** `ft_profile(col ORDER BY col)` reads out of bounds inside DuckDB. The fault is in the C API's shared update path, not in this aggregate: the sorted path makes the state vector constant, and `CAPIAggregateUpdate` flattens the input vectors without flattening the state — its `combine` and `finalize` siblings both do. It is reported upstream and deferred. Order the statement instead.
 
 `ft_profile` reached this shape by giving up a scalar. It was `ft_profile(list(col))`, a scalar over an assembled `LIST`, because duckdb-rs exposes no aggregate-UDF registration API. DuckDB's C API does, and the extension already talks to it directly — but an aggregate cannot be registered at a name a scalar already holds, so the `list()` forms retired to free the name. `ft_profile(list(col))` becomes `ft_profile(col)`, and `ft_profile(list(col), h)` becomes `ft_profile(col, h)`.
 
@@ -199,11 +199,11 @@ SELECT ft_infer('jane.doe@company.co.uk');   -- identity.person.email
 -- Profile ONE column. The aggregate pools the column's values into a single
 -- sample and returns one row:
 SELECT ft_profile(email) FROM people;
--- {'type': identity.person.email, 'confidence': 1.0, 'duckdb_type': VARCHAR}
+-- {'type': identity.person.email, 'confidence': 0.502, 'duckdb_type': VARCHAR}
 
 -- With a header hint, which feeds the model's header branch:
 SELECT ft_profile(email, 'email') FROM people;
--- {'type': identity.person.email, 'confidence': 1.0, 'duckdb_type': VARCHAR}
+-- {'type': identity.person.email, 'confidence': 0.677, 'duckdb_type': VARCHAR}
 
 -- It is a real aggregate, so GROUP BY works and each group is profiled on its
 -- own sample. One row per group, each carrying that group's own STRUCT.

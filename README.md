@@ -151,7 +151,7 @@ SELECT * FROM ft_profile('my_table');
 -- Profile ONE column. ft_profile is an aggregate, so this is the plain SQL
 -- shape: DuckDB pools the column into one sample and hands it over once.
 SELECT ft_profile(value) FROM my_table;
--- {'type': datetime.date.mdy_slash, 'confidence': 0.61, 'duckdb_type': DATE}
+-- {'type': datetime.date.mdy_slash, 'confidence': 0.833, 'duckdb_type': DATE}
 -- A second argument is a header hint, fed to the model's header branch:
 -- ft_profile(value, 'value'). GROUP BY, FILTER and DISTINCT all work; an
 -- aggregate-level ORDER BY inside the call does not — see docs/DEVELOPMENT.md.
@@ -173,9 +173,9 @@ SELECT ft_infer('192.168.1.1');
 --
 -- ft_profile samples differently again, because an aggregate sees the rows one
 -- chunk at a time and cannot stride over a column it has not read yet: it keeps
--- a reservoir of up to 100 values (PROFILE_SAMPLE_CAP), so every row of the
--- group has the same chance of reaching the model. The two can therefore
--- disagree on a column whose values are not homogeneous.
+-- a reservoir of up to 100 values (PROFILE_SAMPLE_CAP), so a value late in the
+-- scan is as likely to reach the model as one at the front. The two can
+-- therefore disagree on a column whose values are not homogeneous.
 SELECT ft_detail(value) FROM my_table;   -- 4-row date column
 -- → {"type": "datetime.date.mdy_slash", "confidence": 0.833, "duckdb_type": "DATE", "samples": 4, "disambiguation": "date_slash_disambiguation", "votes": {"datetime.date.mdy_slash": 0.833}}
 -- Every row returns that identical object. Note `SELECT … LIMIT 1` reports
