@@ -4,9 +4,8 @@
 The extension's surface — which functions exist, what kind each is, what each
 returns — is asserted in prose in README.md, docs/ARCHITECTURE.md,
 docs/DEVELOPMENT.md and the `finetype-duckdb` module doc, and prose is where it
-has gone wrong: a crate table said "5 scalar functions" when the entrypoint
-registers 13 scalars, 2 table macros and 1 table function, and a return type was
-described as a STRUCT where the catalog says VARCHAR.
+has gone wrong: a return type was described as a STRUCT where the catalog says
+VARCHAR.
 
 DuckDB settles all of it mechanically. `duckdb_functions()` reports every
 function a loaded extension registered, with its kind, its overloads and its
@@ -349,7 +348,7 @@ NOT_FUNCTIONS = {
     "finetype_core": "a crate",
     "finetype_duckdb": "a crate (and the cargo package name)",
     "finetype_model": "a crate",
-    "finetype_init_c_api": "the C entrypoint symbol baked by the entrypoint macro",
+    "finetype_init_c_api": "the C entrypoint symbol",
     "finetype_reject_errors": "the sidecar TABLE the CLI writes, not a function",
 }
 
