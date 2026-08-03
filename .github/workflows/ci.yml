@@ -53,6 +53,18 @@ jobs:
       - name: Check for drift between FINETYPE_CI_MODEL and models/default
         run: .github/scripts/check-ci-model-drift.sh
 
+      - name: ...and the drift gate detects a planted drift
+        # The step above is only known to pass. This one runs the same script
+        # over scratch trees it builds: a planted drift in the symlink form and
+        # in the plain-text form git leaves on Windows, a target differing only
+        # by a path component (which a basename comparison would call aligned),
+        # a models/default that resolves to no name, and a whitespace pin —
+        # each held to an exit status AND a message, since a status alone
+        # cannot tell a refusal from a crash. The aligned trees, FINETYPE_CI_MODEL
+        # unset among them, are asserted green in the same run, or the catches
+        # are noise.
+        run: .github/scripts/check-ci-model-drift.sh --self-test
+
   evidence:
     name: Fixture manifest + scorer failure propagation
     runs-on: ubuntu-latest
