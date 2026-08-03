@@ -21,11 +21,11 @@ After the v0.6.17 release we decoupled CI from the `models/default` symlink (see
 2. **Bump `FINETYPE_CI_MODEL`** in `.github/workflows/ci.yml` and `.github/workflows/release.yml` (workflow-level `env:` blocks).
 3. **Flip `models/default`** — `ln -sfn <new-model> models/default`.
 
-Steps 2 and 3 may ship in the same PR. Step 1 must precede step 2 (or step 2 can be deferred if the promotion is purely a runtime change).
+Steps 2 and 3 ship in the same PR: CI fails while `FINETYPE_CI_MODEL` and `models/default` name different models. Step 1 must precede step 2 — CI's download 404s on a model that is not on HuggingFace yet.
 
 **Quality gates before any of this.** A candidate clears the promotion-order scoreboard *before* the flip (CLAUDE.md "Promotion order"): gold-anchor → drift proxy → gold + rare-type scoreboard → **representative accuracy (advisory)** → **external-data band (advisory)** → corpus-honest gate (**blocking**). The representative band (`eval/repr/representative_corpus.tsv`, scored `score_gold_anchor.py … --reframe`) is reported alongside gold and flags an advisory drop on the candidate-vs-v19 delta; it never blocks on its own. The external-data band (`scripts/external_band.py` over `eval/datasets/gold_external/`, held labels live-derived from `gold_corpus.tsv`) profiles whole real external tables the model never trained on and reports the same candidate-vs-baseline delta; also advisory, also never blocking. Only gold + the corpus-honest relocation gate block. See specs `2026-06-18-representative-accuracy-gate` and `output/external-band/2026-07-11-first-reading.md`.
 
-A non-blocking drift check (`.github/scripts/check-ci-model-drift.sh`) warns in CI when `FINETYPE_CI_MODEL` and `models/default` disagree — legitimate during promotion PRs, but visible so divergence isn't silent for weeks.
+The drift check (`.github/scripts/check-ci-model-drift.sh`) fails the `CI model vs symlink drift` job when `FINETYPE_CI_MODEL` and `models/default` name different models. Run it with `--self-test` to exercise it over scratch trees.
 
 ### Step 0: pack the encoders in half precision before uploading
 
