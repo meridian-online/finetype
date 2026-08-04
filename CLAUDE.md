@@ -9,14 +9,10 @@ Every decision in this repo should reflect these principles:
 1. **Spark joy for analysts** — Type inference should feel magical, not tedious. Clear output, helpful error messages, sensible defaults.
 2. **Write programs that do one thing and do it well** — Each command has one job: `profile` discovers, `taxonomy` generates schema, `validate` enforces and materialises typed output. Separate concerns for separate tools.
 3. **Design for the future, for it will be here sooner than you think** — The type taxonomy, model architecture, and extension interfaces should accommodate new data types and formats without breaking existing behaviour.
-
-### Precision Principle
-
-Precision is what makes FineType valuable. Every validation pattern, locale rule, and disambiguation heuristic must meaningfully distinguish "is this type" from "is not this type."
-
-- Prefer precise locale-specific validation over permissive universal patterns. If a type is `designation: locale_specific`, its real validation lives in `validation_by_locale`, not the universal `validation` block.
-- A validation that confirms 90% of random input is not a validation.
-- Expanding locale coverage is the path to accuracy, not relaxing heuristics.
+4. **Precision Principle** — Precision is what makes the product valuable. Every validation pattern, locale rule, and disambiguation heuristic must meaningfully distinguish "is this type" from "is not this type."
+   - Prefer precise locale-specific validation over permissive universal patterns. If a type is `designation: locale_specific`, its real validation lives in `validation_by_locale`, not the universal `validation` block.
+   - A validation that confirms 90% of random input is not a validation.
+   - Expanding locale coverage is the path to accuracy, not relaxing heuristics.
 
 ## Communicating with the analyst
 
