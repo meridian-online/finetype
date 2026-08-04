@@ -119,12 +119,12 @@ jobs:
         # The count gates read documentation; this reads COMMENTS, which is the
         # other place prose goes wrong. Two checks on the lines this branch
         # ADDED: a symbol attributed to a named crate must actually be defined
-        # there, and a backticked repo path must exist. It found three stale
-        # citations on its first run here — two comments pointing at
-        # `scripts/train_entity_classifier.py` and one at
-        # `scripts/prepare_model2vec.py`, both rewritten in Rust under
-        # crates/finetype-train long ago, so a reader following either found
-        # nothing.
+        # there, and a backticked repo path must exist.
+        #
+        # THIS FILE IS IN SCOPE. A comment in a workflow is an instruction an
+        # agent acts on, so a present-tense pointer at a path that has moved is
+        # indistinguishable from an instruction to use it. SYNTAX and
+        # SYNTAX_BY_NAME in the script name what it opens.
         #
         # fetch-depth 0: it diffs against origin/main and REFUSES to report
         # success when it cannot resolve a merge base, rather than printing a
@@ -139,6 +139,13 @@ jobs:
         # purely because its cases named the other repo's crates. A const is
         # found that one crate defines and another does not, and both the false
         # and the true attribution are asserted.
+        #
+        # The cases past Rust feed a RAW LINE through the gate's own comment
+        # reader rather than handing it a comment body: a citation in a workflow
+        # comment, one in a trailing comment, and text that only looks like a
+        # comment inside a quoted value. A file set widened without the matcher
+        # widening with it reads more files, finds nothing in them, and reddens
+        # here.
         run: scripts/check_comment_citations.py --self-test
 
   doc-surface:

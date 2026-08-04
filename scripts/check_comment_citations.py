@@ -21,10 +21,20 @@ WHAT IS CHECKED (changed comment lines only, `origin/main...HEAD`)
        only ever *reads* the value.
     B  PATH — a backticked repo-relative path (optionally `:LINE`) must exist.
 
+WHERE IT LOOKS
+    Comments in the file types SYNTAX names — Rust `//`, `///`, `//!`, and `#`
+    in Python, shell, YAML and TOML — plus the names in SYNTAX_BY_NAME, which
+    is how the Makefile is reached. A workflow file is in scope
+    because it is an instruction file: an agent reads `.github/workflows/ci.yml`
+    and acts on it, so a present-tense pointer at a path that has moved is
+    indistinguishable from an instruction to use it.
+
 WHAT IS *NOT* CHECKED (scope, stated so nobody reads this as more than it is)
-    - Only ADDED comment lines in the diff. Pre-existing debt is not blocking;
-      this stops new claims, it does not audit old ones. `--all` audits the tree.
-    - Only `.rs` files, and only `//`, `///`, `//!` lines.
+    - ADDED comment lines in the diff, and no more. Pre-existing debt is not
+      blocking; this stops new claims, it does not audit old ones. `--all`
+      audits the tree.
+    - A `/* … */` block is not read, in any language that has one.
+    - A file absent from both tables is not read; Markdown is one such.
     - Bare `a::b` Rust paths are deliberately NOT resolved. Precision matters
       more than recall here — a gate that cries wolf gets disabled, and this
       repo has three defused guards already. Adding path resolution means
@@ -40,9 +50,9 @@ ESCAPE HATCH
     not silently skipped. Writing the reason is the point.
 
 USAGE
-    scripts/check-comment-citations.py             # gate the diff vs origin/main
-    scripts/check-comment-citations.py --all       # audit every comment in tree
-    scripts/check-comment-citations.py --self-test # prove the gate can fail
+    scripts/check_comment_citations.py             # gate the diff vs origin/main
+    scripts/check_comment_citations.py --all       # audit every comment in tree
+    scripts/check_comment_citations.py --self-test # prove the gate can fail
 """
 
 from __future__ import annotations
@@ -66,7 +76,24 @@ ACKNOWLEDGED: dict[str, str] = {
 
 DEFN = r"(?:const|static|fn|struct|enum|trait|type|union|mod)\s+{sym}\b|macro_rules!\s+{sym}\b"
 
-COMMENT = re.compile(r"^\s*(?://!|///|//)\s?(.*)$")
+# What a comment looks like, per file type: the markers that open one, and the
+# quote characters that can hide a marker from being one. This table IS the file
+# filter — a path it cannot answer for is a path the gate does not read — so
+# widening the set of files and widening the comment matcher are one edit, and
+# cannot come apart. `--self-test` asserts a workflow file resolves here.
+#
+# Rust tracks `"` and not `'`: an apostrophe there is a lifetime or a char
+# literal far more often than a string delimiter.
+_HASH = (("#",), "\"'")
+SYNTAX: dict[str, tuple[tuple[str, ...], str]] = {
+    ".rs": (("//!", "///", "//"), '"'),
+    ".py": _HASH,
+    ".sh": _HASH,
+    ".yml": _HASH,
+    ".yaml": _HASH,
+    ".toml": _HASH,
+}
+SYNTAX_BY_NAME: dict[str, tuple[tuple[str, ...], str]] = {"Makefile": _HASH}
 
 # `some-crate`'s `SYMBOL`   /   `SYMBOL` in `some-crate`
 ATTR_POSSESSIVE = re.compile(r"`([a-z][a-z0-9-]*)`'s\s+`([A-Za-z_][A-Za-z0-9_]*)`")
@@ -74,6 +101,63 @@ ATTR_IN = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)`\s+in\s+`([a-z][a-z0-9-]*)`")
 
 # A backticked repo-relative path, optionally with :LINE
 PATH_REF = re.compile(r"`((?:crates|scripts|examples|vendor|\.github)/[A-Za-z0-9_./-]+?)(?::\d+)?`")
+
+
+def syntax_for(path: Path) -> tuple[tuple[str, ...], str] | None:
+    """How comments are written in this file, or None if the gate cannot read it."""
+    return SYNTAX.get(path.suffix) or SYNTAX_BY_NAME.get(path.name)
+
+
+def comment_body(line: str, markers: tuple[str, ...], quotes: str) -> str | None:
+    """The comment text on this line, or None if the line carries no comment.
+
+    A marker opens a comment where it starts the line or follows whitespace and
+    is not inside a quoted run. Both halves are load-bearing: `${VAR#name}` is
+    not a comment, `sed 's/#.*//'` is not a comment, and a citation reported out
+    of either is the kind of noise that gets a gate switched off.
+
+    A quote character is tracked only where the line carries an EVEN number of
+    it. An unbalanced one is prose — "don't", "it's" — and tracking it would
+    swallow the rest of the line, hiding a real comment behind an apostrophe.
+    The tie goes to reading the line: under-reading a quoted argument costs a
+    false positive somebody sees and fixes, while over-reading one costs a
+    citation nobody checks, silently.
+    """
+    live = {q for q in quotes if line.count(q) % 2 == 0}
+    open_q = ""
+    for i, c in enumerate(line):
+        if open_q:
+            if c == open_q:
+                open_q = ""
+            continue
+        if c in live:
+            open_q = c
+            continue
+        if i and not line[i - 1].isspace():
+            continue
+        for mark in markers:
+            if line.startswith(mark, i):
+                return line[i + len(mark):].strip()
+    return None
+
+
+def comment_on(path: Path, line: str) -> str | None:
+    syn = syntax_for(path)
+    return None if syn is None else comment_body(line, *syn)
+
+
+def tracked_files() -> list[Path]:
+    """The tracked paths the gate can read comments in.
+
+    `git ls-files` rather than a glob so the audit covers what the repository
+    ships — a submodule is one gitlink entry here, not a second tree walked at
+    this repo's expense.
+    """
+    out = subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files", "-z"], capture_output=True, text=True
+    )
+    files = [ROOT / f for f in (out.stdout or "").split("\0") if f]
+    return sorted(f for f in files if syntax_for(f) is not None and f.is_file())
 
 
 def crates() -> set[str]:
@@ -171,7 +255,8 @@ def changed_files() -> list[Path]:
         capture_output=True,
         text=True,
     )
-    return [ROOT / f for f in (out.stdout or "").split() if f.endswith(".rs")]
+    touched = [ROOT / f for f in (out.stdout or "").split()]
+    return [f for f in touched if syntax_for(f) is not None]
 
 
 def added_comment_lines(path: Path) -> list[tuple[int, str]]:
@@ -190,20 +275,25 @@ def added_comment_lines(path: Path) -> list[tuple[int, str]]:
             lineno = int(hunk.group(1))
             continue
         if line.startswith("+") and not line.startswith("+++"):
-            m = COMMENT.match(line[1:])
-            if m:
-                hits.append((lineno, m.group(1)))
+            body = comment_on(path, line[1:])
+            if body is not None:
+                hits.append((lineno, body))
             lineno += 1
     return hits
 
 
-def all_comment_lines(path: Path) -> list[tuple[int, str]]:
-    hits = []
-    for i, line in enumerate(path.read_text(errors="replace").splitlines(), 1):
-        m = COMMENT.match(line)
-        if m:
-            hits.append((i, m.group(1)))
+def comment_lines(path: Path, text: str) -> list[tuple[int, str]]:
+    """(line-number, comment-body) for every comment in `text`, read as `path`."""
+    hits: list[tuple[int, str]] = []
+    for i, line in enumerate(text.splitlines(), 1):
+        body = comment_on(path, line)
+        if body is not None:
+            hits.append((i, body))
     return hits
+
+
+def all_comment_lines(path: Path) -> list[tuple[int, str]]:
+    return comment_lines(path, path.read_text(errors="replace"))
 
 
 def check(pairs: list[tuple[Path, list[tuple[int, str]]]]) -> list[str]:
@@ -342,18 +432,87 @@ def self_test() -> int:
         cases.append((f"`{name}` is called here", True,
                       f"STAYS GREEN: ACKNOWLEDGED as external ({why})"))
 
+    # --- PAST RUST: the file filter and the comment matcher, together ------
+    # A file filter widened without the comment matcher yields a gate that reads
+    # more files and finds nothing in them — coverage in appearance only. The
+    # cases above hand `check()` a comment body directly, so they cannot tell
+    # the difference. These hand it a RAW LINE and let the gate's own reader
+    # find the comment, so a `#` line it cannot parse is a MISS here.
+    workflow = next(iter(sorted(ROOT.glob(".github/workflows/*.yml"))), None)
+    if workflow is None:
+        print("self-test: no .github/workflows/*.yml to derive the workflow case from")
+        return 1
+
+    # Which real files the gate will open, asserted before anything is planted
+    # in one. The line cases below plant into a probe path; these say the tree's
+    # own workflow, shell and Python files are paths the gate reaches at all.
+    # The Markdown control is the stated scope limit, held to rather than
+    # assumed: widening to it is a decision, not a side effect.
+    set_cases: list[tuple[Path, bool, str]] = []
+    for pattern in (".github/workflows/*.yml", "scripts/*.sh", "scripts/*.py"):
+        found = next(iter(sorted(ROOT.glob(pattern))), None)
+        if found is None:
+            print(f"self-test: no {pattern} to derive a file-set case from")
+            return 1
+        set_cases.append((found, True, f"IN SCOPE: {found.relative_to(ROOT)}"))
+    doc = next(iter(sorted(ROOT.glob("*.md"))), None)
+    if doc is None:
+        print("self-test: no *.md to derive the out-of-scope case from")
+        return 1
+    set_cases.append((doc, False, f"OUT OF SCOPE, and stated so: {doc.relative_to(ROOT)}"))
+
+    probe_rs = ROOT / "crates" / home / "src" / "probe.rs"
+    probe_yml = workflow.parent / "probe.yml"
+    probe_sh = ROOT / "scripts" / "probe.sh"
+
+    line_cases: list[tuple[Path, str, bool, str]] = [
+        (probe_yml, f"      # rebuilt from `{missing}`", False,
+         "a dead path cited in a workflow comment"),
+        (probe_yml, f"      # rebuilt from `{real_file}:1`", True,
+         "STAYS GREEN: a real path cited in a workflow comment"),
+        (probe_yml, f"      - run: make build  # rebuilt from `{missing}`", False,
+         "a dead path in a TRAILING workflow comment"),
+        (probe_yml, f"      - run: echo 'rebuilt from `{missing}`'", True,
+         "STAYS GREEN: a quoted YAML value is not a comment"),
+        (probe_yml, f"      - run: curl https://example.invalid/x#`{missing}`", True,
+         "STAYS GREEN: a `#` fragment mid-token is not a comment"),
+        (probe_sh, f"sed 's/#.*//' in.txt  # rebuilt from `{missing}`", False,
+         "a `#` inside a quoted argument does not end the scan early"),
+        (probe_sh, f"grep -- '# rebuilt from `{missing}`' in.txt", True,
+         "STAYS GREEN: a `#` inside a quoted argument opens no comment"),
+        (probe_sh, f"dest=${{src#`{missing}`}}", True,
+         "STAYS GREEN: `${VAR#…}` is a parameter expansion, not a comment"),
+        (probe_sh, f"echo \"it's fine\"  # rebuilt from `{missing}`", False,
+         "an apostrophe in prose does not hide the comment behind it"),
+        (probe_rs, f"let n = 1; // rebuilt from `{missing}`", False,
+         "a dead path in a trailing Rust comment"),
+        (probe_rs, f"let p = \"rebuilt from `{missing}`\";", True,
+         "STAYS GREEN: a Rust string literal is not a comment"),
+    ]
+
     bad = 0
+    for path, reachable, label in set_cases:
+        ok = (syntax_for(path) is not None) == reachable
+        print(f"  {'ok  ' if ok else 'MISS'} {label}")
+        if not ok:
+            bad += 1
     for body, should_pass, label in cases:
-        fake = [(ROOT / "crates" / home / "src" / "probe.rs", [(1, body)])]
-        got = not check(fake)
+        got = not check([(probe_rs, [(1, body)])])
         ok = got == should_pass
         print(f"  {'ok  ' if ok else 'MISS'} {label}")
         if not ok:
             bad += 1
+    for path, line, should_pass, label in line_cases:
+        got = not check([(path, comment_lines(path, line))])
+        ok = got == should_pass
+        print(f"  {'ok  ' if ok else 'MISS'} [{path.suffix}] {label}")
+        if not ok:
+            bad += 1
+    total = len(set_cases) + len(cases) + len(line_cases)
     if bad:
-        print(f"\nself-test FAILED: {bad} of {len(cases)} cases wrong")
+        print(f"\nself-test FAILED: {bad} of {total} cases wrong")
         return 1
-    print(f"\nself-test passed: {len(cases)} derived cases, detection and control both correct")
+    print(f"\nself-test passed: {total} derived cases, detection and control both correct")
     return 0
 
 
@@ -362,8 +521,7 @@ def main() -> int:
     if "--self-test" in args:
         return self_test()
     if "--all" in args:
-        files = sorted(ROOT.glob("crates/**/*.rs"))
-        pairs = [(f, all_comment_lines(f)) for f in files]
+        pairs = [(f, all_comment_lines(f)) for f in tracked_files()]
     else:
         pairs = [(f, added_comment_lines(f)) for f in changed_files() if f.exists()]
 
