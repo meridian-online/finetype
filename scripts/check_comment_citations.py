@@ -441,9 +441,24 @@ def self_test() -> int:
     if workflow is None:
         print("self-test: no .github/workflows/*.yml to derive the workflow case from")
         return 1
-    if syntax_for(workflow) is None:
-        print(f"self-test: {workflow.relative_to(ROOT)} is outside the checked file set")
+
+    # Which real files the gate will open, asserted before anything is planted
+    # in one. The line cases below plant into a probe path; these say the tree's
+    # own workflow, shell and Python files are paths the gate reaches at all.
+    # The Markdown control is the stated scope limit, held to rather than
+    # assumed: widening to it is a decision, not a side effect.
+    set_cases: list[tuple[Path, bool, str]] = []
+    for pattern in (".github/workflows/*.yml", "scripts/*.sh", "scripts/*.py"):
+        found = next(iter(sorted(ROOT.glob(pattern))), None)
+        if found is None:
+            print(f"self-test: no {pattern} to derive a file-set case from")
+            return 1
+        set_cases.append((found, True, f"IN SCOPE: {found.relative_to(ROOT)}"))
+    doc = next(iter(sorted(ROOT.glob("*.md"))), None)
+    if doc is None:
+        print("self-test: no *.md to derive the out-of-scope case from")
         return 1
+    set_cases.append((doc, False, f"OUT OF SCOPE, and stated so: {doc.relative_to(ROOT)}"))
 
     probe_rs = ROOT / "crates" / home / "src" / "probe.rs"
     probe_yml = workflow.parent / "probe.yml"
@@ -473,6 +488,11 @@ def self_test() -> int:
     ]
 
     bad = 0
+    for path, reachable, label in set_cases:
+        ok = (syntax_for(path) is not None) == reachable
+        print(f"  {'ok  ' if ok else 'MISS'} {label}")
+        if not ok:
+            bad += 1
     for body, should_pass, label in cases:
         got = not check([(probe_rs, [(1, body)])])
         ok = got == should_pass
@@ -485,7 +505,7 @@ def self_test() -> int:
         print(f"  {'ok  ' if ok else 'MISS'} [{path.suffix}] {label}")
         if not ok:
             bad += 1
-    total = len(cases) + len(line_cases)
+    total = len(set_cases) + len(cases) + len(line_cases)
     if bad:
         print(f"\nself-test FAILED: {bad} of {total} cases wrong")
         return 1
