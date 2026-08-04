@@ -5,6 +5,77 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.56] - 2026-08-04
+
+### Changed
+
+- **`ft_profile` is a DuckDB aggregate, so it types a column directly.**
+  `SELECT ft_profile(email) FROM people` is the call a reader reaches for first,
+  and it did not bind: `ft_profile` was a scalar over an assembled `LIST`, so the
+  column form was `ft_profile(list(email))` and the `ft_profile(tbl)` table macro
+  existed partly to hide that. The reason on record was that duckdb-rs exposes no
+  aggregate-UDF registration API — still true of the wrapper, never true of
+  DuckDB, whose aggregate entrypoints sit in the pinned `libduckdb-sys` loadable
+  bindings this extension already talks to directly. **The call shape changes:**
+  `ft_profile(list(col))` becomes `ft_profile(col)`, and
+  `ft_profile(list(col), header)` becomes `ft_profile(col, header)`. `GROUP BY`,
+  `FILTER` and `DISTINCT` work on it. The `ft_profile(tbl)` table macro keeps its
+  name and its output shape, and now groups the melted table by column name to
+  pass that name as the header hint rather than pooling with `list()` and calling
+  the scalar. Call shapes are tabulated in
+  [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), and the registered surface — name,
+  kind and return type — is compared against `duckdb_functions()` of a built
+  extension by `scripts/check_duckdb_catalog.py` on the `doc-surface` CI job, so
+  a documented shape that the extension does not register fails there.
+
+  **An aggregate-level `ORDER BY` inside the call is not supported.**
+  `ft_profile(col ORDER BY col)` reads out of bounds inside DuckDB. The fault is
+  in the C API's shared update path rather than in this aggregate: the sorted path
+  leaves the state vector constant while `CAPIAggregateUpdate` flattens the input
+  vectors without flattening the state, where its `combine` and `finalize`
+  siblings flatten both. Reported upstream (duckdb/duckdb#21537, closed unfixed
+  and deferred), the callback cannot detect it, and the workaround is to order the
+  statement instead of the aggregate. (#97)
+
+### Removed
+
+- **The `ft_profile(LIST<VARCHAR>)` and `ft_profile(LIST<VARCHAR>, VARCHAR)`
+  scalars.** An aggregate cannot be registered at a name a scalar already holds —
+  the C API registers with `ALTER_ON_CONFLICT`, the catalog throws because the
+  existing entry is a different kind, and the C API swallows the message and
+  returns an error state — so the `LIST` scalars retired to free the name for the
+  aggregate above. Rewrite `ft_profile(list(col))` as `ft_profile(col)`. (#97)
+
+### Fixed
+
+- **The release pre-flight's model-drift check can fail.**
+  `.github/scripts/check-ci-model-drift.sh` had no non-zero exit path: it compared
+  `FINETYPE_CI_MODEL` against the `models/default` target, printed a `::warning::`
+  when they disagreed, and exited 0 — so `CI model vs symlink drift` reported the
+  same green check as the jobs that can go red, and the binary-release pre-flight
+  opens by reading exactly that signal. Drift is the condition under which every
+  platform build of a release fails: `.github/scripts/download-model.sh` fetches
+  into `models/<FINETYPE_CI_MODEL>` while `crates/finetype-cli/build.rs` resolves
+  the `models/default` link target and panics unless that directory holds
+  `label_map.json` and `config.json`. The check now exits non-zero on drift, with
+  no promotion-PR exclusion, and a companion CI step plants drifts in scratch
+  trees — the symlink form, the plain-text form git leaves on Windows, a target
+  differing only by a path component, a `models/default` resolving to no name, and
+  a whitespace pin — holding each to an exit status *and* a message, since a
+  status alone cannot tell a refusal from a crash. `docs/RELEASE.md` no longer
+  describes the check as non-blocking. (#98)
+
+- **The comment-citation gate reads every file type it claims to cover.** It
+  resolved citations in Rust comments only, so a dead path or a misattributed
+  constant written in a workflow file, a shell script, a Python module or a
+  manifest was never read — citations in `ci.yml`'s own comments named Python
+  scripts absent from the tree. The file set and the comment matcher widen
+  together, with a per-syntax comment marker rather than Rust's assumed
+  everywhere: widening the file set alone reads more files and sees nothing in
+  them, which is now a `--self-test` case that reddens when the matcher is left on
+  Rust markers. Shell and YAML get their own handling so an unbalanced apostrophe
+  in prose cannot swallow the rest of the line and hide a citation.
+
 ## [0.6.55] - 2026-08-02
 
 ### Fixed
