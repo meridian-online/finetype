@@ -23,7 +23,8 @@ WHAT IS CHECKED (changed comment lines only, `origin/main...HEAD`)
 
 WHERE IT LOOKS
     Comments in the file types SYNTAX names — Rust `//`, `///`, `//!`, and `#`
-    in Python, shell, YAML, TOML and the Makefile. A workflow file is in scope
+    in Python, shell, YAML and TOML — plus the names in SYNTAX_BY_NAME, which
+    is how the Makefile is reached. A workflow file is in scope
     because it is an instruction file: an agent reads `.github/workflows/ci.yml`
     and acts on it, so a present-tense pointer at a path that has moved is
     indistinguishable from an instruction to use it.
@@ -33,7 +34,7 @@ WHAT IS *NOT* CHECKED (scope, stated so nobody reads this as more than it is)
       blocking; this stops new claims, it does not audit old ones. `--all`
       audits the tree.
     - A `/* … */` block is not read, in any language that has one.
-    - A file type absent from SYNTAX is not read; Markdown is one of them.
+    - A file absent from both tables is not read; Markdown is one such.
     - Bare `a::b` Rust paths are deliberately NOT resolved. Precision matters
       more than recall here — a gate that cries wolf gets disabled, and this
       repo has three defused guards already. Adding path resolution means
@@ -146,7 +147,7 @@ def comment_on(path: Path, line: str) -> str | None:
 
 
 def tracked_files() -> list[Path]:
-    """Every tracked path the gate can read comments in.
+    """The tracked paths the gate can read comments in.
 
     `git ls-files` rather than a glob so the audit covers what the repository
     ships — a submodule is one gitlink entry here, not a second tree walked at
@@ -479,6 +480,8 @@ def self_test() -> int:
          "a `#` inside a quoted argument does not end the scan early"),
         (probe_sh, f"grep -- '# rebuilt from `{missing}`' in.txt", True,
          "STAYS GREEN: a `#` inside a quoted argument opens no comment"),
+        (probe_sh, f"dest=${{src#`{missing}`}}", True,
+         "STAYS GREEN: `${VAR#…}` is a parameter expansion, not a comment"),
         (probe_sh, f"echo \"it's fine\"  # rebuilt from `{missing}`", False,
          "an apostrophe in prose does not hide the comment behind it"),
         (probe_rs, f"let n = 1; // rebuilt from `{missing}`", False,

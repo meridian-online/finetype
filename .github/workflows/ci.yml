@@ -123,8 +123,8 @@ jobs:
         #
         # THIS FILE IS IN SCOPE. A comment in a workflow is an instruction an
         # agent acts on, so a present-tense pointer at a path that has moved is
-        # indistinguishable from an instruction to use it. SYNTAX in the script
-        # names each file type it reads.
+        # indistinguishable from an instruction to use it. SYNTAX and
+        # SYNTAX_BY_NAME in the script name what it opens.
         #
         # fetch-depth 0: it diffs against origin/main and REFUSES to report
         # success when it cannot resolve a merge base, rather than printing a
