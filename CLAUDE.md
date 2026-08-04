@@ -4,15 +4,18 @@ FineType is a type inference engine that detects and classifies data types in ta
 
 ## The Meridian Pillars
 
-Every decision in this repo should reflect these principles:
+The canonical statement is the Meridian Pillars note in the `bearing` vault; this is how they read for
+the typing engine. Every decision in this repo should reflect them:
 
 1. **Spark joy for analysts** — Type inference should feel magical, not tedious. Clear output, helpful error messages, sensible defaults.
 2. **Write programs that do one thing and do it well** — Each command has one job: `profile` discovers, `taxonomy` generates schema, `validate` enforces and materialises typed output. Separate concerns for separate tools.
 3. **Design for the future, for it will be here sooner than you think** — The type taxonomy, model architecture, and extension interfaces should accommodate new data types and formats without breaking existing behaviour.
-4. **Precision Principle** — Precision is what makes the product valuable. Every validation pattern, locale rule, and disambiguation heuristic must meaningfully distinguish "is this type" from "is not this type."
+4. **Precision Principle** — Precision is what makes the product valuable, and it governs the claims we make as well as the types we assign.
+   - *On a type:* every validation pattern, locale rule, and disambiguation heuristic must meaningfully distinguish "is this type" from "is not this type."
    - Prefer precise locale-specific validation over permissive universal patterns. If a type is `designation: locale_specific`, its real validation lives in `validation_by_locale`, not the universal `validation` block.
    - A validation that confirms 90% of random input is not a validation.
    - Expanding locale coverage is the path to accuracy, not relaxing heuristics.
+   - *On a claim:* assert what can be shown and say plainly what is not known. A confident picture that is wrong is the failure this product exists to prevent, so asserting one about our own work is the same defect. An unpinned number, a bare universal quantifier and a promise the artefact does not keep are precision failures.
 
 ## Communicating with the analyst
 
