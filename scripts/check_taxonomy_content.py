@@ -218,9 +218,9 @@ def _unquote(raw: str) -> str:
     return raw
 
 
-# A YAML indicator that opens a value this reader does not read: a block scalar,
-# a flow collection, an anchor, an alias, a tag, a directive, or a character YAML
-# reserves. A value opening with one is refused, not skipped.
+# A value opening with one of these is refused, not skipped. > and | open a
+# block scalar, [ and { a flow collection, & an anchor, * an alias, ! a tag,
+# % a directive, # a comment; @ ` , ] and } cannot open a plain scalar.
 UNREAD_INDICATORS = ">|[]{}&*!%@`,#"
 
 
