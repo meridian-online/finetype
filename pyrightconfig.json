@@ -33,6 +33,7 @@
     "scripts/check_comment_citations.py",
     "scripts/check_duckdb_catalog.py",
     "scripts/check_sql_examples.py",
+    "scripts/check_taxonomy_content.py",
     "scripts/encoder_dtype.py",
     "scripts/encoder_dtype_record_diff.py",
     "scripts/encoder_dtype_record_diff_mutations.py"

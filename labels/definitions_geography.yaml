@@ -1545,11 +1545,11 @@ geography.transportation.iso6346:
   release_priority: 3
   aliases: [container_code, bic_code]
   samples:
-    - "MSCU1234567"
-    - "HLXU3456789"
+    - "MSCU1234566"
+    - "HLXU3456784"
     - "CMAU6543210"
-    - "TRIU7890123"
-    - "MSKU2345678"
+    - "TRIU7890125"
+    - "MSKU2345671"
   icon: ship
   canonical: "https://www.iso.org/standard/83558.html"
   references: null

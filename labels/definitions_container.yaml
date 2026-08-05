@@ -52,9 +52,9 @@ container.object.json:
   frictionless:
     type: object
   format_string: null
-  transform: "PARSE_JSON({col})"
+  transform: "CAST({col} AS JSON)"
   transform_ext: null
-  decompose: "RECURSIVE_INFER_ON_FIELDS({col})"
+  decompose: null
   validation:
     type: string
     pattern: "^\\{.*\\}$"
@@ -98,9 +98,9 @@ container.object.json_array:
   frictionless:
     type: array
   format_string: null
-  transform: "PARSE_JSON({col})"
+  transform: "CAST({col} AS JSON)"
   transform_ext: null
-  decompose: "RECURSIVE_INFER_ON_ARRAY_ELEMENTS({col})"
+  decompose: null
   validation:
     type: string
     pattern: "^\\[.*\\]$"
@@ -137,8 +137,8 @@ container.object.xml:
     type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
-  transform_ext: "XMLPARSE(DOCUMENT {col})"
-  decompose: "RECURSIVE_INFER_ON_XML_CHILDREN({col})"
+  transform_ext: null
+  decompose: null
   validation:
     type: string
     pattern: "^<.*>.*</.*>$"
@@ -175,7 +175,7 @@ container.object.html:
   transform_ext: null
   decompose:
     text_content: "REGEXP_REPLACE({col}, '<[^>]+>', '', 'g')"
-    tag_count: "CAST(REGEXP_COUNT({col}, '<[a-zA-Z][^>]*>') AS INTEGER)"
+    tag_count: "CAST(LEN(REGEXP_EXTRACT_ALL({col}, '<[a-zA-Z][^>]*>')) AS INTEGER)"
   validation:
     type: string
     pattern: "^.*<(p|div|span|a|br|img|h[1-6]|ul|ol|li|table|tr|td|th|strong|em|b|i|form|input|button|select|textarea|header|footer|nav|section|article|main|aside|figure|figcaption|blockquote|pre|code|script|style|link|meta|head|body|html)[\\s>/ ].*$"
@@ -220,7 +220,7 @@ container.object.yaml:
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
-  decompose: "RECURSIVE_INFER_ON_YAML_STRUCTURE({col})"
+  decompose: null
   validation:
     type: string
     pattern: "^[a-zA-Z_][a-zA-Z0-9_]*:\\s*.*"
@@ -260,7 +260,7 @@ container.object.csv:
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
-  decompose: "RECURSIVE_INFER_ON_CSV_COLUMNS({col})"
+  decompose: null
   validation:
     type: string
     pattern: "^[^,]+(,[^,]+)*$"
@@ -485,7 +485,7 @@ container.key_value.query_string:
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
-  decompose: "RECURSIVE_PARSE_QUERY_STRING({col})"
+  decompose: null
   validation:
     type: string
     pattern: "^[^=&]+=([^&]*)(&[^=&]+=[^&]*)*$"

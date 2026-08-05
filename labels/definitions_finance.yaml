@@ -337,7 +337,7 @@ finance.payment.credit_card_number:
   aliases: [pan, credit_card]
   samples:
     - "4532015112830366"
-    - "5425233010103442"
+    - "5425233430109903"
     - "374245455400126"
   icon: credit-card
   canonical: "https://www.iso.org/standard/70484.html"
