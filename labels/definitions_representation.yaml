@@ -284,7 +284,7 @@ representation.text.plain_text:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    word_count: "CAST(REGEXP_COUNT({col}, '\\s+') + 1 AS SMALLINT)"
+    word_count: "CAST(LEN(REGEXP_EXTRACT_ALL({col}, '\\s+')) + 1 AS SMALLINT)"
     char_count: "LENGTH({col})"
   validation:
     type: string
@@ -349,10 +349,7 @@ representation.format.color_hex:
   format_string: null
   transform: "UPPER(CAST({col} AS VARCHAR))"
   transform_ext: null
-  decompose:
-    red: "CAST(CONV(REGEXP_EXTRACT(UPPER({col}), '[A-F0-9]{6}|[A-F0-9]{3}'), 16, 10) AS INTEGER)"
-    green: "CAST(CONV(REGEXP_EXTRACT(UPPER({col}), '[A-F0-9]{6}|[A-F0-9]{3}'), 16, 10) AS INTEGER)"
-    blue: "CAST(CONV(REGEXP_EXTRACT(UPPER({col}), '[A-F0-9]{6}|[A-F0-9]{3}'), 16, 10) AS INTEGER)"
+  decompose: null
   validation:
     type: string
     pattern: "^#?[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$"
@@ -702,7 +699,7 @@ representation.scientific.dna_sequence:
   transform_ext: null
   decompose:
     length: "LENGTH({col})"
-    gc_content: "CAST(REGEXP_COUNT({col}, '[GC]') AS DOUBLE) / LENGTH({col})"
+    gc_content: "CAST(LEN(REGEXP_EXTRACT_ALL({col}, '[GC]')) AS DOUBLE) / LENGTH({col})"
   validation:
     type: string
     pattern: "^[ATGCRYSWKMBDHVN]+$"
@@ -736,7 +733,7 @@ representation.scientific.rna_sequence:
   transform_ext: null
   decompose:
     length: "LENGTH({col})"
-    gc_content: "CAST(REGEXP_COUNT({col}, '[GC]') AS DOUBLE) / LENGTH({col})"
+    gc_content: "CAST(LEN(REGEXP_EXTRACT_ALL({col}, '[GC]')) AS DOUBLE) / LENGTH({col})"
   validation:
     type: string
     pattern: "^[AUGCRYSWKMBDHVN]+$"

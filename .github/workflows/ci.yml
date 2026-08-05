@@ -190,6 +190,27 @@ jobs:
       - name: ...and the catalog gate detects a wrong surface
         run: scripts/check_duckdb_catalog.py --self-test
 
+      - name: The taxonomy's published SQL and samples resolve
+        # `labels/definitions_*.yaml` is published: `finetype taxonomy --full`
+        # emits it and the type-registry pages render `transform` and
+        # `decompose` as copy-button code blocks. The two gates above read
+        # README.md, docs/*.md and the module doc, so `labels/` was outside
+        # every file list they enumerate. This reads the same catalog for call
+        # heads and cast targets, and puts each `samples:` value of a
+        # checksum-bearing leaf through finetype-core's own check digit — via
+        # the `checksum-samples` binary `make build-extension` produced above,
+        # so no build step of its own. No model needed.
+        run: scripts/check_taxonomy_content.py
+
+      - name: ...and the taxonomy gate detects unresolvable content
+        # Mutations of a pristine copy of labels/, covering each value shape the
+        # reader answers for: an inline scalar, a folded block, a nested
+        # mapping entry; a missing function, a missing cast type, an extension
+        # symbol used in the plain-DuckDB fields; a sample that fails its check
+        # digit, a scheme finetype-core does not know, and a check-digit leaf
+        # with its samples removed.
+        run: scripts/check_taxonomy_content.py --self-test
+
       - name: Download model from HuggingFace
         # Only the SQL examples need it. The catalog gate above ran without it,
         # so a wrong surface reddens before this download is paid for.

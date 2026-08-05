@@ -681,9 +681,8 @@ technology.identifier.ulid:
     type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
-  transform_ext: "TRY_CAST({col} AS ULID)"
-  decompose:
-    timestamp_ms: "EPOCH_MS(({col}::ULID)::BIGINT)"
+  transform_ext: null
+  decompose: null
   validation:
     type: string
     pattern: "^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$"
@@ -714,7 +713,7 @@ technology.identifier.tsid:
     type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
-  transform_ext: "tsid_to_timestamp({col})"
+  transform_ext: null
   decompose: null
   validation:
     type: string

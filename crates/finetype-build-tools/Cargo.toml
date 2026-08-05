@@ -3,15 +3,24 @@ name = "finetype-build-tools"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Build utilities for FineType (DuckDB extension metadata)"
+description = "Build and gate utilities for FineType (DuckDB extension metadata, taxonomy check digits)"
 publish = false
 
 [[bin]]
 name = "append-duckdb-metadata"
 path = "src/bin/append_duckdb_metadata.rs"
 
+# The check-digit oracle scripts/check_taxonomy_content.py calls. It lives here
+# rather than in finetype-core because this package is `publish = false` and is
+# already built by `make build-extension`, so the gate needs no build step of
+# its own.
+[[bin]]
+name = "checksum-samples"
+path = "src/bin/checksum_samples.rs"
+
 [dependencies]
 clap = { workspace = true }
+finetype-core = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
