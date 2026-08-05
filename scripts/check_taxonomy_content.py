@@ -311,8 +311,8 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
             continue
 
         if name == "samples" and rest == "":
-            # Scanned the way the nested mapping below is: the block runs to the
-            # first line at or above the key's own indent, and a blank or a
+            # Scanned the way the nested mapping below is: the block ends at the
+            # first non-blank line indented under four spaces, and a blank or a
             # comment inside it is passed over rather than ending it. Stopping
             # at one leaves the items after it unread while YAML publishes them.
             for offset, item in enumerate(lines[index + 1 :], lineno + 1):
@@ -724,9 +724,8 @@ def _flow_sequence_transform(labels_dir: Path) -> None:
 def _run_on_inline_transform(labels_dir: Path) -> None:
     """Break the first inline `transform:` across two lines, unquoted.
 
-    PyYAML folds the pair back into the original expression, so what has to be
-    caught is the shape: the reader takes line one for the whole value, and the
-    part it drops is the part a cast target lives in.
+    The break is at the last space, so PyYAML folds the pair back into the
+    expression the leaf started with and what has to be caught is the shape.
     """
     leaf, expr = _first_expr(labels_dir, "transform", "inline")
     head, _, tail = expr.text.rpartition(" ")
@@ -738,7 +737,7 @@ def _run_on_inline_transform(labels_dir: Path) -> None:
 
 
 def _first_null_sql_prop(labels_dir: Path) -> tuple[Path, int, str]:
-    """The first `transform:`, `decompose:` or `transform_ext:` written null."""
+    """The first `transform:`, `decompose:` or `transform_ext:` set null or `~`."""
     for path in sorted(labels_dir.glob(DEFINITION_GLOB)):
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             prop = PROP_RE.match(line)
