@@ -311,10 +311,18 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
             continue
 
         if name == "samples" and rest == "":
+            # Scanned the way the nested mapping below is: the block runs to the
+            # first line at or above the key's own indent, and a blank or a
+            # comment inside it is passed over rather than ending it. Stopping
+            # at one leaves the items after it unread while YAML publishes them.
             for offset, item in enumerate(lines[index + 1 :], lineno + 1):
+                if item.strip() and not item.startswith("    "):
+                    break
+                if not item.strip() or item.lstrip().startswith("#"):
+                    continue
                 item_match = ITEM_RE.match(item)
                 if not item_match:
-                    break
+                    raise _refuse(rel, offset, f"the value under `{name}:`", item)
                 raw = item_match.group(1).strip()
                 current.samples.append(
                     Sample(line=offset, value=_unquote(raw), escaped="\\" in raw)
@@ -790,20 +798,55 @@ def _first_checksum_leaf(labels_dir: Path) -> Leaf:
     raise Fatal("self-test: no leaf carries both a `checksum:` and a sample")
 
 
+def _bump_digit(value: str) -> str:
+    """`value` with its last digit moved on by one, so it fails its own scheme."""
+    digits = [index for index, char in enumerate(value) if char.isdigit()]
+    if not digits:
+        raise Fatal(f"self-test: {value!r} has no digit to bump")
+    last = digits[-1]
+    return value[:last] + str((int(value[last]) + 1) % 10) + value[last + 1 :]
+
+
 def _corrupt_sample(labels_dir: Path) -> None:
     """Bump the last digit of the first sample of the first checksum-bearing leaf."""
     leaf = _first_checksum_leaf(labels_dir)
     sample = leaf.samples[0]
-    digits = [index for index, char in enumerate(sample.value) if char.isdigit()]
-    if not digits:
-        raise Fatal(f"self-test: {sample.value!r} has no digit to bump")
-    last = digits[-1]
-    bumped = (
-        sample.value[:last]
-        + str((int(sample.value[last]) + 1) % 10)
-        + sample.value[last + 1 :]
-    )
-    _edit_line(leaf.path, sample.line, sample.value, bumped)
+    _edit_line(leaf.path, sample.line, sample.value, _bump_digit(sample.value))
+
+
+def _run_on_sample(labels_dir: Path) -> None:
+    """Continue the first sample of the first checksum leaf onto a second line.
+
+    Line one is left whole, so the value a reader that stops there still
+    satisfies its check digit. What such a reader loses is the rest of the
+    published value, and every sample after this one.
+    """
+    leaf = _first_checksum_leaf(labels_dir)
+    sample = leaf.samples[0]
+    lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines[sample.line - 1] = f"    - {sample.value}\n      NO_SUCH_SAMPLE_TAIL\n"
+    leaf.path.write_text("".join(lines), encoding="utf-8")
+
+
+def _interrupt_samples(filler: str):
+    """Put `filler` after the first sample and corrupt the last one.
+
+    YAML publishes the items either side of a blank line or a comment, so both
+    have to be read past. The corrupted sample is the evidence that they were:
+    it sits after the filler, and on its own it is caught.
+    """
+
+    def apply(labels_dir: Path) -> None:
+        leaf = _first_checksum_leaf(labels_dir)
+        if len(leaf.samples) < 2:
+            raise Fatal(f"self-test: {leaf.key} carries too few samples to split")
+        last = leaf.samples[-1]
+        _edit_line(leaf.path, last.line, last.value, _bump_digit(last.value))
+        lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+        lines.insert(leaf.samples[0].line, filler)
+        leaf.path.write_text("".join(lines), encoding="utf-8")
+
+    return apply
 
 
 def _rename_scheme(labels_dir: Path) -> None:
@@ -914,6 +957,22 @@ def self_test(root: Path, functions: set[str], types: set[str], oracle: Path) ->
             "a checksum: directive is continued onto a second line",
             _run_on_checksum,
             "`checksum:` has a value shape this reader does not read: 'no_such_scheme'",
+        ),
+        (
+            "a samples: value is continued onto a second line",
+            _run_on_sample,
+            "under `samples:` has a value shape this reader does not read: "
+            "'NO_SUCH_SAMPLE_TAIL'",
+        ),
+        (
+            "a blank line sits between two samples, and a later one is corrupt",
+            _interrupt_samples("\n"),
+            "fails the",
+        ),
+        (
+            "a comment sits between two samples, and a later one is corrupt",
+            _interrupt_samples("    # a note\n"),
+            "fails the",
         ),
     ]
 
