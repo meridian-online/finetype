@@ -223,8 +223,11 @@ jobs:
         # blank line, and a comment, between two samples and between two
         # decompose: entries. YAML publishes what sits either side of one, and
         # each case breaks the item AFTER the interruption, so what it pins is
-        # that the block did not end there. The comment cases sweep its column,
-        # because a comment sits at whatever column its author put it.
+        # that the block did not end there. The comment cases sweep its column:
+        # a reader that tests the indent first reads past a comment at four
+        # spaces and stops at a shallower one, and
+        # `labels/definitions_technology.yaml` carries comments at column 0 and
+        # at two spaces.
         run: scripts/check_taxonomy_content.py --self-test
 
       - name: Download model from HuggingFace

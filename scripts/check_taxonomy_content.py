@@ -263,8 +263,8 @@ def _refuse_run_on(
     `started` is whether the key line already carries a scalar. When it does, a
     comment ends that scalar and PyYAML rejects a deeper line after one, so the
     scan stops at the comment. When the key line is bare the value is still
-    pending: a comment at any column is not part of it and does not end it, and
-    `checksum:\\n  # note\\n    iban` loads as `checksum: iban`.
+    pending, so a comment is not part of it and does not end it — a bare
+    `checksum:`, a `# note` line and then `iban` loads as `checksum: iban`.
     """
     for offset in range(index + 1, len(lines)):
         line = lines[offset]
@@ -317,9 +317,9 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
 
         if name == "checksum":
             # `checksum:` with nothing after the colon is the scheme written
-            # null, unless a deeper line follows — then that line is the value
-            # and the leaf has a scheme this reader would otherwise not see,
-            # taking its whole check-digit coverage with it.
+            # null, unless a deeper line follows — then that line is the value,
+            # and a leaf whose scheme this reader does not see takes its
+            # samples out of the check-digit run with it.
             _refuse_run_on(rel, lines, index, name, started=rest != "")
             if rest in ("", "null", "~"):
                 continue
@@ -331,11 +331,10 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
             # Scanned the way the nested mapping below is: blank and comment
             # lines are skipped, and the block ends at the first line left that
             # is not indented four spaces. The comment test runs BEFORE the
-            # indent test — a comment sits at whatever column its author chose,
-            # `labels/definitions_technology.yaml` carries them at 0 and at 2,
-            # and PyYAML publishes the items on either side of one. Testing the
-            # indent first ends the block at a comment shallower than the items
-            # and leaves every item after it unread.
+            # indent test, because a comment shallower than the items would
+            # otherwise end the block while PyYAML publishes the items on
+            # either side of it. `labels/definitions_technology.yaml:233` is a
+            # comment at column 0, and `:253` one at two spaces inside a leaf.
             for offset, item in enumerate(lines[index + 1 :], lineno + 1):
                 if not item.strip() or item.lstrip().startswith("#"):
                     continue
@@ -894,8 +893,8 @@ def _interrupt_nested(filler: str):
     """Put `filler` above the last entry of a nested `decompose:`, and break it.
 
     The same mutation as `_interrupt_samples`, aimed at the other block loop:
-    the broken entry sits after the filler, so only a reader that got past the
-    filler reaches it.
+    the broken entry sits after the filler, so a reader that stops at the
+    filler does not reach it.
     """
 
     def apply(labels_dir: Path) -> None:
@@ -1058,12 +1057,11 @@ def self_test(root: Path, functions: set[str], types: set[str], oracle: Path) ->
         ),
     ]
 
-    # A comment sits at whatever column its author put it, and the two block
-    # loops have to read past it wherever that is: reading the indent first
-    # gets past one at four spaces and ends the block at a shallower one,
-    # leaving what follows unread while PyYAML publishes it. So the column is
-    # swept rather than fixed — `labels/definitions_technology.yaml` carries
-    # comments at 0 and at 2, so the shallow ones are not a contrived shape.
+    # The comment column is swept rather than fixed. A reader that tests the
+    # indent before the comment reads past one at four spaces and ends the
+    # block at a shallower one, so a case pinned at four alone leaves that
+    # reader green. `labels/definitions_technology.yaml:233` is a comment at
+    # column 0, and `:253` one at two spaces inside a leaf.
     for column in (0, 2, 3, 4):
         pad = " " * column + "# a note\n"
         cases.append(
