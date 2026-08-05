@@ -212,9 +212,11 @@ jobs:
         #
         # Also shapes the reader does NOT answer for — a nested entry folded
         # into a block scalar, a flow sequence, a block and a mapping indented
-        # below the reader's floor. A shape it cannot read has to be refused,
-        # because a skipped entry reports the same expression count as a clean
-        # tree.
+        # below the reader's floor, and a plain scalar broken across two lines
+        # at an inline SQL field, a null one and a checksum: directive. A shape
+        # it cannot read has to be refused, because a skipped entry reports the
+        # same expression count as a clean tree — which is how the run-on
+        # scalar was found, at exit 0 with the clean tree's own figures.
         run: scripts/check_taxonomy_content.py --self-test
 
       - name: Download model from HuggingFace

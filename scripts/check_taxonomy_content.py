@@ -157,16 +157,13 @@ SQL_STRING_RE = re.compile(r"'(?:''|[^'])*'")
 # module scope, which is what lets `pyright` and the workflow run the same set
 # with no dependency install.
 #
-#   key: "expr"        an inline scalar, quoted or bare
+#   key: "expr"        an inline scalar, quoted or bare, on ONE line
 #   key: >             a folded or literal block, continued at deeper indent
 #   key:               a nested mapping, one expression per entry
 #     name: "expr"
 #   key: null          no expression here — `~` reads the same
 #   samples:           a block sequence
 #     - "value"
-#
-# A `transform:`, `decompose:` or `transform_ext:` value this reader cannot read
-# raises `Fatal`, rather than being skipped.
 
 LEAF_RE = re.compile(r"^([a-z][a-z0-9_.]*):\s*$")
 PROP_RE = re.compile(r"^  ([a-z_]+):(.*)$")
@@ -218,7 +215,7 @@ def _unquote(raw: str) -> str:
     return raw
 
 
-# A value opening with one of these is refused, not skipped. > and | open a
+# `_scalar` does not read a value opening with one of these. > and | open a
 # block scalar, [ and { a flow collection, & an anchor, * an alias, ! a tag,
 # % a directive, # a comment; @ ` , ] and } cannot open a plain scalar.
 UNREAD_INDICATORS = ">|[]{}&*!%@`,#"
@@ -251,6 +248,24 @@ def _refuse(rel: str, lineno: int, what: str, raw: str) -> Fatal:
         f"    Write the expression as a quoted scalar on one line, or teach "
         f"{Path(__file__).name} this shape."
     )
+
+
+def _refuse_run_on(rel: str, lines: list[str], index: int, name: str) -> None:
+    """Refuse a plain scalar that runs on past the line just read.
+
+    A plain scalar continues onto any following line indented deeper than its
+    key, across blank lines, and folds into one value. `PROP_RE` sits at two
+    spaces and `LEAF_RE` at none, so a deeper line matches neither and is
+    dropped — leaving the first line standing for a value it is only part of.
+    A comment ends the scalar, and YAML rejects a deeper line after one.
+    """
+    for offset in range(index + 1, len(lines)):
+        line = lines[offset]
+        if not line.strip():
+            continue
+        if not line.startswith("   ") or line.lstrip().startswith("#"):
+            return
+        raise _refuse(rel, offset + 1, f"`{name}:`", line)
 
 
 def read_definitions(labels_dir: Path) -> list[Leaf]:
@@ -290,6 +305,7 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
         name, rest = prop.group(1), prop.group(2).strip()
 
         if name == "checksum" and rest not in ("", "null", "~"):
+            _refuse_run_on(rel, lines, index, name)
             current.checksum = _unquote(rest)
             current.checksum_line = lineno
             continue
@@ -309,6 +325,7 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
             continue
 
         if rest in ("null", "~"):
+            _refuse_run_on(rel, lines, index, name)
             continue
 
         if rest.startswith(">") or rest.startswith("|"):
@@ -350,6 +367,7 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
         text = _scalar(rest)
         if text is None:
             raise _refuse(rel, lineno, f"`{name}:`", rest)
+        _refuse_run_on(rel, lines, index, name)
         current.exprs.append(Expr(name, "inline", text, lineno, lineno))
 
     return leaves
@@ -695,6 +713,54 @@ def _flow_sequence_transform(labels_dir: Path) -> None:
     leaf.path.write_text("".join(lines), encoding="utf-8")
 
 
+def _run_on_inline_transform(labels_dir: Path) -> None:
+    """Break the first inline `transform:` across two lines, unquoted.
+
+    PyYAML folds the pair back into the original expression, so what has to be
+    caught is the shape: the reader takes line one for the whole value, and the
+    part it drops is the part a cast target lives in.
+    """
+    leaf, expr = _first_expr(labels_dir, "transform", "inline")
+    head, _, tail = expr.text.rpartition(" ")
+    if not head:
+        raise Fatal(f"self-test: {expr.text!r} has no space to break at")
+    lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines[expr.first_line - 1] = f"  transform: {head}\n    {tail}\n"
+    leaf.path.write_text("".join(lines), encoding="utf-8")
+
+
+def _first_null_sql_prop(labels_dir: Path) -> tuple[Path, int, str]:
+    """The first `transform:`, `decompose:` or `transform_ext:` written null."""
+    for path in sorted(labels_dir.glob(DEFINITION_GLOB)):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            prop = PROP_RE.match(line)
+            if prop is None or prop.group(1) not in SQL_FIELDS:
+                continue
+            if prop.group(2).strip() in ("null", "~"):
+                return path, lineno, prop.group(1)
+    raise Fatal("self-test: no SQL field is written null")
+
+
+def _run_on_null_field(labels_dir: Path) -> None:
+    """Continue a null SQL field onto a second line.
+
+    PyYAML folds the two into one string, so the field carries an expression
+    while the reader reads the leaf as having none there.
+    """
+    path, lineno, name = _first_null_sql_prop(labels_dir)
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines[lineno - 1] = f"  {name}: null\n    NO_SUCH_FUNCTION_AT_ALL({{col}})\n"
+    path.write_text("".join(lines), encoding="utf-8")
+
+
+def _run_on_checksum(labels_dir: Path) -> None:
+    """Continue a `checksum:` directive onto a second line."""
+    leaf = _first_checksum_leaf(labels_dir)
+    lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines[leaf.checksum_line - 1] = f"  checksum: {leaf.checksum}\n    no_such_scheme\n"
+    leaf.path.write_text("".join(lines), encoding="utf-8")
+
+
 def _under_indent_block(labels_dir: Path) -> None:
     """Re-indent a folded `transform:` block's continuation to three spaces."""
     leaf, expr = _first_expr(labels_dir, "transform", "block")
@@ -833,6 +899,21 @@ def self_test(root: Path, functions: set[str], types: set[str], oracle: Path) ->
             "a decompose: mapping's entries sit below the reader's indent",
             _under_indent_nested,
             "`decompose:` has a value shape this reader does not read: ''",
+        ),
+        (
+            "an inline transform: is broken across two lines, unquoted",
+            _run_on_inline_transform,
+            "`transform:` has a value shape this reader does not read",
+        ),
+        (
+            "a null SQL field is continued onto a second line",
+            _run_on_null_field,
+            "value shape this reader does not read: 'NO_SUCH_FUNCTION_AT_ALL({col})'",
+        ),
+        (
+            "a checksum: directive is continued onto a second line",
+            _run_on_checksum,
+            "`checksum:` has a value shape this reader does not read: 'no_such_scheme'",
         ),
     ]
 
