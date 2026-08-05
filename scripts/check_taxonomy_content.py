@@ -155,16 +155,18 @@ SQL_STRING_RE = re.compile(r"'(?:''|[^'])*'")
 #
 # Deliberately not a YAML parser: every gate CI runs here is stdlib-only at
 # module scope, which is what lets `pyright` and the workflow run the same set
-# with no dependency install. The reader answers for four shapes and refuses
-# anything else, and its liveness is asserted after every read — a reader that
-# silently harvested nothing would look exactly like a clean tree.
+# with no dependency install.
 #
 #   key: "expr"        an inline scalar, quoted or bare
 #   key: >             a folded or literal block, continued at deeper indent
 #   key:               a nested mapping, one expression per entry
 #     name: "expr"
+#   key: null          no expression here — `~` reads the same
 #   samples:           a block sequence
 #     - "value"
+#
+# A `transform:`, `decompose:` or `transform_ext:` value this reader cannot read
+# raises `Fatal`, rather than being skipped.
 
 LEAF_RE = re.compile(r"^([a-z][a-z0-9_.]*):\s*$")
 PROP_RE = re.compile(r"^  ([a-z_]+):(.*)$")
@@ -206,15 +208,49 @@ def _unquote(raw: str) -> str:
     """The scalar's text, with one layer of surrounding quotes removed.
 
     Escape sequences are NOT decoded. A backslash therefore means the returned
-    text and the scalar's real text differ. That is harmless for head and cast
-    extraction, where a backslash only ever appears inside a regex argument this
-    gate blanks anyway; it is not harmless for a sample value, which has to be
-    exact. `Sample.escaped` carries the distinction to `_check_samples`, which
-    refuses rather than judging a string it did not build.
+    text and the scalar's real text differ, which is not tolerable for a sample
+    value: it has to be exact. `Sample.escaped` carries the distinction to
+    `_check_samples`, which refuses rather than judging a string it did not
+    build.
     """
     if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "\"'":
         return raw[1:-1]
     return raw
+
+
+# A YAML indicator that opens a value this reader does not read: a block scalar,
+# a flow collection, an anchor, an alias, a tag, a directive, or a character YAML
+# reserves. A value opening with one is refused, not skipped.
+UNREAD_INDICATORS = ">|[]{}&*!%@`,#"
+
+
+def _scalar(raw: str) -> str | None:
+    """A one-line scalar's text, or None when this reader cannot read the shape.
+
+    Escape sequences are not decoded — see `_unquote`.
+    """
+    if not raw:
+        return None
+    if raw[0] in "\"'":
+        if len(raw) >= 2 and raw[-1] == raw[0]:
+            return raw[1:-1]
+        return None
+    if raw[0] in UNREAD_INDICATORS:
+        return None
+    if " #" in raw or "\t#" in raw:
+        return None
+    return raw
+
+
+def _refuse(rel: str, lineno: int, what: str, raw: str) -> Fatal:
+    """The refusal for a value shape the reader does not read."""
+    shown = raw.strip()[:80]
+    return Fatal(
+        f"{rel}:{lineno}: {what} has a value shape this reader does not read: "
+        f"{shown!r}.\n"
+        f"    Write the expression as a quoted scalar on one line, or teach "
+        f"{Path(__file__).name} this shape."
+    )
 
 
 def read_definitions(labels_dir: Path) -> list[Leaf]:
@@ -284,32 +320,37 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
                 if cont.strip():
                     buf.append(cont.strip())
                     last = offset
-            if buf:
-                current.exprs.append(
-                    Expr(name, "block", " ".join(buf), lineno + 1, last)
-                )
+            if not buf:
+                raise _refuse(rel, lineno, f"`{name}:`", rest)
+            current.exprs.append(Expr(name, "block", " ".join(buf), lineno + 1, last))
             continue
 
         if rest == "":
+            entries = 0
             for offset, nested in enumerate(lines[index + 1 :], lineno + 1):
                 if nested.strip() and not nested.startswith("    "):
                     break
+                if not nested.strip() or nested.lstrip().startswith("#"):
+                    continue
                 nested_match = NESTED_RE.match(nested)
-                if nested_match:
-                    current.exprs.append(
-                        Expr(
-                            name,
-                            "nested",
-                            _unquote(nested_match.group(2).strip()),
-                            offset,
-                            offset,
-                        )
-                    )
+                if not nested_match:
+                    raise _refuse(rel, offset, f"the entry under `{name}:`", nested)
+                entries += 1
+                key, value = nested_match.group(1), nested_match.group(2).strip()
+                if value in ("null", "~"):
+                    continue
+                text = _scalar(value)
+                if text is None:
+                    raise _refuse(rel, offset, f"`{key}:` under `{name}:`", value)
+                current.exprs.append(Expr(name, "nested", text, offset, offset))
+            if not entries:
+                raise _refuse(rel, lineno, f"`{name}:`", rest)
             continue
 
-        current.exprs.append(
-            Expr(name, "inline", _unquote(rest), lineno, lineno)
-        )
+        text = _scalar(rest)
+        if text is None:
+            raise _refuse(rel, lineno, f"`{name}:`", rest)
+        current.exprs.append(Expr(name, "inline", text, lineno, lineno))
 
     return leaves
 
@@ -630,6 +671,52 @@ def _rename_cast_target(replacement: str):
     return apply
 
 
+def _fold_nested_entry(labels_dir: Path) -> None:
+    """Rewrite the first nested `decompose:` entry as a folded block scalar."""
+    leaf, expr = _first_expr(labels_dir, "decompose", "nested")
+    lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+    match = NESTED_RE.match(lines[expr.first_line - 1].rstrip("\n"))
+    if match is None:
+        raise Fatal(f"self-test: {leaf.rel}:{expr.first_line} is not a nested entry")
+    lines[expr.first_line - 1] = (
+        f"    {match.group(1)}: >\n      NO_SUCH_FUNCTION_AT_ALL({{col}})\n"
+    )
+    leaf.path.write_text("".join(lines), encoding="utf-8")
+
+
+def _flow_sequence_transform(labels_dir: Path) -> None:
+    """Rewrite the first inline `transform:` as a flow sequence of itself.
+
+    The expression is left resolvable, so what has to be caught is the shape.
+    """
+    leaf, expr = _first_expr(labels_dir, "transform", "inline")
+    lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines[expr.first_line - 1] = f'  transform: ["{expr.text}"]\n'
+    leaf.path.write_text("".join(lines), encoding="utf-8")
+
+
+def _under_indent_block(labels_dir: Path) -> None:
+    """Re-indent a folded `transform:` block's continuation to three spaces."""
+    leaf, expr = _first_expr(labels_dir, "transform", "block")
+    lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+    for lineno in range(expr.first_line, expr.last_line + 1):
+        lines[lineno - 1] = "   " + lines[lineno - 1].lstrip()
+    leaf.path.write_text("".join(lines), encoding="utf-8")
+
+
+def _under_indent_nested(labels_dir: Path) -> None:
+    """Re-indent a `decompose:` mapping's entries to three spaces."""
+    leaf, expr = _first_expr(labels_dir, "decompose", "nested")
+    lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+    start = expr.first_line - 1
+    while start > 0 and NESTED_RE.match(lines[start - 1].rstrip("\n")):
+        start -= 1
+    while start < len(lines) and NESTED_RE.match(lines[start].rstrip("\n")):
+        lines[start] = "   " + lines[start].lstrip()
+        start += 1
+    leaf.path.write_text("".join(lines), encoding="utf-8")
+
+
 def _first_checksum_leaf(labels_dir: Path) -> Leaf:
     for leaf in read_definitions(labels_dir):
         if leaf.checksum and leaf.samples:
@@ -726,6 +813,26 @@ def self_test(root: Path, functions: set[str], types: set[str], oracle: Path) ->
             "a checksum leaf loses every sample",
             _empty_samples,
             "carries no `samples:` value",
+        ),
+        (
+            "a nested decompose: entry is folded into a block scalar",
+            _fold_nested_entry,
+            "under `decompose:` has a value shape this reader does not read",
+        ),
+        (
+            "an inline transform: is written as a flow sequence",
+            _flow_sequence_transform,
+            "`transform:` has a value shape this reader does not read: '[",
+        ),
+        (
+            "a folded transform: block is continued below the reader's indent",
+            _under_indent_block,
+            "`transform:` has a value shape this reader does not read: '>'",
+        ),
+        (
+            "a decompose: mapping's entries sit below the reader's indent",
+            _under_indent_nested,
+            "`decompose:` has a value shape this reader does not read: ''",
         ),
     ]
 
