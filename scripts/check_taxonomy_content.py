@@ -250,20 +250,31 @@ def _refuse(rel: str, lineno: int, what: str, raw: str) -> Fatal:
     )
 
 
-def _refuse_run_on(rel: str, lines: list[str], index: int, name: str) -> None:
+def _refuse_run_on(
+    rel: str, lines: list[str], index: int, name: str, *, started: bool = True
+) -> None:
     """Refuse a plain scalar that runs on past the line just read.
 
     A plain scalar continues onto any following line indented deeper than its
     key, across blank lines, and folds into one value. `PROP_RE` sits at two
     spaces and `LEAF_RE` at none, so a deeper line matches neither and is
     dropped — leaving the first line standing for a value it is only part of.
-    A comment ends the scalar, and YAML rejects a deeper line after one.
+
+    `started` is whether the key line already carries a scalar. When it does, a
+    comment ends that scalar and PyYAML rejects a deeper line after one, so the
+    scan stops at the comment. When the key line is bare the value is still
+    pending: a comment at any column is not part of it and does not end it, and
+    `checksum:\\n  # note\\n    iban` loads as `checksum: iban`.
     """
     for offset in range(index + 1, len(lines)):
         line = lines[offset]
         if not line.strip():
             continue
-        if not line.startswith("   ") or line.lstrip().startswith("#"):
+        if line.lstrip().startswith("#"):
+            if started:
+                return
+            continue
+        if not line.startswith("   "):
             return
         raise _refuse(rel, offset + 1, f"`{name}:`", line)
 
@@ -304,22 +315,32 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
             continue
         name, rest = prop.group(1), prop.group(2).strip()
 
-        if name == "checksum" and rest not in ("", "null", "~"):
-            _refuse_run_on(rel, lines, index, name)
+        if name == "checksum":
+            # `checksum:` with nothing after the colon is the scheme written
+            # null, unless a deeper line follows — then that line is the value
+            # and the leaf has a scheme this reader would otherwise not see,
+            # taking its whole check-digit coverage with it.
+            _refuse_run_on(rel, lines, index, name, started=rest != "")
+            if rest in ("", "null", "~"):
+                continue
             current.checksum = _unquote(rest)
             current.checksum_line = lineno
             continue
 
         if name == "samples" and rest == "":
-            # Scanned the way the nested mapping below is: the block ends at the
-            # first non-blank line indented under four spaces, and a blank or a
-            # comment inside it is passed over rather than ending it. Stopping
-            # at one leaves the items after it unread while YAML publishes them.
+            # Scanned the way the nested mapping below is: blank and comment
+            # lines are skipped, and the block ends at the first line left that
+            # is not indented four spaces. The comment test runs BEFORE the
+            # indent test — a comment sits at whatever column its author chose,
+            # `labels/definitions_technology.yaml` carries them at 0 and at 2,
+            # and PyYAML publishes the items on either side of one. Testing the
+            # indent first ends the block at a comment shallower than the items
+            # and leaves every item after it unread.
             for offset, item in enumerate(lines[index + 1 :], lineno + 1):
-                if item.strip() and not item.startswith("    "):
-                    break
                 if not item.strip() or item.lstrip().startswith("#"):
                     continue
+                if not item.startswith("    "):
+                    break
                 item_match = ITEM_RE.match(item)
                 if not item_match:
                     raise _refuse(rel, offset, f"the value under `{name}:`", item)
@@ -339,6 +360,9 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
         if rest.startswith(">") or rest.startswith("|"):
             buf: list[str] = []
             last = lineno
+            # Not the order the `samples:` and nested loops use: inside a block
+            # scalar a `#` is content rather than a comment, and a line
+            # shallower than the block is where the scalar ends.
             for offset, cont in enumerate(lines[index + 1 :], lineno + 1):
                 if cont.strip() and not cont.startswith("    "):
                     break
@@ -352,11 +376,12 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
 
         if rest == "":
             entries = 0
+            # Comment before indent, for the reason given at `samples:` above.
             for offset, nested in enumerate(lines[index + 1 :], lineno + 1):
-                if nested.strip() and not nested.startswith("    "):
-                    break
                 if not nested.strip() or nested.lstrip().startswith("#"):
                     continue
+                if not nested.startswith("    "):
+                    break
                 nested_match = NESTED_RE.match(nested)
                 if not nested_match:
                     raise _refuse(rel, offset, f"the entry under `{name}:`", nested)
@@ -768,6 +793,23 @@ def _run_on_checksum(labels_dir: Path) -> None:
     leaf.path.write_text("".join(lines), encoding="utf-8")
 
 
+def _bare_checksum_key(filler: str):
+    """Move a `checksum:` value below its key, with `filler` in between.
+
+    PyYAML folds the two lines into `checksum: <scheme>`, so the leaf still
+    declares a scheme. A reader that judges the key line alone sees `checksum:`
+    written null and drops the leaf from the check-digit run with its samples.
+    """
+
+    def apply(labels_dir: Path) -> None:
+        leaf = _first_checksum_leaf(labels_dir)
+        lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+        lines[leaf.checksum_line - 1] = f"  checksum:\n{filler}    {leaf.checksum}\n"
+        leaf.path.write_text("".join(lines), encoding="utf-8")
+
+    return apply
+
+
 def _under_indent_block(labels_dir: Path) -> None:
     """Re-indent a folded `transform:` block's continuation to three spaces."""
     leaf, expr = _first_expr(labels_dir, "transform", "block")
@@ -844,6 +886,37 @@ def _interrupt_samples(filler: str):
         lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
         lines.insert(leaf.samples[0].line, filler)
         leaf.path.write_text("".join(lines), encoding="utf-8")
+
+    return apply
+
+
+def _interrupt_nested(filler: str):
+    """Put `filler` above the last entry of a nested `decompose:`, and break it.
+
+    The same mutation as `_interrupt_samples`, aimed at the other block loop:
+    the broken entry sits after the filler, so only a reader that got past the
+    filler reaches it.
+    """
+
+    def apply(labels_dir: Path) -> None:
+        for leaf in read_definitions(labels_dir):
+            entries = [
+                expr
+                for expr in leaf.exprs
+                if expr.field_name == "decompose" and expr.shape == "nested"
+            ]
+            if len(entries) < 2 or not heads(entries[-1].text):
+                continue
+            target = entries[-1]
+            head = heads(target.text)[0]
+            _edit_line(
+                leaf.path, target.first_line, head + "(", "NO_SUCH_FUNCTION_AT_ALL("
+            )
+            lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+            lines.insert(target.first_line - 1, filler)
+            leaf.path.write_text("".join(lines), encoding="utf-8")
+            return
+        raise Fatal("self-test: no `decompose:` mapping has two entries to split")
 
     return apply
 
@@ -958,6 +1031,16 @@ def self_test(root: Path, functions: set[str], types: set[str], oracle: Path) ->
             "`checksum:` has a value shape this reader does not read: 'no_such_scheme'",
         ),
         (
+            "a checksum: key is left bare and its scheme put on the next line",
+            _bare_checksum_key(""),
+            "`checksum:` has a value shape this reader does not read",
+        ),
+        (
+            "...and again with a comment between the bare key and the scheme",
+            _bare_checksum_key("  # a note\n"),
+            "`checksum:` has a value shape this reader does not read",
+        ),
+        (
             "a samples: value is continued onto a second line",
             _run_on_sample,
             "under `samples:` has a value shape this reader does not read: "
@@ -969,11 +1052,36 @@ def self_test(root: Path, functions: set[str], types: set[str], oracle: Path) ->
             "fails the",
         ),
         (
-            "a comment sits between two samples, and a later one is corrupt",
-            _interrupt_samples("    # a note\n"),
-            "fails the",
+            "a blank line sits between two decompose: entries, and the next is broken",
+            _interrupt_nested("\n"),
+            "in `decompose:`, which the loaded catalog does not have",
         ),
     ]
+
+    # A comment sits at whatever column its author put it, and the two block
+    # loops have to read past it wherever that is: reading the indent first
+    # gets past one at four spaces and ends the block at a shallower one,
+    # leaving what follows unread while PyYAML publishes it. So the column is
+    # swept rather than fixed — `labels/definitions_technology.yaml` carries
+    # comments at 0 and at 2, so the shallow ones are not a contrived shape.
+    for column in (0, 2, 3, 4):
+        pad = " " * column + "# a note\n"
+        cases.append(
+            (
+                f"a comment at column {column} sits between two samples, "
+                f"and a later one is corrupt",
+                _interrupt_samples(pad),
+                "fails the",
+            )
+        )
+        cases.append(
+            (
+                f"a comment at column {column} sits between two decompose: entries, "
+                f"and the next is broken",
+                _interrupt_nested(pad),
+                "in `decompose:`, which the loaded catalog does not have",
+            )
+        )
 
     print(
         f"self-test: {len(functions)} catalog functions, {len(types)} catalog types, "
