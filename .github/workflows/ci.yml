@@ -230,6 +230,42 @@ jobs:
         # at two spaces.
         run: scripts/check_taxonomy_content.py --self-test
 
+      - name: Every published sample satisfies its own leaf's pattern
+        # The gate above puts a CHECK-DIGIT leaf's samples through
+        # finetype-core; this puts EVERY leaf's samples through its own
+        # `validation.pattern`. Nothing did before: `finetype check` validates
+        # the 50 values per definition its GENERATOR produces — the
+        # `12550/12550` it reports — and never reads the static `samples:` list,
+        # so a sample of "ABC" under a leaf whose own pattern is `^[0-9]+$` left
+        # every job in this file green.
+        #
+        # Bolted onto this job rather than given its own, for the reason the
+        # count gate is bolted onto `evidence`: the oracle it calls is a bin in
+        # finetype-build-tools, which `make build-extension` above already
+        # built, so the marginal cost is a stdlib-python second. It needs
+        # neither duckdb nor the model.
+        run: scripts/check_sample_patterns.py
+
+      - name: ...and the sample gate detects a contradiction
+        # Nine mutations that must fail — a sample replaced with a value its own
+        # pattern rejects (at the first, middle and last patterned leaf, since
+        # one permissive pattern would otherwise carry the whole case), a
+        # pattern tightened past its own samples, a pattern that no longer
+        # compiles (the product drops such a validator with `.ok()` and then
+        # validates nothing), a patterned leaf that loses every sample, a
+        # quarantined sample edited to a different wrong value, a quarantined
+        # sample corrected with its entry left behind, and a duplicated leaf key
+        # that serde_yaml silently resolves to one leaf.
+        #
+        # And two that must NOT: a sample swapped for one that a leaf with the
+        # IDENTICAL pattern publishes — the cross-leaf case, which is a
+        # judgement rather than a violation, since eight patterns in labels/ are
+        # shared byte-for-byte by two or three leaves — and a nonsense sample
+        # under a leaf with no pattern at all, which is outside the declared
+        # scope. Without that second pair this gate could be refusing honest
+        # values and nobody would find out until it refused one.
+        run: scripts/check_sample_patterns.py --self-test
+
       - name: Download model from HuggingFace
         # Only the SQL examples need it. The catalog gate above ran without it,
         # so a wrong surface reddens before this download is paid for.

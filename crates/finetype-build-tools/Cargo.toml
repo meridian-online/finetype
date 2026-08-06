@@ -18,9 +18,17 @@ path = "src/bin/append_duckdb_metadata.rs"
 name = "checksum-samples"
 path = "src/bin/checksum_samples.rs"
 
+# The pattern oracle scripts/check_sample_patterns.py calls, here for the same
+# reason as checksum-samples above: `make build-extension` already builds this
+# package, so the gate needs no build step of its own.
+[[bin]]
+name = "validate-samples"
+path = "src/bin/validate_samples.rs"
+
 [dependencies]
 clap = { workspace = true }
 finetype-core = { workspace = true }
+serde_yaml = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
