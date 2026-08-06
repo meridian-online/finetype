@@ -127,6 +127,15 @@ LOAD finetype;
 -- Load a locally-built extension (DuckDB started with -unsigned)
 LOAD './target/release/finetype.duckdb_extension';
 
+-- The demo table every example below queries: a date column, a JSON column and
+-- four rows. Paste the whole block — none of the examples creates it.
+CREATE TABLE my_table (value VARCHAR, json_col VARCHAR);
+INSERT INTO my_table VALUES
+  ('01/15/2024', '{"host":"192.168.1.1","seen":"2024-01-15"}'),
+  ('02/20/2024', '{"host":"10.0.0.8","seen":"2024-02-20"}'),
+  ('03/25/2024', '{"host":"172.16.0.3","seen":"2024-03-25"}'),
+  ('04/30/2024', '{"host":"192.168.1.9","seen":"2024-04-30"}');
+
 -- Profile a whole table — one row per column. This is the everyday form.
 SELECT * FROM ft_profile('my_table');
 -- ┌─────────────┬─────────────────────────┬────────────────────┬─────────────┐
@@ -136,9 +145,8 @@ SELECT * FROM ft_profile('my_table');
 -- │ json_col    │ container.object.json   │ 0.7428288459777832 │ JSON        │
 -- │ value       │ datetime.date.mdy_slash │ 0.6156769394874573 │ DATE        │
 -- └─────────────┴─────────────────────────┴────────────────────┴─────────────┘
--- Box captured verbatim from a real run, type row and all. `my_table` here is
--- the 4-row demo table the later examples use: a date column `value` and a JSON
--- column `json_col`. `confidence` is a raw DOUBLE — ft_profile does not round
+-- Box captured verbatim from a real run, type row and all, over the four rows
+-- created above. `confidence` is a raw DOUBLE — ft_profile does not round
 -- it, so expect the full value rather than the tidy 3dp that ft_detail's JSON
 -- prints.
 --

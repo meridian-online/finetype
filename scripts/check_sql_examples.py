@@ -10,9 +10,12 @@ those is a copy-paste that fails on first contact with a terminal.
 
 WHAT IS RUN
     Every ```sql fence in README.md and docs/*.md (dated snapshots excluded).
-    Each fence gets: a hermetic DuckDB, a LOAD of the LOCAL artifact, and its
-    document's fixture — the tables the examples name — prepended. Then every
-    statement in the fence runs. A DuckDB error is a failure.
+    Each fence gets a hermetic DuckDB and a LOAD of the LOCAL artifact. A
+    document listed in SELF_CONTAINED gets nothing else — its fences run exactly
+    as a reader pastes them, so this gate IS that reader's path rather than a
+    proxy for it. Any other document gets its FIXTURES entry prepended, which is
+    the gate supplying tables the document does not create. Then every statement
+    in the fence runs. A DuckDB error is a failure.
 
 WHAT IS ASSERTED — SHAPE ONLY
     Whatever the fence's own trailing comment shows about the RESULT:
@@ -80,19 +83,31 @@ SNAPSHOT_FILES = {
     "docs/mechanism-attribution.md",
 }
 
-# One fixture per document: the tables its examples name, with enough rows for a
-# column-level classifier to have something to work with. Values are chosen to be
-# obviously typed (an email is an email) — but nothing here asserts what the
-# model calls them.
+# Documents that carry their own setup, and are therefore given NOTHING here.
+#
+# A fixture is the gate quietly supplying what a document owes its reader, and it
+# hides the defect exactly where it costs most. README.md named `my_table` seven
+# times, described it — "the 4-row demo table the later examples use" — and never
+# created it; this file did, in a string that occurred once in the repository and
+# zero times in README.md. The gate was green and a reader pasting the first
+# example got `Catalog Error: Table with name my_table does not exist!`.
+#
+# For a document listed here the run below IS the reader's path, not a proxy for
+# it. The gate refuses to hand one a fixture, so the way to make a red run green
+# is to fix the document.
+SELF_CONTAINED = {"README.md"}
+
+# One fixture per document that is NOT self-contained: the tables its examples
+# name, with enough rows for a column-level classifier to have something to work
+# with. Values are chosen to be obviously typed (an email is an email) — but
+# nothing here asserts what the model calls them.
+#
+# Each surviving entry is a document that does not create the tables its examples
+# query. Audited 2026-08-06, and `only the README` was false: of the three
+# documents that had a fixture, ZERO created any of their five tables. README.md
+# now creates its one; these two still create none of their four. That is a
+# defect in those documents of the same kind, not a property of this gate.
 FIXTURES: dict[str, str] = {
-    "README.md": """
-CREATE TABLE my_table (value VARCHAR, json_col VARCHAR);
-INSERT INTO my_table VALUES
-  ('01/15/2024', '{"host":"192.168.1.1","seen":"2024-01-15"}'),
-  ('02/20/2024', '{"host":"10.0.0.8","seen":"2024-02-20"}'),
-  ('03/25/2024', '{"host":"172.16.0.3","seen":"2024-03-25"}'),
-  ('04/30/2024', '{"host":"192.168.1.9","seen":"2024-04-30"}');
-""",
     "docs/DEVELOPMENT.md": """
 CREATE TABLE people (age INTEGER, email VARCHAR, phone VARCHAR);
 INSERT INTO people VALUES
@@ -435,7 +450,11 @@ def _arrays(stdout: str) -> list[list]:
 
 
 def run_fence(
-    fence: Fence, statements: list[Statement], root: Path, extension: Path
+    fence: Fence,
+    statements: list[Statement],
+    root: Path,
+    extension: Path,
+    fixtures: dict[str, str] | None = None,
 ) -> tuple[list[str], dict[int, list]]:
     """Run one fence. Returns (failures, {statement index: its result rows})."""
     failures: list[str] = []
@@ -447,7 +466,7 @@ def run_fence(
         ext_dir.mkdir()
         prepare_run_dir(run_dir, root, fence.rel)
 
-        pieces = [FIXTURES.get(fence.rel, "")]
+        pieces = [(fixtures if fixtures is not None else FIXTURES).get(fence.rel, "")]
         emitted: list[int] = []
         for index, statement in enumerate(statements):
             if LOAD_RE.match(statement.sql):
@@ -508,11 +527,30 @@ def _blame(stderr: str, statements: list[Statement], emitted: list[int], stdout:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def check(root: Path, extension: Path, macro_shapes: dict | None = None) -> list[str]:
+def check(
+    root: Path,
+    extension: Path,
+    macro_shapes: dict | None = None,
+    fixtures: dict[str, str] | None = None,
+) -> list[str]:
     failures: list[str] = []
     fences = find_fences(root)
     if not fences:
         return ["no ```sql fences found at all — this gate has stopped reading the docs"]
+
+    # A document that has taken responsibility for its own setup must not get it
+    # back through this file. Without this, the way to green a README whose
+    # CREATE TABLE was deleted is to add a fixture, which is how the defect this
+    # set exists to prevent was introduced in the first place.
+    supplied = fixtures if fixtures is not None else FIXTURES
+    for rel in sorted(SELF_CONTAINED):
+        if supplied.get(rel, "").strip():
+            failures.append(
+                f"{rel}: SELF_CONTAINED says this document carries its own setup, "
+                f"and FIXTURES supplies it one anyway. Delete the fixture, or "
+                f"take the document out of SELF_CONTAINED and say why its reader "
+                f"cannot paste what its examples need."
+            )
 
     artifact = Path(DEFAULT_EXTENSION)
     for fence in fences:
@@ -551,7 +589,7 @@ def check(root: Path, extension: Path, macro_shapes: dict | None = None) -> list
         # A wrong LOAD path does not stop the fence being run — the injected
         # LOAD is the local build either way, and a second independent problem
         # in the same fence is worth reporting in the same pass.
-        run_failures, results = run_fence(fence, statements, root, extension)
+        run_failures, results = run_fence(fence, statements, root, extension, fixtures)
         failures.extend(run_failures)
         if run_failures:
             continue
@@ -563,7 +601,13 @@ def check(root: Path, extension: Path, macro_shapes: dict | None = None) -> list
                 continue
             kind, want = expectation
             where = f"{fence.rel}:{statement.line}"
-            described = _describe(statement.sql, fence, root, extension)
+            described = _describe(
+                statement.sql,
+                fence,
+                root,
+                extension,
+                _setup(fence, statements, fixtures, upto=index),
+            )
             if described is None:
                 failures.append(f"{where}: DESCRIBE of this statement failed")
                 continue
@@ -643,7 +687,13 @@ def check(root: Path, extension: Path, macro_shapes: dict | None = None) -> list
                 continue
             if not any(call in statement.sql for statement in statements):
                 continue
-            described = _describe(f"SELECT * FROM {call};", fence, root, extension)
+            described = _describe(
+                f"SELECT * FROM {call};",
+                fence,
+                root,
+                extension,
+                _setup(fence, statements, fixtures),
+            )
             if described is None:
                 failures.append(f"{fence.where}: DESCRIBE of `{call}` failed")
                 continue
@@ -657,8 +707,46 @@ def check(root: Path, extension: Path, macro_shapes: dict | None = None) -> list
     return failures
 
 
-def _describe(sql: str, fence: Fence, root: Path, extension: Path) -> list | None:
-    """DESCRIBE one statement, with its document's fixture in place."""
+# The statement heads that BUILD something a later statement can query. A
+# self-contained document's tables come from its own fence rather than from
+# FIXTURES, so a DESCRIBE has to replay them or it describes a query against a
+# table that does not exist yet — which reads exactly like the query being wrong.
+SETUP_HEADS = (
+    "create",
+    "insert",
+    "update",
+    "delete",
+    "drop",
+    "alter",
+    "attach",
+    "copy",
+    "set",
+    "pragma",
+)
+
+
+def _setup(
+    fence: Fence,
+    statements: list[Statement],
+    fixtures: dict[str, str] | None,
+    upto: int | None = None,
+) -> str:
+    """Everything a DESCRIBE needs in place before the statement it describes."""
+    supplied = fixtures if fixtures is not None else FIXTURES
+    pieces = [supplied.get(fence.rel, "")]
+    for index, statement in enumerate(statements):
+        if upto is not None and index >= upto:
+            break
+        first = statement.sql.strip().split(None, 1)
+        if first and first[0].lower() in SETUP_HEADS:
+            pieces.append(statement.sql)
+    return "\n".join(pieces)
+
+
+def _describe(
+    sql: str, fence: Fence, root: Path, extension: Path, setup: str = ""
+) -> list | None:
+    """DESCRIBE one statement, with the tables it queries in place."""
     body = sql.strip().rstrip(";")
     if not body.lower().startswith(("select", "with", "from")):
         return None
@@ -669,7 +757,7 @@ def _describe(sql: str, fence: Fence, root: Path, extension: Path) -> list | Non
         ext_dir = tmp_path / "ext"
         ext_dir.mkdir()
         prepare_run_dir(run_dir, root, fence.rel)
-        script = FIXTURES.get(fence.rel, "") + f"\nDESCRIBE {body};"
+        script = setup + f"\nDESCRIBE {body};"
         code, stdout, _ = _duckdb(script, run_dir, extension, ext_dir, model_env(root))
         if code != 0:
             return None
@@ -735,7 +823,16 @@ def _nothing(root: Path) -> None:
 
 def self_test(root: Path, extension: Path) -> int:
     # (name, doc mutation, expected substring — None means "must stay green",
-    #  MACRO_SHAPES override)
+    #  MACRO_SHAPES override, FIXTURES override)
+    #
+    # The FIXTURES override is how a case reaches the SELF_CONTAINED rule: that
+    # rule is about this file, not about a document, so no document mutation can
+    # exercise it.
+    smuggled_fixture = dict(FIXTURES)
+    smuggled_fixture["README.md"] = (
+        "CREATE TABLE my_table (value VARCHAR, json_col VARCHAR);\n"
+    )
+
     wrong_macro_shape = {
         "ft_profile('people')": (
             "docs/DEVELOPMENT.md",
@@ -748,7 +845,30 @@ def self_test(root: Path, extension: Path) -> int:
         )
     }
 
-    cases: list[tuple[str, Callable[[Path], None], str | None, dict | None]] = [
+    cases: list[
+        tuple[str, Callable[[Path], None], str | None, dict | None, dict | None]
+    ] = [
+        (
+            "the README stops creating the table its own examples query",
+            # The defect this document had for its whole life, and the one the
+            # fixture hid. It is deliberately the FIRST case: everything else
+            # here is about a wrong example, and this is about an absent one.
+            _sub(
+                "README.md",
+                "CREATE TABLE my_table (value VARCHAR, json_col VARCHAR);",
+                "-- (nothing creates my_table)",
+            ),
+            "Table with name my_table does not exist",
+            None,
+            None,
+        ),
+        (
+            "a self-contained document is handed a fixture anyway",
+            _nothing,
+            "carries its own setup",
+            None,
+            smuggled_fixture,
+        ),
         (
             "a documented query stops running",
             # Breaks the TABLE, not one named example. Naming a specific
@@ -760,17 +880,20 @@ def self_test(root: Path, extension: Path) -> int:
             _sub("README.md", "FROM my_table;", "FROM no_such_table;"),
             "the example does not run",
             None,
+            None,
         ),
         (
             "a documented function does not exist",
             _sub("docs/DEVELOPMENT.md", "SELECT ft_infer(", "SELECT ft_inferr("),
             "the example does not run",
             None,
+            None,
         ),
         (
             "a documented result box renames a column",
             _sub("docs/DEVELOPMENT.md", "│ column_name │ type ", "│ col_name    │ type "),
             "the documented result box shows columns",
+            None,
             None,
         ),
         (
@@ -779,11 +902,13 @@ def self_test(root: Path, extension: Path) -> int:
                  "-- {'valid': false, 'rule': pattern,"),
             "documented STRUCT fields",
             None,
+            None,
         ),
         (
             "a documented JSON result names a key the query never returns",
             _sub("README.md", '"duckdb_type":"DATE"', '"broad_type":"DATE"'),
             "which the query never returns",
+            None,
             None,
         ),
         (
@@ -791,6 +916,7 @@ def self_test(root: Path, extension: Path) -> int:
             _sub("README.md", "LOAD './target/release/finetype.duckdb_extension';",
                  "LOAD './target/release/finetype_duckdb.duckdb_extension';"),
             "names an artifact no build produces",
+            None,
             None,
         ),
         (
@@ -801,12 +927,14 @@ def self_test(root: Path, extension: Path) -> int:
                  "SELECT * FROM customers\nWHERE json_extract_string"),
             "a shell command inside a ```sql fence",
             None,
+            None,
         ),
         (
             "a table macro's documented column TYPE drifts",
             _nothing,
             "DESCRIBE says",
             wrong_macro_shape,
+            None,
         ),
 
         # ── the two that must NOT fire ───────────────────────────────────────
@@ -815,11 +943,13 @@ def self_test(root: Path, extension: Path) -> int:
             _sub("docs/DEVELOPMENT.md", "│      0.956 │", "│      0.412 │"),
             None,
             None,
+            None,
         ),
         (
             "STAYS GREEN: a predicted label changes",
             _sub("README.md", '"type":"datetime.date.mdy_slash"',
                  '"type":"datetime.date.dmy_slash"'),
+            None,
             None,
             None,
         ),
@@ -838,14 +968,14 @@ def self_test(root: Path, extension: Path) -> int:
             return 1
         print("  ok   control: unmutated tree passes")
 
-        for name, mutate, expected, macro_shapes in cases:
+        for name, mutate, expected, macro_shapes, fixtures in cases:
             work = Path(tmp) / "work"
             if work.exists():
                 shutil.rmtree(work)
             shutil.copytree(pristine, work)
             try:
                 mutate(work)
-                found = check(work, extension, macro_shapes)
+                found = check(work, extension, macro_shapes, fixtures)
                 text = "\n".join(found)
             except Fatal as exc:
                 text = str(exc)
