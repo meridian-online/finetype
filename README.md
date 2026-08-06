@@ -127,8 +127,8 @@ LOAD finetype;
 -- Load a locally-built extension (DuckDB started with -unsigned)
 LOAD './target/release/finetype.duckdb_extension';
 
--- The demo table every example below uses: a date column and a JSON column,
--- four rows. Paste it first — nothing here creates it for you.
+-- The demo table every example below queries: a date column, a JSON column and
+-- four rows. Paste the whole block — none of the examples creates it.
 CREATE TABLE my_table (value VARCHAR, json_col VARCHAR);
 INSERT INTO my_table VALUES
   ('01/15/2024', '{"host":"192.168.1.1","seen":"2024-01-15"}'),
