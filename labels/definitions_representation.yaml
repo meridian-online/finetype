@@ -1297,7 +1297,7 @@ representation.identifier.numeric_code:
   samples:
     - "840"
     - "036"
-    - "5112"
+    - "06"
     - "06075"
     - "0001"
     - "99"
