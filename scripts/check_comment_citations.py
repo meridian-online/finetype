@@ -112,9 +112,12 @@ def comment_body(line: str, markers: tuple[str, ...], quotes: str) -> str | None
     """The comment text on this line, or None if the line carries no comment.
 
     A marker opens a comment where it starts the line or follows whitespace and
-    is not inside a quoted run. Both halves are load-bearing: `${VAR#name}` is
-    not a comment, `sed 's/#.*//'` is not a comment, and a citation reported out
-    of either is the kind of noise that gets a gate switched off.
+    is not inside a quoted run. A citation reported out of `${VAR#name}` or out
+    of `sed 's/#.*//'` is the kind of noise that gets a gate switched off — but
+    the WHITESPACE half answers both of those on its own, since in each the
+    marker follows a non-space character and never reaches the quote filter.
+    What the quote half is for is a marker that follows a SPACE and still sits
+    inside a balanced quoted argument.
 
     A quote character is tracked only where the line carries an EVEN number of
     it. An unbalanced one is prose — "don't", "it's" — and tracking it would
@@ -122,6 +125,11 @@ def comment_body(line: str, markers: tuple[str, ...], quotes: str) -> str | None
     The tie goes to reading the line: under-reading a quoted argument costs a
     false positive somebody sees and fixes, while over-reading one costs a
     citation nobody checks, silently.
+
+    Both directions of that rule are pinned by a `--self-test` case, and which
+    case by which is decided there rather than asserted here: replacing the
+    comprehension with `set()` reddens the balanced-quote case, and replacing it
+    with `set(quotes)` reddens the apostrophe case.
     """
     live = {q for q in quotes if line.count(q) % 2 == 0}
     open_q = ""
@@ -482,7 +490,26 @@ def self_test() -> int:
          "STAYS GREEN: a `#` inside a quoted argument opens no comment"),
         (probe_sh, f"dest=${{src#`{missing}`}}", True,
          "STAYS GREEN: `${VAR#…}` is a parameter expansion, not a comment"),
-        (probe_sh, f"echo \"it's fine\"  # rebuilt from `{missing}`", False,
+        # --- the parity rule's two directions, one mutation each --------------
+        # Where a case above carries a marker that must NOT open a comment, that
+        # marker follows a non-space character — so the whitespace half answers
+        # it on its own and the quote filter is never reached. The two cases
+        # below reach the filter, from opposite sides of the even/odd rule, and
+        # each dies under a different mutation of it:
+        #
+        #   live = set()       kills the balanced-quote case, whose marker
+        #                      follows a SPACE and sits inside a quoted run, so
+        #                      nothing but quote tracking stops it opening a
+        #                      comment.
+        #   live = set(quotes) kills the apostrophe case, where an odd quote
+        #                      would open a run that never closes and swallow
+        #                      the real comment behind it.
+        #
+        # Neither mutation is caught by the other's case, and until both existed
+        # the filter could be deleted outright with the whole self-test green.
+        (probe_sh, f"echo 'see # rebuilt from `{missing}`' >> out.txt", True,
+         "STAYS GREEN: a SPACED `#` inside a balanced quote, which only quote tracking answers"),
+        (probe_sh, f"echo it's fine  # rebuilt from `{missing}`", False,
          "an apostrophe in prose does not hide the comment behind it"),
         (probe_rs, f"let n = 1; // rebuilt from `{missing}`", False,
          "a dead path in a trailing Rust comment"),
