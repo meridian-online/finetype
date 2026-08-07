@@ -4,8 +4,7 @@ FineType is a type inference engine that detects and classifies data types in ta
 
 ## The Meridian Pillars
 
-The canonical statement is the Meridian Pillars note in the `bearing` vault; this is how they read for
-the typing engine. Every decision in this repo should reflect them:
+This is how the pillars read for the typing engine. Every decision in this repo should reflect them:
 
 1. **Spark joy for analysts** — Type inference should feel magical, not tedious. Clear output, helpful error messages, sensible defaults.
 2. **Write programs that do one thing and do it well** — Each command has one job: `profile` discovers, `taxonomy` generates schema, `validate` enforces and materialises typed output. Separate concerns for separate tools.
