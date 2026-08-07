@@ -38,6 +38,10 @@ WHAT IS ASSERTED
     4. A leaf carrying a `checksum:` directive names a scheme `resolve` knows,
        carries at least one sample, and each of its samples satisfies that
        scheme's check digit.
+    5. Every line the reader's two top-level regexes are responsible for is one
+       of them able to read. A line at column zero that `LEAF_RE` misses, or one
+       at two spaces that `PROP_RE` misses, is REFUSED rather than dropped —
+       the drop is a green verdict on content nothing read.
 
 WHAT IS *NOT* ASSERTED
     That an expression RUNS. Heads and cast targets are checked; argument
@@ -164,6 +168,18 @@ SQL_STRING_RE = re.compile(r"'(?:''|[^'])*'")
 #   key: null          no expression here — `~` reads the same
 #   samples:           a block sequence
 #     - "value"
+#
+# `LEAF_RE` and `PROP_RE` are not two patterns among several: between them they
+# decide whether ANYTHING under a key is read, so a spelling either one misses
+# takes the whole leaf or the whole property out of the run silently. Both are
+# therefore refusals rather than skips — a line at column zero, or at exactly
+# two spaces, that its regex does not match stops the gate. Deeper lines are
+# reached through the key above them and are judged there instead.
+#
+# The one exemption is the interior of a multi-line flow collection opened by a
+# key already read. `labels/definitions_geography.yaml` opens a `locales: [`
+# sequence at two spaces and closes it with a `]` at two spaces, and that
+# closer is part of a value rather than a property the reader missed.
 
 LEAF_RE = re.compile(r"^([a-z][a-z0-9_.]*):\s*$")
 PROP_RE = re.compile(r"^  ([a-z_]+):(.*)$")
@@ -250,6 +266,59 @@ def _refuse(rel: str, lineno: int, what: str, raw: str) -> Fatal:
     )
 
 
+def _refuse_line(rel: str, lineno: int, what: str, raw: str) -> Fatal:
+    """The refusal for a LINE shape the reader does not recognise.
+
+    `_refuse` answers for a value the reader reached and could not read. This
+    answers for a line it would never have reached at all: `LEAF_RE` and
+    `PROP_RE` are what decide whether a line is read, so a spelling either one
+    misses used to be dropped and the file reported as clean.
+    """
+    shown = raw.strip()[:80]
+    return Fatal(
+        f"{rel}:{lineno}: {what} has a line shape this reader does not read: "
+        f"{shown!r}.\n"
+        f"    Spell the key the way its neighbours are spelled, or teach "
+        f"{Path(__file__).name} this shape."
+    )
+
+
+# A quoted scalar of either style. Blanked before flow-collection brackets are
+# counted, so a bracket inside a value — a character class in a regex, a format
+# string — cannot open or close a collection.
+QUOTED_RE = re.compile(r"'(?:''|[^'])*'|\"(?:\\.|[^\"\\])*\"")
+
+# A comment, once quoted spans are blanked: `#` at the start of the line or
+# after whitespace. YAML reads one inside a flow collection too.
+COMMENT_RE = re.compile(r"(?:^|\s)#")
+
+
+def _flow_delta(text: str) -> int:
+    """Net unclosed `[` and `{` in `text`, ignoring quoted spans and comments."""
+    blanked = QUOTED_RE.sub("''", text)
+    comment = COMMENT_RE.search(blanked)
+    if comment is not None:
+        blanked = blanked[: comment.start()]
+    opened = sum(1 for char in blanked if char in "[{")
+    closed = sum(1 for char in blanked if char in "]}")
+    return opened - closed
+
+
+def _refuse_structural(rel: str, lineno: int, line: str) -> None:
+    """Refuse a line at an indent one of the two top-level regexes owns.
+
+    Column zero is where `LEAF_RE` reads a leaf key and two spaces is where
+    `PROP_RE` reads its properties. Any other indent belongs to a value this
+    reader either harvests through the key above it or does not read at all,
+    and is judged there rather than here.
+    """
+    indent = len(line) - len(line.lstrip(" "))
+    if indent == 0:
+        raise _refuse_line(rel, lineno, "a leaf key at column zero", line)
+    if indent == 2:
+        raise _refuse_line(rel, lineno, "a property at two spaces of indent", line)
+
+
 def _refuse_run_on(
     rel: str, lines: list[str], index: int, name: str, *, started: bool = True
 ) -> None:
@@ -302,16 +371,37 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
     lines = path.read_text(encoding="utf-8").splitlines()
     leaves: list[Leaf] = []
     current: Leaf | None = None
+    # Depth of the multi-line flow collection currently open, and the line that
+    # opened it. Clamped at zero on both arms: a stray closer ends the
+    # collection rather than driving the count negative, which would exempt
+    # every line below it from the structural refusal.
+    flow_depth = 0
+    flow_line = 0
 
     for index, line in enumerate(lines):
         lineno = index + 1
+        if flow_depth:
+            flow_depth = max(flow_depth + _flow_delta(line), 0)
+            continue
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
         leaf_match = LEAF_RE.match(line)
         if leaf_match:
             current = Leaf(path=path, rel=rel, line=lineno, key=leaf_match.group(1))
             leaves.append(current)
             continue
         prop = PROP_RE.match(line)
-        if not prop or current is None:
+        if prop is None:
+            _refuse_structural(rel, lineno, line)
+            continue
+        # Set before the value is judged, so that a key whose value opens a
+        # collection carries its interior even when the branches below refuse
+        # the value itself.
+        flow_depth = max(_flow_delta(prop.group(2)), 0)
+        if flow_depth:
+            flow_line = lineno
+        if current is None:
             continue
         name, rest = prop.group(1), prop.group(2).strip()
 
@@ -401,6 +491,13 @@ def _read_file(path: Path, labels_dir: Path) -> list[Leaf]:
             raise _refuse(rel, lineno, f"`{name}:`", rest)
         _refuse_run_on(rel, lines, index, name)
         current.exprs.append(Expr(name, "inline", text, lineno, lineno))
+
+    if flow_depth:
+        raise Fatal(
+            f"{rel}:{flow_line}: a flow collection opens here and never closes, so "
+            f"every line below it went unread.\n"
+            f"    {lines[flow_line - 1].strip()[:80]}"
+        )
 
     return leaves
 
@@ -760,6 +857,79 @@ def _run_on_inline_transform(labels_dir: Path) -> None:
     leaf.path.write_text("".join(lines), encoding="utf-8")
 
 
+def _stray_space_before_colon(labels_dir: Path) -> None:
+    """Put a space before the colon of the first inline `transform:`.
+
+    PyYAML publishes `  transform : "…"` as the `transform` key, and it is a
+    spelling `PROP_RE` misses — `[a-z_]+` cannot reach the colon across the
+    space. The value planted is unresolvable, so a reader that drops the line
+    is dropping a call to a function the catalog does not have.
+    """
+    leaf, expr = _first_expr(labels_dir, "transform", "inline")
+    lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines[expr.first_line - 1] = '  transform : "NO_SUCH_FUNCTION_AT_ALL({col})"\n'
+    leaf.path.write_text("".join(lines), encoding="utf-8")
+
+
+def _first_leaf_key_line(labels_dir: Path) -> tuple[Path, int, str]:
+    """The first line of the first definitions file that `LEAF_RE` reads."""
+    for path in sorted(labels_dir.glob(DEFINITION_GLOB)):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if LEAF_RE.match(line):
+                return path, lineno, line
+    raise Fatal("self-test: no definitions file carries a leaf key")
+
+
+def _capitalise_leaf_key(labels_dir: Path) -> None:
+    """Capitalise the first leaf key of the first definitions file.
+
+    `LEAF_RE` anchors on `[a-z]`, so PyYAML publishes the leaf and this reader
+    never sees the key. The FIRST key in the file is the one taken because no
+    leaf is open above it: every property below then belongs to nothing and is
+    dropped with the key, which is the fail-open in its cleanest form.
+    """
+    path, lineno, line = _first_leaf_key_line(labels_dir)
+    _edit_line(path, lineno, line[0], line[0].upper())
+
+
+def _orphan_flow_closer(labels_dir: Path) -> None:
+    """Put a flow-sequence closer at two spaces with no flow sequence open.
+
+    The exemption `labels/definitions_geography.yaml` needs is for the interior
+    of a collection that is OPEN. A rule written instead as "a `]` at two
+    spaces is fine" passes that file and passes this line too, so this is what
+    separates the two.
+    """
+    leaf, expr = _first_expr(labels_dir, "transform", "inline")
+    lines = leaf.path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines.insert(expr.first_line, "  ]\n")
+    leaf.path.write_text("".join(lines), encoding="utf-8")
+
+
+def _unterminated_flow(labels_dir: Path) -> None:
+    """Delete the closing line of a multi-line flow collection.
+
+    Everything below the opener then reads as that collection's interior. The
+    exemption has to end at the end of the file rather than carrying the rest
+    of it, or it is a way to switch the structural refusal off.
+    """
+    for path in sorted(labels_dir.glob(DEFINITION_GLOB)):
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        depth = 0
+        for index, line in enumerate(lines):
+            if depth:
+                depth = max(depth + _flow_delta(line), 0)
+                if not depth:
+                    del lines[index]
+                    path.write_text("".join(lines), encoding="utf-8")
+                    return
+                continue
+            prop = PROP_RE.match(line.rstrip("\n"))
+            if prop is not None:
+                depth = max(_flow_delta(prop.group(2)), 0)
+    raise Fatal("self-test: no multi-line flow collection to leave open")
+
+
 def _first_null_sql_prop(labels_dir: Path) -> tuple[Path, int, str]:
     """The first `transform:`, `decompose:` or `transform_ext:` set null or `~`."""
     for path in sorted(labels_dir.glob(DEFINITION_GLOB)):
@@ -1044,6 +1214,31 @@ def self_test(root: Path, functions: set[str], types: set[str], oracle: Path) ->
             _run_on_sample,
             "under `samples:` has a value shape this reader does not read: "
             "'NO_SUCH_SAMPLE_TAIL'",
+        ),
+        # The two top-level regexes, and the one exemption they carry. These
+        # mutate the LINE rather than the value: each is a spelling PyYAML
+        # publishes and the regex misses, which used to be dropped in silence.
+        (
+            "a property key carries a stray space before its colon",
+            _stray_space_before_colon,
+            "a property at two spaces of indent has a line shape this reader "
+            "does not read",
+        ),
+        (
+            "a leaf key at column zero is capitalised",
+            _capitalise_leaf_key,
+            "a leaf key at column zero has a line shape this reader does not read",
+        ),
+        (
+            "a flow-sequence closer sits at two spaces with no sequence open",
+            _orphan_flow_closer,
+            "a property at two spaces of indent has a line shape this reader "
+            "does not read: ']'",
+        ),
+        (
+            "a multi-line flow sequence loses its closer",
+            _unterminated_flow,
+            "a flow collection opens here and never closes",
         ),
         (
             "a blank line sits between two samples, and a later one is corrupt",
