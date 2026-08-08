@@ -190,6 +190,11 @@ TMP="$(mktemp -d)" || exit 2
 trap 'rm -rf "$TMP"' EXIT
 
 failures=0
+# Counted on the success path only, and reconciled against `pairs` before this
+# script is allowed to report clean. Without it the closing line would read
+# "$pairs of $pairs", which is true by construction and therefore says nothing:
+# a loop that examined one pair of four would still print four of four.
+checked=0
 
 echo "check-formula-asset: $FORMULA — $pairs url/sha256 pair(s)"
 
@@ -250,6 +255,7 @@ while [[ $i -lt $pairs ]]; do
 		continue
 	fi
 
+	checked=$((checked + 1))
 	echo "  ok  $url"
 	echo "      $got  ($bytes bytes)"
 done
@@ -259,5 +265,14 @@ if [[ $failures -ne 0 ]]; then
 	exit 1
 fi
 
-echo "check-formula-asset: $pairs of $pairs pair(s) fetched and matched"
+# Every pair the parser found must have been either matched or counted as a
+# failure. If the arithmetic does not close, the loop skipped something and the
+# clean report below would be a claim about assets nobody fetched.
+if [[ $((checked + failures)) -ne $pairs ]]; then
+	echo "check-formula-asset: examined $checked of $pairs pair(s) and reported $failures failure(s)" >&2
+	echo "    the loop did not reach every pair in the formula; this check cannot report clean" >&2
+	exit 2
+fi
+
+echo "check-formula-asset: $checked of $pairs pair(s) fetched and matched"
 exit 0
