@@ -17,9 +17,18 @@
 #           the two facts `brew install` establishes before it unpacks
 #           anything.
 #   DOES NOT PROVE  that the binary inside the asset runs. That needs a host of
-#           the target architecture. The formula publishes four: arm and x86_64
-#           for macOS and for Linux, and three of the four are produced by a
-#           runner that is not that architecture.
+#           the target architecture. The formula publishes four — arm and
+#           x86_64, for macOS and for Linux — and two of them are built on a
+#           runner of another architecture: per the matrix in
+#           .github/workflows/release.yml, aarch64-unknown-linux-gnu is
+#           cross-compiled on ubuntu-latest, and x86_64-apple-darwin is built
+#           on macos-latest, which is arm64. The build job packages and uploads
+#           each asset without executing it.
+#
+#           This is not the count in release.yml's update-homebrew comment.
+#           That one measures the four targets against the single
+#           ubuntu-latest runner that executes this check, where three differ;
+#           this one measures each target against the runner that produced it.
 #
 # Usage:
 #
@@ -39,9 +48,10 @@
 #
 # Its own regression test is scripts/check-formula-asset-selftest.sh, and the
 # mutation harness that proves the self-test still detects is
-# scripts/check-formula-asset-mutations.sh. Both run on every pull request via
-# .github/workflows/ci.yml. This script needs published release assets, so it
-# can only run on a tag; those two are what keep it honest in between.
+# scripts/check-formula-asset-mutations.sh. .github/workflows/ci.yml runs both
+# on pushes to main and on pull requests targeting main — a pull request into
+# any other branch runs neither. This script needs published release assets, so
+# it can only run on a tag; those two are what keep it honest in between.
 set -uo pipefail
 
 usage() {
@@ -140,7 +150,7 @@ fi
 # reconstructing the URL from the tag instead would re-derive the same mistake
 # the generator made and agree with it. The generator IS the thing under
 # suspicion here: it composes all four urls and all four checksums from the tag
-# and the sidecars, and it is the only writer of the file.
+# and the sidecars.
 # ---------------------------------------------------------------------------
 declare -a URLS=()
 declare -a SHAS=()
@@ -268,6 +278,13 @@ fi
 # Every pair the parser found must have been either matched or counted as a
 # failure. If the arithmetic does not close, the loop skipped something and the
 # clean report below would be a claim about assets nobody fetched.
+#
+# No formula can reach this: each of the four `continue`s in the loop above
+# increments `failures` first, and the one path that increments neither counter
+# is a hard `exit 2`. That makes it dead-looking rather than dead, and the
+# self-test cannot tell the difference — so it is proved in
+# scripts/check-formula-asset-mutations.sh, against copies of this loop that
+# already skip. Delete it and that file goes red.
 if [[ $((checked + failures)) -ne $pairs ]]; then
 	echo "check-formula-asset: examined $checked of $pairs pair(s) and reported $failures failure(s)" >&2
 	echo "    the loop did not reach every pair in the formula; this check cannot report clean" >&2
