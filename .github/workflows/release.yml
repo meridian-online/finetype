@@ -140,33 +140,56 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: .github/scripts/publish-crates.sh
 
+  # The formula this job writes is a published install path: four urls and four
+  # checksums that `brew install` resolves on a stranger's machine. Everything
+  # this job does to produce them is string-handling — the checksums come from
+  # the `.sha256` sidecars beside the assets, and a sidecar downloading
+  # correctly says nothing about the asset being reachable under the name the
+  # heredoc composed. The tap has no pull-request CI of its own, so this
+  # workflow is where a formula addressing a file that is not there has to stop.
+  # `scripts/check-formula-asset.sh`, below, is what stops it.
+  #
+  # What that check covers and what it does not: it proves each url resolves and
+  # that the asset behind it hashes to the checksum written beside it. It does
+  # not prove the binary inside runs — that needs a host of the target
+  # architecture, and three of the four targets are not the runner's. Do not
+  # read a green release as those binaries having launched anywhere.
   update-homebrew:
     name: Update Homebrew Formula
     needs: release
     runs-on: ubuntu-latest
     steps:
+      # This job runs scripts/check-formula-asset.sh below, so it needs this
+      # repository as well as the tap. First, before the tap lands in a
+      # subdirectory of the workspace: a checkout cleans its destination.
+      - uses: actions/checkout@v5
+
       - name: Extract version
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      # Into `sidecars/` rather than the workspace root, which is now a checkout
+      # of this repository: downloads that land beside the tracked tree are one
+      # careless glob away from being mistaken for it.
       - name: Download SHA256 files
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           TAG="${GITHUB_REF_NAME}"
-          BASE="https://github.com/meridian-online/finetype/releases/download/${TAG}"
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          mkdir -p sidecars
           for target in aarch64-apple-darwin x86_64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
-            curl -sfLO "${BASE}/finetype-${TAG}-${target}.tar.gz.sha256"
+            curl -sfL -o "sidecars/finetype-${TAG}-${target}.tar.gz.sha256" \
+              "${BASE}/finetype-${TAG}-${target}.tar.gz.sha256"
           done
-          ls -la *.sha256
+          ls -la sidecars/*.sha256
 
       - name: Parse SHA256 values
         id: sha
         run: |
           TAG="${GITHUB_REF_NAME}"
-          echo "aarch64_macos=$(awk '{print $1}' finetype-${TAG}-aarch64-apple-darwin.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
-          echo "x86_64_macos=$(awk '{print $1}' finetype-${TAG}-x86_64-apple-darwin.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
-          echo "aarch64_linux=$(awk '{print $1}' finetype-${TAG}-aarch64-unknown-linux-gnu.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
-          echo "x86_64_linux=$(awk '{print $1}' finetype-${TAG}-x86_64-unknown-linux-gnu.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
+          echo "aarch64_macos=$(awk '{print $1}' sidecars/finetype-${TAG}-aarch64-apple-darwin.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
+          echo "x86_64_macos=$(awk '{print $1}' sidecars/finetype-${TAG}-x86_64-apple-darwin.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
+          echo "aarch64_linux=$(awk '{print $1}' sidecars/finetype-${TAG}-aarch64-unknown-linux-gnu.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
+          echo "x86_64_linux=$(awk '{print $1}' sidecars/finetype-${TAG}-x86_64-unknown-linux-gnu.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
 
       - name: Checkout homebrew-tap
         uses: actions/checkout@v5
@@ -219,6 +242,20 @@ jobs:
             end
           end
           FORMULA
+
+      # Fetch each of the four urls the formula publishes, at the exact strings
+      # written into the file, and compare each asset against the checksum on
+      # the next line. Parsed back OUT of the formula rather than recomposed
+      # from the tag: a recomposition would re-derive whatever the heredoc above
+      # got wrong and agree with it.
+      #
+      # `--min-pairs 4` is one per published target, so a formula that lost a
+      # platform block cannot pass by checking the blocks that survived.
+      #
+      # It runs BEFORE the push, so a broken pair stops here instead of landing
+      # in the tap and surfacing at someone else's `brew install`.
+      - name: Prove the formula's assets exist and match their checksums
+        run: scripts/check-formula-asset.sh --min-pairs 4 homebrew-tap/Formula/finetype.rb
 
       - name: Commit and push
         run: |
