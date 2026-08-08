@@ -1147,7 +1147,10 @@ mod report {
     /// A missing file is an error rather than a signal to skip the
     /// comparison: the report is tracked, so a read error means the path moved
     /// or the working tree is damaged.
-    pub fn read_harness_report(path: &Path) -> Result<String, String> {
+    ///
+    /// Private to this module, with `compare_to_fixture`. See
+    /// `compare_report_file` for what that privacy does and does not stop.
+    fn read_harness_report(path: &Path) -> Result<String, String> {
         std::fs::read_to_string(path).map_err(|e| {
             format!(
                 "read harness report {}: {} — this file is tracked, so a read error \
@@ -1312,11 +1315,24 @@ mod report {
     /// Panics when the report cannot be read, and when the parse compared
     /// nothing for a reason that reads like a pass.
     ///
-    /// Three tests enter here: `vci3_fixture_attribution_regression_match` and
+    /// Four tests enter here: `vci3_fixture_attribution_regression_match` and
     /// `vci3_fixture_no_report_row_missing_from_fixture` with
-    /// `report_path()`, and `vci3_report_absent_file_is_an_error` with a path
-    /// that does not exist. The missing-report case that third test drives is
-    /// therefore the one the two fixture tests run.
+    /// `report_path()`, `vci3_report_file_is_present` with `report_path()` and
+    /// an empty fixture, and `vci3_report_absent_file_is_an_error` with a path
+    /// that does not exist. The missing-report case that last test drives is
+    /// therefore the one the others run.
+    ///
+    /// `read_harness_report` and `compare_to_fixture` are private to this
+    /// module. Re-assembling the two around a report-missing skip — the shape
+    /// this file carried before that skip was removed — no longer compiles.
+    ///
+    /// The privacy reaches the mutations that name those two functions, and no
+    /// further. One that re-implements them instead —
+    /// `std::fs::read_to_string`, the public `parse_report`, and the
+    /// comparison inlined — compiles, and skips with the report absent while
+    /// both fixture tests stay green. `vci3_report_file_is_present` is what
+    /// fails then, and it is what holds the report's presence against a
+    /// rewritten call site in general.
     pub fn compare_report_file(path: &Path, fixture: &[FixtureRow]) -> (usize, Vec<String>) {
         let report = read_harness_report(path).unwrap_or_else(|e| panic!("{e}"));
         let parsed = parse_report(&report);
@@ -1327,10 +1343,10 @@ mod report {
     /// Compare parsed attribution rows against the fixture. Returns the number
     /// of rows that matched their fixture entry, and one message per
     /// disagreement.
-    pub fn compare_to_fixture(
-        rows: &[AttributionRow],
-        fixture: &[FixtureRow],
-    ) -> (usize, Vec<String>) {
+    ///
+    /// Private to this module, with `read_harness_report`. See
+    /// `compare_report_file`.
+    fn compare_to_fixture(rows: &[AttributionRow], fixture: &[FixtureRow]) -> (usize, Vec<String>) {
         let by_key: BTreeMap<(&str, &str), &FixtureRow> = fixture
             .iter()
             .map(|r| ((r.dataset.as_str(), r.column.as_str()), r))
@@ -2375,6 +2391,34 @@ mod report_tests {
             "unreadable cells: {:?}",
             parsed.unreadable_failing_cells
         );
+    }
+
+    /// The tracked report is present, and `check_not_vacuous` accepts its
+    /// parse.
+    ///
+    /// A verdict of its own, and the reason it is one: the two fixture tests
+    /// reach `eval/eval_output/validate_corpus.md` only to compare it, so a
+    /// report-missing skip at both of their call sites leaves them passing
+    /// with the file gone. Measured before this test existed — both call sites
+    /// bypassed and the file moved aside ran 35 passed, 0 failed, exit 0. This
+    /// test has no comparison to skip, so it reddens on the file's absence
+    /// whatever the fixture tests were rewritten to do.
+    ///
+    /// The empty fixture makes every parsed row a `missing from fixture`
+    /// message, which is discarded: the verdict here is that the file read and
+    /// that `check_not_vacuous` accepted the parse, not what the rows say. The
+    /// fixture tests own the comparison.
+    #[test]
+    fn vci3_report_file_is_present() {
+        let path = report_path();
+        assert!(
+            path.exists(),
+            "the harness report is absent at {} — it is tracked, so it is present in a \
+             checkout that is not damaged. Regenerate with `make validate-corpus`.",
+            path.display()
+        );
+
+        compare_report_file(&path, &[]);
     }
 
     /// An absent report is an error, not a skip.
