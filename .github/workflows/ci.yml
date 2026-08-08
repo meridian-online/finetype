@@ -37,6 +37,35 @@ jobs:
       - name: private planning paths and absolute home paths
         run: ./scripts/check-public-hygiene.sh
 
+  formula-asset:
+    # The odd job here: the check it covers cannot run on a pull request at all.
+    # scripts/check-formula-asset.sh addresses a published release through the
+    # rewritten tap formula, and there is no release on a branch — so the check
+    # lives in release.yml and its credibility lives here.
+    #
+    # That split is the whole point. A check that runs on a tag and nowhere else
+    # is exercised a handful of times a year, always at the moment it is least
+    # welcome to be wrong. These two stand a loopback HTTP server in front of
+    # throwaway assets and prove — on every pull request, with no network beyond
+    # localhost and no toolchain — that a wrong checksum, an unresolvable url
+    # and a lost platform block each still turn it red, and that a self-test
+    # saying so can still tell a broken check from a working one.
+    name: Tap formula asset check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: The check reddens on a bad checksum, a 404 and a missing block
+        run: ./scripts/check-formula-asset-selftest.sh
+      - name: ...and the self-test detects seven broken copies of the check
+        # A self-test is only worth its exit code if it can still see a failure.
+        # Seven deliberately broken checks — always-exit-0, the digest
+        # comparison removed, the loop stopped after the first pair, the HTTP
+        # status ignored, the minimum-pairs guard removed, a parser that keeps
+        # only the last pair, and one that reads the first and last and skips
+        # the middle — each must make the step above go red.
+        run: ./scripts/check-formula-asset-mutations.sh
+
   download-model-test:
     name: download-model.sh tests
     runs-on: ubuntu-latest
