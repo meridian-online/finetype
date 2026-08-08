@@ -1148,9 +1148,8 @@ mod report {
     /// comparison: the report is tracked, so a read error means the path moved
     /// or the working tree is damaged.
     ///
-    /// Private to this module, with `compare_to_fixture`, so that the read and
-    /// the comparison cannot be re-assembled outside it. See
-    /// `compare_report_file`.
+    /// Private to this module, with `compare_to_fixture`. See
+    /// `compare_report_file` for what that privacy does and does not stop.
     fn read_harness_report(path: &Path) -> Result<String, String> {
         std::fs::read_to_string(path).map_err(|e| {
             format!(
@@ -1324,11 +1323,16 @@ mod report {
     /// therefore the one the others run.
     ///
     /// `read_harness_report` and `compare_to_fixture` are private to this
-    /// module, so a caller outside it that wants a report on disk compared
-    /// against the fixture reaches them through this function and inherits the
-    /// panic above. Re-assembling the two around a report-missing skip — the
-    /// shape this file carried before that skip was removed — no longer
-    /// compiles.
+    /// module. Re-assembling the two around a report-missing skip — the shape
+    /// this file carried before that skip was removed — no longer compiles.
+    ///
+    /// The privacy reaches the mutations that name those two functions, and no
+    /// further. One that re-implements them instead —
+    /// `std::fs::read_to_string`, the public `parse_report`, and the
+    /// comparison inlined — compiles, and skips with the report absent while
+    /// both fixture tests stay green. `vci3_report_file_is_present` is what
+    /// fails then, and it is what holds the report's presence against a
+    /// rewritten call site in general.
     pub fn compare_report_file(path: &Path, fixture: &[FixtureRow]) -> (usize, Vec<String>) {
         let report = read_harness_report(path).unwrap_or_else(|e| panic!("{e}"));
         let parsed = parse_report(&report);
@@ -2389,7 +2393,8 @@ mod report_tests {
         );
     }
 
-    /// The tracked report is present, and says something.
+    /// The tracked report is present, and `check_not_vacuous` accepts its
+    /// parse.
     ///
     /// A verdict of its own, and the reason it is one: the two fixture tests
     /// reach `eval/eval_output/validate_corpus.md` only to compare it, so a
