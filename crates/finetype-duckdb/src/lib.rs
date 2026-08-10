@@ -22,8 +22,8 @@
 //! - `ft_unpack(json)` — Recursively classify JSON fields, returns annotated JSON
 //! - `ft_version()` — Returns the extension version
 //!
-//! `finetype_spike(n)` is registered only under the non-default `spike` cargo
-//! feature; see the comment on its registration in the entrypoint.
+//! The `finetype_spike` table function is registered only under the non-default
+//! `spike` cargo feature; see the comment on its registration in the entrypoint.
 
 use duckdb::core::{DataChunkHandle, Inserter, LogicalTypeHandle, LogicalTypeId};
 use duckdb::vscalar::{ScalarFunctionSignature, VScalar};
@@ -772,7 +772,7 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
     // rejects to the output .db via duckdb-rs (spec ac-06 / ac-09).
     #[cfg(feature = "spike")]
     con.register_table_function::<spike::FineTypeSpike>("finetype_spike")
-        .expect("Failed to register finetype_spike (spike artefact — not production)");
+        .expect("Failed to register the spike table function — not production surface");
 
     // ── ft_ converged surface (spec 2026-06-03-duckdb-extension-table-verbs) ──
     // The whole registered surface: the un-prefixed `finetype*` scalars this
