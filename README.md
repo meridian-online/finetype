@@ -203,8 +203,8 @@ SELECT ft_unpack(json_col) FROM my_table;
 
 > **Removed:** the un-prefixed scalars — `finetype`, `finetype_detail`,
 > `finetype_cast`, `finetype_unpack`, `finetype_validate` and `finetype_version` — are
-> no longer registered. They were deprecated in 0.6.23 in favour of the `ft_` verbs, and
-> a build that no longer carries them raises `Catalog Error` on a call that used to work.
+> no longer registered. They were deprecated in 0.6.23 in favour of the `ft_` verbs;
+> a call to one now raises `Catalog Error`.
 >
 > **Two of the six do not map by renaming.** `finetype` sampled the DuckDB chunk, so it
 > answered at *column* level: if you were typing a column with it, the replacement is
