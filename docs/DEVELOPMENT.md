@@ -154,7 +154,9 @@ The contract targets (`configure`, `release`, `debug`, `test_release`, `test_deb
 
 ## DuckDB Extension SQL Surface (`ft_` verbs)
 
-The extension exposes a `profile → schema → validate` flow that mirrors the CLI, so an analyst answers "what type is this column?" and "is this table valid?" in SQL — not just "what type is this one value?". Every verb is `ft_`-prefixed; the older un-prefixed scalars (`finetype`, `finetype_detail`, `finetype_cast`, `finetype_unpack`, `finetype_validate`, `finetype_version`) stay registered as aliases for one release.
+The extension exposes a `profile → schema → validate` flow that mirrors the CLI, so an analyst answers "what type is this column?" and "is this table valid?" in SQL — not just "what type is this one value?". Every verb is `ft_`-prefixed.
+
+**Breaking change: the un-prefixed scalars are gone.** `finetype`, `finetype_detail`, `finetype_cast`, `finetype_unpack`, `finetype_validate` and `finetype_version` were deprecated in 0.6.23 and are no longer registered, so a call to one now raises `Catalog Error`. Two of the six do not map by renaming — `finetype` was column-level and maps to `ft_profile`, not to the single-value `ft_infer`, and `finetype_validate` maps to `ft_validate_text`, which returns a `STRUCT` where the old scalar returned a `VARCHAR`. The migration table is in [CHANGELOG.md](../CHANGELOG.md).
 
 | Verb | Scope | DuckDB kind | Mirrors CLI |
 |------|-------|-------------|-------------|
@@ -272,7 +274,7 @@ SELECT ft_validate_text('not-an-email',
 │ addr │ NULL │ NULL │ nested STRUCT(city VARCHAR) column — unnest / to_json / extract before validating │
 ```
 
-> The community `description.yml` (`extended_description` / `hello_world`) teaches the `ft_` profile → schema → validate surface as of the v0.6.23 republish; the un-prefixed scalars (`finetype`, `finetype_validate`, …) remain registered as aliases for one release so a v0.6.22 install keeps working.
+> The community `description.yml` (`extended_description` / `hello_world`) teaches the `ft_` profile → schema → validate surface as of the v0.6.23 republish. The un-prefixed scalars it superseded are no longer registered, so the community entry has to be republished off a build that no longer carries them before an install can be told the old names are gone.
 
 ## Related Repositories
 

@@ -42,7 +42,9 @@ SELECT
     table_name,
     col_name,
     col_value,
-    finetype(col_value) AS ft_label
+    -- ft_detail's scalar path samples the DuckDB chunk, so this label is the
+    -- chunk's consensus rather than a per-value answer.
+    json_extract_string(ft_detail(col_value), '$.type') AS ft_label
 FROM column_values;
 
 -- Per-column majority vote

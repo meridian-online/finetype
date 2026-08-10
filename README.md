@@ -31,7 +31,7 @@ identity.person.email
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing. 99.9% actionability across 120 tested types.
 - **Locale-aware** — validates 65 locales for postal codes, 46 for phone numbers, 27 for month/day names
 - **MCP server** — `finetype mcp` exposes type inference to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/)
-- **DuckDB extension** — 12 scalar functions, 1 aggregate and 2 table macros, a `profile → schema → validate` surface in SQL: `ft_profile()` types a column or every column of a table, `ft_validate()` checks a table against a JSON Schema, plus `ft_infer()` / `ft_detail()` / `ft_cast()` / `ft_unpack()` scalars. The full table, gated against the loaded extension's catalog, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#duckdb-extension)
+- **DuckDB extension** — 6 scalar functions, 1 aggregate and 2 table macros, a `profile → schema → validate` surface in SQL: `ft_profile()` types a column or every column of a table, `ft_validate()` checks a table against a JSON Schema, plus `ft_infer()` / `ft_detail()` / `ft_cast()` / `ft_unpack()` scalars. The full table, gated against the loaded extension's catalog, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#duckdb-extension)
 - **Schema-driven validation** — `finetype validate data.csv schema.json --db out.db --table orders` materialises typed DuckDB tables (per-column transforms applied) plus a `finetype_reject_errors` sidecar in a single pass
 - **Pure Rust** — no Python runtime or dependencies
 
@@ -201,25 +201,22 @@ SELECT ft_unpack(json_col) FROM my_table;
 > Full surface, including the two table macros and the `profile → schema → validate`
 > flow, in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#duckdb-extension-sql-surface-ft_-verbs).
 
-> **Deprecated:** the un-prefixed scalars (`finetype()`, `finetype_detail()`,
-> `finetype_cast()`, `finetype_unpack()`, `finetype_validate()`, `finetype_version()`)
-> are still registered as aliases but are no longer the taught surface — they have
-> been superseded by the `ft_` verbs since 0.6.23.
+> **Removed:** the un-prefixed scalars — `finetype`, `finetype_detail`,
+> `finetype_cast`, `finetype_unpack`, `finetype_validate` and `finetype_version` — are
+> no longer registered. They were deprecated in 0.6.23 in favour of the `ft_` verbs, and
+> a build that no longer carries them raises `Catalog Error` on a call that used to work.
 >
-> **None of these is a plain rename — check each one.** `finetype(value)` pools the DuckDB
-> chunk as its sample, exactly as `ft_detail` does in scalar form, so it is *column*-level;
-> `ft_infer` types a single value at a sample size of one and will give you different, weaker
-> answers. If you were typing a column with `finetype()`, the replacement is **`ft_profile`**,
-> and `ft_infer` only if you really were probing one literal.
+> **Two of the six do not map by renaming.** `finetype` sampled the DuckDB chunk, so it
+> answered at *column* level: if you were typing a column with it, the replacement is
+> **`ft_profile`**, and `ft_infer` — a single value at a sample size of one — only if you
+> really were probing one literal. And `finetype_validate` is **not** `ft_validate`, which
+> is a table macro; its counterpart is **`ft_validate_text`**, which returns
+> `STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR)` where the old scalar
+> returned a `VARCHAR`. `finetype_detail`, `finetype_cast`, `finetype_unpack` and
+> `finetype_version` are the safe find-and-replace in the set.
 >
-> Separately, `finetype_validate` is **not** `ft_validate` (a table macro); its counterpart is
-> **`ft_validate_text`** — and that swap **changes the return type**. `finetype_validate` returns
-> a `VARCHAR`, the bare string `'valid'` or an error message; `ft_validate_text` returns a
-> `STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR)`. Code doing
-> `WHERE finetype_validate(...) = 'valid'` must become `WHERE ft_validate_text(...).valid`.
->
-> `finetype_detail` / `_cast` / `_unpack` / `_version` are true aliases of their `ft_` twins and
-> are the only safe find-and-replace in the set.
+> The migration table, with the call shapes on both sides, is in
+> [CHANGELOG.md](CHANGELOG.md).
 
 On first use, the extension downloads model weights from HuggingFace and caches them locally. Set `FINETYPE_MODEL_DIR` to use a local model path instead.
 

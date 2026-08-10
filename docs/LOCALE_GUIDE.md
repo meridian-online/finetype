@@ -87,20 +87,20 @@ Column: order_dates
 
 ### DuckDB Extension
 
-**The extension does not report a locale.** `finetype_detail` returns `type`,
+**The extension does not report a locale.** `ft_detail` returns `type`,
 `confidence`, `duckdb_type`, `samples`, `votes` and — only when a disambiguation
 rule fired — `disambiguation`. There is no `locale` key; the CLI's
 `--output json` has one, the extension does not
 (`crates/finetype-duckdb/src/column_fn.rs`, `format_column_result_json`).
 
 ```sql
-SELECT finetype_detail(phone_number) FROM customers;
+SELECT ft_detail(phone_number) FROM customers;
 -- → {"type":"identity.person.phone_number","confidence":0.98,"duckdb_type":"VARCHAR","samples":4,"votes":{"identity.person.phone_number":0.98}}
 
 -- Filter on the detected TYPE (the locale is not in this payload)
 SELECT customer_id, phone_number
 FROM customers
-WHERE json_extract_string(finetype_detail(phone_number), '$.type')
+WHERE json_extract_string(ft_detail(phone_number), '$.type')
       = 'identity.person.phone_number';
 ```
 
@@ -183,15 +183,19 @@ datetime.component.month_name.EN
 Useful for datasets with non-English date text:
 
 ```sql
--- French dataset
-SELECT finetype(month_col) FROM french_dates;
+-- French dataset. ft_profile is an aggregate, so it reads the whole column and
+-- answers once — one row, not one per input row.
+SELECT ft_profile(month_col).type FROM french_dates;
 -- → datetime.component.month_name.FR (not EN)
 
 -- Then map the name to a month number, per locale. DuckDB's strptime('%B') is
--- English-only, so a non-English locale needs its own list.
+-- English-only, so a non-English locale needs its own list. The column's type is
+-- a single value, so join it back across the rows rather than calling the
+-- aggregate inside the CASE.
+WITH col AS (SELECT ft_profile(month_col).type AS col_type FROM french_dates)
 SELECT
   month_col,
-  CASE finetype(month_col)
+  CASE col_type
     WHEN 'datetime.component.month_name.FR'
       THEN list_position(
              ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
@@ -200,7 +204,7 @@ SELECT
     WHEN 'datetime.component.month_name.EN'
       THEN month(try_strptime(month_col, '%B'))
   END AS month_number
-FROM french_dates;
+FROM french_dates, col;
 ```
 
 ## Working with Locale Data
@@ -213,7 +217,7 @@ In DuckDB, filter on the detected type (the extension reports no locale):
 
 ```sql
 SELECT * FROM customers
-WHERE json_extract_string(finetype_detail(phone_number), '$.type')
+WHERE json_extract_string(ft_detail(phone_number), '$.type')
       = 'identity.person.phone_number';
 ```
 
@@ -391,7 +395,7 @@ finetype profile customers.csv
 
 **What to do:**
 - This is correct behavior — your data *is* multi-locale
-- Use `finetype_detail()` in DuckDB to separate and transform by locale
+- Use `ft_detail()` in DuckDB to separate and transform by locale
 - Or filter/validate by expected region using locale information
 
 ## Advanced: Using Locale in ETL Pipelines
@@ -428,7 +432,7 @@ SELECT
   region,
   COUNT(*) AS postal_codes,
   COUNT(CASE
-    WHEN json_extract_string(finetype_detail(postal_code), '$.type')
+    WHEN json_extract_string(ft_detail(postal_code), '$.type')
          = 'geography.address.postal_code'
     THEN 1
   END) AS validated
@@ -451,4 +455,4 @@ ORDER BY validated DESC;
 - **LOCALE_DETECTION_ARCHITECTURE.md** — Why FineType uses post-hoc validation instead of model-based locale classification
 - **TAXONOMY_COMPARISON.md** — How FineType's locale system compares to other data typing systems
 - **CLI Reference** — `finetype --help` for locale-related flags
-- **DuckDB Functions** — `SELECT finetype_version()` to see supported locales
+- **DuckDB Functions** — `SELECT ft_version()` to see supported locales

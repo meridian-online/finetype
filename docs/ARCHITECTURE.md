@@ -100,7 +100,7 @@ Pure Rust, no Python runtime, no external C++ dependencies. Integrates cleanly w
 | `finetype-model` | Flat CharCNN + Sense→Sharpen inference, feature extraction, column-mode disambiguation, Model2Vec | `candle-core`, `candle-nn` |
 | `finetype-cli` | Binary: CLI commands (infer, profile, load, check, generate, taxonomy, schema, train, mcp) | `clap`, `csv` |
 | `finetype-mcp` | MCP server library (rmcp, 6 tools, taxonomy resources) | `rmcp`, `tokio` |
-| `finetype-duckdb` | DuckDB extension: 12 scalar functions + 1 aggregate + 2 table macros with embedded model | `duckdb`, `libduckdb-sys` |
+| `finetype-duckdb` | DuckDB extension: 6 scalar functions + 1 aggregate + 2 table macros with embedded model | `duckdb`, `libduckdb-sys` |
 | `finetype-eval` | Evaluation binaries (profile, actionability, GitTables, SOTAB) | `csv`, `duckdb`, `arrow` |
 | `finetype-train` | Pure Rust ML training (Sense, Entity, CharCNN, sibling-context attention, data pipeline) | `candle-core`, `candle-nn`, `duckdb` |
 | `finetype-build-tools` | Build utilities (DuckDB extension metadata) | — |
@@ -218,8 +218,9 @@ by `scripts/check_duckdb_catalog.py` — name, kind and return type. `ft_profile
 appears twice because it is registered twice: an aggregate over a column, and a
 table macro DuckDB routes to when the call sits in `FROM`.
 
-The `ft_` names are the taught surface. The un-prefixed scalars stay registered
-as aliases for one release so a v0.6.22 community install keeps working.
+This table is the whole surface. The un-prefixed `finetype*` scalars that
+shipped alongside it from 0.6.23 are removed; `CHANGELOG.md` carries the
+migration, and two of the six do not map by renaming.
 
 | Function | Kind | Returns | Purpose |
 |---|---|---|---|
@@ -232,14 +233,8 @@ as aliases for one release so a v0.6.22 community install keeps working.
 | `ft_cast(value)` | scalar | VARCHAR | Normalize value for TRY_CAST |
 | `ft_unpack(json)` | scalar | VARCHAR | Recursively classify JSON fields |
 | `ft_version()` | scalar | VARCHAR | Version string |
-| `finetype(col)` / `finetype(list, header?)` | scalar | VARCHAR | Alias — column-level classification |
-| `finetype_detail(col)` / `finetype_detail(list, header?)` | scalar | VARCHAR | Alias of `ft_detail` |
-| `finetype_cast(value)` | scalar | VARCHAR | Alias of `ft_cast` |
-| `finetype_unpack(json)` | scalar | VARCHAR | Alias of `ft_unpack` |
-| `finetype_validate(value, schema_json)` | scalar | VARCHAR | Returns `'valid'` or an error message — NOT the `ft_validate_text` STRUCT |
-| `finetype_version()` | scalar | VARCHAR | Alias of `ft_version` |
 
-Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification (~2048-row chunks). `finetype_validate` uses cached schema parsing for performance.
+Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification (~2048-row chunks).
 
 ## MCP Server
 

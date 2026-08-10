@@ -1,4 +1,4 @@
-//! Value normalization for finetype_cast().
+//! Value normalization for ft_cast().
 //!
 //! Given a detected finetype label, normalizes the raw string value into a canonical
 //! form suitable for DuckDB TRY_CAST. Returns None if validation fails.

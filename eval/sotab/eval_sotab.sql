@@ -79,7 +79,9 @@ SELECT
     col_index,
     gt_label,
     col_value,
-    finetype(col_value) AS ft_label
+    -- ft_detail's scalar path samples the DuckDB chunk, so this label is the
+    -- chunk's consensus rather than a per-value answer.
+    json_extract_string(ft_detail(col_value), '$.type') AS ft_label
 FROM column_values;
 
 SELECT count(*) AS values_classified FROM classified;
@@ -430,15 +432,15 @@ SELECT
 FROM classified;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 8. COLUMN-LEVEL CLASSIFICATION via finetype(list())
+-- 8. COLUMN-LEVEL CLASSIFICATION via the ft_profile aggregate
 -- ═══════════════════════════════════════════════════════════════════════════════
--- Uses finetype(list(values)) for integrated column-level classification
+-- Uses ft_profile(col) for integrated column-level classification
 -- with built-in disambiguation rules (date formats, coordinates, boolean subtypes,
 -- categorical detection, numeric range analysis, etc.)
 
 .print ''
 .print '═══════════════════════════════════════════════════════════════════'
-.print '          finetype(list()) vs PER-VALUE MAJORITY VOTE      '
+.print '           ft_profile(col) vs PER-VALUE MAJORITY VOTE      '
 .print '═══════════════════════════════════════════════════════════════════'
 
 -- 8a. Run column-level classification
@@ -447,8 +449,8 @@ SELECT
     cv.table_name,
     cv.col_index,
     cv.gt_label,
-    finetype(list(cv.col_value)) AS predicted_label,
-    finetype_detail(list(cv.col_value)) AS detail_json
+    ft_profile(cv.col_value).type AS predicted_label,
+    ft_detail(list(cv.col_value)) AS detail_json
 FROM column_values cv
 GROUP BY cv.table_name, cv.col_index, cv.gt_label;
 
@@ -492,7 +494,7 @@ LEFT JOIN schema_mapping sm ON cp.gt_label = sm.sotab_label;
 
 -- 8c. Side-by-side headline comparison
 .print ''
-.print '--- COMPARISON: per-value majority vote vs finetype(list()) ---'
+.print '--- COMPARISON: per-value majority vote vs ft_profile(col) ---'
 SELECT
     'per-value majority vote' AS method,
     count(*) AS total,
@@ -503,7 +505,7 @@ SELECT
 FROM eval_results WHERE match_quality IS NOT NULL
 UNION ALL
 SELECT
-    'finetype(list())' AS method,
+    'ft_profile(col)' AS method,
     count(*) AS total,
     sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
     ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_pct,
@@ -524,7 +526,7 @@ SELECT
 FROM eval_results WHERE detectability = 'format_detectable'
 UNION ALL
 SELECT
-    'finetype(list())' AS method,
+    'ft_profile(col)' AS method,
     count(*) AS total,
     sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
     ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_pct,
@@ -532,9 +534,9 @@ SELECT
     ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_pct
 FROM eval_results_v2 WHERE detectability = 'format_detectable';
 
--- 8e. Where finetype(list()) differs from majority vote
+-- 8e. Where ft_profile(col) differs from majority vote
 .print ''
-.print '--- Columns where finetype(list()) CHANGED the prediction ---'
+.print '--- Columns where ft_profile(col) CHANGED the prediction ---'
 SELECT
     v1.predicted_label AS majority_vote,
     v2.predicted_label AS column_fn,
@@ -554,7 +556,7 @@ LIMIT 30;
 
 -- 8f. Net improvement summary
 .print ''
-.print '--- Net improvement: finetype(list()) vs per-value majority vote ---'
+.print '--- Net improvement: ft_profile(col) vs per-value majority vote ---'
 WITH diff AS (
     SELECT
         CASE
