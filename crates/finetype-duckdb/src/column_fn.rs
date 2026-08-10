@@ -1,22 +1,19 @@
-//! Column-level classification helpers for the `finetype()` and `finetype_detail()` overloads.
+//! Column-level classification helpers for the `ft_detail()` overloads and the
+//! `ft_profile` aggregate.
 //!
-//! When `finetype()` receives a `LIST<VARCHAR>` input (via `list(col)`), it delegates
+//! When `ft_detail()` receives a `LIST<VARCHAR>` input (via `list(col)`), it delegates
 //! to these helpers which use the ColumnClassifier's disambiguation rules (date formats,
 //! coordinates, boolean subtypes, categorical detection, etc.) to produce a single
 //! semantic type for the whole column.
 //!
 //! Usage:
 //! ```sql
-//! -- Column classification (LIST<VARCHAR> overload)
-//! SELECT col_name, finetype(list(col_value))
+//! -- Full detail over an explicit column sample (LIST<VARCHAR> overload)
+//! SELECT col_name, ft_detail(list(col_value))
 //! FROM values_table GROUP BY col_name;
 //!
 //! -- With header hint for better disambiguation
-//! SELECT col_name, finetype(list(col_value), col_name)
-//! FROM values_table GROUP BY col_name;
-//!
-//! -- Full detail (JSON output)
-//! SELECT col_name, finetype_detail(list(col_value))
+//! SELECT col_name, ft_detail(list(col_value), col_name)
 //! FROM values_table GROUP BY col_name;
 //! ```
 
@@ -51,8 +48,8 @@ pub const PROFILE_SAMPLE_CAP: usize = 100;
 
 /// Check whether the first column of a data chunk is a LIST type.
 ///
-/// Used by the unified `finetype()` / `finetype_detail()` to dispatch between
-/// single-value (VARCHAR) and column-level (LIST<VARCHAR>) classification.
+/// Used by `ft_detail()` to dispatch between single-value (VARCHAR) and
+/// column-level (LIST<VARCHAR>) classification.
 pub unsafe fn is_list_input(input: &mut DataChunkHandle) -> bool {
     use libduckdb_sys::*;
 
@@ -173,60 +170,6 @@ unsafe fn read_list_varchar_inner(
 // ═══════════════════════════════════════════════════════════════════════════════
 // COLUMN-LEVEL INVOKE HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
-
-/// Column-level classification: LIST<VARCHAR> → label VARCHAR.
-///
-/// Called by `FineType::invoke()` when the first argument is a LIST<VARCHAR>.
-pub unsafe fn invoke_column_label(
-    input: &mut DataChunkHandle,
-    output: &mut dyn WritableVector,
-) -> std::result::Result<(), Box<dyn Error>> {
-    let col_classifier = get_column_classifier();
-    let len = input.len();
-    let n_cols = input.num_columns();
-    let mut output_vec = output.flat_vector();
-
-    for i in 0..len {
-        if let Some(values) = read_list_varchar(input, 0, i) {
-            if values.is_empty() {
-                let cstr = CString::new("unknown")?;
-                output_vec.insert(i, cstr);
-                continue;
-            }
-
-            // Check for optional header argument (2-arg overload)
-            let result = if n_cols >= 2 {
-                if let Some(header) = crate::read_varchar(input, 1, i) {
-                    if header.is_empty() {
-                        col_classifier.classify_column(&values)
-                    } else {
-                        col_classifier.classify_column_with_header(&values, &header)
-                    }
-                } else {
-                    col_classifier.classify_column(&values)
-                }
-            } else {
-                col_classifier.classify_column(&values)
-            };
-
-            match result {
-                Ok(col_result) => {
-                    let cstr = CString::new(col_result.label.as_str())?;
-                    output_vec.insert(i, cstr);
-                }
-                Err(_) => {
-                    let cstr = CString::new("unknown")?;
-                    output_vec.insert(i, cstr);
-                }
-            }
-        } else {
-            // NULL list → NULL output
-            output_vec.set_null(i);
-        }
-    }
-
-    Ok(())
-}
 
 /// Column-level classification with full detail: LIST<VARCHAR> → JSON VARCHAR.
 ///

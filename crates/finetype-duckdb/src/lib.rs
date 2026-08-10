@@ -5,8 +5,9 @@
 //! in both directions — a function this list omits, and a name this list invents,
 //! each fail CI.
 //!
-//! The `ft_` names are the taught surface; the un-prefixed `finetype*` scalars
-//! stay registered as aliases for one release so a v0.6.22 install keeps working.
+//! `ft_` is the whole surface. The un-prefixed `finetype*` scalars that shipped
+//! alongside it from 0.6.23 are gone; the migration table is in `CHANGELOG.md`,
+//! and two of the six do not map by renaming.
 //!
 //! - `ft_infer(value)` — Single-value probe → VARCHAR label. Weaker than a column.
 //! - `ft_profile(col)` / `ft_profile(col, header)` — aggregate: column-level
@@ -20,16 +21,9 @@
 //! - `ft_cast(value)` — Normalize a value for safe TRY_CAST (dates → ISO, booleans → true/false)
 //! - `ft_unpack(json)` — Recursively classify JSON fields, returns annotated JSON
 //! - `ft_version()` — Returns the extension version
-//! - `finetype(value)` / `finetype(list(values))` / `finetype(list(values), header)`
-//!   — Alias: classification → VARCHAR label
-//! - `finetype_detail(value)` — Alias of `ft_detail`
-//! - `finetype_cast(value)` — Alias of `ft_cast`
-//! - `finetype_unpack(json)` — Alias of `ft_unpack`
-//! - `finetype_validate(value, schema_json)` — Returns VARCHAR: `'valid'` or an
-//!   error message. NOT the STRUCT that `ft_validate_text` returns.
-//! - `finetype_version()` — Alias of `ft_version`
-//! - `finetype_spike(n)` — a spike artefact, not production surface; see the
-//!   comment on its registration in the entrypoint.
+//!
+//! The `finetype_spike` table function is registered only under the non-default
+//! `spike` cargo feature; see the comment on its registration in the entrypoint.
 
 use duckdb::core::{DataChunkHandle, Inserter, LogicalTypeHandle, LogicalTypeId};
 use duckdb::vscalar::{ScalarFunctionSignature, VScalar};
@@ -49,6 +43,7 @@ include!(concat!(env!("OUT_DIR"), "/embedded_taxonomy.rs"));
 mod column_fn;
 mod normalize;
 mod profile_agg;
+#[cfg(feature = "spike")]
 mod spike;
 mod type_mapping;
 mod unpack;
@@ -73,7 +68,7 @@ const M2V_TOKENIZER: &str = "model2vec/tokenizer.json";
 const M2V_MODEL: &str = "model2vec/model.safetensors";
 
 /// Global column classifier backed by multi-branch model.
-/// Initialized on first finetype() call, loaded at runtime from
+/// Initialized on the first classifying call, loaded at runtime from
 /// HuggingFace Hub or a local directory.
 static COLUMN_CLASSIFIER: OnceLock<ColumnClassifier> = OnceLock::new();
 
@@ -209,7 +204,7 @@ unsafe fn read_varchar(
 // SCALAR FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// `finetype_version()` — Returns the FineType extension version string.
+/// `ft_version()` — Returns the FineType extension version string.
 struct FineTypeVersion;
 
 impl VScalar for FineTypeVersion {
@@ -237,100 +232,9 @@ impl VScalar for FineTypeVersion {
     }
 }
 
-/// `finetype(value VARCHAR) → VARCHAR` — Semantic type classification.
-/// `finetype(list(values) LIST<VARCHAR>) → VARCHAR` — Explicit column classification.
-/// `finetype(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR` — Column with header hint.
-///
-/// Classifies data as a semantic type (e.g. "datetime.date.iso", "identity.person.email").
-///
-/// In scalar mode (`finetype(col)`), the function automatically uses the DuckDB
-/// processing chunk (~2048 rows) as a sample for column-level disambiguation.
-/// This means majority vote + disambiguation rules (date formats, coordinates,
-/// boolean subtypes, categorical detection, numeric range, etc.) are applied
-/// even without an explicit `list()` wrapper.
-///
-/// The `list()` overload gives explicit control over the sample — useful with
-/// GROUP BY to classify each group independently, or when you want the full
-/// column rather than a chunk-sized sample.
-struct FineType;
-
-impl VScalar for FineType {
-    type State = ();
-
-    unsafe fn invoke(
-        _state: &Self::State,
-        input: &mut DataChunkHandle,
-        output: &mut dyn WritableVector,
-    ) -> Result<(), Box<dyn Error>> {
-        // Dispatch based on input type: VARCHAR vs LIST<VARCHAR>
-        if column_fn::is_list_input(input) {
-            return column_fn::invoke_column_label(input, output);
-        }
-
-        // Scalar path: use the chunk as a column sample for disambiguation.
-        // Collect all non-null, non-empty values, run column classification,
-        // and write the consensus label for every row.
-        let len = input.len();
-        let mut output_vec = output.flat_vector();
-
-        let mut non_null_indices: Vec<usize> = Vec::with_capacity(len);
-        let mut texts: Vec<String> = Vec::with_capacity(len);
-
-        for i in 0..len {
-            if let Some(text) = read_varchar(input, 0, i) {
-                if !text.is_empty() {
-                    non_null_indices.push(i);
-                    texts.push(text);
-                } else {
-                    let cstr = CString::new("unknown")?;
-                    output_vec.insert(i, cstr);
-                }
-            } else {
-                output_vec.set_null(i);
-            }
-        }
-
-        if !texts.is_empty() {
-            let col_result = column_fn::classify_column(&texts)?;
-            let label = CString::new(col_result.label.as_str())?;
-            for idx in &non_null_indices {
-                output_vec.insert(*idx, label.clone());
-            }
-        }
-
-        Ok(())
-    }
-
-    fn signatures() -> Vec<ScalarFunctionSignature> {
-        let varchar = LogicalTypeHandle::from(LogicalTypeId::Varchar);
-        let list_varchar = LogicalTypeHandle::list(&varchar);
-
-        vec![
-            // finetype(value VARCHAR) → VARCHAR
-            ScalarFunctionSignature::exact(
-                vec![LogicalTypeHandle::from(LogicalTypeId::Varchar)],
-                LogicalTypeHandle::from(LogicalTypeId::Varchar),
-            ),
-            // finetype(list(values) LIST<VARCHAR>) → VARCHAR
-            ScalarFunctionSignature::exact(
-                vec![list_varchar],
-                LogicalTypeHandle::from(LogicalTypeId::Varchar),
-            ),
-            // finetype(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR
-            ScalarFunctionSignature::exact(
-                vec![
-                    LogicalTypeHandle::list(&LogicalTypeHandle::from(LogicalTypeId::Varchar)),
-                    LogicalTypeHandle::from(LogicalTypeId::Varchar),
-                ],
-                LogicalTypeHandle::from(LogicalTypeId::Varchar),
-            ),
-        ]
-    }
-}
-
-/// `finetype_detail(value VARCHAR) → VARCHAR` — Detailed semantic type classification.
-/// `finetype_detail(list(values) LIST<VARCHAR>) → VARCHAR` — Explicit column detail.
-/// `finetype_detail(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR` — Column detail with header.
+/// `ft_detail(value VARCHAR) → VARCHAR` — Detailed semantic type classification.
+/// `ft_detail(list(values) LIST<VARCHAR>) → VARCHAR` — Explicit column detail.
+/// `ft_detail(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR` — Column detail with header.
 ///
 /// Returns a JSON object with classification details. In both scalar and list modes,
 /// the output includes:
@@ -398,17 +302,17 @@ impl VScalar for FineTypeDetail {
         let list_varchar = LogicalTypeHandle::list(&varchar);
 
         vec![
-            // finetype_detail(value VARCHAR) → VARCHAR
+            // ft_detail(value VARCHAR) → VARCHAR
             ScalarFunctionSignature::exact(
                 vec![LogicalTypeHandle::from(LogicalTypeId::Varchar)],
                 LogicalTypeHandle::from(LogicalTypeId::Varchar),
             ),
-            // finetype_detail(list(values) LIST<VARCHAR>) → VARCHAR
+            // ft_detail(list(values) LIST<VARCHAR>) → VARCHAR
             ScalarFunctionSignature::exact(
                 vec![list_varchar],
                 LogicalTypeHandle::from(LogicalTypeId::Varchar),
             ),
-            // finetype_detail(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR
+            // ft_detail(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR
             ScalarFunctionSignature::exact(
                 vec![
                     LogicalTypeHandle::list(&LogicalTypeHandle::from(LogicalTypeId::Varchar)),
@@ -420,17 +324,17 @@ impl VScalar for FineTypeDetail {
     }
 }
 
-/// `finetype_cast(value VARCHAR) → VARCHAR` — Normalize a value for safe casting.
+/// `ft_cast(value VARCHAR) → VARCHAR` — Normalize a value for safe casting.
 ///
 /// Classifies the value, then normalizes it to a canonical form suitable for
 /// DuckDB `TRY_CAST()`. Returns NULL if the value doesn't validate for its
 /// detected type.
 ///
 /// Examples:
-/// - `finetype_cast('01/15/2024')` → `'2024-01-15'` (US date → ISO)
-/// - `finetype_cast('Yes')` → `'true'` (boolean normalization)
-/// - `finetype_cast('550E8400-...')` → `'550e8400-...'` (UUID lowercase)
-/// - `finetype_cast('1,234')` → `'1234'` (strip formatting)
+/// - `ft_cast('01/15/2024')` → `'2024-01-15'` (US date → ISO)
+/// - `ft_cast('Yes')` → `'true'` (boolean normalization)
+/// - `ft_cast('550E8400-...')` → `'550e8400-...'` (UUID lowercase)
+/// - `ft_cast('1,234')` → `'1234'` (strip formatting)
 struct FineTypeCast;
 
 impl VScalar for FineTypeCast {
@@ -483,7 +387,7 @@ impl VScalar for FineTypeCast {
     }
 }
 
-/// `finetype_unpack(json_value VARCHAR) → VARCHAR` — Recursively infer types in JSON.
+/// `ft_unpack(json_value VARCHAR) → VARCHAR` — Recursively infer types in JSON.
 ///
 /// Parses a JSON string and classifies each scalar value. Returns annotated JSON
 /// where each value is replaced with an object containing:
@@ -532,62 +436,6 @@ impl VScalar for FineTypeUnpack {
     fn signatures() -> Vec<ScalarFunctionSignature> {
         vec![ScalarFunctionSignature::exact(
             vec![LogicalTypeHandle::from(LogicalTypeId::Varchar)],
-            LogicalTypeHandle::from(LogicalTypeId::Varchar),
-        )]
-    }
-}
-
-/// `finetype_validate(value VARCHAR, schema_json VARCHAR) → VARCHAR`
-///
-/// Validates a value against a JSON Schema fragment. Returns 'valid' if the value
-/// passes, or the first validation error message if it fails.
-///
-/// The schema is parsed and cached for performance — the same schema string
-/// is compiled only once across all rows.
-///
-/// Examples:
-/// - `finetype_validate('test@example.com', '{"type":"string","pattern":"^[^@]+@[^@]+$"}')` → `'valid'`
-/// - `finetype_validate('not-an-email', '{"type":"string","pattern":"^[^@]+@[^@]+$"}')` → error message
-/// - `finetype_validate('abc', '{"type":"string","minLength":5}')` → error message
-struct FineTypeValidate;
-
-impl VScalar for FineTypeValidate {
-    type State = ();
-
-    unsafe fn invoke(
-        _state: &Self::State,
-        input: &mut DataChunkHandle,
-        output: &mut dyn WritableVector,
-    ) -> Result<(), Box<dyn Error>> {
-        let len = input.len();
-        let mut output_vec = output.flat_vector();
-
-        for i in 0..len {
-            let value = read_varchar(input, 0, i);
-            let schema = read_varchar(input, 1, i);
-
-            match (value, schema) {
-                (Some(val), Some(sch)) => {
-                    let result = validate::validate_value(&val, &sch);
-                    let cstr = CString::new(result)?;
-                    output_vec.insert(i, cstr);
-                }
-                _ => {
-                    // NULL input → NULL output
-                    output_vec.set_null(i);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn signatures() -> Vec<ScalarFunctionSignature> {
-        vec![ScalarFunctionSignature::exact(
-            vec![
-                LogicalTypeHandle::from(LogicalTypeId::Varchar),
-                LogicalTypeHandle::from(LogicalTypeId::Varchar),
-            ],
             LogicalTypeHandle::from(LogicalTypeId::Varchar),
         )]
     }
@@ -651,9 +499,8 @@ impl VScalar for FineTypeInfer {
 /// `ft_validate_text(value VARCHAR, schema VARCHAR) → STRUCT{valid, constraint, message}`
 ///
 /// Validates a value (or a whole column, one row at a time) against a JSON
-/// Schema fragment. Unlike `finetype_validate`, which returns a bare
-/// `'valid'`/error string, this returns a STRUCT mirroring the CLI
-/// `reject_errors` shape so a report can name which constraint failed:
+/// Schema fragment, returning a STRUCT mirroring the CLI `reject_errors` shape
+/// so a report can name which constraint failed:
 ///   - `valid` BOOLEAN
 ///   - `constraint` VARCHAR — `pattern` | `min_length` | … | `other` (NULL when valid)
 ///   - `message` VARCHAR — the `jsonschema` error text (NULL when valid)
@@ -915,41 +762,24 @@ pub unsafe extern "C" fn finetype_init_c_api(
 /// Called by DuckDB when loading the extension. The Connection is valid for the
 /// lifetime of the extension.
 pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dyn Error>> {
-    con.register_scalar_function::<FineTypeVersion>("finetype_version")
-        .expect("Failed to register finetype_version");
-
-    con.register_scalar_function::<FineTypeValidate>("finetype_validate")
-        .expect("Failed to register finetype_validate");
-
-    con.register_scalar_function::<FineType>("finetype")
-        .expect("Failed to register finetype");
-
-    con.register_scalar_function::<FineTypeDetail>("finetype_detail")
-        .expect("Failed to register finetype_detail");
-
-    con.register_scalar_function::<FineTypeCast>("finetype_cast")
-        .expect("Failed to register finetype_cast");
-
-    con.register_scalar_function::<FineTypeUnpack>("finetype_unpack")
-        .expect("Failed to register finetype_unpack");
-
-    // Spike (ac-04) — NOT a production function. Registers a trivial
-    // table function to preserve the compile-time evidence that (a) vtab
-    // is active under loadable-extension and (b) scalar + table function
+    // Spike (ac-04) — NOT a production function, and behind the non-default
+    // `spike` cargo feature so no user's catalog carries it. Registers a
+    // trivial table function to preserve the compile-time evidence that (a)
+    // vtab is active under loadable-extension and (b) scalar + table function
     // coexistence compiles. No production use — the spike ratified
     // rollback_plan Scenario A (see MADR 0064); the CLI calls
     // finetype_core::table_validator::validate_table directly and writes
     // rejects to the output .db via duckdb-rs (spec ac-06 / ac-09).
+    #[cfg(feature = "spike")]
     con.register_table_function::<spike::FineTypeSpike>("finetype_spike")
-        .expect("Failed to register finetype_spike (spike artefact — not production)");
+        .expect("Failed to register the spike table function — not production surface");
 
     // ── ft_ converged surface (spec 2026-06-03-duckdb-extension-table-verbs) ──
-    // The un-prefixed scalars above stay registered as aliases for one release
-    // so the v0.6.22 community install keeps working; new docs teach the ft_
-    // names. ft_infer is the single-value probe; ft_validate_text returns a
-    // STRUCT; ft_detail / ft_cast / ft_unpack / ft_version alias the existing
-    // scalar impls. ft_profile is not here: it is an aggregate plus a table
-    // macro, and an aggregate cannot take a name a scalar already holds.
+    // The whole registered surface: the un-prefixed `finetype*` scalars this
+    // list used to sit under are removed, and CHANGELOG.md carries the
+    // migration. ft_infer is the single-value probe; ft_validate_text returns a
+    // STRUCT. ft_profile is not here: it is an aggregate plus a table macro,
+    // and an aggregate cannot take a name a scalar already holds.
     con.register_scalar_function::<FineTypeVersion>("ft_version")
         .expect("Failed to register ft_version");
     con.register_scalar_function::<FineTypeInfer>("ft_infer")

@@ -186,8 +186,10 @@ SELECT
     gt_label,
     ontology,
     col_value,
-    finetype(col_value) AS ft_label,
-    finetype_detail(col_value) AS ft_detail
+    -- ft_detail's scalar path samples the DuckDB chunk, so this label is the
+    -- chunk's consensus rather than a per-value answer.
+    json_extract_string(ft_detail(col_value), '$.type') AS ft_label,
+    ft_detail(col_value) AS ft_detail
 FROM sampled_values;
 
 SELECT 'Classification complete' AS step,

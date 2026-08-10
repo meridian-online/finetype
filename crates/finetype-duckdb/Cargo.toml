@@ -14,6 +14,16 @@ publish = false
 name = "finetype"
 crate-type = ["cdylib"]
 
+# `spike` registers crates/finetype-duckdb/src/spike.rs — a trivial VTab kept as
+# living evidence that vtab is active under `loadable-extension` and that a
+# table function and the scalars coexist (choice 0064, finding a/b). It is NOT
+# production surface, so it is off by default and no released artifact carries
+# `finetype_spike` in its catalog. The `spike-compiles` step of the doc-surface
+# CI job builds with it, which is what keeps the evidence a compile rather than
+# a memory.
+[features]
+spike = []
+
 [dependencies]
 # `vtab` is transitively enabled by `loadable-extension` in the workspace
 # duckdb dep — we list it here as well for explicit documentation of the

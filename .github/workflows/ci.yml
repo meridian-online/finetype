@@ -214,6 +214,17 @@ jobs:
         # trainer. `make build-release` would build all of them.
         run: make build-extension
 
+      - name: The spike still compiles, off the default build
+        # crates/finetype-duckdb/src/spike.rs is a trivial VTab kept as living
+        # evidence that `vtab` is active under `loadable-extension` and that a
+        # table function and the scalars coexist (choice 0064, findings a/b).
+        # It is behind the non-default `spike` feature so no released artifact
+        # carries `finetype_spike` in its catalog — which means nothing else in
+        # this file compiles it, and evidence nobody compiles is a memory. Here
+        # rather than in its own job because `make build-extension` above has
+        # already built this crate's dependency graph.
+        run: cargo check -p finetype_duckdb --features spike
+
       - name: The documented DuckDB surface matches duckdb_functions()
         # Which functions exist, what kind each is and what each returns are
         # asserted in prose in README.md, docs/ARCHITECTURE.md and the

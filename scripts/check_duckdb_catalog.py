@@ -50,9 +50,10 @@ WHAT IS *NOT* ASSERTED
     Nothing about the community build. This deliberately never touches it — the
     question here is whether the docs match the code in this tree.
 
-    finetype_spike is registered but is a spike artefact the docs deliberately do
-    not teach; it is listed in UNDOCUMENTED with that reason rather than being
-    silently skipped.
+    finetype_spike is not in a default build at all — it registers only under the
+    `spike` cargo feature. It stays in UNDOCUMENTED so that a build carrying it
+    is skipped rather than reported as an undocumented function, and so that a
+    doc teaching it still fails.
 
 USAGE
     scripts/check_duckdb_catalog.py                  # gate the working tree
@@ -303,7 +304,8 @@ MODULE_DOC_RE = re.compile(r"^//! - `(?P<name>[a-z_]+)\(")
 UNDOCUMENTED = {
     "finetype_spike": (
         "a spike artefact kept for the compile-time evidence that vtab is active "
-        "under loadable-extension; the entrypoint says so and no doc teaches it"
+        "under loadable-extension; it registers only under the non-default `spike` "
+        "cargo feature, so a default build has none and no doc teaches it"
     ),
 }
 

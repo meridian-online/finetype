@@ -1,4 +1,4 @@
-//! JSON unpacking for finetype_unpack().
+//! JSON unpacking for ft_unpack().
 //!
 //! Parses JSON input, classifies each scalar value, and returns annotated JSON
 //! with per-field type information.

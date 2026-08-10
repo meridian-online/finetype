@@ -5,6 +5,45 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Removed
+
+- **BREAKING: the six un-prefixed scalars are no longer registered.** `finetype`,
+  `finetype_detail`, `finetype_cast`, `finetype_unpack`, `finetype_validate` and
+  `finetype_version` were kept as aliases when 0.6.23 made `ft_` the taught
+  surface, on a stated overlap of one release. `ft_` is now the whole surface,
+  and a call to any of the six raises `Catalog Error`.
+
+  **Four of the six are a rename. Two are not, and a mechanical find-and-replace
+  on those two returns worse answers or a type error rather than failing.**
+
+  | Removed call | Replacement | What changes |
+  |---|---|---|
+  | `finetype(col)` typing a column | `ft_profile(col)` | `finetype` pooled the DuckDB chunk as its sample, so it answered at *column* level. `ft_profile` is an **aggregate**: it returns `STRUCT("type" VARCHAR, confidence DOUBLE, duckdb_type VARCHAR)` for the column, not a VARCHAR per row. Take `.type` for the label, and expect one row where you had one per input row. |
+  | `finetype(value)` probing one literal | `ft_infer(value)` | Same VARCHAR label, but `ft_infer` is a sample of one with no sibling context — strictly weaker than a column. Reach for it only when the input really is a single literal. |
+  | `finetype(list(col))` / `finetype(list(col), header)` | `ft_profile(col)` / `ft_profile(col, header)` | The `list()` wrapper goes; the aggregate reads the column directly, and `GROUP BY` gives you the per-group form. Returns the STRUCT above. |
+  | `finetype_validate(value, schema)` | `ft_validate_text(value, schema)` | **Not** `ft_validate`, which is a table macro over a whole table. And the return type changes: `finetype_validate` returned a VARCHAR — the bare string `'valid'`, or an error message — where `ft_validate_text` returns `STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR)`. `WHERE finetype_validate(v, s) = 'valid'` becomes `WHERE ft_validate_text(v, s).valid`, and the failed constraint is now named in `.constraint` rather than buried in a message string. |
+  | `finetype_detail(…)` | `ft_detail(…)` | Rename. Same impl, same overloads, same JSON VARCHAR. |
+  | `finetype_cast(value)` | `ft_cast(value)` | Rename. Same impl. |
+  | `finetype_unpack(json)` | `ft_unpack(json)` | Rename. Same impl. |
+  | `finetype_version()` | `ft_version()` | Rename. Same impl. |
+
+  The last four rows are the only safe find-and-replace in the set.
+
+  The extension's registered surface is now 6 scalars, 1 aggregate and 2 table
+  macros; `scripts/check_duckdb_catalog.py` compares that against
+  `duckdb_functions()` of a loaded build on the `doc-surface` CI job, in both
+  directions, so a doc that still teaches a removed name fails there.
+
+- **`finetype_spike` is gone from the built artifact.** The trivial VTab that
+  proved `vtab` is active under `loadable-extension` was registered in every
+  production build, carrying its own comment saying it is not a production
+  function — so it sat in every user's catalog and autocomplete. It now
+  registers only under the non-default `spike` cargo feature. The evidence it
+  exists for is a compile, and the `doc-surface` CI job still pays for it:
+  `cargo check -p finetype_duckdb --features spike`.
+
 ## [0.6.56] - 2026-08-04
 
 ### Changed
