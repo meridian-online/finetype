@@ -384,3 +384,52 @@ predicted label, no score, no row count. Those move with a retrain and pinning
 one would make the gate flake and then be ignored. Its self-test proves the point
 by moving a confidence digit and a predicted label and requiring the gate to stay
 green.
+
+## Which self-tests a pull request runs
+
+Every gate here ships a `--self-test` — a harness that mutates the gate, or the
+tree the gate reads, and requires the gate to redden. Those proofs are routed:
+`.github/gate-self-tests.tsv` says which paths invalidate which proof, and
+`.github/scripts/gate-self-tests.py` diffs the pull request against its base and
+publishes one boolean per gate that each self-test step in
+`.github/workflows/ci.yml` is guarded by. A diff that leaves the gates alone runs
+none of them; a diff that rewrites one runs that one.
+
+```bash
+make check-gate-routing     # the audit, and the router's own self-test
+```
+
+**Adding a gate means adding a row.** The audit runs on every pull request and
+reddens when the manifest, the tree and the workflow disagree — a script carrying
+a `--self-test` that no row watches, a registered command no step runs, or a step
+that runs unguarded and so runs on every diff.
+
+**A guard is compared whole, and the reason is worth reading once.** A routed
+step carries exactly `steps.<routing step>.outputs.<id> == 'true'`. Anything else
+is refused, because the near misses are not typos and do not look like defects:
+`== 'false'` and `!= 'true'` invert the routing so the proof runs only when the
+gate did *not* change, and an appended `&& github.event_name == 'push'` stops it
+running on pull requests at all. Each still mentions the right output, so a check
+that looked for the output name rather than the whole expression accepted all
+three.
+
+**Each job routes itself, and that is not a style choice.** A shared routing job
+that other jobs `needs:` was measured on a probe pull request: when it failed, its
+dependants were *skipped*, and a required status check that is skipped **satisfies
+branch protection** — the pull request reported `UNSTABLE`, which is mergeable,
+not `BLOCKED`. Two of this repository's five required contexts were among them. So
+no job depends on another for routing, and `plan` runs the audit before it plans,
+which puts the audit inside required contexts where a failure actually blocks.
+
+Further shapes are refused because they leave a job *green*: a guard naming a
+step that does not exist, a guard sitting above the step that sets it (Actions
+resolves `steps.<id>.outputs` against what has already run), a job-level `if:` on
+a job holding a proof, a `continue-on-error` letting a red proof pass — and worst,
+an `if:` on the routing step itself, which empties every output in that job and
+skips the audit along with the proofs. `--self-test` carries a named case for
+every shape named in these paragraphs, and that case list is the enumeration; it
+is not claimed to be complete.
+
+**Everything uncertain routes more work, never less.** No base commit, an
+unfetchable one, a diff that will not run, or a change to the manifest, the router
+or `.github/workflows/ci.yml` each select every gate and say so in the log.

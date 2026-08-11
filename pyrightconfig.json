@@ -27,6 +27,7 @@
 // unresolved import instead of a type error.
 {
   "include": [
+    ".github/scripts/gate-self-tests.py",
     "scripts/evidence.py",
     "scripts/score_gold_anchor.py",
     "scripts/check_doc_taxonomy_counts.py",

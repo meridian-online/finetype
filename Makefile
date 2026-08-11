@@ -36,9 +36,9 @@ setup:
 	@echo "✓ Rust updated, git hooks installed (pre-commit: fmt; pre-push: fmt+clippy)"
 
 # ─── CI (run locally before pushing) ─────────
-.PHONY: ci lint fmt clippy workspace-test types hygiene
+.PHONY: ci lint fmt clippy workspace-test types hygiene check-gate-routing
 
-ci: fmt clippy test check types hygiene
+ci: fmt clippy test check types hygiene check-gate-routing
 	@echo "═══ All CI checks passed ═══"
 
 lint: fmt clippy
@@ -71,6 +71,13 @@ types:
 hygiene:
 	./scripts/check-public-hygiene-selftest.sh
 	./scripts/check-public-hygiene.sh
+
+# Which gate self-test a diff re-runs, and whether the wiring that decides still
+# holds. The audit is what CI runs unconditionally; the self-test is the router's
+# own proof and is itself routed. Stdlib python, no build.
+check-gate-routing:
+	.github/scripts/gate-self-tests.py audit
+	.github/scripts/gate-self-tests.py --self-test
 
 # ─── CLI Tests ─────────────────────────────────
 .PHONY: test-smoke test-docs test-golden test-cli check-doc-counts

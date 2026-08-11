@@ -1,0 +1,76 @@
+# Which gate self-test a diff has to re-run, and which it does not.
+#
+# Read by .github/scripts/gate-self-tests.py. Every gate in this repository ships
+# a self-test that mutates the gate, or the tree the gate reads, and requires the
+# gate to redden -- a gate that is only known to pass is not known to detect.
+# Those proofs used to run on every pull request, so a README typo paid for all
+# of them and a diff that rewrote a gate paid exactly the same, which is to say
+# the rule "a changed gate re-proves itself" was enforced by nobody.
+#
+# A row says: when one of these paths changes, run these commands. Each job that
+# carries a proof runs `gate-self-tests.py plan` as a step of its own and guards
+# each command with `steps.<routing step>.outputs.<id> == 'true'`, compared WHOLE.
+#
+# NO JOB DEPENDS ON ANOTHER FOR ROUTING, and that is load-bearing rather than
+# tidy. Measured on a probe pull request: when a shared routing job failed, the
+# jobs needing it were SKIPPED, and a required status check that is skipped
+# SATISFIES branch protection -- the pull request reported UNSTABLE, which is
+# mergeable, not BLOCKED. Two of the five required contexts here were among them.
+#
+# `plan` audits before it plans, so a routing defect reddens the job it would have
+# mis-routed, including the required ones. That is what makes the audit blocking;
+# the standalone `gate-routing` job is only an early signal.
+#
+# The audit refuses more than a missing guard, and the shapes that matter are the
+# ones that leave a job GREEN: a guard written `== 'false'`, which inverts the
+# routing and reads like routing; a guard naming a step that does not exist or
+# sitting above the step that sets it; an `if:` on a job holding a proof; a
+# `continue-on-error` letting a red proof pass; and worst, an `if:` on the routing
+# STEP, which empties every output in the job and skips the audit along with the
+# proofs. `--self-test` carries a named case per shape and that case list, not a
+# count in prose, is the enumeration.
+#
+# FORMAT: three TAB-separated columns. Blank lines and `#` lines are ignored.
+#
+#   1  id        [a-z][a-z0-9_]*, unique. It becomes an output of the routing
+#                STEP and is read as `steps.<step>.outputs.<id>`, where a hyphen
+#                would parse as subtraction.
+#   2  commands  comma-separated. Each must appear VERBATIM as one line of a
+#                `run:` in .github/workflows/ci.yml, on a step guarded by this
+#                row's id. Drift in either direction reddens the audit, so the
+#                manifest cannot describe a workflow that has moved on.
+#   3  paths     comma-separated, repo-relative, each an existing file. A diff
+#                touching any of them runs column 2.
+#
+# ALWAYS-ON, and deliberately so: this manifest, the router, and the workflow
+# itself. A change to any of the three re-runs every gate's self-test, because a
+# change to the routing cannot be trusted to route itself.
+#
+# WHAT A ROW CANNOT SAY, and it costs a real gap. Column 3 lists FILES, and a
+# gate whose detection depends on another module is not covered by watching its
+# own file alone: `scripts/check_sample_patterns.py` imports
+# `scripts/check_taxonomy_content.py`, so editing the imported module routes
+# `taxonomy_content` and NOT `sample_patterns`, whose self-test exercises code it
+# no longer re-proves. Add the imported file to the importing row when you notice
+# one; nothing here derives it.
+#
+# THE BOUNDARY. A row belongs here when its command exists to prove a GATE can
+# fail. `.github/scripts/test-download-model.sh` and `scripts/test_score_clean_label.sh`
+# are tests of a tool rather than proofs of a gate, and `scripts/test_evidence.sh`
+# is the evidence suite itself; those keep running on every diff. What is routed
+# is the mutation harness that proves the suite detects.
+#
+# id	commands	paths
+public_hygiene	./scripts/check-public-hygiene-selftest.sh	scripts/check-public-hygiene.sh, scripts/check-public-hygiene-selftest.sh, scripts/public-hygiene-allowlist.txt, scripts/public-hygiene-innocent-strings.txt
+formula_asset	./scripts/check-formula-asset-selftest.sh, ./scripts/check-formula-asset-mutations.sh	scripts/check-formula-asset.sh, scripts/check-formula-asset-selftest.sh, scripts/check-formula-asset-mutations.sh
+ci_model_drift	.github/scripts/check-ci-model-drift.sh --self-test	.github/scripts/check-ci-model-drift.sh
+evidence	scripts/test_evidence_mutations.sh	scripts/evidence.py, scripts/test_evidence.sh, scripts/test_evidence_mutations.sh
+doc_taxonomy_counts	scripts/check_doc_taxonomy_counts.py --self-test	scripts/check_doc_taxonomy_counts.py
+comment_citations	scripts/check_comment_citations.py --self-test	scripts/check_comment_citations.py
+duckdb_catalog	scripts/check_duckdb_catalog.py --self-test	scripts/check_duckdb_catalog.py
+taxonomy_content	scripts/check_taxonomy_content.py --self-test	scripts/check_taxonomy_content.py
+sample_patterns	scripts/check_sample_patterns.py --self-test	scripts/check_sample_patterns.py
+sql_examples	scripts/check_sql_examples.py --self-test	scripts/check_sql_examples.py
+encoder_dtype	scripts/encoder_dtype.py self-test	scripts/encoder_dtype.py
+encoder_record_diff	scripts/encoder_dtype_record_diff.py self-test, scripts/encoder_dtype_record_diff_mutations.py	scripts/encoder_dtype_record_diff.py, scripts/encoder_dtype_record_diff_mutations.py
+gate_routing	.github/scripts/gate-self-tests.py --self-test	.github/scripts/gate-self-tests.py, .github/gate-self-tests.tsv
