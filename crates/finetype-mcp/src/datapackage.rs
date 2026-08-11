@@ -19,7 +19,7 @@
 //!   nowhere, so the extensions validate cleanly.
 
 use finetype_core::enum_domain::{detect_enum_domain, label_is_enum_keyword_eligible, EnumConfig};
-use finetype_core::Taxonomy;
+use finetype_core::{PatternFit, Taxonomy};
 use serde_json::{json, Map, Value};
 use std::collections::BTreeSet;
 
@@ -207,12 +207,38 @@ fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold
         field.insert("format".into(), json!(fmt));
     }
 
-    if let Some(constraints) = constraints_for(col.label, col.values, def, ftype, enum_threshold) {
+    // The published `pattern` is fitted to the values observed in THIS column,
+    // not taken from the type. A correct label whose column carries legitimate
+    // variants the type's canonical pattern rejects would otherwise ship a
+    // constraint the data violates.
+    let fit = def
+        .and_then(|d| d.validation.as_ref())
+        .and_then(|v| v.fit_pattern(col.values));
+
+    if let Some(constraints) = constraints_for(
+        col.label,
+        col.values,
+        def,
+        ftype,
+        enum_threshold,
+        fit.as_ref(),
+    ) {
         field.insert("constraints".into(), constraints);
     }
 
     // ── ac-03 custom properties (lossless carriers the fold drops) ──
     field.insert("x-finetype-label".into(), json!(col.label));
+    // A widened or dropped pattern is stated rather than done silently: the
+    // consumer can see which rule the type would have imposed and that the
+    // column's own values are why it did not survive verbatim.
+    if let Some(fit) = &fit {
+        if let Some(outcome) = fit.outcome() {
+            field.insert(
+                "x-finetype-pattern-fit".into(),
+                json!({ "outcome": outcome, "canonical": fit.canonical() }),
+            );
+        }
+    }
     if let Some(conf) = col.confidence {
         field.insert(
             "x-finetype-confidence".into(),
@@ -248,18 +274,23 @@ fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold
 /// `minimum`/`maximum` from the type's static validation, plus `enum` ONLY when
 /// the column is a closed categorical (observed, enum-keyword-eligible). Returns
 /// `None` when no constraint applies.
+///
+/// `fit` is the reconciliation of the type's canonical `pattern` with this
+/// column's observed values; it decides whether a `pattern` is published, and
+/// which one. `None` means the type carries no pattern.
 fn constraints_for(
     label: &str,
     values: &[String],
     def: Option<&finetype_core::Definition>,
     ftype: &str,
     enum_threshold: usize,
+    fit: Option<&PatternFit>,
 ) -> Option<Value> {
     let mut c = Map::new();
 
     if let Some(v) = def.and_then(|d| d.validation.as_ref()) {
-        if let Some(p) = &v.pattern {
-            c.insert("pattern".into(), json!(p));
+        if let Some(pattern) = fit.and_then(|f| f.published()) {
+            c.insert("pattern".into(), json!(pattern));
         }
         if let Some(n) = v.min_length {
             c.insert("minLength".into(), json!(n));
@@ -324,9 +355,30 @@ datetime.date.dmy_slash:
   frictionless:
     type: date
     format: "%d/%m/%Y"
+geography.location.country_code:
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+  validation:
+    type: string
+    pattern: "^[A-Z]{2}$"
 "#,
         )
         .expect("test taxonomy parses")
+    }
+
+    /// One column, emitted, with the values it was profiled from.
+    fn field_for(label: &str, values: &[&str]) -> Value {
+        let owned: Vec<String> = values.iter().map(|s| s.to_string()).collect();
+        let cols = vec![DatapackageColumn {
+            name: "col",
+            label,
+            values: &owned,
+            confidence: Some(0.9),
+            locale: None,
+        }];
+        let dp = emit_datapackage(&cols, &meta(), &test_taxonomy(), 32);
+        dp["resources"][0]["schema"]["fields"][0].clone()
     }
 
     fn meta() -> ResourceMeta {
@@ -432,6 +484,62 @@ datetime.date.dmy_slash:
         }];
         let dp = emit_datapackage(&cols, &m, &tax, 32);
         assert!(dp["resources"][0].get("encoding").is_none());
+    }
+
+    #[test]
+    fn a_column_matching_its_type_publishes_the_canonical_pattern() {
+        let field = field_for("geography.location.country_code", &["US", "FR", "JP"]);
+        assert_eq!(field["constraints"]["pattern"], json!("^[A-Z]{2}$"));
+        assert!(field.get("x-finetype-pattern-fit").is_none());
+    }
+
+    #[test]
+    fn a_column_with_a_few_extra_shapes_publishes_a_widened_pattern() {
+        // The label is right — this is a country-code column — and a minority of
+        // its values are subdivision codes. The emitted rule admits both.
+        let field = field_for(
+            "geography.location.country_code",
+            &["US", "FR", "US-DE", "US-CA", "CA-ON"],
+        );
+        assert_eq!(
+            field["constraints"]["pattern"],
+            json!("^[A-Z]{2}$|^[A-Z]{2}-[A-Z]{2}$")
+        );
+        assert_eq!(
+            field["x-finetype-pattern-fit"],
+            json!({ "outcome": "widened", "canonical": "^[A-Z]{2}$" })
+        );
+        // The label is untouched: widening a constraint is not re-typing.
+        assert_eq!(
+            field["x-finetype-label"],
+            json!("geography.location.country_code")
+        );
+    }
+
+    #[test]
+    fn a_column_too_varied_to_enumerate_publishes_no_pattern() {
+        let field = field_for(
+            "geography.location.country_code",
+            &[
+                "United States",
+                "France",
+                "Japan",
+                "The Netherlands",
+                "Cote d'Ivoire",
+            ],
+        );
+        assert!(
+            field
+                .get("constraints")
+                .and_then(|c| c.get("pattern"))
+                .is_none(),
+            "expected no pattern, got {}",
+            field["constraints"]
+        );
+        assert_eq!(
+            field["x-finetype-pattern-fit"],
+            json!({ "outcome": "omitted", "canonical": "^[A-Z]{2}$" })
+        );
     }
 
     #[test]
