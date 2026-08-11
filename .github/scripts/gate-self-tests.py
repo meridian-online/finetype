@@ -1107,6 +1107,22 @@ def self_test() -> int:
     for name, mutate, expect in cases:
         rec.reddens(name, with_tree(mutate), expect)
 
+    # `plan` must REFUSE on a tree the audit rejects, not route it. Without this
+    # the audit could be dropped from the planning path entirely -- leaving it
+    # only in the standalone job, which is not a required context and therefore
+    # not blocking -- with every other case still green.
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "repo"
+        root.mkdir()
+        clean_base = _scratch_repo(root)
+        rec.check("`plan` routes a clean tree", cmd_plan(root, clean_base) == 0)
+        broken = (root / MANIFEST_REL).read_text(encoding="utf-8")
+        _write(root, MANIFEST_REL, broken + "stowaway\tscripts/nope.py --self-test\tscripts/nope.py\n")
+        rec.check(
+            "`plan` REFUSES a tree the audit rejects, rather than routing it",
+            cmd_plan(root, clean_base) == 1,
+        )
+
     # ── the real tree ────────────────────────────────────────────────────────
     print("\nthis repository")
     real = audit(ROOT)
@@ -1121,6 +1137,21 @@ def self_test() -> int:
 
 
 # ── entry point ─────────────────────────────────────────────────────────────
+
+
+def cmd_plan(root: Path, base: str) -> int:
+    """Audit, then route. The order is the point and the self-test pins it.
+
+    The audit runs INSIDE the job that is about to route, which is what makes it
+    blocking: two of this repository's required contexts route, so a routing
+    defect reddens a check branch protection reads. A dedicated audit job does
+    not -- it is not a required context, and a pull request whose only red job is
+    unrequired reports UNSTABLE, which is mergeable.
+    """
+    if report_audit(root) != 0:
+        return 1
+    emit(route(root, base))
+    return 0
 
 
 def report_audit(root: Path) -> int:
@@ -1150,17 +1181,7 @@ def main(argv: list[str]) -> int:
     if args.self_test:
         return self_test()
     if args.command == "plan":
-        # The audit runs FIRST, inside the same job that is about to route. That
-        # is what makes it blocking: it runs in `Private paths in tracked files`
-        # and `Documented DuckDB surface + SQL examples`, both required contexts,
-        # so a routing defect reddens a check that branch protection reads. A
-        # dedicated audit job would not -- it is not a required context, and a
-        # pull request whose only red job is unrequired reports UNSTABLE, which
-        # is mergeable.
-        if report_audit(ROOT) != 0:
-            return 1
-        emit(route(ROOT, args.base))
-        return 0
+        return cmd_plan(ROOT, args.base)
     if args.command == "audit":
         return report_audit(ROOT)
 
