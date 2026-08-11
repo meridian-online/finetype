@@ -25,12 +25,16 @@ jobs:
     # base, reads `.github/gate-self-tests.tsv`, and publishes one boolean per
     # gate; every self-test step below is guarded by its own boolean.
     #
-    # The audit runs first and UNCONDITIONALLY, because every way this mechanism
-    # can rot is silent in Actions. An expression naming an output that does not
-    # exist, or a job the step does not depend on, is the empty string — so the
-    # step is skipped and the job is green, and a proof that did not run is
-    # indistinguishable from one that passed. The audit refuses such a tree
-    # rather than routing it.
+    # The audit runs first and UNCONDITIONALLY, because three of the ways this
+    # mechanism rots are silent in Actions: an expression naming an output that
+    # does not exist, one naming a job the step does not depend on, and an `if:`
+    # on this job, which skips every job that needs it. Each resolves to nothing,
+    # so the step is skipped and the job is green, and a proof that did not run is
+    # indistinguishable from one that passed. The audit refuses such a tree rather
+    # than routing it. The rest of what it refuses is not silent but is no easier
+    # to see in review — a guard written `== 'false'` reads exactly like routing —
+    # and `.github/scripts/gate-self-tests.py --self-test` carries a named case
+    # per shape.
     #
     # `outputs:` has to be written by hand; Actions has no other way to publish
     # one. The audit requires an entry per manifest row, wired to this step's own

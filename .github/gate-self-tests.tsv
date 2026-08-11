@@ -8,13 +8,17 @@
 # the rule "a changed gate re-proves itself" was enforced by nobody.
 #
 # A row says: when one of these paths changes, run these commands. The workflow
-# guards each command with `needs.<routing job>.outputs.<id>`, and
-# `gate-self-tests.py audit` -- which runs on every diff, because it costs a
-# stdlib-python second -- reddens when a row, the tree and the workflow stop
-# agreeing. That audit is the load-bearing half. Each way this could rot is
-# SILENT in Actions: a guard that names a job the step does not depend on, or an
-# output the routing job never declared, evaluates to the empty string, skips its
-# step, and reports the job green.
+# guards each command with `needs.<routing job>.outputs.<id> == 'true'`, compared
+# WHOLE, and `gate-self-tests.py audit` -- which runs on every diff, because it
+# costs a stdlib-python second -- reddens when a row, the tree and the workflow
+# stop agreeing. That audit is the load-bearing half.
+#
+# Three of the shapes it refuses are SILENT in Actions: a guard naming a job the
+# step does not depend on, an output the routing job never declared, and an `if:`
+# on the routing job. Each evaluates to nothing, skips its step, and reports the
+# job green. The others are visible but not obvious -- a guard written
+# `== 'false'` inverts the routing and reads like routing. `--self-test` carries
+# a named case per shape, which is the enumeration this paragraph is counting.
 #
 # FORMAT: three TAB-separated columns. Blank lines and `#` lines are ignored.
 #

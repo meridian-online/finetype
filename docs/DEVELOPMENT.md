@@ -400,12 +400,24 @@ make check-gate-routing     # the audit, and the router's own self-test
 ```
 
 **Adding a gate means adding a row.** The audit runs on every pull request and
-reddens if the manifest, the tree and the workflow disagree — a script carrying a
-`--self-test` that no row watches, a registered command no step runs, a step that
-runs unguarded, a guard naming a job the step does not depend on, or an output the
-routing job never declared. The last three are the ones worth knowing about: each
-is *silent* in Actions, because an expression that resolves to nothing skips its
-step and leaves the job green.
+reddens when the manifest, the tree and the workflow disagree — a script carrying
+a `--self-test` that no row watches, a registered command no step runs, or a step
+that runs unguarded and so runs on every diff.
+
+**A guard is compared whole, and the reason is worth reading once.** A routed
+step carries exactly `needs.<routing job>.outputs.<id> == 'true'`. Anything else
+is refused, because the near misses are not typos and do not look like defects:
+`== 'false'` and `!= 'true'` invert the routing so the proof runs only when the
+gate did *not* change, and an appended `&& github.event_name == 'push'` stops it
+running on pull requests at all. Each of those still mentions the right output, so
+a check that looked for the output name rather than the whole expression accepted
+all three.
+
+The same reasoning covers three shapes that are genuinely *silent* — the step is
+skipped and the job is green, with nothing to read: a guard naming a job the step
+does not `needs:`, an output the routing job never declared, and an `if:` on the
+routing job itself, which skips every job depending on it. `--self-test` carries a
+named case for each shape listed in these two paragraphs.
 
 **Everything uncertain routes more work, never less.** No base commit, an
 unfetchable one, a diff that will not run, or a change to the manifest, the router

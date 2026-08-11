@@ -29,12 +29,17 @@ WHAT THIS DOES
     `audit` is the half that keeps `plan` honest, and it runs unconditionally
             because it is the cheap one. It reddens when the manifest, the tree
             and the workflow stop agreeing -- a gate nothing routes, a guard
-            naming a job that does not exist, a routing output nobody declared.
-            Every one of those failures is SILENT in Actions: an expression that
-            references a missing output is the empty string, the step is skipped,
-            and the job is green. A green job whose proof did not run is the
-            failure this file exists to make impossible, so the audit refuses
-            rather than reports.
+            naming a job that does not exist, a routing output nobody declared,
+            a guard written `== 'false'` so the proof runs only when the gate did
+            not change. Three of those are SILENT in Actions: an expression
+            referencing a missing output is the empty string, the step is skipped,
+            and the job is green. So the audit refuses rather than reports.
+
+            It is a list of refused shapes, not a proof of exhaustion. Each shape
+            it covers has a named case in `--self-test`; a shape nobody thought of
+            has neither, and the four that this file's first version missed were
+            all found by someone reading it rather than by running it. Read the
+            case list before trusting the coverage.
 
     `--self-test` is this file's own instance of the thing it routes. It builds
             scratch repositories and requires each check above to redden against
@@ -114,6 +119,48 @@ SELFTEST_INVOCATION = re.compile(
 # A hyphen there parses as subtraction, so the character set is narrowed here
 # rather than discovered when a guard silently evaluates to the empty string.
 ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def guard_expression(routing_job: str, gate_id: str) -> str:
+    """The ONE condition a routed self-test may carry.
+
+    Compared whole, never searched for. A containment test accepts every
+    expression that merely mentions the output, and four of those invert or
+    disable the routing while reading almost identically:
+
+        needs.<job>.outputs.<id> == 'false'      the proof runs only when the
+                                                 gate did NOT change
+        needs.<job>.outputs.<id> != 'true'       the same, one character
+        … == 'true' && github.event_name == 'push'
+                                                 the proof never runs on a pull
+                                                 request, which is the only
+                                                 event this file gates
+        … == 'true' || <anything>                the guard stops deciding
+
+    A mechanism that guarantees a gate's self-test runs, and that can be
+    switched off by a one-character edit nothing refuses, is not the guarantee.
+    """
+    return f"needs.{routing_job}.outputs.{gate_id} == 'true'"
+
+
+def job_guard_gates(condition: str, routing_job: str, gate_ids: set[str]) -> set[str] | None:
+    """The gates a job-level `if:` admits, or None if it is not purely routing.
+
+    A job condition made only of guards joined by `||` can widen which diffs run
+    the job and can never narrow it below its own steps' guards, so it is safe.
+    Anything else -- a `&&`, a negation, an event test, a bare term -- is
+    REFUSED rather than interpreted. Reading it wrongly means certifying a job
+    that skips the proof its steps ask for.
+    """
+    if not condition.strip():
+        return set()
+    admitted: set[str] = set()
+    for term in (t.strip() for t in condition.split("||")):
+        match = next((g for g in gate_ids if term == guard_expression(routing_job, g)), None)
+        if match is None:
+            return None
+        admitted.add(match)
+    return admitted
 
 BLOCK_SCALARS = {"|", ">", "|-", ">-", "|+", ">+"}
 
@@ -436,6 +483,18 @@ def audit(root: Path) -> list[str]:
 
     watched = {p for g in gates for p in g.paths}
     registered = {c for g in gates for c in g.commands}
+    every_id = {g.id for g in gates}
+
+    # The routing job answers for all of them, so it may not be conditional. A
+    # single `if:` here -- `github.event_name == 'workflow_dispatch'` is the
+    # one-line version -- skips this job, skips every job that needs it, and
+    # skips every proof they carry, in a run with no red anywhere.
+    if jobs[routing_job].condition:
+        problems.append(
+            f"{WORKFLOW_REL}:{jobs[routing_job].lineno}: routing job `{routing_job}` carries "
+            f"`if: {jobs[routing_job].condition}`. It must be unconditional: skipping it skips "
+            "every job that needs it and every proof they carry, with nothing red"
+        )
 
     for trigger in (MANIFEST_REL, ROUTER_REL):
         if trigger not in watched:
@@ -452,13 +511,14 @@ def audit(root: Path) -> list[str]:
                     "file in the tree -- a path that cannot change routes nothing"
                 )
 
-        guard = f"needs.{routing_job}.outputs.{gate.id}"
+        reference = f"needs.{routing_job}.outputs.{gate.id}"
+        guard = guard_expression(routing_job, gate.id)
         declared = jobs[routing_job].outputs.get(gate.id, "")
         expected = f"steps.{step_id}.outputs.{gate.id}"
         if not declared:
             problems.append(
                 f"{WORKFLOW_REL}:{jobs[routing_job].lineno}: job `{routing_job}` declares no "
-                f"output `{gate.id}`, so `{guard}` is the empty string and every step it "
+                f"output `{gate.id}`, so `{reference}` is the empty string and every step it "
                 "guards is skipped in a green job"
             )
         if declared and expected not in declared:
@@ -478,10 +538,39 @@ def audit(root: Path) -> list[str]:
                 continue
             for hit in hits:
                 owner = jobs[hit.job]
-                if guard not in hit.condition and guard not in owner.condition:
+                # Whole-string, both sides. `guard in condition` accepts
+                # `== 'false'`, `!= 'true'` and `… && github.event_name == 'push'`,
+                # each of which reads like routing and disables it.
+                if hit.condition != guard and owner.condition != guard:
+                    carried = hit.condition or owner.condition
+                    if not carried:
+                        problems.append(
+                            f"{WORKFLOW_REL}:{hit.lineno}: `{command}` runs unguarded, so it "
+                            f"runs on every diff. It must carry exactly `{guard}`"
+                        )
+                    else:
+                        problems.append(
+                            f"{WORKFLOW_REL}:{hit.lineno}: `{command}` is guarded by "
+                            f"`{carried}`, not by `{guard}`. Only the exact comparison routes "
+                            "it: `== 'false'`, `!= 'true'` and an added `&&` each read like "
+                            "routing and disable it"
+                        )
+                # A job condition may only WIDEN. Any term that is not one of these
+                # guards can narrow the job away while its gate has changed, and the
+                # step inside is then skipped in a green job whatever its own `if:`
+                # says.
+                admitted = job_guard_gates(owner.condition, routing_job, every_id)
+                if admitted is None:
                     problems.append(
-                        f"{WORKFLOW_REL}:{hit.lineno}: `{command}` runs without `{guard}` on the "
-                        "step or on its job, so it runs on every diff"
+                        f"{WORKFLOW_REL}:{owner.lineno}: job `{hit.job}` carries a routed "
+                        f"self-test under `if: {owner.condition}`, which is not a disjunction "
+                        "of routing guards, so it can skip a proof its steps ask for"
+                    )
+                elif admitted and gate.id not in admitted:
+                    problems.append(
+                        f"{WORKFLOW_REL}:{owner.lineno}: job `{hit.job}` runs `{command}` but "
+                        f"its own `if:` never admits `{gate.id}`, so a diff changing that gate "
+                        "skips the job and the proof with it"
                     )
                 if hit.job != routing_job and routing_job not in owner.needs:
                     problems.append(
@@ -781,6 +870,20 @@ def self_test() -> int:
             rec.check(f"...and says why the {label} did it", bool(plan.forced), plan.forced)
             _git(root, "reset", "-q", "--hard", base)
 
+        # The documented "a diff that will not run selects every gate" branch,
+        # exercised by making `git diff` genuinely fail rather than by injecting a
+        # stub: an orphan HEAD leaves the base resolvable and HEAD unnameable, so
+        # resolve_base succeeds and changed_paths returns None. Without this the
+        # branch could be inverted to "selects nothing" -- the opposite of the
+        # documented property -- with every other case still green.
+        _git(root, "checkout", "-q", "--orphan", "unborn")
+        plan = route(root, base)
+        rec.check(
+            "a diff that will not run selects every gate", plan.selected == every, str(plan.selected)
+        )
+        rec.check("...and names the diff as the reason", "git diff" in plan.forced, plan.forced)
+        _git(root, "checkout", "-q", "-f", "-B", "main", base)
+
         absent = "0" * 40
         plan = route(root, absent)
         rec.check("an all-zero base selects every gate", plan.selected == every)
@@ -864,6 +967,37 @@ def self_test() -> int:
         _scratch_tree(root)
         clean = audit(root)
         rec.check("the unbroken scratch tree audits clean", clean == [], "; ".join(clean))
+
+    # The positive half of the job-condition rule, and the shape `ci.yml`'s
+    # encoder job actually uses: a job carrying proofs for two gates says so on
+    # the job, and each step still carries its own exact guard. Without this case
+    # the rule could be tightened to "no job condition at all" and nothing would
+    # say it had stopped admitting a legitimate shape.
+    #
+    # The step guard is not optional here. Whole-job routing -- a bare step under
+    # a job condition -- is sound only while that condition is exactly one guard;
+    # widen it and the bare step runs whenever EITHER gate changes, which is the
+    # cost this routing exists to avoid. That shape is refused below.
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        _scratch_tree(root)
+        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
+        text = text.replace(
+            "    if: needs.gate-routing.outputs.beta == 'true'",
+            "    if: needs.gate-routing.outputs.beta == 'true' || "
+            "needs.gate-routing.outputs.alpha == 'true'",
+        ).replace(
+            "      - name: the beta proof\n        run: |",
+            "      - name: the beta proof\n"
+            "        if: needs.gate-routing.outputs.beta == 'true'\n        run: |",
+        )
+        _write(root, WORKFLOW_REL, text)
+        widened = audit(root)
+        rec.check(
+            "a job condition widened to a second gate, with per-step guards, stays clean",
+            widened == [],
+            "; ".join(widened),
+        )
 
     def drop_guard(root: Path) -> None:
         text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
@@ -963,11 +1097,114 @@ def self_test() -> int:
             ", .github/gate-self-tests.tsv", ""
         ))
 
-    unguarded = "runs without `needs.gate-routing.outputs.alpha`"
+    # The four expressions that read like routing and are not. Each mentions the
+    # right output, so a containment test accepts all four; the first two invert
+    # the routing and the third confines it to an event this workflow does not
+    # gate self-tests on.
+    def rewrite_alpha_guard(replacement: str) -> Callable[[Path], None]:
+        def mutate(root: Path) -> None:
+            text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
+            _write(root, WORKFLOW_REL, text.replace(
+                "        if: needs.gate-routing.outputs.alpha == 'true'",
+                f"        if: {replacement}",
+            ))
+
+        return mutate
+
+    def conditional_routing_job(root: Path) -> None:
+        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
+        _write(root, WORKFLOW_REL, text.replace(
+            "  gate-routing:\n    name: Routing\n",
+            "  gate-routing:\n    name: Routing\n"
+            "    if: github.event_name == 'workflow_dispatch'\n",
+        ))
+
+    def narrowing_job_condition(root: Path) -> None:
+        # The beta job is routed whole. Point its condition at another gate: beta
+        # changes, the job is skipped, and beta's proof never runs.
+        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
+        _write(root, WORKFLOW_REL, text.replace(
+            "    if: needs.gate-routing.outputs.beta == 'true'",
+            "    if: needs.gate-routing.outputs.alpha == 'true'",
+        ))
+
+    def widened_whole_job_routing(root: Path) -> None:
+        # The beta step relies on whole-job routing and carries no `if:` of its
+        # own. Widening the job condition makes it run whenever ALPHA changes.
+        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
+        _write(root, WORKFLOW_REL, text.replace(
+            "    if: needs.gate-routing.outputs.beta == 'true'",
+            "    if: needs.gate-routing.outputs.beta == 'true' || "
+            "needs.gate-routing.outputs.alpha == 'true'",
+        ))
+
+    def uninterpretable_job_condition(root: Path) -> None:
+        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
+        _write(root, WORKFLOW_REL, text.replace(
+            "    if: needs.gate-routing.outputs.beta == 'true'",
+            "    if: needs.gate-routing.outputs.beta == 'true' && github.ref != 'refs/heads/main'",
+        ))
+
     for name, mutate, expect in (
-        ("an unguarded self-test step reddens", drop_guard, unguarded),
-        ("a guard naming a job that does not exist reddens", misname_job, unguarded),
-        ("a guard carrying another gate's id reddens", wrong_id, unguarded),
+        (
+            "an unguarded self-test step reddens",
+            drop_guard,
+            "runs unguarded, so it runs on every diff",
+        ),
+        (
+            "a guard naming a job that does not exist reddens",
+            misname_job,
+            "is guarded by `needs.gate-routng.outputs.alpha == 'true'`",
+        ),
+        (
+            "a guard carrying another gate's id reddens",
+            wrong_id,
+            "is guarded by `needs.gate-routing.outputs.beta == 'true'`",
+        ),
+        (
+            "a guard INVERTED to == 'false' reddens",
+            rewrite_alpha_guard("needs.gate-routing.outputs.alpha == 'false'"),
+            "is guarded by `needs.gate-routing.outputs.alpha == 'false'`",
+        ),
+        (
+            "a guard inverted to != 'true' reddens",
+            rewrite_alpha_guard("needs.gate-routing.outputs.alpha != 'true'"),
+            "is guarded by `needs.gate-routing.outputs.alpha != 'true'`",
+        ),
+        (
+            "a guard narrowed by an event test reddens",
+            rewrite_alpha_guard(
+                "needs.gate-routing.outputs.alpha == 'true' && github.event_name == 'push'"
+            ),
+            "&& github.event_name == 'push'`, not by",
+        ),
+        (
+            "a guard widened by a disjunction with a non-guard reddens",
+            rewrite_alpha_guard(
+                "needs.gate-routing.outputs.alpha == 'true' || github.event_name == 'push'"
+            ),
+            "|| github.event_name == 'push'`, not by",
+        ),
+        (
+            "a CONDITIONAL routing job reddens",
+            conditional_routing_job,
+            "routing job `gate-routing` carries `if: github.event_name == 'workflow_dispatch'`",
+        ),
+        (
+            "a job whose own `if:` never admits the gate it proves reddens",
+            narrowing_job_condition,
+            "its own `if:` never admits `beta`",
+        ),
+        (
+            "a job condition that is not a disjunction of guards reddens",
+            uninterpretable_job_condition,
+            "is not a disjunction of routing guards",
+        ),
+        (
+            "whole-job routing widened under a bare step reddens",
+            widened_whole_job_routing,
+            "|| needs.gate-routing.outputs.alpha == 'true'`, not by",
+        ),
         (
             "a job reading the routing outputs without `needs:` reddens",
             drop_needs,
