@@ -528,8 +528,12 @@ mod tests {
 
     #[test]
     fn shapes_are_ordered_so_the_same_column_emits_the_same_pattern() {
+        // Same values in two orders, and the exact string, so this pins the
+        // ordering rather than only that two calls agree.
+        let expected = "^[A-Z]{2}$|^[0-9]{4}$|^[A-Z]{2}-[A-Z]{2}$|^[a-z]{2}$";
         let forward = fit_pattern_to_observed(COUNTRY_CODE, &vals(&["US-DE", "1234", "ab"]));
         let backward = fit_pattern_to_observed(COUNTRY_CODE, &vals(&["ab", "1234", "US-DE"]));
+        assert_eq!(forward.published(), Some(expected));
         assert_eq!(forward, backward);
     }
 
