@@ -153,31 +153,43 @@ pub fn fit_pattern_to_observed(pattern: &str, values: &[String]) -> PatternFit {
         return PatternFit::AsIs(pattern.to_string());
     }
 
-    // The canonical pattern stays verbatim as the first alternative, so the
-    // widened pattern is a superset of it by construction and a reader can see
-    // what was added. `BTreeSet` fixes the order of the additions, so the same
-    // column profiled twice emits the same string.
-    let mut widened = String::from(pattern);
-    for shape in &shapes {
+    match widen(pattern, &shapes, values) {
+        Some(widened) => PatternFit::Widened {
+            pattern: widened,
+            canonical: pattern.to_string(),
+        },
+        None => PatternFit::Omit {
+            canonical: pattern.to_string(),
+        },
+    }
+}
+
+/// Assemble the widened pattern, or `None` if the result is not publishable.
+///
+/// The canonical pattern stays verbatim as the first alternative, so the widened
+/// pattern is a superset of it by construction and a reader can see what was
+/// added. The shapes arrive ordered, so the same column profiled twice emits the
+/// same string.
+///
+/// The alternation is built by hand out of escaped literals and character
+/// classes, so **whether it compiles, and whether it admits what was observed,
+/// are checked rather than assumed**. Either failure returns `None` and the
+/// caller omits the constraint: a constraint that does not fit is the defect
+/// being fixed, and shipping a broken one in its place would be worse than
+/// shipping none.
+fn widen(canonical: &str, shapes: &BTreeSet<String>, values: &[String]) -> Option<String> {
+    let mut widened = String::from(canonical);
+    for shape in shapes {
         widened.push_str("|^");
         widened.push_str(shape);
         widened.push('$');
     }
-
-    // The alternation is assembled by hand out of escaped literals and character
-    // classes, so whether it compiles and whether it admits what was observed are
-    // checked rather than assumed. Either failure falls back to the omit arm — a
-    // constraint that does not fit is the defect being fixed, and shipping a
-    // broken one in its place would be worse than shipping none.
-    match compile(&widened) {
-        Some(widened_matcher) if observed().all(|v| widened_matcher(v)) => PatternFit::Widened {
-            pattern: widened,
-            canonical: pattern.to_string(),
-        },
-        _ => PatternFit::Omit {
-            canonical: pattern.to_string(),
-        },
-    }
+    let matcher = compile(&widened)?;
+    values
+        .iter()
+        .filter(|v| !v.is_empty())
+        .all(|v| matcher(v))
+        .then_some(widened)
 }
 
 /// Compile `pattern` into a value predicate, or `None` if it will not compile.
@@ -371,6 +383,24 @@ mod tests {
         }
     }
 
+    /// Merging letters and digits inside one alphanumeric run is what decides
+    /// widen-vs-omit on an identifier column, not just how a shape reads. These
+    /// six codes are one shape merged and six unmerged — past the threshold.
+    #[test]
+    fn one_run_of_letters_and_digits_is_one_shape() {
+        let fit = fit_pattern_to_observed(
+            COUNTRY_CODE,
+            &vals(&["US", "H7C4", "2HBR", "AB12", "1A2B", "X999", "88AA"]),
+        );
+        assert_eq!(
+            fit,
+            PatternFit::Widened {
+                pattern: "^[A-Z]{2}$|^[A-Z0-9]{4}$".to_string(),
+                canonical: COUNTRY_CODE.to_string(),
+            }
+        );
+    }
+
     /// The threshold itself: exactly `MAX_OBSERVED_SHAPES` distinct shapes still
     /// widens, one more drops the constraint. The fixture is mixed-format by
     /// construction — each value contributes a shape no other value has.
@@ -416,6 +446,7 @@ mod tests {
     fn a_non_ascii_value_drops_the_constraint() {
         // One shape by count, but not one this renders: no Unicode class is
         // synthesised, so the omit arm takes it.
+        assert_eq!(observed_shape("CÔ"), None);
         assert_eq!(
             fit_pattern_to_observed(COUNTRY_CODE, &vals(&["US", "FR", "CÔ"])),
             PatternFit::Omit {
@@ -456,6 +487,43 @@ mod tests {
         assert_eq!(fit.published(), Some("^[A-Z]{2}$|^[A-Z]\\.[A-Z]\\+[A-Z]$"));
         assert!(accepts(&fit, "A.B+C"));
         assert!(!accepts(&fit, "AXBYC"));
+    }
+
+    fn shape_set(shapes: &[&str]) -> BTreeSet<String> {
+        shapes.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn a_widened_pattern_that_will_not_compile_is_refused() {
+        // What a renderer bug would produce: an unclosed character class. It has
+        // to be caught here rather than published, so the caller omits instead.
+        assert_eq!(
+            widen(COUNTRY_CODE, &shape_set(&["[A-Z"]), &vals(&["US"])),
+            None
+        );
+    }
+
+    #[test]
+    fn a_widened_pattern_that_rejects_an_observed_value_is_refused() {
+        // The shape does not describe the value it came from — a widened pattern
+        // that still fails the data is the defect, not the fix.
+        assert_eq!(
+            widen(
+                COUNTRY_CODE,
+                &shape_set(&["[0-9]{2}"]),
+                &vals(&["US", "us"])
+            ),
+            None
+        );
+        // …and the same call with a shape that does describe it is published.
+        assert_eq!(
+            widen(
+                COUNTRY_CODE,
+                &shape_set(&["[a-z]{2}"]),
+                &vals(&["US", "us"])
+            ),
+            Some("^[A-Z]{2}$|^[a-z]{2}$".to_string())
+        );
     }
 
     #[test]
