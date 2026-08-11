@@ -53,3 +53,4 @@ sql_examples	scripts/check_sql_examples.py --self-test	scripts/check_sql_example
 encoder_dtype	scripts/encoder_dtype.py self-test	scripts/encoder_dtype.py
 encoder_record_diff	scripts/encoder_dtype_record_diff.py self-test, scripts/encoder_dtype_record_diff_mutations.py	scripts/encoder_dtype_record_diff.py, scripts/encoder_dtype_record_diff_mutations.py
 gate_routing	.github/scripts/gate-self-tests.py --self-test	.github/scripts/gate-self-tests.py, .github/gate-self-tests.tsv
+probe_row	scripts/nonexistent_probe.py --self-test	scripts/nonexistent_probe.py
