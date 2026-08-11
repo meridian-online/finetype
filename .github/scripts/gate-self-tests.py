@@ -121,46 +121,36 @@ SELFTEST_INVOCATION = re.compile(
 ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
-def guard_expression(routing_job: str, gate_id: str) -> str:
+def guard_expression(plan_step: str, gate_id: str) -> str:
     """The ONE condition a routed self-test may carry.
 
     Compared whole, never searched for. A containment test accepts every
     expression that merely mentions the output, and four of those invert or
     disable the routing while reading almost identically:
 
-        needs.<job>.outputs.<id> == 'false'      the proof runs only when the
-                                                 gate did NOT change
-        needs.<job>.outputs.<id> != 'true'       the same, one character
+        steps.<plan>.outputs.<id> == 'false'   the proof runs only when the gate
+                                               did NOT change
+        steps.<plan>.outputs.<id> != 'true'    the same, one character
         … == 'true' && github.event_name == 'push'
-                                                 the proof never runs on a pull
-                                                 request, which is the only
-                                                 event this file gates
-        … == 'true' || <anything>                the guard stops deciding
+                                               the proof never runs on a pull
+                                               request, which is the only event
+                                               this file gates
+        … == 'true' || <anything>              the guard stops deciding
 
     A mechanism that guarantees a gate's self-test runs, and that can be
     switched off by a one-character edit nothing refuses, is not the guarantee.
+
+    IT READS A STEP, NOT A JOB, AND THAT IS THE LOAD-BEARING PART. The first cut
+    published the booleans as outputs of one routing job and had every other job
+    `needs:` it. Measured on a probe pull request: when that job failed, the jobs
+    depending on it were SKIPPED, and a required status check that is skipped
+    SATISFIES branch protection -- the pull request reported UNSTABLE, which is
+    mergeable, not BLOCKED. Two of this repository's five required contexts were
+    among them. Routing inside the job removes the dependency, so a required
+    check can no longer be satisfied by not running.
     """
-    return f"needs.{routing_job}.outputs.{gate_id} == 'true'"
+    return f"steps.{plan_step}.outputs.{gate_id} == 'true'"
 
-
-def job_guard_gates(condition: str, routing_job: str, gate_ids: set[str]) -> set[str] | None:
-    """The gates a job-level `if:` admits, or None if it is not purely routing.
-
-    A job condition made only of guards joined by `||` can widen which diffs run
-    the job and can never narrow it below its own steps' guards, so it is safe.
-    Anything else -- a `&&`, a negation, an event test, a bare term -- is
-    REFUSED rather than interpreted. Reading it wrongly means certifying a job
-    that skips the proof its steps ask for.
-    """
-    if not condition.strip():
-        return set()
-    admitted: set[str] = set()
-    for term in (t.strip() for t in condition.split("||")):
-        match = next((g for g in gate_ids if term == guard_expression(routing_job, g)), None)
-        if match is None:
-            return None
-        admitted.add(match)
-    return admitted
 
 BLOCK_SCALARS = {"|", ">", "|-", ">-", "|+", ">+"}
 
@@ -443,58 +433,45 @@ def discover_gate_files(root: Path) -> list[str]:
 # ── the audit ───────────────────────────────────────────────────────────────
 
 
-def routing_job_id(steps: list[Step]) -> str:
-    """The job that runs `plan`, found in the workflow rather than assumed."""
-    owners = sorted({s.job for s in steps if any(PLAN_MARK in c for c in s.commands)})
-    if not owners:
+def plan_steps_by_job(steps: list[Step]) -> dict[str, Step]:
+    """The `plan` step each job runs, keyed by job.
+
+    Every job carrying a routed self-test runs its own. There is no shared
+    routing job to depend on, by design -- see `guard_expression`.
+    """
+    found: dict[str, Step] = {}
+    for step in steps:
+        if not any(PLAN_MARK in c for c in step.commands):
+            continue
+        if step.job in found:
+            raise Fatal(
+                f"{WORKFLOW_REL}:{step.lineno}: job `{step.job}` runs `{PLAN_MARK}` twice; "
+                "the guards can only name one step"
+            )
+        if not step.step_id:
+            raise Fatal(
+                f"{WORKFLOW_REL}:{step.lineno}: the step running `{PLAN_MARK}` in job "
+                f"`{step.job}` has no `id:`, so no guard can reference its outputs"
+            )
+        found[step.job] = step
+    if not found:
         raise Fatal(
             f"{WORKFLOW_REL}: no step runs `{PLAN_MARK}`, so nothing sets the outputs every "
             "guard reads. Each guard would evaluate to the empty string and each self-test "
             "would be skipped in a green job."
         )
-    if len(owners) > 1:
-        raise Fatal(
-            f"{WORKFLOW_REL}: `{PLAN_MARK}` runs in more than one job ({', '.join(owners)}); "
-            "the guards can only name one"
-        )
-    return owners[0]
-
-
-def plan_step_id(steps: list[Step], routing_job: str) -> str:
-    """The `id:` of the planning step, which the job outputs must reference."""
-    for step in steps:
-        if step.job == routing_job and any(PLAN_MARK in c for c in step.commands):
-            if not step.step_id:
-                raise Fatal(
-                    f"{WORKFLOW_REL}:{step.lineno}: the step running `{PLAN_MARK}` has no "
-                    "`id:`, so the job cannot map its outputs"
-                )
-            return step.step_id
-    raise Fatal(f"{WORKFLOW_REL}: lost the planning step in job `{routing_job}`")
+    return found
 
 
 def audit(root: Path) -> list[str]:
     """Everything that must be true for a guard in the workflow to mean anything."""
     gates = load_manifest(root)
     jobs, steps = scan_workflow(root)
-    routing_job = routing_job_id(steps)
-    step_id = plan_step_id(steps, routing_job)
+    plan_steps = plan_steps_by_job(steps)
     problems: list[str] = []
 
     watched = {p for g in gates for p in g.paths}
     registered = {c for g in gates for c in g.commands}
-    every_id = {g.id for g in gates}
-
-    # The routing job answers for all of them, so it may not be conditional. A
-    # single `if:` here -- `github.event_name == 'workflow_dispatch'` is the
-    # one-line version -- skips this job, skips every job that needs it, and
-    # skips every proof they carry, in a run with no red anywhere.
-    if jobs[routing_job].condition:
-        problems.append(
-            f"{WORKFLOW_REL}:{jobs[routing_job].lineno}: routing job `{routing_job}` carries "
-            f"`if: {jobs[routing_job].condition}`. It must be unconditional: skipping it skips "
-            "every job that needs it and every proof they carry, with nothing red"
-        )
 
     for trigger in (MANIFEST_REL, ROUTER_REL):
         if trigger not in watched:
@@ -511,23 +488,6 @@ def audit(root: Path) -> list[str]:
                     "file in the tree -- a path that cannot change routes nothing"
                 )
 
-        reference = f"needs.{routing_job}.outputs.{gate.id}"
-        guard = guard_expression(routing_job, gate.id)
-        declared = jobs[routing_job].outputs.get(gate.id, "")
-        expected = f"steps.{step_id}.outputs.{gate.id}"
-        if not declared:
-            problems.append(
-                f"{WORKFLOW_REL}:{jobs[routing_job].lineno}: job `{routing_job}` declares no "
-                f"output `{gate.id}`, so `{reference}` is the empty string and every step it "
-                "guards is skipped in a green job"
-            )
-        if declared and expected not in declared:
-            problems.append(
-                f"{WORKFLOW_REL}:{jobs[routing_job].lineno}: output `{gate.id}` of job "
-                f"`{routing_job}` does not read `{expected}`, so it carries another gate's "
-                "verdict"
-            )
-
         for command in gate.commands:
             hits = [s for s in steps if command in s.commands]
             if not hits:
@@ -538,12 +498,43 @@ def audit(root: Path) -> list[str]:
                 continue
             for hit in hits:
                 owner = jobs[hit.job]
-                # Whole-string, both sides. `guard in condition` accepts
-                # `== 'false'`, `!= 'true'` and `… && github.event_name == 'push'`,
-                # each of which reads like routing and disables it.
-                if hit.condition != guard and owner.condition != guard:
-                    carried = hit.condition or owner.condition
-                    if not carried:
+                planner = plan_steps.get(hit.job)
+
+                # The job has to do its own routing. Depending on another job's
+                # outputs is what let a skipped required check satisfy branch
+                # protection; see `guard_expression`.
+                if planner is None:
+                    problems.append(
+                        f"{WORKFLOW_REL}:{hit.lineno}: job `{hit.job}` runs `{command}` but no "
+                        f"step in it runs `{PLAN_MARK}`, so nothing in this job sets the "
+                        "outputs its guards read"
+                    )
+                    continue
+
+                # Ordering, because Actions resolves `steps.<id>.outputs` against
+                # what has ALREADY run. A guard above its planner is the empty
+                # string, so the proof is skipped and the job is green.
+                if planner.lineno > hit.lineno:
+                    problems.append(
+                        f"{WORKFLOW_REL}:{hit.lineno}: `{command}` is guarded by step "
+                        f"`{planner.step_id}`, which does not run until line {planner.lineno}. "
+                        "Its outputs are empty here, so the proof is skipped in a green job"
+                    )
+
+                # A job-level `if:` can skip the whole job, and it cannot read the
+                # `steps` context, so it can never be the guard -- only a way to
+                # lose one.
+                if owner.condition:
+                    problems.append(
+                        f"{WORKFLOW_REL}:{owner.lineno}: job `{hit.job}` carries a routed "
+                        f"self-test under `if: {owner.condition}`. A job holding a proof must "
+                        "be unconditional; a job-level condition cannot read `steps` and can "
+                        "only skip the proof"
+                    )
+
+                guard = guard_expression(planner.step_id, gate.id)
+                if hit.condition != guard:
+                    if not hit.condition:
                         problems.append(
                             f"{WORKFLOW_REL}:{hit.lineno}: `{command}` runs unguarded, so it "
                             f"runs on every diff. It must carry exactly `{guard}`"
@@ -551,33 +542,10 @@ def audit(root: Path) -> list[str]:
                     else:
                         problems.append(
                             f"{WORKFLOW_REL}:{hit.lineno}: `{command}` is guarded by "
-                            f"`{carried}`, not by `{guard}`. Only the exact comparison routes "
-                            "it: `== 'false'`, `!= 'true'` and an added `&&` each read like "
-                            "routing and disable it"
+                            f"`{hit.condition}`, not by `{guard}`. Only the exact comparison "
+                            "routes it: `== 'false'`, `!= 'true'` and an added `&&` each read "
+                            "like routing and disable it"
                         )
-                # A job condition may only WIDEN. Any term that is not one of these
-                # guards can narrow the job away while its gate has changed, and the
-                # step inside is then skipped in a green job whatever its own `if:`
-                # says.
-                admitted = job_guard_gates(owner.condition, routing_job, every_id)
-                if admitted is None:
-                    problems.append(
-                        f"{WORKFLOW_REL}:{owner.lineno}: job `{hit.job}` carries a routed "
-                        f"self-test under `if: {owner.condition}`, which is not a disjunction "
-                        "of routing guards, so it can skip a proof its steps ask for"
-                    )
-                elif admitted and gate.id not in admitted:
-                    problems.append(
-                        f"{WORKFLOW_REL}:{owner.lineno}: job `{hit.job}` runs `{command}` but "
-                        f"its own `if:` never admits `{gate.id}`, so a diff changing that gate "
-                        "skips the job and the proof with it"
-                    )
-                if hit.job != routing_job and routing_job not in owner.needs:
-                    problems.append(
-                        f"{WORKFLOW_REL}:{owner.lineno}: job `{hit.job}` reads "
-                        f"`needs.{routing_job}.…` without `needs: {routing_job}`, so the guard "
-                        "is the empty string and the step is skipped in a green job"
-                    )
 
     for step in steps:
         for command in step.commands:
@@ -698,54 +666,44 @@ on:
     branches: [main]
 
 jobs:
-  gate-routing:
-    name: Routing
+  alpha:
+    name: Alpha
     runs-on: ubuntu-latest
-    outputs:
-      any: ${{ steps.route.outputs.any }}
-      alpha: ${{ steps.route.outputs.alpha }}
-      beta: ${{ steps.route.outputs.beta }}
-      gate_routing: ${{ steps.route.outputs.gate_routing }}
     steps:
       - uses: actions/checkout@v5
-      - name: Audit
-        run: .github/scripts/gate-self-tests.py audit
       - name: Route
         id: route
         run: .github/scripts/gate-self-tests.py plan --base "abc"
-
-  alpha:
-    name: Alpha
-    needs: [gate-routing]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
       - name: the real gate
         run: scripts/alpha_gate.py
       - name: ...and it detects
-        if: needs.gate-routing.outputs.alpha == 'true'
+        if: steps.route.outputs.alpha == 'true'
         run: scripts/alpha_gate.py --self-test
 
   beta:
     name: Beta
-    needs: [gate-routing]
-    if: needs.gate-routing.outputs.beta == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Route
+        id: route
+        run: .github/scripts/gate-self-tests.py plan --base "abc"
       - name: the beta proof
+        if: steps.route.outputs.beta == 'true'
         run: |
           echo running
           scripts/beta-gate-selftest.sh
 
   router-self-test:
     name: Router
-    needs: [gate-routing]
-    if: needs.gate-routing.outputs.gate_routing == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Route
+        id: route
+        run: .github/scripts/gate-self-tests.py plan --base "abc"
       - name: the router proves itself
+        if: steps.route.outputs.gate_routing == 'true'
         run: .github/scripts/gate-self-tests.py --self-test
 """
 
@@ -968,90 +926,55 @@ def self_test() -> int:
         clean = audit(root)
         rec.check("the unbroken scratch tree audits clean", clean == [], "; ".join(clean))
 
-    # The positive half of the job-condition rule, and the shape `ci.yml`'s
-    # encoder job actually uses: a job carrying proofs for two gates says so on
-    # the job, and each step still carries its own exact guard. Without this case
-    # the rule could be tightened to "no job condition at all" and nothing would
-    # say it had stopped admitting a legitimate shape.
-    #
-    # The step guard is not optional here. Whole-job routing -- a bare step under
-    # a job condition -- is sound only while that condition is exactly one guard;
-    # widen it and the bare step runs whenever EITHER gate changes, which is the
-    # cost this routing exists to avoid. That shape is refused below.
+    # The positive half, and it has to bite or it is decoration. A job may carry
+    # UNROUTED steps beside routed ones -- `evidence` and `doc-surface` both do,
+    # and their real gates must keep running on every diff -- so adding one must
+    # stay clean. The assertion below is written against a workflow the mutation
+    # actually changed: `_scratch_tree` is re-read afterwards and the inserted
+    # text asserted present, because the two replacements this case used to make
+    # had silently become no-ops when the fixture changed shape, and a no-op
+    # mutation is a case that passes on an unmutated tree.
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         _scratch_tree(root)
         text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        text = text.replace(
-            "    if: needs.gate-routing.outputs.beta == 'true'",
-            "    if: needs.gate-routing.outputs.beta == 'true' || "
-            "needs.gate-routing.outputs.alpha == 'true'",
-        ).replace(
-            "      - name: the beta proof\n        run: |",
-            "      - name: the beta proof\n"
-            "        if: needs.gate-routing.outputs.beta == 'true'\n        run: |",
-        )
-        _write(root, WORKFLOW_REL, text)
+        extra = "      - name: an unrouted check\n        run: scripts/alpha_gate.py --verify\n"
+        mutated = text.replace("      - name: the real gate\n", extra + "      - name: the real gate\n", 1)
+        rec.check("...the widening case actually mutates its fixture", mutated != text)
+        _write(root, WORKFLOW_REL, mutated)
         widened = audit(root)
         rec.check(
-            "a job condition widened to a second gate, with per-step guards, stays clean",
+            "an unrouted step beside a routed one stays clean",
             widened == [],
             "; ".join(widened),
         )
 
-    def drop_guard(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "        if: needs.gate-routing.outputs.alpha == 'true'\n", ""
-        ))
+    def rewrite(old: str, new_text: str, count: int = -1) -> Callable[[Path], None]:
+        """Mutate the scratch workflow by substitution.
 
-    def misname_job(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "needs.gate-routing.outputs.alpha == 'true'",
-            "needs.gate-routng.outputs.alpha == 'true'",
-        ))
+        `count` matters: all three scratch jobs carry an identical routing step,
+        so a mutation meant for one job has to say so, or it removes the routing
+        from the whole file and trips a different rule.
+        """
 
-    def wrong_id(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "        if: needs.gate-routing.outputs.alpha == 'true'",
-            "        if: needs.gate-routing.outputs.beta == 'true'",
-        ))
+        def mutate(root: Path) -> None:
+            text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
+            assert text.count(old) >= 1, f"self-test: {old!r} is not in the scratch workflow"
+            _write(root, WORKFLOW_REL, text.replace(old, new_text, count))
 
-    def drop_needs(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "  alpha:\n    name: Alpha\n    needs: [gate-routing]\n",
-            "  alpha:\n    name: Alpha\n",
-        ))
+        return mutate
 
-    def drop_output(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "      alpha: ${{ steps.route.outputs.alpha }}\n", ""
-        ))
+    ALPHA_PROOF = (
+        "      - name: ...and it detects\n"
+        "        if: steps.route.outputs.alpha == 'true'\n"
+        "        run: scripts/alpha_gate.py --self-test\n"
+    )
 
-    def crossed_output(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "      alpha: ${{ steps.route.outputs.alpha }}",
-            "      alpha: ${{ steps.route.outputs.beta }}",
-        ))
-
-    def drop_step(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "        run: scripts/alpha_gate.py --self-test\n", "        run: true\n"
-        ))
-
-    def unregistered_selftest(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "      - name: the real gate\n        run: scripts/alpha_gate.py\n",
-            "      - name: the real gate\n        run: scripts/alpha_gate.py\n"
-            "      - name: a stowaway\n        run: scripts/gamma_gate.py --self-test\n",
-        ))
+    ALPHA_GUARD = "        if: steps.route.outputs.alpha == 'true'\n"
+    ALPHA_PLAN = (
+        "      - name: Route\n        id: route\n"
+        '        run: .github/scripts/gate-self-tests.py plan --base "abc"\n'
+    )
 
     def unwatched_gate(root: Path) -> None:
         _write(root, "scripts/gamma_gate.py", 'import sys\nif "--self-test" in sys.argv:\n    pass\n')
@@ -1062,169 +985,102 @@ def self_test() -> int:
     def missing_watched_path(root: Path) -> None:
         (root / "scripts/beta_gate.sh").unlink()
 
-    def no_routing_job(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "        run: .github/scripts/gate-self-tests.py plan --base \"abc\"",
-            "        run: true",
-        ))
-
-    def two_routing_jobs(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text + """
-  second-router:
-    name: Second
-    runs-on: ubuntu-latest
-    steps:
-      - name: Route again
-        id: route2
-        run: .github/scripts/gate-self-tests.py plan --base "abc"
-""")
-
-    def no_plan_step_id(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace("        id: route\n", ""))
-
-    def block_needs(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "    needs: [gate-routing]\n", "    needs:\n      - gate-routing\n", 1
-        ))
-
     def unrouted_root_trigger(root: Path) -> None:
         text = (root / MANIFEST_REL).read_text(encoding="utf-8")
-        _write(root, MANIFEST_REL, text.replace(
-            ", .github/gate-self-tests.tsv", ""
-        ))
+        _write(root, MANIFEST_REL, text.replace(", .github/gate-self-tests.tsv", ""))
 
-    # The four expressions that read like routing and are not. Each mentions the
-    # right output, so a containment test accepts all four; the first two invert
-    # the routing and the third confines it to an event this workflow does not
-    # gate self-tests on.
-    def rewrite_alpha_guard(replacement: str) -> Callable[[Path], None]:
-        def mutate(root: Path) -> None:
-            text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-            _write(root, WORKFLOW_REL, text.replace(
-                "        if: needs.gate-routing.outputs.alpha == 'true'",
-                f"        if: {replacement}",
-            ))
+    guard_shapes = (
+        ("INVERTED to == 'false'", "steps.route.outputs.alpha == 'false'"),
+        ("inverted to != 'true'", "steps.route.outputs.alpha != 'true'"),
+        (
+            "narrowed by an event test",
+            "steps.route.outputs.alpha == 'true' && github.event_name == 'push'",
+        ),
+        (
+            "widened by a disjunction",
+            "steps.route.outputs.alpha == 'true' || github.event_name == 'push'",
+        ),
+        ("pointed at another gate", "steps.route.outputs.beta == 'true'"),
+        ("pointed at a step that does not exist", "steps.rout.outputs.alpha == 'true'"),
+    )
 
-        return mutate
-
-    def conditional_routing_job(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "  gate-routing:\n    name: Routing\n",
-            "  gate-routing:\n    name: Routing\n"
-            "    if: github.event_name == 'workflow_dispatch'\n",
-        ))
-
-    def narrowing_job_condition(root: Path) -> None:
-        # The beta job is routed whole. Point its condition at another gate: beta
-        # changes, the job is skipped, and beta's proof never runs.
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "    if: needs.gate-routing.outputs.beta == 'true'",
-            "    if: needs.gate-routing.outputs.alpha == 'true'",
-        ))
-
-    def widened_whole_job_routing(root: Path) -> None:
-        # The beta step relies on whole-job routing and carries no `if:` of its
-        # own. Widening the job condition makes it run whenever ALPHA changes.
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "    if: needs.gate-routing.outputs.beta == 'true'",
-            "    if: needs.gate-routing.outputs.beta == 'true' || "
-            "needs.gate-routing.outputs.alpha == 'true'",
-        ))
-
-    def uninterpretable_job_condition(root: Path) -> None:
-        text = (root / WORKFLOW_REL).read_text(encoding="utf-8")
-        _write(root, WORKFLOW_REL, text.replace(
-            "    if: needs.gate-routing.outputs.beta == 'true'",
-            "    if: needs.gate-routing.outputs.beta == 'true' && github.ref != 'refs/heads/main'",
-        ))
-
-    for name, mutate, expect in (
+    cases: list[tuple[str, Callable[[Path], None], str]] = [
         (
             "an unguarded self-test step reddens",
-            drop_guard,
+            rewrite(ALPHA_GUARD, ""),
             "runs unguarded, so it runs on every diff",
         ),
+    ]
+    for label, expression in guard_shapes:
+        cases.append((
+            f"a guard {label} reddens",
+            rewrite(ALPHA_GUARD, f"        if: {expression}\n"),
+            f"is guarded by `{expression}`, not by",
+        ))
+
+    cases += [
         (
-            "a guard naming a job that does not exist reddens",
-            misname_job,
-            "is guarded by `needs.gate-routng.outputs.alpha == 'true'`",
+            "a job carrying a proof with NO routing step of its own reddens",
+            rewrite(ALPHA_PLAN, "", 1),
+            "but no step in it runs `gate-self-tests.py plan`",
         ),
         (
-            "a guard carrying another gate's id reddens",
-            wrong_id,
-            "is guarded by `needs.gate-routing.outputs.beta == 'true'`",
-        ),
-        (
-            "a guard INVERTED to == 'false' reddens",
-            rewrite_alpha_guard("needs.gate-routing.outputs.alpha == 'false'"),
-            "is guarded by `needs.gate-routing.outputs.alpha == 'false'`",
-        ),
-        (
-            "a guard inverted to != 'true' reddens",
-            rewrite_alpha_guard("needs.gate-routing.outputs.alpha != 'true'"),
-            "is guarded by `needs.gate-routing.outputs.alpha != 'true'`",
-        ),
-        (
-            "a guard narrowed by an event test reddens",
-            rewrite_alpha_guard(
-                "needs.gate-routing.outputs.alpha == 'true' && github.event_name == 'push'"
+            "a guard sitting ABOVE the step that sets it reddens",
+            # Actions resolves `steps.<id>.outputs` against what has already run,
+            # so a routing step moved BELOW the proof it guards leaves the guard
+            # empty and the proof skipped, in a green job. Moving it one step down
+            # is not enough -- it has to end up past the guarded step.
+            lambda root: _write(
+                root,
+                WORKFLOW_REL,
+                (root / WORKFLOW_REL)
+                .read_text(encoding="utf-8")
+                .replace(ALPHA_PLAN, "", 1)
+                .replace(ALPHA_PROOF, ALPHA_PROOF + ALPHA_PLAN, 1),
             ),
-            "&& github.event_name == 'push'`, not by",
+            "which does not run until line",
         ),
         (
-            "a guard widened by a disjunction with a non-guard reddens",
-            rewrite_alpha_guard(
-                "needs.gate-routing.outputs.alpha == 'true' || github.event_name == 'push'"
+            "a job-level `if:` on a job holding a proof reddens",
+            rewrite(
+                "  alpha:\n    name: Alpha\n",
+                "  alpha:\n    name: Alpha\n    if: github.event_name == 'push'\n",
             ),
-            "|| github.event_name == 'push'`, not by",
+            "A job holding a proof must be unconditional",
         ),
         (
-            "a CONDITIONAL routing job reddens",
-            conditional_routing_job,
-            "routing job `gate-routing` carries `if: github.event_name == 'workflow_dispatch'`",
+            "a routing step with no `id:` is refused",
+            rewrite("      - name: Route\n        id: route\n", "      - name: Route\n"),
+            "has no `id:`",
         ),
         (
-            "a job whose own `if:` never admits the gate it proves reddens",
-            narrowing_job_condition,
-            "its own `if:` never admits `beta`",
+            "two routing steps in one job are refused",
+            rewrite(ALPHA_PLAN, ALPHA_PLAN + ALPHA_PLAN),
+            "runs `gate-self-tests.py plan` twice",
         ),
         (
-            "a job condition that is not a disjunction of guards reddens",
-            uninterpretable_job_condition,
-            "is not a disjunction of routing guards",
-        ),
-        (
-            "whole-job routing widened under a bare step reddens",
-            widened_whole_job_routing,
-            "|| needs.gate-routing.outputs.alpha == 'true'`, not by",
-        ),
-        (
-            "a job reading the routing outputs without `needs:` reddens",
-            drop_needs,
-            "without `needs: gate-routing`",
-        ),
-        ("a routing output nobody declared reddens", drop_output, "declares no output `alpha`"),
-        (
-            "an output wired to the wrong gate reddens",
-            crossed_output,
-            "does not read `steps.route.outputs.alpha`",
+            "a workflow with no routing step at all is refused",
+            rewrite('        run: .github/scripts/gate-self-tests.py plan --base "abc"', "        run: true"),
+            "no step runs `gate-self-tests.py plan`",
         ),
         (
             "a registered self-test no step runs reddens",
-            drop_step,
+            rewrite("        run: scripts/alpha_gate.py --self-test\n", "        run: true\n"),
             f"which no step in {WORKFLOW_REL} runs",
         ),
         (
             "a self-test the manifest does not register reddens",
-            unregistered_selftest,
+            rewrite(
+                "      - name: the real gate\n",
+                "      - name: a stowaway\n        run: scripts/gamma_gate.py --self-test\n"
+                "      - name: the real gate\n",
+            ),
             f"`scripts/gamma_gate.py --self-test` is a gate self-test that {MANIFEST_REL}",
+        ),
+        (
+            "a block-sequence `needs:` is refused rather than guessed",
+            rewrite("    name: Alpha\n", "    name: Alpha\n    needs:\n      - beta\n"),
+            "writes `needs:` as a block sequence",
         ),
         (
             "a gate script no row watches reddens",
@@ -1242,23 +1098,13 @@ def self_test() -> int:
             "watches `scripts/beta_gate.sh`, which is not a file",
         ),
         (
-            "a workflow with no routing job reddens",
-            no_routing_job,
-            f"no step runs `{PLAN_MARK}`",
-        ),
-        ("a workflow with two routing jobs reddens", two_routing_jobs, "runs in more than one job"),
-        ("a planning step with no `id:` reddens", no_plan_step_id, "has no `id:`"),
-        (
-            "a block-sequence `needs:` is refused rather than guessed",
-            block_needs,
-            "writes `needs:` as a block sequence",
-        ),
-        (
             "the manifest not watching itself reddens",
             unrouted_root_trigger,
             f"`{MANIFEST_REL}` re-routes every gate when it changes and no row watches it",
         ),
-    ):
+    ]
+
+    for name, mutate, expect in cases:
         rec.reddens(name, with_tree(mutate), expect)
 
     # ── the real tree ────────────────────────────────────────────────────────
@@ -1277,6 +1123,18 @@ def self_test() -> int:
 # ── entry point ─────────────────────────────────────────────────────────────
 
 
+def report_audit(root: Path) -> int:
+    """Print the audit's findings and return the exit code they imply."""
+    problems = audit(root)
+    for problem in problems:
+        print(f"FAIL  {problem}")
+    if problems:
+        print(f"\n{len(problems)} problem(s): a guarded self-test is only worth its guard")
+        return 1
+    print("gate self-test routing: every gate registered, guarded and reachable")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--self-test", action="store_true", help="prove the routing and the audit")
@@ -1292,17 +1150,19 @@ def main(argv: list[str]) -> int:
     if args.self_test:
         return self_test()
     if args.command == "plan":
+        # The audit runs FIRST, inside the same job that is about to route. That
+        # is what makes it blocking: it runs in `Private paths in tracked files`
+        # and `Documented DuckDB surface + SQL examples`, both required contexts,
+        # so a routing defect reddens a check that branch protection reads. A
+        # dedicated audit job would not -- it is not a required context, and a
+        # pull request whose only red job is unrequired reports UNSTABLE, which
+        # is mergeable.
+        if report_audit(ROOT) != 0:
+            return 1
         emit(route(ROOT, args.base))
         return 0
     if args.command == "audit":
-        problems = audit(ROOT)
-        for problem in problems:
-            print(f"FAIL  {problem}")
-        if problems:
-            print(f"\n{len(problems)} problem(s): a guarded self-test is only worth its guard")
-            return 1
-        print("gate self-test routing: every gate registered, guarded and reachable")
-        return 0
+        return report_audit(ROOT)
 
     parser.print_help()
     return 2
