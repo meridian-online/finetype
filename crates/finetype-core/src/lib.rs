@@ -9,6 +9,7 @@
 
 pub mod checker;
 pub mod checksum;
+pub mod constraint_fit;
 pub mod datetime_format;
 pub mod enum_domain;
 pub mod fast_path;
@@ -26,6 +27,7 @@ pub mod validation_veto;
 pub mod validator;
 
 pub use checker::{format_report, CheckReport, Checker};
+pub use constraint_fit::{fit_pattern_to_observed, PatternFit, MAX_OBSERVED_SHAPES};
 pub use fast_path::deterministic_fast_path;
 pub use generator::{Generator, Sample};
 pub use json_reader::{collect_json, collect_ndjson, JsonPathMap};

@@ -101,6 +101,21 @@ impl Validation {
         serde_json::Value::Object(schema)
     }
 
+    /// Reconcile this definition's `pattern` with the values a column actually
+    /// holds, so a descriptor published from it describes the column rather than
+    /// the idealised type. `None` when the definition carries no pattern and
+    /// there is nothing to reconcile.
+    ///
+    /// The rule and the bound on "few and enumerable" live in
+    /// [`crate::constraint_fit`]; this is the hook from the type that owns the
+    /// pattern. Nothing here changes a label: a column whose values do not fit
+    /// its type keeps that type, and only the constraint published from it moves.
+    pub fn fit_pattern(&self, observed: &[String]) -> Option<crate::constraint_fit::PatternFit> {
+        self.pattern
+            .as_ref()
+            .map(|p| crate::constraint_fit::fit_pattern_to_observed(p, observed))
+    }
+
     /// Returns `true` when this validation is "precise" enough to be used as
     /// positive evidence that a column really is this type — strong enough to
     /// disarm an attractor-demotion guard.

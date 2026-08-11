@@ -40,11 +40,32 @@ fn meta() -> ResourceMeta {
 /// datetime, numeric, boolean, and categorical-enum (a string-typed
 /// enum-keyword-eligible label with small distinct values emits a closed
 /// `enum`; the boolean column exercises the boolean type without an enum).
+///
+/// Plus both outcomes of fitting a `pattern` to the values observed in a column,
+/// because each one changes what the descriptor carries: a widened pattern and a
+/// dropped one, each accompanied by an `x-finetype-pattern-fit` extension the
+/// profile has to accept.
 fn fixture_columns() -> Vec<(&'static str, &'static str, Vec<String>)> {
     vec![
         ("email", "identity.person.email", vec![]),
         ("d", "datetime.date.dmy_slash", vec![]),
         ("lat", "geography.coordinate.latitude", vec![]),
+        (
+            "jurisdiction",
+            "geography.location.country_code",
+            vec!["US".into(), "FR".into(), "US-DE".into(), "CA-ON".into()],
+        ),
+        (
+            "registry",
+            "geography.location.country_code",
+            vec![
+                "United States".into(),
+                "France".into(),
+                "Japan".into(),
+                "The Netherlands".into(),
+                "Cote d'Ivoire".into(),
+            ],
+        ),
         (
             "flag",
             "representation.boolean.binary",
@@ -78,11 +99,24 @@ fn emitted_descriptor_validates_against_vendored_profile() {
 
     // An x-finetype-* extension is present (so we are actually testing that
     // extensions do not break conformance).
+    let fields = descriptor["resources"][0]["schema"]["fields"]
+        .as_array()
+        .expect("fields array");
     assert!(
-        descriptor["resources"][0]["schema"]["fields"][0]
-            .get("x-finetype-label")
-            .is_some(),
+        fields[0].get("x-finetype-label").is_some(),
         "expected x-finetype-label on emitted fields"
+    );
+    // …including the one this fixture set exists to put in front of the
+    // profile: both outcomes of fitting a pattern to the observed values.
+    let outcomes: Vec<&str> = fields
+        .iter()
+        .filter_map(|f| f.pointer("/x-finetype-pattern-fit/outcome"))
+        .filter_map(|o| o.as_str())
+        .collect();
+    assert_eq!(
+        outcomes,
+        vec!["widened", "omitted"],
+        "expected the descriptor under test to carry both fit outcomes"
     );
 
     let schema = vendored_profile();
