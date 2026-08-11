@@ -36,20 +36,35 @@ use std::collections::BTreeSet;
 /// How many distinct observed shapes may be folded into a widened pattern before
 /// the constraint is dropped instead — the bound on "few and enumerable".
 ///
-/// **Four.** Two real columns set the floor. A country-code column mixing alpha-2
-/// with `US-DE`-shaped subdivision codes contributes one extra shape, three if
-/// the data also carries three-letter (`GB-ENG`) and numeric (`IT-21`) suffixes.
-/// A four-character legal-form code column, whose codes are legally allowed to be
-/// all-digit or all-letter, contributes two. Four clears both with headroom, and
-/// each count is pinned by a fixture in this module's tests rather than asserted
-/// here.
+/// **Four.** Two real columns set the floor, and each count below is pinned by a
+/// fixture in this module's tests rather than asserted here.
 ///
-/// Four also sets the ceiling: an emitted pattern is the canonical pattern plus
-/// at most four anchored alternatives, which a person reading a descriptor can
-/// still enumerate. At five and up the alternation stops being a rule and becomes
-/// a transcription of the column — and since every added alternative admits more
-/// junk, the bound is the only thing keeping "widened" from sliding into "admits
-/// anything".
+/// A four-character legal-form code column, whose codes are legally allowed to be
+/// all-digit or all-letter, contributes two.
+///
+/// A country-code column mixing ISO 3166-1 alpha-2 with ISO 3166-2 subdivision
+/// codes contributes **four**. Measured over every distinct value of a published
+/// column — 76 of them fail the alpha-2 pattern — the four are `MY-15`, `KN-N`,
+/// `US-DE` and `GB-SCT`, rendering as `[A-Z]{2}-[0-9]{2}`, `[A-Z]{2}-[A-Z]`,
+/// `[A-Z]{2}-[A-Z]{2}` and `[A-Z]{2}-[A-Z]{3}`. Every suffix length ISO 3166-2
+/// permits is present, so this is the shape of the column rather than an
+/// accident of one sample.
+///
+/// **That column fills the bound exactly, and the margin is nil.** It is a
+/// considered position, not an oversight: a fifth suffix shape in some future
+/// sample drops the constraint on the very column this bound was chosen for.
+/// Dropping it is the correct arm of the rule when a column really is that
+/// varied — the alternative is a pattern nobody can read — but raising the bound
+/// to buy margin buys it on every other column too, and the pattern a reader can
+/// still enumerate is what makes the constraint worth publishing.
+/// The test `a_country_code_column_fills_the_bound_exactly` pins both halves:
+/// four suffix shapes widen, five omit.
+///
+/// Four is also the ceiling on what is emitted: the canonical pattern plus at
+/// most four anchored alternatives. At five and up the alternation stops being a
+/// rule and becomes a transcription of the column — and since every added
+/// alternative admits more junk, the bound is the only thing keeping "widened"
+/// from sliding into "admits anything".
 pub const MAX_OBSERVED_SHAPES: usize = 4;
 
 /// Longest rendered shape, in characters, that may enter a published pattern.
@@ -210,9 +225,10 @@ fn compile(pattern: &str) -> Option<impl Fn(&str) -> bool> {
 /// Merging letters and digits inside one alphanumeric run is what keeps an
 /// identifier column enumerable — the interleaving of letters and digits within a
 /// code is not structure a consumer can rely on, whereas a punctuation boundary
-/// is, so punctuation splits runs and letter/digit alternation does not. Without
-/// the merge, `8888` / `XJHM` / `H7C4` / `2HBR` are four unrelated shapes and the
-/// column is dropped for variety it does not have.
+/// is, so punctuation splits runs and letter/digit alternation does not. Six
+/// four-character codes are enough to flip the outcome: merged they are one
+/// shape, unmerged they are six, and six is over the bound. The fixture is
+/// `one_run_of_letters_and_digits_is_one_shape`.
 ///
 /// Returns `None` for a value that is not ASCII, holds a control character, or
 /// renders longer than [`MAX_SHAPE_CHARS`]. Each of those forces the omit arm:
@@ -381,6 +397,42 @@ mod tests {
         for junk in ["88888", "999", "xjhm", "XJHMQ"] {
             assert!(!accepts(&fit, junk), "{junk} should still be rejected");
         }
+    }
+
+    /// What a published country-code column actually costs: every suffix length
+    /// ISO 3166-2 permits occurs in it, so it fills `MAX_OBSERVED_SHAPES`
+    /// exactly. This is the fixture behind the bound's doc comment, and behind
+    /// the claim that the margin on that column is nil.
+    #[test]
+    fn a_country_code_column_fills_the_bound_exactly() {
+        // One code per suffix shape, each taken from the published column:
+        // numeric, one letter, two letters, three.
+        let observed = vals(&["US", "FR", "MY-15", "KN-N", "US-DE", "GB-SCT"]);
+        let fit = fit_pattern_to_observed(COUNTRY_CODE, &observed);
+        assert_eq!(
+            fit,
+            PatternFit::Widened {
+                pattern: "^[A-Z]{2}$|^[A-Z]{2}-[0-9]{2}$|^[A-Z]{2}-[A-Z]$\
+                          |^[A-Z]{2}-[A-Z]{2}$|^[A-Z]{2}-[A-Z]{3}$"
+                    .to_string(),
+                canonical: COUNTRY_CODE.to_string(),
+            }
+        );
+        for value in observed.iter() {
+            assert!(accepts(&fit, value), "{value} should be admitted");
+        }
+
+        // …and there is no margin left. One more shape — the same code in lower
+        // case, the kind of drift a source introduces without warning — and the
+        // column this bound was chosen for loses its constraint.
+        let mut with_one_more = observed.clone();
+        with_one_more.push("us-de".to_string());
+        assert_eq!(
+            fit_pattern_to_observed(COUNTRY_CODE, &with_one_more),
+            PatternFit::Omit {
+                canonical: COUNTRY_CODE.to_string()
+            }
+        );
     }
 
     /// Merging letters and digits inside one alphanumeric run is what decides
