@@ -421,12 +421,14 @@ not `BLOCKED`. Two of this repository's five required contexts were among them. 
 no job depends on another for routing, and `plan` runs the audit before it plans,
 which puts the audit inside required contexts where a failure actually blocks.
 
-Three further shapes are refused because they are *silent* — the step is skipped
-and the job is green, with nothing to read: a guard naming a step that does not
-exist, a guard sitting above the step that sets it (Actions resolves
-`steps.<id>.outputs` against what has already run), and a job-level `if:` on a job
-holding a proof. `--self-test` carries a named case for every shape named in these
-three paragraphs.
+Further shapes are refused because they leave a job *green*: a guard naming a
+step that does not exist, a guard sitting above the step that sets it (Actions
+resolves `steps.<id>.outputs` against what has already run), a job-level `if:` on
+a job holding a proof, a `continue-on-error` letting a red proof pass — and worst,
+an `if:` on the routing step itself, which empties every output in that job and
+skips the audit along with the proofs. `--self-test` carries a named case for
+every shape named in these paragraphs, and that case list is the enumeration; it
+is not claimed to be complete.
 
 **Everything uncertain routes more work, never less.** No base commit, an
 unfetchable one, a diff that will not run, or a change to the manifest, the router

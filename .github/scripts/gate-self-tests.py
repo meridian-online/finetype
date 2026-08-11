@@ -29,21 +29,23 @@ WHAT THIS DOES
     `audit` is the half that keeps `plan` honest, and it runs unconditionally
             because it is the cheap one. It reddens when the manifest, the tree
             and the workflow stop agreeing -- a gate nothing routes, a guard
-            naming a job that does not exist, a routing output nobody declared,
-            a guard written `== 'false'` so the proof runs only when the gate did
-            not change. Three of those are SILENT in Actions: an expression
-            referencing a missing output is the empty string, the step is skipped,
-            and the job is green. So the audit refuses rather than reports.
+            written `== 'false'` so the proof runs only when the gate did not
+            change, a condition on the step that does the routing.
 
-            It is a list of refused shapes, not a proof of exhaustion. Each shape
-            it covers has a named case in `--self-test`; a shape nobody thought of
-            has neither, and the four that this file's first version missed were
-            all found by someone reading it rather than by running it. Read the
-            case list before trusting the coverage.
+            THE WORST SHAPE IS THE LAST ONE, and it is why this paragraph does
+            not lead with the guards. Skip the routing step and every output in
+            that job is empty, so every proof skips AND the audit meant to refuse
+            the tree never runs -- in a job that reports green and complete. A
+            missing guard costs one proof; a skipped planner costs the proofs and
+            the check on them together.
 
-    `--self-test` is this file's own instance of the thing it routes. It builds
-            scratch repositories and requires each check above to redden against
-            a tree that violates it, and to stay quiet against one that does not.
+            IT IS A LIST OF REFUSED SHAPES, NOT A PROOF OF EXHAUSTION. Every shape
+            it covers has a named case in `--self-test` and the case list is the
+            enumeration -- read it rather than trusting a count in prose. Six
+            shapes have been added by people reading this file rather than running
+            it, the last two after the audit was already refusing four, so the
+            honest prior is that more exist. When you find the seventh, add the
+            rule and its case; do not tighten this sentence.
 
 FAIL-SAFE DIRECTION
     Every uncertainty routes MORE work, never less. No base commit, an
@@ -61,7 +63,7 @@ EXIT CODES
     1  findings -- the audit disagrees with the tree, or a self-test case did not
        redden
     2  the tool could not run correctly: a malformed manifest, an unreadable
-       workflow, no routing job. Always a hard failure, never a quiet pass.
+       workflow, no routing step. Always a hard failure, never a quiet pass.
 """
 
 from __future__ import annotations
@@ -89,8 +91,8 @@ WORKFLOW_REL = ".github/workflows/ci.yml"
 # self-tests rather than by the reader of the diff.
 ROOT_TRIGGERS = (MANIFEST_REL, ROUTER_REL, WORKFLOW_REL)
 
-# How the workflow names the planning step. The audit finds the routing job by
-# looking for this, rather than being told a job name it could not verify.
+# How the workflow names the planning step. The audit finds each job's router by
+# looking for this, rather than being told a step id it could not verify.
 PLAN_MARK = "gate-self-tests.py plan"
 
 # Where a gate self-test may live. Non-recursive on purpose: `scripts/` also
@@ -115,7 +117,7 @@ SELFTEST_INVOCATION = re.compile(
     r"(--self-test\b)|(\sself-test\b)|(-selftest\.(?:sh|py)\b)|([-_]mutations\.(?:sh|py)\b)"
 )
 
-# An id becomes a job output name and a property in `needs.<job>.outputs.<id>`.
+# An id becomes a step output name and a property in `steps.<step>.outputs.<id>`.
 # A hyphen there parses as subtraction, so the character set is narrowed here
 # rather than discovered when a guard silently evaluates to the empty string.
 ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -194,7 +196,7 @@ def load_manifest(root: Path) -> list[Gate]:
         if not ID_RE.match(gate_id):
             raise Fatal(
                 f"{MANIFEST_REL}:{lineno}: id {gate_id!r} must match {ID_RE.pattern} -- "
-                "it is dereferenced as needs.<job>.outputs.<id> in the workflow"
+                "it is read as steps.<step>.outputs.<id> in the workflow"
             )
         if gate_id in first_seen:
             raise Fatal(
@@ -237,6 +239,9 @@ class Step:
     step_id: str = ""
     condition: str = ""
     commands: tuple[str, ...] = ()
+    # `continue-on-error: true` turns a red proof into a green job. It is read
+    # here because a key this reader ignores is a key the audit cannot refuse.
+    continue_on_error: str = ""
 
 
 def _read_value(key: str, inline: str, lines: list[str], index: int, key_indent: int) -> tuple[list[str], int]:
@@ -402,6 +407,8 @@ def _apply_step_key(step: Step, key: str, values: list[str]) -> None:
         step.condition = " ".join(values)
     elif key == "run":
         step.commands = tuple(v for v in values if v)
+    elif key == "continue-on-error":
+        step.continue_on_error = " ".join(values)
 
 
 # ── discovery ───────────────────────────────────────────────────────────────
@@ -521,6 +528,21 @@ def audit(root: Path) -> list[str]:
                         "Its outputs are empty here, so the proof is skipped in a green job"
                     )
 
+                # THREE conditions sit in this neighbourhood and all three have to
+                # be looked at. The guard below is one. The job is the second. The
+                # PLANNER is the third, and it is the worst of them: skip the step
+                # that routes and every output is empty, so every proof in the job
+                # skips AND the audit that would have refused the tree never runs,
+                # in a job that reports green and complete. The first version of
+                # this file read the other two and not this one.
+                if planner.condition:
+                    problems.append(
+                        f"{WORKFLOW_REL}:{planner.lineno}: the routing step `{planner.step_id}` "
+                        f"in job `{hit.job}` carries `if: {planner.condition}`. It must be "
+                        "unconditional: skipping it empties every output in this job, skips "
+                        "every proof, and skips the audit meant to refuse that"
+                    )
+
                 # A job-level `if:` can skip the whole job, and it cannot read the
                 # `steps` context, so it can never be the guard -- only a way to
                 # lose one.
@@ -531,6 +553,17 @@ def audit(root: Path) -> list[str]:
                         "be unconditional; a job-level condition cannot read `steps` and can "
                         "only skip the proof"
                     )
+
+                # A proof allowed to fail is not a proof. This is the same shape as
+                # a missing guard reached from the other side: the step runs, goes
+                # red, and the job reports success anyway.
+                for offender, role in ((planner, "routing step"), (hit, "proof")):
+                    if offender.continue_on_error:
+                        problems.append(
+                            f"{WORKFLOW_REL}:{offender.lineno}: the {role} in job `{hit.job}` "
+                            f"carries `continue-on-error: {offender.continue_on_error}`, so it "
+                            "can fail and leave the job green"
+                        )
 
                 guard = guard_expression(planner.step_id, gate.id)
                 if hit.condition != guard:
@@ -1039,6 +1072,30 @@ def self_test() -> int:
                 .replace(ALPHA_PROOF, ALPHA_PROOF + ALPHA_PLAN, 1),
             ),
             "which does not run until line",
+        ),
+        (
+            "an `if:` on the ROUTING STEP reddens",
+            # The worst of the three conditions in this neighbourhood, and the one
+            # the first version of this file did not read: skipping the planner
+            # empties every output in the job, skips every proof, and skips the
+            # audit that exists to refuse the tree -- all of it green.
+            rewrite(ALPHA_PLAN, ALPHA_PLAN.replace(
+                "        id: route\n",
+                "        id: route\n        if: github.event_name == 'push'\n",
+            ), 1),
+            "the routing step `route` in job `alpha` carries `if: github.event_name == 'push'`",
+        ),
+        (
+            "`continue-on-error` on a routed proof reddens",
+            rewrite(ALPHA_GUARD, ALPHA_GUARD + "        continue-on-error: true\n", 1),
+            "the proof in job `alpha` carries `continue-on-error: true`",
+        ),
+        (
+            "`continue-on-error` on the routing step reddens",
+            rewrite(ALPHA_PLAN, ALPHA_PLAN.replace(
+                "        id: route\n", "        id: route\n        continue-on-error: true\n",
+            ), 1),
+            "the routing step in job `alpha` carries `continue-on-error: true`",
         ),
         (
             "a job-level `if:` on a job holding a proof reddens",

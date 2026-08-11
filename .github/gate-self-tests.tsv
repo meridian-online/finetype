@@ -21,29 +21,38 @@
 # mis-routed, including the required ones. That is what makes the audit blocking;
 # the standalone `gate-routing` job is only an early signal.
 #
-# Three of the shapes the audit refuses are SILENT in Actions: a guard naming a
-# step that does not exist, a guard above the step that sets it, and a job-level
-# `if:` on a job holding a proof. Each evaluates to nothing, skips its step, and
-# reports the job green. The others are visible but not obvious -- a guard written
-# `== 'false'` inverts the routing and reads like routing. `--self-test` carries a
-# named case per shape, which is the enumeration this paragraph is counting.
+# The audit refuses more than a missing guard, and the shapes that matter are the
+# ones that leave a job GREEN: a guard written `== 'false'`, which inverts the
+# routing and reads like routing; a guard naming a step that does not exist or
+# sitting above the step that sets it; an `if:` on a job holding a proof; a
+# `continue-on-error` letting a red proof pass; and worst, an `if:` on the routing
+# STEP, which empties every output in the job and skips the audit along with the
+# proofs. `--self-test` carries a named case per shape and that case list, not a
+# count in prose, is the enumeration.
 #
 # FORMAT: three TAB-separated columns. Blank lines and `#` lines are ignored.
 #
-#   1  id        [a-z][a-z0-9_]*, unique. It becomes an output of the routing job
-#                and is dereferenced as `needs.<job>.outputs.<id>`, where a
-#                hyphen would parse as subtraction.
+#   1  id        [a-z][a-z0-9_]*, unique. It becomes an output of the routing
+#                STEP and is read as `steps.<step>.outputs.<id>`, where a hyphen
+#                would parse as subtraction.
 #   2  commands  comma-separated. Each must appear VERBATIM as one line of a
-#                `run:` in .github/workflows/ci.yml, in a step -- or a job --
-#                guarded by this row's id. Drift in either direction reddens the
-#                audit, so the manifest cannot describe a workflow that has
-#                moved on.
+#                `run:` in .github/workflows/ci.yml, on a step guarded by this
+#                row's id. Drift in either direction reddens the audit, so the
+#                manifest cannot describe a workflow that has moved on.
 #   3  paths     comma-separated, repo-relative, each an existing file. A diff
 #                touching any of them runs column 2.
 #
 # ALWAYS-ON, and deliberately so: this manifest, the router, and the workflow
 # itself. A change to any of the three re-runs every gate's self-test, because a
 # change to the routing cannot be trusted to route itself.
+#
+# WHAT A ROW CANNOT SAY, and it costs a real gap. Column 3 lists FILES, and a
+# gate whose detection depends on another module is not covered by watching its
+# own file alone: `scripts/check_sample_patterns.py` imports
+# `scripts/check_taxonomy_content.py`, so editing the imported module routes
+# `taxonomy_content` and NOT `sample_patterns`, whose self-test exercises code it
+# no longer re-proves. Add the imported file to the importing row when you notice
+# one; nothing here derives it.
 #
 # THE BOUNDARY. A row belongs here when its command exists to prove a GATE can
 # fail. `.github/scripts/test-download-model.sh` and `scripts/test_score_clean_label.sh`
