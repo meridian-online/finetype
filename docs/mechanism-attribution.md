@@ -277,8 +277,7 @@ holds a row to whichever it makes:
 | neither | the mechanism is compared whenever the report attributes the column | the mechanism differs |
 
 A carve-out over a column the report does not attribute is the shape
-worth knowing about: the comparison walks the report, so the flag is
-never reached, and a regression in that column is absorbed into a
+worth knowing about: a regression in that column is absorbed into a
 green run. Resolve such a row against the current report — the
 mechanism the column now carries, or `expect_no_attribution` if it has
 left the failing set — rather than leaving the flag on.

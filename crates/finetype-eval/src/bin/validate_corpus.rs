@@ -1336,12 +1336,22 @@ mod report {
     /// Panics when the report cannot be read, and when the parse compared
     /// nothing for a reason that reads like a pass.
     ///
-    /// Four tests enter here: `vci3_fixture_attribution_regression_match` and
-    /// `vci3_fixture_no_report_row_missing_from_fixture` with
-    /// `report_path()`, `vci3_report_file_is_present` with `report_path()` and
-    /// an empty fixture, and `vci3_report_absent_file_is_an_error` with a path
-    /// that does not exist. The missing-report case that last test drives is
-    /// therefore the one the others run.
+    /// Call sites enter here in these shapes, and
+    /// `grep -n 'compare_report_file(' ` on this file re-derives them. Read
+    /// that rather than a list of test names, which adding a test invalidates:
+    ///
+    /// - `report_path()` with the loaded fixture: the live comparisons against
+    ///   the tracked report.
+    /// - `report_path()` with an empty fixture: the verdict is that the file
+    ///   read and that `check_not_vacuous` accepted the parse, not what the
+    ///   rows say.
+    /// - a path that does not exist: the missing-report case.
+    /// - a scratch path holding a report rendered in-test: the fixture-sweep
+    ///   cases, which need a report the corpus does not produce.
+    ///
+    /// The missing-report case runs inside this function, so a mutation
+    /// designer reasoning about it is reasoning about the same code the live
+    /// comparisons execute rather than a path of its own.
     ///
     /// `read_harness_report` and `compare_to_fixture` are private to this
     /// module. Re-assembling the two around a report-missing skip — the shape
@@ -1351,7 +1361,7 @@ mod report {
     /// further. One that re-implements them instead —
     /// `std::fs::read_to_string`, the public `parse_report`, and the
     /// comparison inlined — compiles, and skips with the report absent while
-    /// both fixture tests stay green. `vci3_report_file_is_present` is what
+    /// the fixture tests stay green. `vci3_report_file_is_present` is what
     /// fails then, and it is what holds the report's presence against a
     /// rewritten call site in general.
     pub fn compare_report_file(path: &Path, fixture: &[FixtureRow]) -> (usize, Vec<String>) {
@@ -2702,13 +2712,14 @@ mod report_tests {
     /// The tracked report is present, and `check_not_vacuous` accepts its
     /// parse.
     ///
-    /// A verdict of its own, and the reason it is one: the two fixture tests
-    /// reach `eval/eval_output/validate_corpus.md` only to compare it, so a
-    /// report-missing skip at both of their call sites leaves them passing
-    /// with the file gone. Measured before this test existed — both call sites
-    /// bypassed and the file moved aside ran 35 passed, 0 failed, exit 0. This
-    /// test has no comparison to skip, so it reddens on the file's absence
-    /// whatever the fixture tests were rewritten to do.
+    /// A verdict of its own, and the reason it is one: the fixture tests reach
+    /// `eval/eval_output/validate_corpus.md` in order to compare it, so a
+    /// report-missing skip at their call sites leaves them passing with the
+    /// file gone. Measured before this test existed, against the two fixture
+    /// tests there were then — both call sites bypassed and the file moved
+    /// aside ran 35 passed, 0 failed, exit 0. This test has no comparison to
+    /// skip, so it reddens on the file's absence whatever the fixture tests
+    /// were rewritten to do.
     ///
     /// The empty fixture makes every parsed row a `missing from fixture`
     /// message, which is discarded: the verdict here is that the file read and
@@ -2729,8 +2740,8 @@ mod report_tests {
 
     /// An absent report is an error, not a skip.
     ///
-    /// Drives `compare_report_file`, the entry point the two fixture tests
-    /// call, rather than `read_harness_report` on its own: a skip introduced
+    /// Drives `compare_report_file`, the entry point the fixture tests call,
+    /// rather than `read_harness_report` on its own: a skip introduced
     /// between the read and the verdict returns a verdict here instead of
     /// panicking. The empty fixture keeps that legible — a run that reaches the
     /// comparison has no fixture row to disagree with, so it returns cleanly
