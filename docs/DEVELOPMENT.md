@@ -405,19 +405,28 @@ a `--self-test` that no row watches, a registered command no step runs, or a ste
 that runs unguarded and so runs on every diff.
 
 **A guard is compared whole, and the reason is worth reading once.** A routed
-step carries exactly `needs.<routing job>.outputs.<id> == 'true'`. Anything else
+step carries exactly `steps.<routing step>.outputs.<id> == 'true'`. Anything else
 is refused, because the near misses are not typos and do not look like defects:
 `== 'false'` and `!= 'true'` invert the routing so the proof runs only when the
 gate did *not* change, and an appended `&& github.event_name == 'push'` stops it
-running on pull requests at all. Each of those still mentions the right output, so
-a check that looked for the output name rather than the whole expression accepted
-all three.
+running on pull requests at all. Each still mentions the right output, so a check
+that looked for the output name rather than the whole expression accepted all
+three.
 
-The same reasoning covers three shapes that are genuinely *silent* — the step is
-skipped and the job is green, with nothing to read: a guard naming a job the step
-does not `needs:`, an output the routing job never declared, and an `if:` on the
-routing job itself, which skips every job depending on it. `--self-test` carries a
-named case for each shape listed in these two paragraphs.
+**Each job routes itself, and that is not a style choice.** A shared routing job
+that other jobs `needs:` was measured on a probe pull request: when it failed, its
+dependants were *skipped*, and a required status check that is skipped **satisfies
+branch protection** — the pull request reported `UNSTABLE`, which is mergeable,
+not `BLOCKED`. Two of this repository's five required contexts were among them. So
+no job depends on another for routing, and `plan` runs the audit before it plans,
+which puts the audit inside required contexts where a failure actually blocks.
+
+Three further shapes are refused because they are *silent* — the step is skipped
+and the job is green, with nothing to read: a guard naming a step that does not
+exist, a guard sitting above the step that sets it (Actions resolves
+`steps.<id>.outputs` against what has already run), and a job-level `if:` on a job
+holding a proof. `--self-test` carries a named case for every shape named in these
+three paragraphs.
 
 **Everything uncertain routes more work, never less.** No base commit, an
 unfetchable one, a diff that will not run, or a change to the manifest, the router
