@@ -48,7 +48,7 @@ check_drift() {
     return 1
   fi
 
-  target="$(readlink models/default 2>/dev/null || cat models/default 2>/dev/null || true)"
+  target="$(readlink models/default 2>/dev/null || true)"
   target="$(trim "${target}")"
   if [ -z "${target}" ]; then
     echo "CI model drift: FINETYPE_CI_MODEL=${ci_model}, models/default resolves to no name. Nothing says which model the binary embeds." >&2
