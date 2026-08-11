@@ -68,6 +68,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -143,12 +144,15 @@ def load_manifest(root: Path) -> list[Gate]:
     for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if not raw.strip() or raw.lstrip().startswith("#"):
             continue
-        fields = raw.split("\t")
+        fields = [f.strip() for f in raw.split("\t")]
+        # Padded before the count is checked, so a malformed row is REFUSED by the
+        # line below rather than crashing the reader on an unpack. A traceback and
+        # a refusal are not the same signal and only one of them names the line.
+        gate_id, commands_field, paths_field = (fields + ["", ""])[:3]
         if len(fields) != 3:
             raise Fatal(
                 f"{MANIFEST_REL}:{lineno}: expected 3 tab-separated columns, found {len(fields)}"
             )
-        gate_id, commands_field, paths_field = (f.strip() for f in fields)
 
         if not ID_RE.match(gate_id):
             raise Fatal(
@@ -449,20 +453,20 @@ def audit(root: Path) -> list[str]:
                 )
 
         guard = f"needs.{routing_job}.outputs.{gate.id}"
-        if gate.id not in jobs[routing_job].outputs:
+        declared = jobs[routing_job].outputs.get(gate.id, "")
+        expected = f"steps.{step_id}.outputs.{gate.id}"
+        if not declared:
             problems.append(
                 f"{WORKFLOW_REL}:{jobs[routing_job].lineno}: job `{routing_job}` declares no "
                 f"output `{gate.id}`, so `{guard}` is the empty string and every step it "
                 "guards is skipped in a green job"
             )
-        else:
-            expected = f"steps.{step_id}.outputs.{gate.id}"
-            if expected not in jobs[routing_job].outputs[gate.id]:
-                problems.append(
-                    f"{WORKFLOW_REL}:{jobs[routing_job].lineno}: output `{gate.id}` of job "
-                    f"`{routing_job}` does not read `{expected}`, so it carries another gate's "
-                    "verdict"
-                )
+        if declared and expected not in declared:
+            problems.append(
+                f"{WORKFLOW_REL}:{jobs[routing_job].lineno}: output `{gate.id}` of job "
+                f"`{routing_job}` does not read `{expected}`, so it carries another gate's "
+                "verdict"
+            )
 
         for command in gate.commands:
             hits = [s for s in steps if command in s.commands]
@@ -666,6 +670,7 @@ def _write(root: Path, rel: str, text: str) -> None:
 def _scratch_tree(root: Path) -> None:
     _write(root, MANIFEST_REL, SCRATCH_MANIFEST)
     _write(root, WORKFLOW_REL, SCRATCH_WORKFLOW)
+    (root / ROUTER_REL).parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ROOT / ROUTER_REL, root / ROUTER_REL)
     _write(root, "scripts/alpha_gate.py", 'import sys\nif "--self-test" in sys.argv:\n    pass\n')
     _write(root, "scripts/beta_gate.sh", "#!/usr/bin/env bash\nexit 0\n")
@@ -707,15 +712,22 @@ class Recorder:
             self.failed.append(name)
             print(f"  FAIL  {name}{(' -- ' + detail) if detail else ''}")
 
-    def reddens(self, name: str, run: object) -> None:
-        """`run` must report at least one problem, or raise Fatal."""
-        assert callable(run)
+    def reddens(self, name: str, run: Callable[[], list[str]], expect: str) -> None:
+        """`run` must report the NAMED problem, or raise Fatal naming it.
+
+        The substring is not decoration. A case that accepts any non-empty result
+        passes when the mutation trips an unrelated rule, or when the scratch
+        setup breaks — which is a case that cannot distinguish the rule it was
+        written for from its own scaffolding falling over.
+        """
         try:
-            problems = run()
+            reported = "\n".join(run())
         except Fatal as exc:
-            self.check(name, True, str(exc))
+            reported = str(exc)
+        if not reported:
+            self.check(name, False, "nothing was reported")
             return
-        self.check(name, bool(problems), "the audit stayed clean")
+        self.check(name, expect in reported, f"expected {expect!r}, got: {reported}")
 
 
 def _commit_change(root: Path, edits: dict[str, str], message: str) -> None:
@@ -788,14 +800,34 @@ def self_test() -> int:
         rec.check("...and a line per gate", written.count("=") == 4, written)
 
     # ── the manifest reader refuses what it cannot read ──────────────────────
+    # Each case pins the MESSAGE, not just the refusal. Six rows can each be
+    # refused for six reasons and an untargeted `except Fatal` accepts any of
+    # them -- which is how a deleted column-count check hides behind the
+    # "names no path" refusal that a short row also triggers.
     print("\nmanifest")
-    for name, body in (
-        ("a duplicate id is fatal", SCRATCH_MANIFEST + "alpha\tx --self-test\tscripts/alpha_gate.py\n"),
-        ("a hyphenated id is fatal", "gate-a\tx --self-test\tscripts/alpha_gate.py\n"),
-        ("a two-column row is fatal", "alpha\tx --self-test\n"),
-        ("a row with no command is fatal", "alpha\t\tscripts/alpha_gate.py\n"),
-        ("a row with no path is fatal", "alpha\tx --self-test\t\n"),
-        ("an empty manifest is fatal", "# nothing but a comment\n"),
+    for name, body, expect in (
+        (
+            "a duplicate id is fatal",
+            SCRATCH_MANIFEST + "alpha\tx --self-test\tscripts/alpha_gate.py\n",
+            "duplicate id 'alpha'",
+        ),
+        (
+            "a hyphenated id is fatal",
+            "gate-a\tx --self-test\tscripts/alpha_gate.py\n",
+            "id 'gate-a' must match",
+        ),
+        (
+            "a two-column row is fatal",
+            "alpha\tx --self-test\n",
+            "expected 3 tab-separated columns, found 2",
+        ),
+        (
+            "a row with no command is fatal",
+            "alpha\t\tscripts/alpha_gate.py\n",
+            "'alpha' names no self-test command",
+        ),
+        ("a row with no path is fatal", "alpha\tx --self-test\t\n", "'alpha' watches no path"),
+        ("an empty manifest is fatal", "# nothing but a comment\n", "no rows"),
     ):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -805,7 +837,7 @@ def self_test() -> int:
                 load_manifest(root)
                 rec.check(name, False, "it parsed")
             except Fatal as exc:
-                rec.check(name, True, str(exc))
+                rec.check(name, expect in str(exc), f"expected {expect!r}, got: {exc}")
 
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -815,9 +847,8 @@ def self_test() -> int:
     # ── the audit ────────────────────────────────────────────────────────────
     print("\naudit")
 
-    def with_tree(mutate: object) -> object:
+    def with_tree(mutate: Callable[[Path], None]) -> Callable[[], list[str]]:
         """Run the audit over a scratch tree that `mutate` has broken."""
-        assert callable(mutate)
 
         def run() -> list[str]:
             with tempfile.TemporaryDirectory() as tmp:
@@ -932,25 +963,66 @@ def self_test() -> int:
             ", .github/gate-self-tests.tsv", ""
         ))
 
-    for name, mutate in (
-        ("an unguarded self-test step reddens", drop_guard),
-        ("a guard naming a job that does not exist reddens", misname_job),
-        ("a guard carrying another gate's id reddens", wrong_id),
-        ("a job reading the routing outputs without `needs:` reddens", drop_needs),
-        ("a routing output nobody declared reddens", drop_output),
-        ("an output wired to the wrong gate reddens", crossed_output),
-        ("a registered self-test no step runs reddens", drop_step),
-        ("a self-test the manifest does not register reddens", unregistered_selftest),
-        ("a gate script no row watches reddens", unwatched_gate),
-        ("a proof script no row watches reddens", unwatched_proof),
-        ("a watched path that is not a file reddens", missing_watched_path),
-        ("a workflow with no routing job reddens", no_routing_job),
-        ("a workflow with two routing jobs reddens", two_routing_jobs),
-        ("a planning step with no `id:` reddens", no_plan_step_id),
-        ("a block-sequence `needs:` is refused rather than guessed", block_needs),
-        ("the manifest not watching itself reddens", unrouted_root_trigger),
+    unguarded = "runs without `needs.gate-routing.outputs.alpha`"
+    for name, mutate, expect in (
+        ("an unguarded self-test step reddens", drop_guard, unguarded),
+        ("a guard naming a job that does not exist reddens", misname_job, unguarded),
+        ("a guard carrying another gate's id reddens", wrong_id, unguarded),
+        (
+            "a job reading the routing outputs without `needs:` reddens",
+            drop_needs,
+            "without `needs: gate-routing`",
+        ),
+        ("a routing output nobody declared reddens", drop_output, "declares no output `alpha`"),
+        (
+            "an output wired to the wrong gate reddens",
+            crossed_output,
+            "does not read `steps.route.outputs.alpha`",
+        ),
+        (
+            "a registered self-test no step runs reddens",
+            drop_step,
+            f"which no step in {WORKFLOW_REL} runs",
+        ),
+        (
+            "a self-test the manifest does not register reddens",
+            unregistered_selftest,
+            f"`scripts/gamma_gate.py --self-test` is a gate self-test that {MANIFEST_REL}",
+        ),
+        (
+            "a gate script no row watches reddens",
+            unwatched_gate,
+            "`scripts/gamma_gate.py` carries a gate self-test and no row watches it",
+        ),
+        (
+            "a proof script no row watches reddens",
+            unwatched_proof,
+            "`scripts/gamma-gate-selftest.sh` carries a gate self-test",
+        ),
+        (
+            "a watched path that is not a file reddens",
+            missing_watched_path,
+            "watches `scripts/beta_gate.sh`, which is not a file",
+        ),
+        (
+            "a workflow with no routing job reddens",
+            no_routing_job,
+            f"no step runs `{PLAN_MARK}`",
+        ),
+        ("a workflow with two routing jobs reddens", two_routing_jobs, "runs in more than one job"),
+        ("a planning step with no `id:` reddens", no_plan_step_id, "has no `id:`"),
+        (
+            "a block-sequence `needs:` is refused rather than guessed",
+            block_needs,
+            "writes `needs:` as a block sequence",
+        ),
+        (
+            "the manifest not watching itself reddens",
+            unrouted_root_trigger,
+            f"`{MANIFEST_REL}` re-routes every gate when it changes and no row watches it",
+        ),
     ):
-        rec.reddens(name, with_tree(mutate))
+        rec.reddens(name, with_tree(mutate), expect)
 
     # ── the real tree ────────────────────────────────────────────────────────
     print("\nthis repository")

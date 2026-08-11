@@ -384,3 +384,29 @@ predicted label, no score, no row count. Those move with a retrain and pinning
 one would make the gate flake and then be ignored. Its self-test proves the point
 by moving a confidence digit and a predicted label and requiring the gate to stay
 green.
+
+## Which self-tests a pull request runs
+
+Every gate here ships a `--self-test` — a harness that mutates the gate, or the
+tree the gate reads, and requires the gate to redden. Those proofs are routed:
+`.github/gate-self-tests.tsv` says which paths invalidate which proof, and
+`.github/scripts/gate-self-tests.py` diffs the pull request against its base and
+publishes one boolean per gate that each self-test step in
+`.github/workflows/ci.yml` is guarded by. A diff that leaves the gates alone runs
+none of them; a diff that rewrites one runs that one.
+
+```bash
+make check-gate-routing     # the audit, and the router's own self-test
+```
+
+**Adding a gate means adding a row.** The audit runs on every pull request and
+reddens if the manifest, the tree and the workflow disagree — a script carrying a
+`--self-test` that no row watches, a registered command no step runs, a step that
+runs unguarded, a guard naming a job the step does not depend on, or an output the
+routing job never declared. The last three are the ones worth knowing about: each
+is *silent* in Actions, because an expression that resolves to nothing skips its
+step and leaves the job green.
+
+**Everything uncertain routes more work, never less.** No base commit, an
+unfetchable one, a diff that will not run, or a change to the manifest, the router
+or `.github/workflows/ci.yml` each select every gate and say so in the log.
