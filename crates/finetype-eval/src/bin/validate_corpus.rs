@@ -1021,7 +1021,26 @@ fn main() -> Result<()> {
 //   - expected_mechanism    (string, required)
 //   - rationale             (string, required)
 //   - pending_escalation    (bool, optional, default false)
+//   - expect_no_attribution (bool, optional, default false)
 //   - superseded_mechanism  (string, optional)
+//
+// `pending_escalation` and `expect_no_attribution` are duals, and each is a
+// claim about the report that `compare_to_fixture` holds the row to:
+//
+//   - `pending_escalation: true` says the harness attributes this column and
+//     disagrees with `expected_mechanism` for a reason that needs a decision
+//     upstream, so the mechanism is not compared. The report MUST carry a row
+//     for the column. A carve-out over a column the report does not attribute
+//     suppresses nothing — the row reddens on no report at all.
+//   - `expect_no_attribution: true` says the column is not among the report's
+//     failing columns and must stay that way. The report MUST NOT carry a row
+//     for it. This is what locks in a column that stopped failing: any
+//     reappearance is a regression, whatever mechanism it carries.
+//
+// A row with neither flag is dormant when the report does not attribute its
+// column, and compared when it does. Dormancy is not a defect there: the row
+// still reddens if the column comes back with a different mechanism, which is
+// the difference between a dormant expectation and a dormant carve-out.
 //
 // `superseded_mechanism` is the `expected_mechanism` a row held before it was
 // re-locked to a later harness report, kept beside the value that replaced it so
@@ -1047,6 +1066,8 @@ mod fixture {
         pub rationale: String,
         #[serde(default)]
         pub pending_escalation: bool,
+        #[serde(default)]
+        pub expect_no_attribution: bool,
         #[serde(default)]
         pub superseded_mechanism: Option<String>,
     }
@@ -1340,14 +1361,34 @@ mod report {
         compare_to_fixture(&parsed.rows, fixture)
     }
 
+    /// The phrase every dead-carve-out message carries. Tests filter on this
+    /// constant rather than on a copy of the wording, so re-wording the message
+    /// cannot leave a filter matching nothing and reading as a pass.
+    pub const DEAD_CARVE_OUT: &str = "carves out a column the report does not attribute";
+
+    /// The phrase every returned-column message carries. Same reason as
+    /// `DEAD_CARVE_OUT`.
+    pub const RESOLVED_COLUMN_RETURNED: &str = "is pinned as a column that stopped failing";
+
     /// Compare parsed attribution rows against the fixture. Returns the number
     /// of rows that matched their fixture entry, and one message per
     /// disagreement.
+    ///
+    /// Two sweeps, because the disagreements run in both directions. The first
+    /// walks the report and asks what the fixture says about each attributed
+    /// column. The second walks the fixture and asks whether each flagged row's
+    /// claim about the report still holds — a claim a report-driven sweep
+    /// cannot reach at all, because a fixture row the report says nothing about
+    /// is a row the first loop never visits.
     ///
     /// Private to this module, with `read_harness_report`. See
     /// `compare_report_file`.
     fn compare_to_fixture(rows: &[AttributionRow], fixture: &[FixtureRow]) -> (usize, Vec<String>) {
         let by_key: BTreeMap<(&str, &str), &FixtureRow> = fixture
+            .iter()
+            .map(|r| ((r.dataset.as_str(), r.column.as_str()), r))
+            .collect();
+        let reported: BTreeMap<(&str, &str), &AttributionRow> = rows
             .iter()
             .map(|r| ((r.dataset.as_str(), r.column.as_str()), r))
             .collect();
@@ -1376,6 +1417,35 @@ mod report {
                 _ => compared += 1,
             }
         }
+
+        for f in fixture {
+            let key = (f.dataset.as_str(), f.column.as_str());
+            match reported.get(&key) {
+                None if f.pending_escalation => failures.push(format!(
+                    "(dataset={}, column={}) {} — the carve-out holds nothing out of the \
+                     comparison, so a regression in that column is absorbed by a flag set \
+                     for a reason the report no longer shows. Resolve the row against the \
+                     current report, or delete it. Rationale on the row: {}",
+                    f.dataset,
+                    f.column,
+                    DEAD_CARVE_OUT,
+                    f.rationale.trim()
+                )),
+                Some(row) if f.expect_no_attribution => failures.push(format!(
+                    "(dataset={}, column={}) {}, but the report attributes it ({} via {}) \
+                     — the improvement that pin locked in has regressed. Rationale on the \
+                     row: {}",
+                    f.dataset,
+                    f.column,
+                    RESOLVED_COLUMN_RETURNED,
+                    row.mechanism,
+                    row.trigger,
+                    f.rationale.trim()
+                )),
+                _ => {}
+            }
+        }
+
         (compared, failures)
     }
 }
@@ -1857,7 +1927,7 @@ mod fixture_tests {
     /// output, NOT from iter-2 spec's illustrative table). The 4 hard
     /// anchors land as code_vs_canonical or format_diversity per iter-2
     /// curation thesis; the GICS Sector taxonomy-gap row carries
-    /// `pending_escalation:true`. This is the correctness anchor (ac-13)
+    /// `expect_no_attribution:true`. This is the correctness anchor (ac-13)
     /// that grounds ac-05's regression check.
     #[test]
     fn vci3_fixture_iter2_anchor_rows_present() {
@@ -1885,8 +1955,10 @@ mod fixture_tests {
             );
         }
 
-        // Known taxonomy-gap row — pending_escalation:true with non-empty
-        // rationale referencing the follow-up obligation.
+        // Known taxonomy-gap row. Neither tracked report has ever carried
+        // GICS Sector as a failing column, so what the row states is that the
+        // column stays out of the failing set — `expect_no_attribution:true`,
+        // not a carve-out from a comparison it never entered.
         let gap_row = by_key
             .get(&("sp500_constituents".into(), "GICS Sector".into()))
             .expect("known gap row (sp500_constituents, GICS Sector) missing from fixture");
@@ -1895,8 +1967,13 @@ mod fixture_tests {
             "GICS Sector row's expected_mechanism mismatch"
         );
         assert!(
-            gap_row.pending_escalation,
-            "GICS Sector row must have pending_escalation: true"
+            gap_row.expect_no_attribution,
+            "GICS Sector row must have expect_no_attribution: true"
+        );
+        assert!(
+            !gap_row.pending_escalation,
+            "GICS Sector row must not have pending_escalation: true — the report \
+             attributes no such column, so the flag would carve out nothing"
         );
         assert!(
             !gap_row.rationale.trim().is_empty(),
@@ -1904,36 +1981,38 @@ mod fixture_tests {
         );
     }
 
-    /// vci3_fixture_anchor_count_2_hard_3_gap (ac-13).
+    /// vci3_fixture_anchor_count_4_hard_1_gap (ac-13).
     ///
     /// **What the counts mean.** "Hard" here is
     /// `pending_escalation:false` — an iter-2 anchor whose adjudicated
-    /// mechanism is still what the harness reports, so it stays in the
-    /// regression comparison. "Gap" is `pending_escalation:true` — the
-    /// adjudicated mechanism is kept in `expected_mechanism` and the row is
-    /// carved out of that comparison, because the harness disagrees for a
-    /// reason that needs a decision upstream rather than a fixture edit.
+    /// mechanism is compared against the report whenever the report attributes
+    /// the column. "Gap" is `pending_escalation:true` — the adjudicated
+    /// mechanism is kept in `expected_mechanism` and the row is carved out of
+    /// that comparison, because the harness disagrees for a reason that needs a
+    /// decision upstream rather than a fixture edit.
     /// `vci3_fixture_iter2_anchor_rows_present` uses "hard anchor" for
     /// something else — the four tuples whose `expected_mechanism` it asserts
     /// strictly — so the two tests partition the same five rows differently.
     ///
-    /// Three anchors sit in the gap set, each for its own reason:
+    /// One anchor sits in the gap set. `fifa_players` / `Value` — the
+    /// 2026-07-17 report reads `path-b-prefix`, so the prediction has left
+    /// CODE_TYPED_LABELS and the GT-sidecar seam is no longer the seam the
+    /// cascade sees. The fixture's own carve-out comment carries the detail,
+    /// and the report attributes the column, so the carve-out suppresses a
+    /// disagreement that exists.
     ///
-    /// - `sp500_constituents` / `GICS Sector` — taxonomy gap. No GICS label
-    ///   exists under v0.6.19, so neither side enters CODE_TYPED_LABELS.
-    /// - `oecd_employment` / `REF_AREA` — the v0.6.19 model mispredicts to
-    ///   `technology.internet.http_method`, which is ALSO in
-    ///   CODE_TYPED_LABELS, so Rule 3's XOR is false and Rule 6 fires.
-    /// - `fifa_players` / `Value` — the 2026-07-17 report reads
-    ///   `path-b-prefix`, so the prediction has left CODE_TYPED_LABELS and
-    ///   the GT-sidecar seam is no longer the seam the cascade sees. The
-    ///   fixture's own carve-out comment carries the detail.
+    /// The count moved from 2/3 on 2026-08-11. `oecd_employment` / `REF_AREA`
+    /// and `sp500_constituents` / `GICS Sector` were carved out of a
+    /// comparison neither column enters: the 2026-07-17 report attributes
+    /// neither, and a carve-out is only reached through a report row. Both are
+    /// now pinned `expect_no_attribution:true` instead, which is checked by
+    /// `vci3_fixture_resolved_carve_outs_stay_out_of_the_report`.
     ///
     /// Asserts: of the 5 iter-2 anchor `(dataset, column)` tuples, exactly
-    /// 2 carry `pending_escalation:false` AND exactly 3 carry
+    /// 4 carry `pending_escalation:false` AND exactly 1 carries
     /// `pending_escalation:true`.
     #[test]
-    fn vci3_fixture_anchor_count_2_hard_3_gap() {
+    fn vci3_fixture_anchor_count_4_hard_1_gap() {
         let rows = load();
         let by_key: BTreeMap<(String, String), &FixtureRow> = rows
             .iter()
@@ -1960,15 +2039,15 @@ mod fixture_tests {
 
         assert_eq!(
             hard.len(),
-            2,
-            "Expected exactly 2 hard anchors (pending_escalation:false), got {}: {:?}",
+            4,
+            "Expected exactly 4 hard anchors (pending_escalation:false), got {}: {:?}",
             hard.len(),
             hard
         );
         assert_eq!(
             gap.len(),
-            3,
-            "Expected exactly 3 known-gap anchors (pending_escalation:true), \
+            1,
+            "Expected exactly 1 known-gap anchor (pending_escalation:true), \
              got {}: {:?}",
             gap.len(),
             gap
@@ -2102,10 +2181,11 @@ mod fixture_tests {
     /// Pins the fixture's *coverage* of the report: a per-column attribution
     /// the harness emits that the fixture has no entry for.
     ///
-    /// `compare_to_fixture` emits two message shapes and this reads one of
-    /// them — `missing from fixture`. The other,
-    /// `fixture expected=… but harness actual=…`, is a mechanism
-    /// disagreement. Coverage gets a verdict of its own here.
+    /// `compare_to_fixture` emits four message shapes and this reads one of
+    /// them — `missing from fixture`. `fixture expected=… but harness
+    /// actual=…` is a mechanism disagreement; the two the fixture sweep emits
+    /// have verdicts of their own in the two tests below. Coverage gets one
+    /// here.
     ///
     /// `check_not_vacuous` runs first for the reason it runs above: a report
     /// that parses no rows yields no message of either shape, so without it
@@ -2129,6 +2209,100 @@ mod fixture_tests {
             missing.join("\n")
         );
     }
+
+    /// vci3_fixture_no_carve_out_without_a_report_row
+    ///
+    /// Pins the live fixture against the live report in the direction the
+    /// report-driven sweep cannot see: a `pending_escalation:true` row the
+    /// report attributes no column for. Such a row suppresses nothing, so a
+    /// regression in that column is absorbed by a flag set for a reason the
+    /// report no longer shows — and the reader of a green run has no way to
+    /// tell that from a carve-out doing its job.
+    ///
+    /// Two carve-outs were in exactly that state until 2026-08-11:
+    /// `oecd_employment` / `REF_AREA`, whose column left the failing set
+    /// between the 2026-04-29 and 2026-07-17 reports, and
+    /// `sp500_constituents` / `GICS Sector`, which neither report has ever
+    /// carried. Restoring `pending_escalation: true` to either row in the
+    /// fixture reddens this test.
+    ///
+    /// It cannot redden on the code path being removed — the fixture it reads
+    /// is clean, so a deleted sweep produces the same empty list. That half is
+    /// held by `vci3_report_dead_carve_out_is_reported`, which drives the same
+    /// entry point over a fixture built to trip it.
+    #[test]
+    fn vci3_fixture_no_carve_out_without_a_report_row() {
+        let fixture = load();
+        let path = report::report_path();
+
+        let (_, failures) = report::compare_report_file(&path, &fixture);
+        let dead: Vec<&str> = failures
+            .iter()
+            .filter(|f| f.contains(report::DEAD_CARVE_OUT))
+            .map(String::as_str)
+            .collect();
+        assert!(
+            dead.is_empty(),
+            "{} fixture row(s) carve out a column {} does not attribute:\n{}",
+            dead.len(),
+            path.display(),
+            dead.join("\n")
+        );
+    }
+
+    /// vci3_fixture_resolved_carve_outs_stay_out_of_the_report
+    ///
+    /// The other half of the same move, and the part that locks the
+    /// improvement in. Both rows below carry `expect_no_attribution:true`,
+    /// which is the claim that the column is not among the report's failing
+    /// columns. This test asserts the flag is still on each row AND that the
+    /// live report agrees with it, so the two ways the pin can be lost —
+    /// deleting the flag, and the column coming back — are one verdict.
+    ///
+    /// It is stronger than the mechanism comparison these rows would get as
+    /// ordinary expectations. `GICS Sector` returning as `code_vs_canonical`
+    /// matches its `expected_mechanism` exactly, so a mechanism comparison
+    /// would call that a pass; here it reddens, because a column entering the
+    /// failing set of a dataset that reports `✓ | 0` is the regression.
+    #[test]
+    fn vci3_fixture_resolved_carve_outs_stay_out_of_the_report() {
+        let resolved: &[(&str, &str)] = &[
+            ("oecd_employment", "REF_AREA"),
+            ("sp500_constituents", "GICS Sector"),
+        ];
+
+        let fixture = load();
+        let by_key: BTreeMap<(String, String), &FixtureRow> = fixture
+            .iter()
+            .map(|r| ((r.dataset.clone(), r.column.clone()), r))
+            .collect();
+        for (d, c) in resolved {
+            let row = by_key
+                .get(&(d.to_string(), c.to_string()))
+                .unwrap_or_else(|| panic!("resolved row ({}, {}) missing from fixture", d, c));
+            assert!(
+                row.expect_no_attribution,
+                "resolved row ({}, {}) has lost `expect_no_attribution: true` — nothing \
+                 then reddens when the column returns to the failing set",
+                d, c
+            );
+        }
+
+        let path = report::report_path();
+        let (_, failures) = report::compare_report_file(&path, &fixture);
+        let returned: Vec<&str> = failures
+            .iter()
+            .filter(|f| f.contains(report::RESOLVED_COLUMN_RETURNED))
+            .map(String::as_str)
+            .collect();
+        assert!(
+            returned.is_empty(),
+            "{} column(s) pinned out of the failing set are attributed by {}:\n{}",
+            returned.len(),
+            path.display(),
+            returned.join("\n")
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -2143,9 +2317,14 @@ mod fixture_tests {
 #[cfg(test)]
 mod report_tests {
     use super::attribute::Mechanism;
-    use super::report::{check_not_vacuous, compare_report_file, parse_report, report_path};
+    use super::fixture::FixtureRow;
+    use super::report::{
+        check_not_vacuous, compare_report_file, parse_report, report_path, DEAD_CARVE_OUT,
+        RESOLVED_COLUMN_RETURNED,
+    };
     use super::{render_report, DatasetResult};
     use std::collections::BTreeMap;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     const ATTRIBUTION_HEADING: &str = "## Per-column attributions";
 
@@ -2180,6 +2359,133 @@ mod report_tests {
             ("code", Mechanism::EnumOverfit, "enum-constraint"),
             ("when", Mechanism::FormatDiversity, "path-b-prefix"),
         ])
+    }
+
+    /// A fixture row with both flags off. The callers below turn one on with
+    /// struct-update syntax, so a row's flags are the only thing that varies
+    /// between a case and its control.
+    fn fixture_row(dataset: &str, column: &str, mechanism: &str) -> FixtureRow {
+        FixtureRow {
+            dataset: dataset.to_string(),
+            column: column.to_string(),
+            expected_mechanism: mechanism.to_string(),
+            rationale: "rendered in-test".to_string(),
+            pending_escalation: false,
+            expect_no_attribution: false,
+            superseded_mechanism: None,
+        }
+    }
+
+    /// Write `report` to a scratch file of its own and compare it through
+    /// `compare_report_file`, the entry point the fixture tests call.
+    ///
+    /// Through the file rather than against parsed rows on purpose:
+    /// `compare_to_fixture` is private to `mod report`, and a helper that
+    /// reached it directly would leave the two tests below green when the
+    /// fixture sweep is wired to nothing the harness runs.
+    fn compared_from_disk(report: &str, fixture: &[FixtureRow]) -> (usize, Vec<String>) {
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "validate-corpus-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir).expect("scratch directory for the rendered report");
+        let path = dir.join("validate_corpus.md");
+        std::fs::write(&path, report).expect("write the rendered report");
+
+        let out = compare_report_file(&path, fixture);
+        std::fs::remove_dir_all(&dir).expect("remove the scratch directory");
+        out
+    }
+
+    /// A `pending_escalation` row the report attributes no column for is
+    /// reported by dataset and column; one the report does attribute is not.
+    ///
+    /// The control is the half that makes this a test of the condition rather
+    /// than of the flag: `beta` / `code` is carved out AND attributed, so a
+    /// sweep that reported every carve-out would push two messages here.
+    #[test]
+    fn vci3_report_dead_carve_out_is_reported() {
+        let report = rendered(&[("code", Mechanism::EnumOverfit, "enum-constraint")]);
+        let live = FixtureRow {
+            pending_escalation: true,
+            ..fixture_row("beta", "code", "enum_overfit")
+        };
+        let dead = FixtureRow {
+            pending_escalation: true,
+            ..fixture_row("beta", "gone", "enum_overfit")
+        };
+
+        let (_, failures) = compared_from_disk(&report, &[live, dead]);
+
+        assert_eq!(
+            failures.len(),
+            1,
+            "one carve-out has a report row and one does not, so exactly one message is \
+             due: {:?}",
+            failures
+        );
+        assert!(
+            failures[0].contains(DEAD_CARVE_OUT),
+            "the message is not the dead-carve-out shape: {}",
+            failures[0]
+        );
+        assert!(
+            failures[0].contains("dataset=beta") && failures[0].contains("column=gone"),
+            "the message does not name the row it is about: {}",
+            failures[0]
+        );
+    }
+
+    /// An `expect_no_attribution` row the report DOES attribute is reported,
+    /// with the mechanism it came back carrying; one the report leaves alone
+    /// is not.
+    ///
+    /// `compared == 1` is part of the verdict: a returned column is still
+    /// mechanism-compared, so the pin adds a reason to redden rather than
+    /// replacing one.
+    #[test]
+    fn vci3_report_pinned_column_that_returns_is_reported() {
+        let report = rendered(&[("code", Mechanism::EnumOverfit, "enum-constraint")]);
+        let returned = FixtureRow {
+            expect_no_attribution: true,
+            ..fixture_row("beta", "code", "enum_overfit")
+        };
+        let holding = FixtureRow {
+            expect_no_attribution: true,
+            ..fixture_row("beta", "clean", "enum_overfit")
+        };
+
+        let (compared, failures) = compared_from_disk(&report, &[returned, holding]);
+
+        assert_eq!(
+            compared, 1,
+            "the returned column matched its expected_mechanism, so it is still counted \
+             as compared"
+        );
+        assert_eq!(
+            failures.len(),
+            1,
+            "one pinned column is attributed and one is not, so exactly one message is \
+             due: {:?}",
+            failures
+        );
+        assert!(
+            failures[0].contains(RESOLVED_COLUMN_RETURNED),
+            "the message is not the returned-column shape: {}",
+            failures[0]
+        );
+        assert!(
+            failures[0].contains("dataset=beta") && failures[0].contains("column=code"),
+            "the message does not name the row it is about: {}",
+            failures[0]
+        );
+        assert!(
+            failures[0].contains("enum_overfit"),
+            "the message does not say what the column came back as: {}",
+            failures[0]
+        );
     }
 
     /// A report with the heading and a well-formed table parses the rows the

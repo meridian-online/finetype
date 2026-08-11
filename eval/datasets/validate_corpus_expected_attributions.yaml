@@ -14,8 +14,27 @@
 #                                            | unknown | no_gt)
 #   - rationale             (string, required, ≤200 chars)
 #   - pending_escalation    (bool,   optional, default false)
+#   - expect_no_attribution (bool,   optional, default false)
 #   - superseded_mechanism  (string, optional: the `expected_mechanism` this row
 #                                    held before it was re-locked, same enum)
+#
+# `pending_escalation` and `expect_no_attribution` are duals. Each is a claim
+# about the report, and `compare_to_fixture` holds the row to it:
+#
+#   * `pending_escalation: true` — the harness attributes this column and
+#     disagrees with `expected_mechanism` for a reason that needs a decision
+#     upstream, so the mechanism is not compared. The report must carry a row
+#     for the column, or the carve-out holds nothing out of a comparison it is
+#     not part of, and the row reddens.
+#   * `expect_no_attribution: true` — the column is not among the report's
+#     failing columns and must stay out. The report must NOT carry a row for
+#     it. This is how a column that stopped failing is locked in: it reddens on
+#     any reappearance, whatever mechanism the reappearance carries.
+#
+# A row with neither flag is dormant while the report says nothing about its
+# column, and compared when it does. That dormancy is not a defect — the row
+# still reddens if the column returns with a different mechanism, which is
+# exactly what a dormant carve-out cannot do.
 #
 # `superseded_mechanism` keeps a re-lock legible: the value a row used to hold
 # stays in the file beside the value it holds now, so the change is readable
@@ -87,7 +106,7 @@
 # the disagreement stays on the record instead of being settled by preference.
 # Whether the sidecar thesis or the cascade is authoritative here is an
 # evaluation call, and it is open; it also moves an anchor count, which is why
-# `vci3_fixture_anchor_count_2_hard_3_gap` reads 2/3.
+# `vci3_fixture_anchor_count_4_hard_1_gap` reads 4/1.
 - dataset: fifa_players
   column: Value
   expected_mechanism: code_vs_canonical
@@ -101,6 +120,21 @@
     than re-locked. Wage shares this seam and WAS re-locked.
   pending_escalation: true
 
+# CARVE-OUT RESOLVED, 2026-08-11 — the column stopped failing.
+#
+# The carve-out was written against the 2026-04-29 report, where REF_AREA is a
+# failing column attributed `misclassification | prediction-error`, exactly the
+# outcome its rationale describes. It is absent from the 2026-07-17 report,
+# whose oecd_employment row reads 7 failing columns against the earlier run's
+# 14 — the column is still in the corpus CSV (34 columns, REF_AREA fifth), so
+# it left the failing set rather than the dataset.
+#
+# From that point the flag suppressed nothing: `compare_to_fixture` walks the
+# report, and a carve-out over a column the report does not attribute is never
+# reached. `expect_no_attribution` is the claim that replaces it, and it is
+# stronger than the mechanism comparison the row would otherwise get: REF_AREA
+# coming back reddens whatever mechanism it comes back with, where an ordinary
+# expectation would only redden on a mechanism other than code_vs_canonical.
 - dataset: oecd_employment
   column: REF_AREA
   expected_mechanism: code_vs_canonical
@@ -108,41 +142,53 @@
     OECD GT sidecar names REF_AREA / Reference area as the load-bearing
     CvC seam — ISO-3 country codes ('NOR') vs full names ('Norway') in
     paired columns. Iter-2 expected GT geography.location.country_code (in
-    allowlist) against a canonical-text predicted side; iter-3 empirical
-    reality differs: the v0.6.19 model mispredicts to
+    allowlist) against a canonical-text predicted side; the 2026-04-29
+    report differed: the v0.6.19 model mispredicted to
     technology.internet.http_method (ALSO in CODE_TYPED_LABELS), so
-    cascade Rule 3's XOR=false and Rule 6 (misclassification) fires.
-    Anchor preserved as iter-2 truth, marked pending_escalation pending
-    model improvement to lift http_method out of REF_AREA's confusion set
-    (or value-shape signals plumbed into RejectRow per the broader
-    escalation path).
-  pending_escalation: true
+    cascade Rule 3's XOR=false and Rule 6 (misclassification) fired, and
+    the row was carved out. The 2026-07-17 report does not attribute the
+    column at all. Anchor preserved as iter-2 truth; the carve-out is
+    replaced by expect_no_attribution, which reddens if the column
+    returns to the failing set under any mechanism.
+  pending_escalation: false
+  expect_no_attribution: true
 
-# Known taxonomy-gap row — NOT a hard anchor.
-# GICS Sector is constructively un-attributable via label-only signals
-# under v0.6.19 taxonomy: GT is representation.discrete.categorical (no
-# GICS label exists), and English-text sector names like "Information
-# Technology" predict text/categorical, not codes — neither side enters
-# the code-typed allowlist. This row exists to keep the obligation
-# visible (taxonomy widening for GICS sector/industry types OR
-# value-shape signals plumbed into RejectRow), pending follow-up spec.
+# CARVE-OUT RESOLVED, 2026-08-11 — the column has never been a failing column.
+#
+# Read against both tracked reports, this carve-out never suppressed anything.
+# sp500_constituents fails 2 columns on 2026-04-29 (Founded, Symbol) and 0 on
+# 2026-07-17; GICS Sector is in neither list. The taxonomy gap the rationale
+# names is real and unchanged — no GICS label exists — but its consequence is
+# that GT `representation.discrete.categorical` and the predicted side agree,
+# so the column validates and the cascade is never asked to attribute it. The
+# obligation the row was written to keep visible is a taxonomy-widening one,
+# not an attribution one, and the fixture is not where it can be held.
+#
+# `expect_no_attribution` states what the reports show and reddens if the
+# column enters the failing set — the point at which a taxonomy widening or a
+# value-shape signal would change what the cascade sees.
 - dataset: sp500_constituents
   column: GICS Sector
   expected_mechanism: code_vs_canonical
   rationale: |
-    Pending taxonomy widening: GICS Sector has no FineType label
-    (v0.6.19 taxonomy gap). Label-only attribution cannot fire — both
-    sides land outside CODE_TYPED_LABELS. Follow-up spec: extend
-    taxonomy with GICS sector/industry types, OR plumb value-shape
-    signals into RejectRow.
-  pending_escalation: true
+    GICS Sector has no FineType label (v0.6.19 taxonomy gap), so
+    label-only attribution could not fire for it — both sides land
+    outside CODE_TYPED_LABELS. Neither the 2026-04-29 nor the 2026-07-17
+    report carries the column as failing, so the carve-out written for
+    that gap held nothing out of the comparison. Pinned instead as a
+    column that does not fail: taxonomy widening for GICS sector /
+    industry types, or value-shape signals plumbed into RejectRow, is
+    what would put it in front of the cascade.
+  pending_escalation: false
+  expect_no_attribution: true
 
 # ---------------------------------------------------------------------------
 # Phase 2 — 75 harness-derived rows from the iter-3 12-dataset run
 # (2026-04-29). Three failing columns already have Phase 1 anchor rows and
 # are NOT duplicated here: gdelt_events.SQLDATE (format_diversity),
 # fifa_players.Value (code_vs_canonical), oecd_employment.REF_AREA
-# (code_vs_canonical, pending_escalation:true). Total fixture rows after
+# (code_vs_canonical, carved out at the time and resolved since — read the
+# row rather than this line for its flags). Total fixture rows after
 # Phase 2 = 80 (5 Phase 1 + 75 Phase 2). Failing columns covered: 78.
 # Each row's `expected_mechanism` reflects the harness's actual output
 # (anti-regression lock per ac-05 framing — proves attribution stability
