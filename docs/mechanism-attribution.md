@@ -252,16 +252,39 @@ the cascade itself. File a card when:
   the diff in CI.
 - The `unknown` bucket has any rows. The cascade has a gap — file a
   card to extend the rule set with an explicit handler.
-- A row is currently marked `pending_escalation: true` in the
-  fixture. These are known taxonomy gaps (e.g. GICS Sector with no
-  FineType label). File a follow-up card to widen the taxonomy or
-  plumb value-shape signals.
+- A row is marked `pending_escalation: true` in the fixture. The
+  mechanism on that row is not compared, so the disagreement it
+  records is waiting on something upstream — a model improvement, a
+  taxonomy widening, value-shape signals into `RejectRow`. File a
+  follow-up card for the upstream fix.
 
 The fixture is the authoritative answer to "what does this failure
 mean?" When you fix the underlying issue, update the fixture in the
 same PR — the fixture row's `expected_mechanism` should change to
 the new (correct) mechanism, and the `rationale` should explain the
 fix.
+
+### What each flag claims about the report
+
+`pending_escalation` and `expect_no_attribution` are opposite claims
+about whether the report attributes a column, and `compare_to_fixture`
+holds a row to whichever it makes:
+
+| flag | claim | reddens when |
+|---|---|---|
+| `pending_escalation: true` | the report attributes this column, and the mechanism is not compared | the report attributes no such column — the carve-out is holding nothing out of the comparison |
+| `expect_no_attribution: true` | the column is not among the report's failing columns | the report attributes it, under any mechanism |
+| neither | the mechanism is compared whenever the report attributes the column | the mechanism differs |
+
+A carve-out over a column the report does not attribute is the shape
+worth knowing about: a regression in that column is absorbed into a
+green run. Resolve such a row against the current report — the
+mechanism the column now carries, or `expect_no_attribution` if it has
+left the failing set — rather than leaving the flag on.
+
+A row with neither flag and no report row is not that shape. It is
+dormant, and it still reddens if the column returns with a different
+mechanism.
 
 ---
 
