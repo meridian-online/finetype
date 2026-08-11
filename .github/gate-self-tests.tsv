@@ -1,0 +1,55 @@
+# Which gate self-test a diff has to re-run, and which it does not.
+#
+# Read by .github/scripts/gate-self-tests.py. Every gate in this repository ships
+# a self-test that mutates the gate, or the tree the gate reads, and requires the
+# gate to redden -- a gate that is only known to pass is not known to detect.
+# Those proofs used to run on every pull request, so a README typo paid for all
+# of them and a diff that rewrote a gate paid exactly the same, which is to say
+# the rule "a changed gate re-proves itself" was enforced by nobody.
+#
+# A row says: when one of these paths changes, run these commands. The workflow
+# guards each command with `needs.<routing job>.outputs.<id>`, and
+# `gate-self-tests.py audit` -- which runs on every diff, because it costs a
+# stdlib-python second -- reddens when a row, the tree and the workflow stop
+# agreeing. That audit is the load-bearing half. Each way this could rot is
+# SILENT in Actions: a guard that names a job the step does not depend on, or an
+# output the routing job never declared, evaluates to the empty string, skips its
+# step, and reports the job green.
+#
+# FORMAT: three TAB-separated columns. Blank lines and `#` lines are ignored.
+#
+#   1  id        [a-z][a-z0-9_]*, unique. It becomes an output of the routing job
+#                and is dereferenced as `needs.<job>.outputs.<id>`, where a
+#                hyphen would parse as subtraction.
+#   2  commands  comma-separated. Each must appear VERBATIM as one line of a
+#                `run:` in .github/workflows/ci.yml, in a step -- or a job --
+#                guarded by this row's id. Drift in either direction reddens the
+#                audit, so the manifest cannot describe a workflow that has
+#                moved on.
+#   3  paths     comma-separated, repo-relative, each an existing file. A diff
+#                touching any of them runs column 2.
+#
+# ALWAYS-ON, and deliberately so: this manifest, the router, and the workflow
+# itself. A change to any of the three re-runs every gate's self-test, because a
+# change to the routing cannot be trusted to route itself.
+#
+# THE BOUNDARY. A row belongs here when its command exists to prove a GATE can
+# fail. `.github/scripts/test-download-model.sh` and `scripts/test_score_clean_label.sh`
+# are tests of a tool rather than proofs of a gate, and `scripts/test_evidence.sh`
+# is the evidence suite itself; those keep running on every diff. What is routed
+# is the mutation harness that proves the suite detects.
+#
+# id	commands	paths
+public_hygiene	./scripts/check-public-hygiene-selftest.sh	scripts/check-public-hygiene.sh, scripts/check-public-hygiene-selftest.sh, scripts/public-hygiene-allowlist.txt, scripts/public-hygiene-innocent-strings.txt
+formula_asset	./scripts/check-formula-asset-selftest.sh, ./scripts/check-formula-asset-mutations.sh	scripts/check-formula-asset.sh, scripts/check-formula-asset-selftest.sh, scripts/check-formula-asset-mutations.sh
+ci_model_drift	.github/scripts/check-ci-model-drift.sh --self-test	.github/scripts/check-ci-model-drift.sh
+evidence	scripts/test_evidence_mutations.sh	scripts/evidence.py, scripts/test_evidence.sh, scripts/test_evidence_mutations.sh
+doc_taxonomy_counts	scripts/check_doc_taxonomy_counts.py --self-test	scripts/check_doc_taxonomy_counts.py
+comment_citations	scripts/check_comment_citations.py --self-test	scripts/check_comment_citations.py
+duckdb_catalog	scripts/check_duckdb_catalog.py --self-test	scripts/check_duckdb_catalog.py
+taxonomy_content	scripts/check_taxonomy_content.py --self-test	scripts/check_taxonomy_content.py
+sample_patterns	scripts/check_sample_patterns.py --self-test	scripts/check_sample_patterns.py
+sql_examples	scripts/check_sql_examples.py --self-test	scripts/check_sql_examples.py
+encoder_dtype	scripts/encoder_dtype.py self-test	scripts/encoder_dtype.py
+encoder_record_diff	scripts/encoder_dtype_record_diff.py self-test, scripts/encoder_dtype_record_diff_mutations.py	scripts/encoder_dtype_record_diff.py, scripts/encoder_dtype_record_diff_mutations.py
+gate_routing	.github/scripts/gate-self-tests.py --self-test	.github/scripts/gate-self-tests.py, .github/gate-self-tests.tsv

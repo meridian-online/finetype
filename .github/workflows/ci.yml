@@ -14,25 +14,98 @@ env:
   FINETYPE_CI_MODEL: m2v8m-s43
 
 jobs:
-  public-hygiene:
-    # Deliberately first, deliberately toolchain-free: it is `git grep` over
-    # tracked files and finishes in seconds, so a path into the private planning
-    # repo, or an absolute home directory, goes red long before the crate build
-    # has resolved a dependency.
+  gate-routing:
+    # Which gate self-tests this diff has to re-run, and which it does not.
     #
-    # This was the only one of the three public repositories with no such gate,
-    # and the most to sweep — 175 planning-tree paths across 99 tracked files.
-    name: Private paths in tracked files
+    # Every gate in this file ships a proof that it can fail, and each of those
+    # proofs used to run on every pull request — so the cheapest diff in the
+    # repository paid for the most expensive proof, and the rule that a CHANGED
+    # gate re-proves itself was held by a reviewer remembering it rather than by
+    # anything that checks. This job replaces the memory. It diffs against the
+    # base, reads `.github/gate-self-tests.tsv`, and publishes one boolean per
+    # gate; every self-test step below is guarded by its own boolean.
+    #
+    # The audit runs first and UNCONDITIONALLY, because every way this mechanism
+    # can rot is silent in Actions. An expression naming an output that does not
+    # exist, or a job the step does not depend on, is the empty string — so the
+    # step is skipped and the job is green, and a proof that did not run is
+    # indistinguishable from one that passed. The audit refuses such a tree
+    # rather than routing it.
+    #
+    # `outputs:` has to be written by hand; Actions has no other way to publish
+    # one. The audit requires an entry per manifest row, wired to this step's own
+    # output, so the hand-written half cannot drift from the manifest.
+    name: Gate self-test routing
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      any: ${{ steps.route.outputs.any }}
+      public_hygiene: ${{ steps.route.outputs.public_hygiene }}
+      formula_asset: ${{ steps.route.outputs.formula_asset }}
+      ci_model_drift: ${{ steps.route.outputs.ci_model_drift }}
+      evidence: ${{ steps.route.outputs.evidence }}
+      doc_taxonomy_counts: ${{ steps.route.outputs.doc_taxonomy_counts }}
+      comment_citations: ${{ steps.route.outputs.comment_citations }}
+      duckdb_catalog: ${{ steps.route.outputs.duckdb_catalog }}
+      taxonomy_content: ${{ steps.route.outputs.taxonomy_content }}
+      sample_patterns: ${{ steps.route.outputs.sample_patterns }}
+      sql_examples: ${{ steps.route.outputs.sql_examples }}
+      encoder_dtype: ${{ steps.route.outputs.encoder_dtype }}
+      encoder_record_diff: ${{ steps.route.outputs.encoder_record_diff }}
+      gate_routing: ${{ steps.route.outputs.gate_routing }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Every gate self-test is registered, guarded and reachable
+        run: .github/scripts/gate-self-tests.py audit
+      - name: Which gates this diff changed
+        id: route
+        # A pull request is measured against the commit it targets, a push to
+        # main against the tip it replaced. The shallow checkout above has
+        # neither, so the router fetches the base at depth 1 and compares the two
+        # trees. An empty, absent or unfetchable base routes EVERY gate and says
+        # so in the log: the direction that costs runner minutes rather than
+        # proof.
+        run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+
+  gate-routing-self-test:
+    # The router is a gate, so it is routed like one. Its own proof builds
+    # scratch repositories and requires each audit rule to redden against a tree
+    # that violates it — including the two silent-green shapes above, a guard
+    # naming a job that does not exist and an output nobody declared.
+    name: Gate routing self-test
+    needs: [gate-routing]
+    if: needs.gate-routing.outputs.gate_routing == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
-      # The gate's own regression test runs FIRST. A hygiene gate fails silently
-      # in both directions — it can stop matching, or start matching honest
-      # prose — so "the gate still works" has to be established before "the tree
-      # is clean" means anything. Both directions were live defects when this
-      # self-test was first run against the gate it tests.
+      - name: The routing detects a routing that would silently skip a proof
+        run: .github/scripts/gate-self-tests.py --self-test
+
+  public-hygiene:
+    # Toolchain-free: it is `git grep` over tracked files and finishes in
+    # seconds, so a path into the private planning repo, or an absolute home
+    # directory, goes red long before the crate build has resolved a dependency.
+    # The only thing ahead of it is the routing job, which is a checkout and a
+    # stdlib-python second.
+    #
+    # This was the only one of the three public repositories with no such gate,
+    # and the most to sweep — 175 planning-tree paths across 99 tracked files.
+    name: Private paths in tracked files
+    needs: [gate-routing]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      # The gate's own regression test runs FIRST when it runs at all. A hygiene
+      # gate fails silently in both directions — it can stop matching, or start
+      # matching honest prose — so "the gate still works" has to be established
+      # before "the tree is clean" means anything. Both directions were live
+      # defects when this self-test was first run against the gate it tests.
+      # Routed: only a diff that touches the gate, its allowlist or its fixture
+      # can have broken it.
       - name: hygiene gate self-test
+        if: needs.gate-routing.outputs.public_hygiene == 'true'
         run: ./scripts/check-public-hygiene-selftest.sh
       - name: private planning paths and absolute home paths
         run: ./scripts/check-public-hygiene.sh
@@ -51,7 +124,14 @@ jobs:
     # unresolvable url and a lost platform block each still turn it red, and
     # that a self-test saying so can still tell a broken check from a working
     # one.
+    #
+    # Every step here is a proof rather than a check, so the whole job is routed:
+    # a diff that leaves `scripts/check-formula-asset.sh` and its two harnesses
+    # alone does not run it. Nothing else in this file depends on it, and it is
+    # not a required check, so a skip is a skip rather than a block.
     name: Tap formula asset check
+    needs: [gate-routing]
+    if: needs.gate-routing.outputs.formula_asset == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -84,6 +164,7 @@ jobs:
 
   drift-check:
     name: CI model vs symlink drift
+    needs: [gate-routing]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -100,10 +181,12 @@ jobs:
         # cannot tell a refusal from a crash. The aligned trees, FINETYPE_CI_MODEL
         # unset among them, are asserted green in the same run, or the catches
         # are noise.
+        if: needs.gate-routing.outputs.ci_model_drift == 'true'
         run: .github/scripts/check-ci-model-drift.sh --self-test
 
   evidence:
     name: Fixture manifest + scorer failure propagation
+    needs: [gate-routing]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -124,6 +207,12 @@ jobs:
         # telling two of its rows apart, and each of the TWO independent report-drift
         # comparisons short-circuited. Each must redden a case aimed at it. Without
         # this the suite above is only known to pass, never known to detect.
+        #
+        # The longest-running proof in this file, and the clearest case for
+        # routing it: the two steps above are the gate and keep running on every
+        # diff; this one answers for a change to `scripts/evidence.py` or to
+        # either harness, and nothing else can invalidate it.
+        if: needs.gate-routing.outputs.evidence == 'true'
         run: scripts/test_evidence_mutations.sh
       - name: Scorer propagates failures and stamps every score with its fixture
         run: scripts/test_score_clean_label.sh
@@ -150,6 +239,7 @@ jobs:
         # remainder, a region heading that disagrees with its own list — each must
         # redden a NAMED case, and the unmutated tree must pass or every "caught"
         # above is noise.
+        if: needs.gate-routing.outputs.doc_taxonomy_counts == 'true'
         run: scripts/check_doc_taxonomy_counts.py --self-test
 
       - name: Comment citations resolve
@@ -183,10 +273,12 @@ jobs:
         # comment inside a quoted value. A file set widened without the matcher
         # widening with it reads more files, finds nothing in them, and reddens
         # here.
+        if: needs.gate-routing.outputs.comment_citations == 'true'
         run: scripts/check_comment_citations.py --self-test
 
   doc-surface:
     name: Documented DuckDB surface + SQL examples
+    needs: [gate-routing]
     runs-on: ubuntu-latest
     steps:
       # `submodules: recursive`, unlike every other job in this file, because
@@ -236,6 +328,7 @@ jobs:
         run: scripts/check_duckdb_catalog.py
 
       - name: ...and the catalog gate detects a wrong surface
+        if: needs.gate-routing.outputs.duckdb_catalog == 'true'
         run: scripts/check_duckdb_catalog.py --self-test
 
       - name: The taxonomy's published SQL and samples resolve
@@ -276,6 +369,7 @@ jobs:
         # spaces and stops at a shallower one, and
         # `labels/definitions_technology.yaml` carries comments at column 0 and
         # at two spaces.
+        if: needs.gate-routing.outputs.taxonomy_content == 'true'
         run: scripts/check_taxonomy_content.py --self-test
 
       - name: Every published sample satisfies its own leaf's pattern
@@ -312,6 +406,7 @@ jobs:
         # under a leaf with no pattern at all, which is outside the declared
         # scope. Without that second pair this gate could be refusing honest
         # values and nobody would find out until it refused one.
+        if: needs.gate-routing.outputs.sample_patterns == 'true'
         run: scripts/check_sample_patterns.py --self-test
 
       - name: Download model from HuggingFace
@@ -351,10 +446,16 @@ jobs:
         # a changed predicted label must leave it green. Without that second
         # pair this gate could be pinning model output and nobody would find out
         # until it flaked.
+        if: needs.gate-routing.outputs.sql_examples == 'true'
         run: scripts/check_sql_examples.py --self-test
 
   encoder-dtype:
+    # Every step here is a proof rather than a check, so the job is routed as a
+    # whole and each step is routed within it: a diff that changes
+    # `scripts/encoder_dtype.py` alone does not re-run the record-diff harness.
     name: Encoder half-precision packing
+    needs: [gate-routing]
+    if: needs.gate-routing.outputs.encoder_dtype == 'true' || needs.gate-routing.outputs.encoder_record_diff == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -378,6 +479,7 @@ jobs:
         # convert, a `--out` copy that loses the source's mode, an integer tensor
         # reinterpreted as floats, and a header written without its alignment padding.
         # Stdlib only.
+        if: needs.gate-routing.outputs.encoder_dtype == 'true'
         run: scripts/encoder_dtype.py self-test
 
       - name: The record diff compares the whole record, not just the label
@@ -388,6 +490,7 @@ jobs:
         # identity-keyed row matching (a positional zip silently compares
         # unrelated columns when an emit partially fails) and CSV parsing that
         # survives a format string containing a comma.
+        if: needs.gate-routing.outputs.encoder_record_diff == 'true'
         run: scripts/encoder_dtype_record_diff.py self-test
 
       - name: ...and eleven wrong implementations of it do not pass
@@ -398,6 +501,7 @@ jobs:
         # max-delta that records the last delta — and must be killed by a NAMED
         # case. Four of these passed when they were first written; the harness is
         # what caught that, and it exits non-zero if any mutation survives again.
+        if: needs.gate-routing.outputs.encoder_record_diff == 'true'
         run: scripts/encoder_dtype_record_diff_mutations.py
 
   fmt:
