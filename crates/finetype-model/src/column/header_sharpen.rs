@@ -87,6 +87,24 @@ pub(crate) fn header_corroborates_naics(header: &str) -> bool {
         .any(|tok| tok == "naics")
 }
 
+/// True if the header names a TITLE column — a classification/category label
+/// or a work's name (`title`, `naics.title`, `title_description`, `Title`) —
+/// as opposed to an untokenized "titled"/"subtitle" false friend. Token-aware
+/// on the exact `title` stem, which also matches the dataset-descriptor
+/// namespaced form (`naics.title` tokenizes to `naics` + `title` on the `.`
+/// delimiter). Every gold row whose header carries this token
+/// (`eval/gold/gold_corpus.tsv`: gittables `Title`, `seattle_checkouts.title`,
+/// `nyc_payroll.title_description`, `naics_codes.title`,
+/// `compound_codelist.title`) is curated `representation.text.plain_text` —
+/// none is `entity_name` — so the token is the corroboration for
+/// `entity_name_title_header_demotion`.
+pub(crate) fn header_corroborates_title(header: &str) -> bool {
+    header
+        .to_lowercase()
+        .split(|c: char| !c.is_alphabetic())
+        .any(|tok| tok == "title")
+}
+
 /// True if the header names an IMEI column (`imei`, `IMEI_number`, `device_imei`).
 /// Token-exact on the distinctive `imei` stem. A 15-digit American Express card
 /// column (`card_number`/`amex`/`cc`) is exactly-15-digit AND Luhn-valid BY
