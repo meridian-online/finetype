@@ -110,6 +110,11 @@ impl ColumnClassifier {
         self.geo_code_membership_vote(result, header, sample);
         self.geo_code_nonmembership_demotion(result, header, sample);
         self.geo_subdivision_membership_promote(result, header, sample);
+        // AFTER geo_subdivision_membership_promote (which claims the ≥90% pure
+        // hyphenated case unconditionally): this promote catches the sub-90%
+        // mixed legal-jurisdiction case, including the postal_code attractor none
+        // of the guards above are gated on.
+        self.geo_hyphenated_region_margin_promote(result, header, sample);
         // AFTER the geo-membership promotes (a real ISO subdivision has 0% org
         // suffix, so it is never in scope): demote an org-name column that the
         // model mistyped as a place (gleif `name`->region) to entity_name.
@@ -123,6 +128,11 @@ impl ColumnClassifier {
         // legit place→entity_name promote needs org_suffix_ratio >= 0.5, which
         // this veto's < 0.1 gate structurally excludes — ordering keeps that
         // promote's output out of this veto's scope by construction.
+        // BEFORE entity_name_vocab_veto: a title-headed entity_name overcall is
+        // header-gated (no value-shape check), so it must get first crack —
+        // vocab_veto's <=20-distinct/single-token gate would otherwise never see
+        // a high-cardinality multi-word title column anyway (no fight either way).
+        self.entity_name_title_header_demotion(result, header);
         self.entity_name_vocab_veto(result, sample);
         // AFTER geo_subdivision_membership_promote: keeps the geo-membership
         // promotes grouped. UN/LOCODE (`USLAX`) is hyphenless, so the ISO-3166-2
@@ -496,6 +506,48 @@ impl ColumnClassifier {
         result.label = LEAF.to_string();
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!("region_nonmembership_veto:{from}"));
+        result.detected_locale = None;
+    }
+
+    /// `entity_name_title_header_demotion` (default ON). Demotes a
+    /// `representation.text.entity_name` OVERCALL on a header-corroborated
+    /// TITLE column to `representation.text.plain_text` — the residual
+    /// `entity_name_vocab_veto` structurally cannot reach, since a title
+    /// column is neither single-token (`≤20 distinct` + no whitespace) nor
+    /// prose in the lowercase sense `entity_prose_override` (R33) requires: a
+    /// classification-label title (`Crop Production`, NAICS) or a work/role
+    /// title (`CHILD PROTECTIVE SPECIALIST`, NYC payroll; `Slim by Design:
+    /// Mindless Eating Solutions...`, Seattle library checkouts) is Title
+    /// Case or ALL-CAPS multi-word text with high distinct-value cardinality
+    /// — neither guard's gate admits it, so it ships confidently-wrong as a
+    /// named entity. Gold-priced: EVERY `title`-tokened header in
+    /// `eval/gold/gold_corpus.tsv` is curated `plain_text`
+    /// (`header_corroborates_title`'s doc comment lists the five rows) and
+    /// none is `entity_name`, so the header token alone is the
+    /// discriminator — no value-shape gate is layered on, matching
+    /// `naics_industry_recovery`'s naics-token gate. Motivating case
+    /// (dataset-descriptor audit): `naics.title` (a category TITLE like
+    /// `Crop Production`) types `entity_name` at 82.2% confidence with
+    /// nothing else in the Sharpen stack able to correct it; `plain_text` is
+    /// the honest residual — the taxonomy has no closed-membership-checkable
+    /// title-text leaf (unlike `identity.industry.naics`, the numeric code
+    /// sibling), so demoting off the false entity claim is the fast-path
+    /// fix rather than a label-space addition. Value-based (0048; the header
+    /// gate is itself the evidence, per the gold-priced note above),
+    /// demote-only, RHH-disableable.
+    fn entity_name_title_header_demotion(&self, result: &mut ColumnResult, header: &str) {
+        if rhh::is_disabled("entity_name_title_header_demotion") {
+            return;
+        }
+        if result.label != "representation.text.entity_name" {
+            return;
+        }
+        if !header_corroborates_title(header) {
+            return;
+        }
+        result.label = "representation.text.plain_text".to_string();
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("entity_name_title_header_demotion".to_string());
         result.detected_locale = None;
     }
 
@@ -2331,6 +2383,121 @@ impl ColumnClassifier {
         result.confidence = result.confidence.max(0.85);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!("geo_subdivision_membership_promote:{from}"));
+        result.detected_locale = None;
+    }
+
+    /// `geo_hyphenated_region_margin_promote` (default ON). The MIXED-format
+    /// promote `geo_subdivision_membership_promote` structurally cannot reach:
+    /// a legal-jurisdiction column carries BOTH bare ISO-3166-1 country codes
+    /// (`US`, `CN`) AND hyphenated ISO-3166-2 subdivision codes (`US-DE`,
+    /// `CA-QC`) in the SAME column — the real shape of a "jurisdiction of
+    /// incorporation" field, which is coarse (country) for most jurisdictions
+    /// and country+subdivision for federated ones — and the country tail
+    /// alone keeps it under the sibling promote's ≥90% purity bar.
+    ///
+    /// Motivating case (dataset-descriptor audit, `edgar_gleif.jurisdiction`):
+    /// a jurisdiction column dominated by US state-of-incorporation codes
+    /// (`US-DE`, `US-NY`, …) plus a minority of bare foreign country codes
+    /// (`CN`, `KY`, `BM`, …) — the shape an EDGAR-GLEIF crosswalk is expected
+    /// to have (most SEC filers are US-incorporated; foreign private issuers
+    /// carry a bare country) — is not just mistyped `state_code`/`country_code`,
+    /// it lands on `geography.address.postal_code` at 95% RAW MODEL confidence
+    /// (measured: a constructed 79-value US-DE/NY/CA/TX/NV/MD + CN/GB/IL/CA/KY/
+    /// BM/IE/JP/DE/FR/CH/NL/LU/AU column). Nothing in the existing Sharpen
+    /// stack reaches it: `postal_code`'s generic (non-locale) validator is
+    /// `minLength`/`maxLength` only — not `is_precise()` — and every
+    /// `validation_by_locale` postal pattern requires a digit, so a
+    /// letter-hyphen-letter jurisdiction code fails ALL of them and scores 0%
+    /// pass; with zero corroboration, `sharpen_attractor_demotion`'s Signal 1
+    /// (validation) and Signal 3 (cardinality, text-attractors only) do not
+    /// apply to postal_code, and Signal 2's `< 0.85` confidence gate does not
+    /// fire because the raw call is 0.95 — a confidently-wrong attractor with
+    /// no guard positioned to catch it.
+    ///
+    /// PROMOTE-ONLY, to `region` alone — this is deliberately NOT a vote back
+    /// toward `country_code`, unlike `geo_code_membership_vote`. An early
+    /// bidirectional version regressed
+    /// `geo_vote_keeps_canadian_provinces_as_state_not_country`: a genuine
+    /// Canadian-province column (`NL`,`SK`,`YT`,`QC`,`ON`) has region_cov 0
+    /// (bare codes, no hyphen) but country_cov 0.71 (`NL`/`SK`/`YT` are ALSO
+    /// valid ISO-3166-1 codes — Netherlands/Slovakia/Mayotte), so a
+    /// country-vs-region vote flips it to `country_code` — exactly the
+    /// bare-code collision `geo_code_membership_vote`'s UNIONED subdivision
+    /// enum already protects against for the `state_code` case. That
+    /// protection cannot be reused here without also reusing its target
+    /// (`state_code`), which a hyphenated value can never satisfy (its own
+    /// validator rejects `US-DE`; `validate-value -l
+    /// geography.location.state_code US-DE` FAILs) — so this guard confines
+    /// itself to the one direction the sibling guards cannot cover: promoting
+    /// a hyphenated-dominant mix to `region`, and leaves demoting toward
+    /// `country_code` to `geo_code_membership_vote`, which already does it
+    /// safely.
+    ///
+    /// Fires on the same starting-label family the sibling geo-membership
+    /// guards patrol (`country_code`/`state_code`/`region`, PLUS
+    /// `postal_code` — the attractor this exists to reach). Promotes to
+    /// `region` when hyphenated ISO-3166-2 membership
+    /// (`finetype_core::membership::iso_3166_2`, same set
+    /// `geo_subdivision_membership_promote` uses) clears the same WIN
+    /// (≥0.70) / MARGIN over bare-country coverage (≥0.20) bar
+    /// `geo_code_membership_vote` uses for its own country/state split — a
+    /// value can satisfy at most one of "exactly 2 uppercase letters" and
+    /// "hyphenated `CC-SSS`", so the two coverages never double-count the
+    /// same value. A genuinely ambiguous or non-geographic column (region
+    /// coverage below the bar — e.g. a real postal-code column, which is
+    /// ~100% digits and so scores ~0% hyphenated-alpha membership) abstains
+    /// rather than guesses. Value-based (0048), promote-only,
+    /// RHH-disableable. Reads existing taxonomy + membership data — no new
+    /// set files, no taxonomy leaf.
+    fn geo_hyphenated_region_margin_promote(
+        &self,
+        result: &mut ColumnResult,
+        _header: &str,
+        sample: &[String],
+    ) {
+        if rhh::is_disabled("geo_hyphenated_region_margin_promote") {
+            return;
+        }
+        const COUNTRY: &str = "geography.location.country_code";
+        const STATE: &str = "geography.location.state_code";
+        const REGION: &str = "geography.location.region";
+        const POSTAL: &str = "geography.address.postal_code";
+        if result.label == REGION || !matches!(result.label.as_str(), COUNTRY | STATE | POSTAL) {
+            return;
+        }
+        let Some(taxonomy) = self.taxonomy.as_ref() else {
+            return;
+        };
+        let Some(country_v) = taxonomy.get_validator(COUNTRY) else {
+            return;
+        };
+        let non_empty: Vec<String> = sample
+            .iter()
+            .map(|v| v.trim().to_uppercase())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let n = non_empty.len() as f64;
+        let country_cov = non_empty.iter().filter(|v| country_v.is_valid(v)).count() as f64 / n;
+        let region_cov = non_empty
+            .iter()
+            .filter(|v| finetype_core::membership::iso_3166_2(v))
+            .count() as f64
+            / n;
+        const WIN: f64 = 0.70;
+        const MARGIN: f64 = 0.20;
+        if !(region_cov >= WIN && region_cov >= country_cov + MARGIN) {
+            // No clear hyphenated-region dominance — leave the model's/sibling
+            // guards' call rather than guess (mirrors geo_code_membership_vote).
+            return;
+        }
+        let from = result.label.clone();
+        result.label = REGION.to_string();
+        result.confidence = result.confidence.max(0.85);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("geo_hyphenated_region_margin_promote:{from}"));
         result.detected_locale = None;
     }
 

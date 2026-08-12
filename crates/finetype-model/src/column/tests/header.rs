@@ -522,3 +522,139 @@ fn ac05_alpha2_regex_rejects_lowercase() {
         );
     }
 }
+
+// ── header_corroborates_title + entity_name_title_header_demotion
+//    (dataset-descriptor audit: naics.title, nyc_payroll.title_description,
+//    compound_codelist.title, gittables `Title` — all gold plain_text,
+//    none entity_name) ──
+
+#[test]
+fn title_header_corroboration() {
+    for h in [
+        "title",
+        "Title",
+        "naics.title",
+        "title_description",
+        "primary_title",
+    ] {
+        assert!(header_corroborates_title(h), "should corroborate: {h}");
+    }
+    // false friends — `title` must match as a whole TOKEN, not a substring.
+    for h in ["subtitle", "titled", "entitled", "name", "description"] {
+        assert!(!header_corroborates_title(h), "should NOT corroborate: {h}");
+    }
+}
+
+#[test]
+fn entity_name_title_demotion_is_default_on() {
+    assert!(!rhh::is_disabled("entity_name_title_header_demotion"));
+}
+
+#[test]
+fn entity_name_title_demotion_fixes_naics_title_column() {
+    // The card's motivating case: naics_codes.csv `title` — category labels
+    // ("Crop Production", "Offices of Lawyers"), currently entity_name.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let titles: Vec<String> = vec![
+        "Soybean Farming",
+        "Commercial and Institutional Building Construction",
+        "Offices of Lawyers",
+        "Custom Computer Programming Services",
+        "General Automotive Repair",
+        "Beauty Salons",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("title", &titles, "representation.text.entity_name", 0.822)
+        .unwrap();
+    assert_eq!(
+        r.label, "representation.text.plain_text",
+        "rule was {:?}",
+        r.disambiguation_rule
+    );
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("entity_name_title_header_demotion")
+    );
+}
+
+#[test]
+fn entity_name_title_demotion_fires_on_namespaced_header() {
+    // The dataset-descriptor catalog names the column `naics.title` (a
+    // `<dataset>.<column>` namespace), which must corroborate identically to
+    // the bare `title` header the raw CSV carries.
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let titles: Vec<String> = vec![
+        "Soybean Farming",
+        "Offices of Lawyers",
+        "Beauty Salons",
+        "Retail Bakeries",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense(
+            "naics.title",
+            &titles,
+            "representation.text.entity_name",
+            0.8,
+        )
+        .unwrap();
+    assert_eq!(r.label, "representation.text.plain_text");
+}
+
+#[test]
+fn entity_name_title_demotion_requires_the_title_token() {
+    // Same values, a header that does NOT carry the `title` token — must
+    // NOT demote (the header gate is load-bearing; no value-shape check
+    // backs this rule, per the guard's own doc comment).
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let titles: Vec<String> = vec![
+        "Soybean Farming",
+        "Offices of Lawyers",
+        "Beauty Salons",
+        "Retail Bakeries",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense(
+            "company_name",
+            &titles,
+            "representation.text.entity_name",
+            0.8,
+        )
+        .unwrap();
+    assert_ne!(
+        r.label, "representation.text.plain_text",
+        "a non-title header must not trigger the demotion"
+    );
+}
+
+#[test]
+fn entity_name_title_demotion_does_not_touch_other_labels() {
+    // A `title`-headed column the model already typed correctly (e.g. a real
+    // word/enum column) must be left alone — the guard only ever touches an
+    // entity_name overcall.
+    let values: Vec<String> = vec!["Mr", "Mrs", "Dr", "Ms", "Mr", "Dr"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let r = cc
+        .compose_from_sense("title", &values, "representation.text.word", 0.9)
+        .unwrap();
+    assert_eq!(r.label, "representation.text.word");
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("entity_name_title_header_demotion")
+    );
+}

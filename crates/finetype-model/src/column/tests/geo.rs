@@ -349,6 +349,106 @@ fn geo_vote_keeps_canadian_provinces_as_state_not_country() {
     );
 }
 
+// === geo_hyphenated_region_margin_promote (dataset-descriptor audit:
+//     edgar_gleif.jurisdiction lands on postal_code, not state_code/
+//     country_code — a mixed bare-country + hyphenated-ISO-3166-2 column) ===
+
+#[test]
+fn geo_hyphenated_region_promote_is_default_on() {
+    assert!(!rhh::is_disabled("geo_hyphenated_region_margin_promote"));
+}
+
+#[test]
+fn geo_hyphenated_region_promote_fixes_the_postal_code_attractor() {
+    // A jurisdiction-of-incorporation column dominated by hyphenated US
+    // state codes plus a minority of bare foreign country codes: real ISO
+    // codes throughout, 80% hyphenated (below the sibling ≥90% pure-promote
+    // bar, so this is what exercises THIS guard specifically). Motivating
+    // case: this shape (mostly US-state, minority bare-country) is what an
+    // EDGAR-GLEIF crosswalk is expected to have, and it measures raw-model
+    // postal_code at 95% confidence with nothing else in the stack able to
+    // correct it (see the guard's own doc comment).
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = [
+        "US-DE", "US-DE", "US-DE", "US-NY", "US-CA", "US-TX", "US-NV", "US-MD", "GB", "IT",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("jurisdiction", &vals, "geography.address.postal_code", 0.95)
+        .unwrap();
+    assert_eq!(
+        r.label, "geography.location.region",
+        "rule was {:?}",
+        r.disambiguation_rule
+    );
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_hyphenated_region_margin_promote:geography.address.postal_code")
+    );
+}
+
+#[test]
+fn geo_hyphenated_region_promote_requires_dominance() {
+    // A 50/50 hyphenated/bare split clears neither the WIN bar nor a
+    // dominance margin — the postal_code call (wrong as it may be) stands
+    // rather than a coin-flip promotion.
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = [
+        "US-DE", "US-NY", "US-CA", "US-TX", "US-NV", "GB", "IT", "ES", "SE", "FR",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let r = cc
+        .compose_from_sense("jurisdiction", &vals, "geography.address.postal_code", 0.95)
+        .unwrap();
+    assert_ne!(r.label, "geography.location.region");
+}
+
+#[test]
+fn geo_hyphenated_region_promote_does_not_regress_bare_canadian_provinces() {
+    // The exact scenario an earlier (bidirectional) version of this guard
+    // regressed: bare Canadian province codes collide with country codes
+    // (NL/SK/YT = Netherlands/Slovakia/Mayotte), scoring country_cov ~0.71 —
+    // but region_cov (hyphenated ISO-3166-2 membership) is 0 for bare codes,
+    // so this guard must NOT treat that as region-dominant.
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["NL", "NL", "NL", "SK", "YT", "QC", "ON"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("state", &vals, "geography.location.state_code", 0.90)
+        .unwrap();
+    assert_ne!(r.label, "geography.location.region");
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("geo_hyphenated_region_margin_promote:geography.location.state_code")
+    );
+}
+
+#[test]
+fn geo_hyphenated_region_promote_leaves_region_alone() {
+    // Already the target label — nothing to promote (mirrors
+    // geo_subdivision_membership_promote's own already-region no-op).
+    let cc = geo_vote_classifier();
+    let vals: Vec<String> = ["US-DE", "US-NY", "US-CA", "US-TX"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("jurisdiction", &vals, "geography.location.region", 0.9)
+        .unwrap();
+    assert_eq!(r.label, "geography.location.region");
+    assert!(r
+        .disambiguation_rule
+        .as_deref()
+        .map(|rule| !rule.starts_with("geo_hyphenated_region_margin_promote"))
+        .unwrap_or(true));
+}
+
 // === geo_code_nonmembership_demotion (external-band guard batch, guard 1) ===
 
 #[test]
