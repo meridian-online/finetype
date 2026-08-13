@@ -5,7 +5,65 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.57] - 2026-08-13
+
+### Changed
+
+- **A published field's `constraints.pattern` is fitted to the column, not copied
+  from the taxonomy leaf.** The pattern on a Data Package field was taken verbatim
+  from the definition of whatever label the column was given, and that pattern
+  describes the type in the abstract. A correctly-typed column carrying legitimate
+  variants the canonical pattern rejects therefore shipped a descriptor that fails
+  its own data, so a consumer running `frictionless validate` against a descriptor
+  we published saw failures on rows that are correct. Two shapes in shipped data
+  show it: a country-code column, correctly typed, mixing ISO 3166-1 alpha-2 with
+  ISO 3166-2 subdivision codes, where `^[A-Z]{2}$` rejects every `US-DE` / `CA-ON`
+  row; and a four-character legal-form code column whose canonical pattern demands
+  at least one letter *and* at least one digit, where all-digit and all-letter
+  codes are both legal under the standard and both fail it. The emitted constraint
+  now describes the values observed. (#111)
+
+- **Two Sharpen guards, both default ON, correct labels that had reached a
+  published descriptor.** Neither adds a taxonomy leaf, a membership set or a
+  retrain — the shipped model is unchanged.
+
+  `entity_name_title_header_demotion` reads a `title`-tokened header. A
+  classification label or a work/role title is neither single-token enough for
+  `entity_name_vocab_veto` nor lowercase prose enough for `entity_prose_override`,
+  so it shipped confidently as a named entity. The header token is the
+  discriminator, matching `naics_industry_recovery`'s own naics-token gate.
+
+  `geo_hyphenated_region_margin_promote` reads a legal-jurisdiction column mixing
+  bare ISO 3166-1 country codes with hyphenated ISO 3166-2 subdivision codes.
+  `geo_subdivision_membership_promote`'s purity bar fails on the country tail, and
+  `geo_code_membership_vote`'s subdivision side reads the bare `state_code` locale
+  enum, which a hyphenated `US-DE` never matches — so nothing reached the shape.
+  The guard **promotes to `region` only**; demotion toward `country_code` is left
+  to `geo_code_membership_vote`, which already does it safely, because a
+  bidirectional version regressed bare Canadian province codes that collide with
+  country codes. (#117)
+
+- **The published samples and SQL expressions are gated against the tree they
+  describe.** `samples:` is a publication surface — it reaches the type registry,
+  the MCP resources and `finetype taxonomy` — and nothing had looked at it:
+  `finetype check` validates the values the *generator* produces, not the values in
+  `labels/`. A sample that failed its own leaf's `validation.pattern` left CI
+  green. Two gates now close it. `validate-samples` applies each leaf's own
+  compiled validator to its own samples through the product's code rather than a
+  second implementation of it; and every published SQL expression is resolved
+  against a hermetic DuckDB catalog with this tree's build loaded, with an
+  allowlist of six SQL keywords each carrying its reason. The corrections that
+  found reach the shipped taxonomy: cast targets and call heads DuckDB does not
+  have, and check-digit samples that fail the shipped Rust implementation. (#102,
+  #104)
+
+- **`representation.identifier.numeric_code` no longer offers a NAICS-shaped
+  sample.** `5112` matched `identity.industry.naics`'s validation pattern through
+  its sector prefix while the same leaf's description defers industry
+  classification codes to that other leaf. Replaced rather than deleted, so the
+  list keeps its length: `06` is the FIPS state code whose state+county extension
+  already sits below it, and its leading zero demonstrates why the leaf is a string
+  rather than an integer. (#103)
 
 ### Removed
 
@@ -43,6 +101,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   registers only under the non-default `spike` cargo feature. The evidence it
   exists for is a compile, and the `doc-surface` CI job still pays for it:
   `cargo check -p finetype_duckdb --features spike`.
+
+### Fixed
+
+- **The taxonomy reader refuses a line its own top-level patterns miss.**
+  `LEAF_RE` and `PROP_RE` decide between them whether anything under a key is read
+  at all, and a line either one missed was dropped: `_read_file` took the `PROP_RE`
+  match and continued when there was none. A published key spelled a way the regex
+  does not recognise therefore left the gate at exit 0 on content it never read —
+  the fail-open direction, in the guard whose subject is the public type registry.
+  Both are refusals now, raising through the same path the value-shape refusals
+  used and naming the file and the line. (#106)
+
+- **A private planning repo is no longer named from this public tree.**
+  `CLAUDE.md`'s pillars preamble and the release skill's eval-baseline step each
+  disclosed its existence, name and role. The pointer is dropped rather than
+  redirected — there is no published page to cite in its place, and the four
+  pillars are stated in full immediately beneath the sentence that pointed away
+  from them. The release step keeps its instruction and loses the parenthetical,
+  which was history rather than an instruction. (#107)
+
+- **The release job proves the four assets the tap formula publishes before pushing
+  it.** `update-homebrew` wrote four urls and four sha256 values into
+  `Formula/finetype.rb` and pushed, having fetched only the `.sha256` sidecar beside
+  each asset and never the asset — so the checksums were honest about the files the
+  packaging produced and said nothing about whether the urls the heredoc composed
+  resolved to them. Nothing downstream looked either; the tap has no pull-request
+  CI. Three of the four platforms are built for an architecture the packaging
+  runner is not, so a wrong url, or a checksum written beside the wrong one,
+  produced a green release and surfaced on a stranger's machine at `brew install`.
+  `scripts/check-formula-asset.sh` parses the formula and fetches what it names.
+  (#108)
+
+- **The tracked harness report carries a verdict of its own, and a dormant fixture
+  row cannot hide behind a carve-out.** Routing both vci3 fixture tests through one
+  panicking entry point closed the report-missing hatch at the line it was on but
+  not the act: restoring the skip at both call sites, bypassing the entry point
+  rather than editing inside it, left the suite green with the report gone (#109).
+  Separately, `compare_to_fixture` walks the report, so a carve-out over a column
+  the report does not attribute was never reached — the flag suppressed nothing,
+  and a regression in that column would have been absorbed into a green run. A
+  second sweep now runs over the fixture, with `expect_no_attribution` as its dual
+  flag, so a column that leaves a dataset's failing set is locked in rather than
+  merely tolerated. (#116)
+
+- **Each gate's self-test is routed to the diffs that change that gate.** The
+  self-tests in this repository ran on every pull request, so a README typo paid
+  for the whole set and a diff that rewrote a gate paid the same — and the rule
+  that a changed gate re-proves itself was held by a reviewer remembering it.
+  `.github/gate-self-tests.tsv` names the commands that prove each gate and the
+  paths that invalidate the proof; `.github/scripts/gate-self-tests.py` publishes
+  one boolean per row and each self-test step is guarded by its own. An
+  unconditional audit refuses a tree where the wiring has rotted — a guard naming
+  an undeclared output, an unneeded job or a mistyped job name each skip silently
+  and green, which is the failure this change exists to close. Every uncertainty
+  routes *more* work: no base commit, an unfetchable base, a diff that will not run,
+  or a change to the manifest, the router or the workflow selects the whole set and
+  says so. (#112)
+
+- **The comment reader's quote-parity rule is pinned in both directions.** The
+  quote half of `comment_body` could be deleted outright and `--self-test` stayed
+  green: the case whose label names that behaviour planted its apostrophe inside a
+  balanced pair of double quotes, so the parity filter never decided anything about
+  it. The shipped behaviour was correct on every input the fixtures construct; what
+  was missing was a fixture that could tell. (#105)
 
 ## [0.6.56] - 2026-08-04
 
