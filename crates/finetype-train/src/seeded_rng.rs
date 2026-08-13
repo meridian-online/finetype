@@ -242,7 +242,7 @@ mod tests {
         assert_eq!(a, b, "same seed must give the same mask");
         assert_ne!(a, c, "a different seed must give a different mask");
         // Not a constant mask: some elements dropped, some kept and scaled.
-        assert!(a.iter().any(|v| *v == 0.0), "no element was dropped");
+        assert!(a.contains(&0.0), "no element was dropped");
         assert!(a.iter().any(|v| *v != 0.0), "every element was dropped");
     }
 
@@ -257,7 +257,7 @@ mod tests {
             .unwrap()
             .to_vec1()
             .unwrap();
-        assert!(out.iter().any(|v| *v == 0.0), "no element was dropped");
+        assert!(out.contains(&0.0), "no element was dropped");
         assert!(out.iter().any(|v| *v != 0.0), "every element was dropped");
     }
 
