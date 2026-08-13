@@ -273,14 +273,14 @@ impl BranchWeights {
         let h = self.linear1.forward_t(&x, false)?;
         let h = self.activate(&h)?;
         let h = if train {
-            candle_nn::ops::dropout(&h, self.dropout)?
+            crate::seeded_rng::dropout(&h, self.dropout)?
         } else {
             h
         };
         let h = self.linear2.forward_t(&h, false)?;
         let h = self.activate(&h)?;
         if train {
-            candle_nn::ops::dropout(&h, self.dropout)
+            crate::seeded_rng::dropout(&h, self.dropout)
         } else {
             Ok(h)
         }
@@ -646,14 +646,14 @@ impl MultiBranchModel {
         let h = self.merge_linear1.forward_t(&normed, false)?;
         let h = activate(&h)?;
         let h = if train {
-            candle_nn::ops::dropout(&h, self.config.dropout)?
+            crate::seeded_rng::dropout(&h, self.config.dropout)?
         } else {
             h
         };
         let h = self.merge_linear2.forward_t(&h, false)?;
         let h = activate(&h)?;
         if train {
-            candle_nn::ops::dropout(&h, self.config.dropout)
+            crate::seeded_rng::dropout(&h, self.config.dropout)
         } else {
             Ok(h)
         }
@@ -2605,6 +2605,10 @@ pub fn train_multi_branch(
 
     let (device, device_name) = crate::get_device();
     eprintln!("Using {device_name} device");
+    // Parameter init and dropout masks are candle device draws, not draws from
+    // `rng`; on CPU they are unreachable from a seed unless routed through this
+    // guard. It stays alive for the whole function.
+    let _seed_guard = crate::seeded_rng::seed_thread(config.seed);
     let mut rng = StdRng::seed_from_u64(config.seed);
 
     // Load frozen sibling-context on the SAME device as the training model.
@@ -2647,7 +2651,7 @@ pub fn train_multi_branch(
 
     // Create model
     let varmap = VarMap::new();
-    let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+    let vb = crate::seeded_rng::seeded_var_builder(&varmap, DType::F32, &device);
     let model = if is_hierarchical {
         let labels = labels
             .ok_or_else(|| anyhow::anyhow!("Hierarchical head requires sorted labels list"))?;
@@ -4080,17 +4084,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_hierarchical_training_loop_small() {
+    /// The synthetic fixture the hierarchical training tests share: 30 records
+    /// over 10 classes, each branch carrying a class-dependent value, split 20
+    /// train / 10 held out.
+    fn hier_training_fixture() -> (Vec<String>, MultiBranchDataset, MultiBranchDataset) {
         let labels = make_hier_labels();
         let n_classes = labels.len();
-        let config = MultiBranchConfig {
-            n_classes,
-            head_type: HeadType::Hierarchical,
-            ..Default::default()
-        };
 
-        // Create synthetic data with class-dependent features
         let mut records = Vec::new();
         for i in 0..30 {
             let class_idx = i % n_classes;
@@ -4150,18 +4150,55 @@ mod tests {
             MultiBranchDataset::from_records(&records[20..], &label_to_idx, 960, 512, 27, 128)
                 .unwrap();
 
-        let tmp_dir = tempfile::tempdir().unwrap();
-        let train_config = MultiBranchTrainConfig {
-            output_dir: tmp_dir.path().to_path_buf(),
-            epochs: 5,
+        (labels, train_data, val_data)
+    }
+
+    fn hier_train_config(
+        output_dir: &std::path::Path,
+        epochs: usize,
+        lr: f64,
+        min_lr: f64,
+    ) -> MultiBranchTrainConfig {
+        MultiBranchTrainConfig {
+            output_dir: output_dir.to_path_buf(),
+            epochs,
             batch_size: 10,
-            lr: 1e-3,
+            lr,
             weight_decay: 1e-4,
             patience: 10,
             seed: 42,
-            min_lr: 1e-6,
+            min_lr,
             logit_adjust_tau: 0.0,
+        }
+    }
+
+    /// The held-out loss a run has to reach, as a fraction of its own first
+    /// epoch, for training to count as having worked.
+    ///
+    /// Held out and not training loss: `train_loss` is the mean over an epoch's
+    /// two batches **with dropout applied**, so it measures the masks as much as
+    /// the model, while `val_loss` is an eval-mode pass with dropout off.
+    ///
+    /// A margin and not `last < first`, because `last < first` is satisfied by a
+    /// run whose optimizer never moves a weight — BatchNorm's running statistics
+    /// keep updating at a zero learning rate and the eval-mode loss falls with
+    /// them. `test_hierarchical_training_criterion_needs_a_working_optimizer`
+    /// pins both halves of that: it fails if such a run stops beating
+    /// `last < first`, and it fails if this ceiling is raised to where such a run
+    /// would pass.
+    const HIER_VAL_LOSS_CEILING: f32 = 0.6;
+
+    #[test]
+    fn test_hierarchical_training_loop_small() {
+        let (labels, train_data, val_data) = hier_training_fixture();
+        let config = MultiBranchConfig {
+            n_classes: labels.len(),
+            head_type: HeadType::Hierarchical,
+            ..Default::default()
         };
+
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let train_config = hier_train_config(tmp_dir.path(), 5, 1e-3, 1e-6);
 
         let summary = train_multi_branch(
             &train_config,
@@ -4176,19 +4213,119 @@ mod tests {
 
         assert_eq!(summary.total_epochs, 5);
 
-        // Loss should decrease
-        let loss_0 = summary.epoch_metrics[0].train_loss;
-        let loss_4 = summary.epoch_metrics[4].train_loss;
+        let val_first = summary.epoch_metrics[0].val_loss;
+        let val_last = summary.epoch_metrics[4].val_loss;
         assert!(
-            loss_4 < loss_0,
-            "Hierarchical training loss should decrease: epoch 0 = {}, epoch 4 = {}",
-            loss_0,
-            loss_4,
+            val_last <= HIER_VAL_LOSS_CEILING * val_first,
+            "five epochs should cut held-out loss to at most {}x its first epoch: \
+             epoch 0 = {val_first}, epoch 4 = {val_last} (ratio {:.4}); \
+             val losses {:?}",
+            HIER_VAL_LOSS_CEILING,
+            val_last / val_first,
+            summary
+                .epoch_metrics
+                .iter()
+                .map(|m| m.val_loss)
+                .collect::<Vec<_>>(),
         );
 
         // Model artifacts should exist
         assert!(tmp_dir.path().join("model.safetensors").exists());
         assert!(tmp_dir.path().join("config.json").exists());
+    }
+
+    /// Two runs of the same seed on the same machine produce the same numbers.
+    ///
+    /// Before `seeded_rng`, `MultiBranchTrainConfig::seed` reached
+    /// `shuffled_batches` and nothing else: parameter init and dropout masks are
+    /// candle device draws, which on CPU come from a generator seeded by the OS.
+    #[test]
+    fn test_hierarchical_training_is_reproducible_at_one_seed() {
+        let (labels, train_data, val_data) = hier_training_fixture();
+        let config = MultiBranchConfig {
+            n_classes: labels.len(),
+            head_type: HeadType::Hierarchical,
+            ..Default::default()
+        };
+
+        let run = || {
+            let tmp_dir = tempfile::tempdir().unwrap();
+            let train_config = hier_train_config(tmp_dir.path(), 2, 1e-3, 1e-6);
+            let summary = train_multi_branch(
+                &train_config,
+                &config,
+                &train_data,
+                &val_data,
+                Some(&labels),
+                None,
+                None,
+            )
+            .unwrap();
+            summary
+                .epoch_metrics
+                .iter()
+                .map(|m| (m.train_loss, m.val_loss, m.val_accuracy))
+                .collect::<Vec<_>>()
+        };
+
+        let first = run();
+        let second = run();
+        assert_eq!(
+            first, second,
+            "same seed, same machine, different numbers: {first:?} then {second:?}"
+        );
+        // A run that learned nothing would also be reproducible, so pin that the
+        // comparison had something in it to disagree about.
+        assert!(
+            first.iter().any(|(train, _, _)| *train > 0.0),
+            "no train loss was recorded: {first:?}"
+        );
+    }
+
+    /// The ceiling in `test_hierarchical_training_loop_small` rejects a run whose
+    /// optimizer never moves a weight — and `last < first` does not.
+    ///
+    /// `lr` and `min_lr` are both zero, so `CosineScheduler` returns zero for
+    /// every epoch and no weight is updated. Held-out loss falls anyway, because
+    /// BatchNorm's running statistics keep tracking the batches, which is why the
+    /// criterion this guards is a margin and not a comparison.
+    #[test]
+    fn test_hierarchical_training_criterion_needs_a_working_optimizer() {
+        let (labels, train_data, val_data) = hier_training_fixture();
+        let config = MultiBranchConfig {
+            n_classes: labels.len(),
+            head_type: HeadType::Hierarchical,
+            ..Default::default()
+        };
+
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let train_config = hier_train_config(tmp_dir.path(), 2, 0.0, 0.0);
+
+        let summary = train_multi_branch(
+            &train_config,
+            &config,
+            &train_data,
+            &val_data,
+            Some(&labels),
+            None,
+            None,
+        )
+        .unwrap();
+
+        let val_first = summary.epoch_metrics[0].val_loss;
+        let val_last = summary.epoch_metrics.last().unwrap().val_loss;
+        assert!(
+            val_last > HIER_VAL_LOSS_CEILING * val_first,
+            "a zero learning rate cut held-out loss from {val_first} to {val_last}, \
+             which the {}x ceiling would accept — the ceiling is not measuring training",
+            HIER_VAL_LOSS_CEILING,
+        );
+        assert!(
+            val_last < val_first,
+            "held-out loss did not fall on a frozen model ({val_first} then {val_last}), \
+             so `last < first` would have been evidence of training after all and the \
+             margin above is answering a question nobody is asking",
+        );
     }
 
     // ── FTMB v3 tests ──────────────────────────────────────────────
