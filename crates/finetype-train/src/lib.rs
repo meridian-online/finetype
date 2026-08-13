@@ -11,6 +11,7 @@ pub mod device;
 pub mod entity;
 pub mod model2vec_prep;
 pub mod multi_branch;
+pub mod seeded_rng;
 pub mod sense;
 pub mod sense_train;
 pub mod sibling_context;

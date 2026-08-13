@@ -273,14 +273,14 @@ impl BranchWeights {
         let h = self.linear1.forward_t(&x, false)?;
         let h = self.activate(&h)?;
         let h = if train {
-            candle_nn::ops::dropout(&h, self.dropout)?
+            crate::seeded_rng::dropout(&h, self.dropout)?
         } else {
             h
         };
         let h = self.linear2.forward_t(&h, false)?;
         let h = self.activate(&h)?;
         if train {
-            candle_nn::ops::dropout(&h, self.dropout)
+            crate::seeded_rng::dropout(&h, self.dropout)
         } else {
             Ok(h)
         }
@@ -646,14 +646,14 @@ impl MultiBranchModel {
         let h = self.merge_linear1.forward_t(&normed, false)?;
         let h = activate(&h)?;
         let h = if train {
-            candle_nn::ops::dropout(&h, self.config.dropout)?
+            crate::seeded_rng::dropout(&h, self.config.dropout)?
         } else {
             h
         };
         let h = self.merge_linear2.forward_t(&h, false)?;
         let h = activate(&h)?;
         if train {
-            candle_nn::ops::dropout(&h, self.config.dropout)
+            crate::seeded_rng::dropout(&h, self.config.dropout)
         } else {
             Ok(h)
         }
@@ -2605,6 +2605,10 @@ pub fn train_multi_branch(
 
     let (device, device_name) = crate::get_device();
     eprintln!("Using {device_name} device");
+    // Parameter init and dropout masks are candle device draws, not draws from
+    // `rng`; on CPU they are unreachable from a seed unless routed through this
+    // guard. It stays alive for the whole function.
+    let _seed_guard = crate::seeded_rng::seed_thread(config.seed);
     let mut rng = StdRng::seed_from_u64(config.seed);
 
     // Load frozen sibling-context on the SAME device as the training model.
@@ -2647,7 +2651,7 @@ pub fn train_multi_branch(
 
     // Create model
     let varmap = VarMap::new();
-    let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+    let vb = crate::seeded_rng::seeded_var_builder(&varmap, DType::F32, &device);
     let model = if is_hierarchical {
         let labels = labels
             .ok_or_else(|| anyhow::anyhow!("Hierarchical head requires sorted labels list"))?;
