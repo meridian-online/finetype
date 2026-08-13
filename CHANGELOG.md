@@ -127,11 +127,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   each asset and never the asset — so the checksums were honest about the files the
   packaging produced and said nothing about whether the urls the heredoc composed
   resolved to them. Nothing downstream looked either; the tap has no pull-request
-  CI. Three of the four platforms are built for an architecture the packaging
-  runner is not, so a wrong url, or a checksum written beside the wrong one,
-  produced a green release and surfaced on a stranger's machine at `brew install`.
-  `scripts/check-formula-asset.sh` parses the formula and fetches what it names.
-  (#108)
+  CI. Two of the four are built on a runner of another architecture — per the
+  matrix in `.github/workflows/release.yml`, `aarch64-unknown-linux-gnu` is
+  cross-compiled on `ubuntu-latest` and `x86_64-apple-darwin` is built on
+  `macos-latest`, which is arm64 — so a wrong url, or a checksum written beside
+  the wrong one, produced a green release and surfaced on a stranger's machine at
+  `brew install`. `scripts/check-formula-asset.sh` parses the formula and fetches
+  what it names. (#108)
 
 - **The tracked harness report carries a verdict of its own, and a dormant fixture
   row cannot hide behind a carve-out.** Routing both vci3 fixture tests through one
