@@ -1,0 +1,190 @@
+# Private planning identifiers already published in this repository's COMMIT
+# MESSAGES, recorded because they cannot be taken back.
+#
+# The two `total` lines below are the count, and the gate refuses this file if
+# either stops matching the entries -- a figure in prose is a figure nobody
+# checks. Measured 2026-08-22 over every commit reachable from main, earliest
+# 2026-02-10, latest 2026-08-08, in 7 rule shapes:
+#
+#     planning-card-id          77
+#     milestone-id              31
+#     private-planning-path     18
+#     private-decision-record   10
+#     absolute-home-path         6
+#     acceptance-criterion       2
+#     private-doc-id             2
+#
+# WHY NOT REWRITTEN. Rewriting a commit message rewrites that commit and every
+# commit after it. On this repository that invalidates every published release
+# tag, every recorded hash in a downstream package tap, and every clone anyone
+# has -- to remove a string that has already been served to every reader and
+# every mirror since the day it was pushed. The disclosure is done. What is
+# recoverable is the RATE, and that is what the gate that reads this file buys.
+#
+# Whether to rewrite anyway is not this file's decision to make, and if it is
+# ever made this file is the enumeration to work from.
+#
+# FORMAT, three pipe-separated fields:
+#
+#     <full 40-character commit sha> | <rule label> | <reason key>
+#
+# No count, no fingerprint and no matched text. A published commit is immutable,
+# so the pair is exact on its own; and the identifier is already in the message,
+# so writing it here would only put it in a second place -- in the one file whose
+# subject is that the first place cannot be fixed.
+#
+# THIS FILE IS NOT AN ESCAPE HATCH. A commit that is not yet pushed can be
+# amended or rebased, so a new violation is always fixable and is always refused.
+# The gate says so itself when it refuses one.
+
+total entries 146
+total commits 137
+
+reason pre-gate-history: On main before any gate read a commit message. Rewriting it would rewrite every commit after it and break every published release hash, a cost out of all proportion to removing a string that has already been served to every reader and mirror.
+
+000b2cd2aeeea8128c38817434a94847edc1dc6d | private-planning-path   | pre-gate-history
+007adfbe94e2cbcbb68fd8892a862154e68640f9 | milestone-id            | pre-gate-history
+00bd2e885e84477f7bffe7e6f4eb0eca723412b8 | planning-card-id        | pre-gate-history
+00bfabeee6b86e7bffbb8d43f2e62df83fa284ae | planning-card-id        | pre-gate-history
+014dfc4408fe820c65115dc9faba48d39f7be6c1 | planning-card-id        | pre-gate-history
+0247671a7e2d9cfd53b802df733fb2ebc5282d55 | milestone-id            | pre-gate-history
+06dead0bbf660aa20926404d70f1d5c020c67c30 | milestone-id            | pre-gate-history
+071962f236dc300a4c7777ec3e73243d8b586ec7 | milestone-id            | pre-gate-history
+07f27f0d7e5aea6943236c8dab13f076c9b2186b | milestone-id            | pre-gate-history
+07f27f0d7e5aea6943236c8dab13f076c9b2186b | private-planning-path   | pre-gate-history
+07fb901896a4544f07a694f71a29ac03ddd4a96b | acceptance-criterion    | pre-gate-history
+0c25c302a21c850b561bfc7c5360eb8a341b4e30 | private-decision-record | pre-gate-history
+0d39fb07440c28ce3943e2985689ba2f9b6eb43a | planning-card-id        | pre-gate-history
+0d6486435359cf7ce86123a3ce4553766c5708b7 | milestone-id            | pre-gate-history
+0e7756b0524c209b6d7532eee7be424db5384d29 | planning-card-id        | pre-gate-history
+102f86a94e1cdf01cf28866c344325366f407a09 | private-decision-record | pre-gate-history
+108bee0c09000b197d90a18bd7f0be041782513a | planning-card-id        | pre-gate-history
+15d344c406fde4ea7747de814d1ec3f60f9b8f29 | planning-card-id        | pre-gate-history
+19a3c116d428ead5c174e1c4ae2399bc47a344ee | milestone-id            | pre-gate-history
+1b4cd61916a3851a5a725b1c0167b8be9ce78221 | private-decision-record | pre-gate-history
+1c9ee9cea4727fa69df985e8a2470d117d98dbca | milestone-id            | pre-gate-history
+1c9ee9cea4727fa69df985e8a2470d117d98dbca | planning-card-id        | pre-gate-history
+1e3db7a2b970ad66ba0a4e9d5154e3785a2f4965 | planning-card-id        | pre-gate-history
+1e631a0a5018c25e53af268445358480772ee9e5 | planning-card-id        | pre-gate-history
+22d90f2926bbb65654d1f04d2177b72bebdaa8b3 | planning-card-id        | pre-gate-history
+2302db07e045d9f83881b0d5bad9891afe9c504a | planning-card-id        | pre-gate-history
+290575199367a3230de80fc7672662ccf308a337 | milestone-id            | pre-gate-history
+290575199367a3230de80fc7672662ccf308a337 | private-planning-path   | pre-gate-history
+294288b74274a7755fe5a35d3ebfee882f0fb6aa | planning-card-id        | pre-gate-history
+2a008b18b0c51e731e9981af6ccba66f9a0367a4 | planning-card-id        | pre-gate-history
+2f15dda40dde1c2e49983c5989ca0b894c14c3a4 | private-planning-path   | pre-gate-history
+300803b7cf62c0bc88726a026b76c7005df7cf49 | private-doc-id          | pre-gate-history
+30c937280842cec06acbcbcf542fee6c6996066f | planning-card-id        | pre-gate-history
+31f0db46ce47b4d4a62a927bf0e940dea2838ba1 | planning-card-id        | pre-gate-history
+31fe887164f78e6a4eb23ebbcae9454f18b79c45 | milestone-id            | pre-gate-history
+31fe887164f78e6a4eb23ebbcae9454f18b79c45 | planning-card-id        | pre-gate-history
+32e12ca674c9a757b8377d85ab30fd7db124c4c5 | milestone-id            | pre-gate-history
+34d950bf8aefe62550991b8e5ea981194026d030 | private-decision-record | pre-gate-history
+36e01a840cb0ebef2efb9173d7f760486e1a5235 | planning-card-id        | pre-gate-history
+36e01a840cb0ebef2efb9173d7f760486e1a5235 | private-decision-record | pre-gate-history
+3f08084c319b6640e2a30d62b07e3b552aacd649 | planning-card-id        | pre-gate-history
+40274a38d3c5f0c9dca50d6ebad0d71f61ec5c2c | planning-card-id        | pre-gate-history
+423350a17b144f9e4558e6ccaa192a3374027c6d | milestone-id            | pre-gate-history
+42850bdaebaa7146c7097d515d65cd661b28cc19 | planning-card-id        | pre-gate-history
+429b4e2658c0b2c5ed11d6c9a3aea7c1325d6c00 | private-planning-path   | pre-gate-history
+470f78c48d2258685eb01ef9be0235782f19a645 | private-planning-path   | pre-gate-history
+474bba403c8c65e5a4a3fa699de1d63650700411 | planning-card-id        | pre-gate-history
+4e47b017c769267ae86139f33d084542ae61b6ee | planning-card-id        | pre-gate-history
+4fe5512c08ccf8f6ce954005086b352552a89db2 | milestone-id            | pre-gate-history
+507737b90499479a47004e2882723ee7883f8bbb | planning-card-id        | pre-gate-history
+510e1e196d0400501436402ba26dc346f583f52f | milestone-id            | pre-gate-history
+512d39d2ec057dce1a18c0b51cff1fca2434234a | planning-card-id        | pre-gate-history
+51316bfe404caf3873a238ae76bfb9a461cbe0a1 | planning-card-id        | pre-gate-history
+51bbda89b003612b9964a6c97edacf99554fa5fa | planning-card-id        | pre-gate-history
+51e0c1c2a882e46a4e30014037f9e320c252cf95 | planning-card-id        | pre-gate-history
+5264396056981ef78e6bb36bfe0cd4cdfef11840 | planning-card-id        | pre-gate-history
+5542640e1ecba91504f21ddfe69aec1ce37526c8 | milestone-id            | pre-gate-history
+56c45d71043b293e78771810497b844e25200304 | planning-card-id        | pre-gate-history
+56c94ac795f8e536ecdc1cefa2445f05989a553a | private-decision-record | pre-gate-history
+581734df6914ab279fdf140257eec310e25a6c46 | milestone-id            | pre-gate-history
+5b163cc5cb01f61ae7c908e1089d616a0b12da41 | milestone-id            | pre-gate-history
+5b163cc5cb01f61ae7c908e1089d616a0b12da41 | planning-card-id        | pre-gate-history
+63ff9c4ccf62fb029b9f98146eae64cedeb25737 | planning-card-id        | pre-gate-history
+6416154131d15e925950bb04127301e9e0d63599 | absolute-home-path      | pre-gate-history
+6646d2c8114530b7ace1dfb8a73b805c1330b778 | planning-card-id        | pre-gate-history
+676f2bcfd4d8bab7dba894a3807e6a47467153a5 | planning-card-id        | pre-gate-history
+6901bdb4392bb3d9048937189e451a07474c953e | planning-card-id        | pre-gate-history
+69c0ab0e51a67f0c9cddf3f9254d25eb9e65aba6 | private-planning-path   | pre-gate-history
+6c3e1c67c1384a2ce6b17bef0a7b73e715ed97fa | planning-card-id        | pre-gate-history
+6d29a2bb45cf193d189d9ae4134208ccbe767673 | planning-card-id        | pre-gate-history
+75aa4a269a9a0dc4f1dd6b08dd662744faffb240 | planning-card-id        | pre-gate-history
+76599b7be2f8e34cb749aa036bc99ed7a81fdbf4 | absolute-home-path      | pre-gate-history
+7bab93f5d3524d276921815e43771475db678f2a | absolute-home-path      | pre-gate-history
+7bada945a604f396f2758d878f6d766ce6cc0506 | milestone-id            | pre-gate-history
+7bada945a604f396f2758d878f6d766ce6cc0506 | planning-card-id        | pre-gate-history
+7cbdfb35dc1c70988e008be728e0aea7a255033a | planning-card-id        | pre-gate-history
+7de46093f47df6441fde9ca95bdf65a69a3446b7 | planning-card-id        | pre-gate-history
+80d28e61e2dc96ddf94bf7fca61febf6e049018e | absolute-home-path      | pre-gate-history
+823503cb57aba0a24b8db7f904eefdb9f1c08f01 | planning-card-id        | pre-gate-history
+82f46847f9851d7c32d7af1c719c7d39b7ce07e2 | private-planning-path   | pre-gate-history
+85a09f7ff60f7eebc66500812b896222d15ddc3c | planning-card-id        | pre-gate-history
+86e967e40d45db21882e42da965550ff52410d93 | absolute-home-path      | pre-gate-history
+875056e81ac8d964e6bc566f508d9bc2264dc565 | planning-card-id        | pre-gate-history
+8945b8d76f78349c7d4b3aa769fc55aa48ae0d4e | planning-card-id        | pre-gate-history
+8a428ef28fb3c6630785b9fcbaf6a81cb1a4d21f | milestone-id            | pre-gate-history
+8b7440ff38b7d547db72e729ffd543686b2a38d3 | planning-card-id        | pre-gate-history
+8d1fc775bdeefa37ea48f74132d86b8e8fb05fae | planning-card-id        | pre-gate-history
+8e196e5b8820bb2b3d6aba85401e1619df9c4f89 | planning-card-id        | pre-gate-history
+8f2096f44527f711a27f05bbc03d03b1a2f40785 | planning-card-id        | pre-gate-history
+8fc81413aeff5c2243d457c9e1807c71d508f7d9 | planning-card-id        | pre-gate-history
+8ff859f5c2d019515733ba141460939c26bb2e38 | private-planning-path   | pre-gate-history
+91aac37f9c19675d756a2b3a79c6b3597af0a929 | planning-card-id        | pre-gate-history
+9785bcb007a077964780fe07f7097de46d32d8ef | planning-card-id        | pre-gate-history
+9ad2093a4f3b83655311cfe8ae81ee2ac41923c7 | milestone-id            | pre-gate-history
+9e014067607449649c512f11173411f1001ea0c0 | planning-card-id        | pre-gate-history
+a1b5263466aaa834dd51d6251efa7dda97050b8d | private-planning-path   | pre-gate-history
+a63f23de0d19a14b81afdeb3d24a747f94d57346 | private-planning-path   | pre-gate-history
+a6966aafcfc15ec7894cfe959844c1f9fb709023 | private-planning-path   | pre-gate-history
+a7fee8dc36397387090d46b3bbad5ef0c50a102c | milestone-id            | pre-gate-history
+a91341d5aab23bc3a1ae51e91d3f804fa615c5b2 | planning-card-id        | pre-gate-history
+a9d33620ce1e2a6536c330e16cd07b9905eed595 | planning-card-id        | pre-gate-history
+aa7c68f9ed43f705d2321893bb6fefc40d3ed487 | planning-card-id        | pre-gate-history
+ab27b7975990b7095e7fd3714faf2a875d467d57 | milestone-id            | pre-gate-history
+ab75b839e9e6dc15d046b747ee02c2cb05dc43a8 | planning-card-id        | pre-gate-history
+afc9bd4573cf206fa6a7ba4aacd1c5fc12fb82c8 | milestone-id            | pre-gate-history
+afc9bd4573cf206fa6a7ba4aacd1c5fc12fb82c8 | private-planning-path   | pre-gate-history
+afdfd1aa4faad06082cd2043ba7feb812670b22b | planning-card-id        | pre-gate-history
+b149674650796f75b140f885ea0aa4e9747f8945 | acceptance-criterion    | pre-gate-history
+b4fa8ecce3c13528e2396be72db0f2fda1c85c24 | planning-card-id        | pre-gate-history
+b5db4637bf90e812b2103b6db15ea18145e23a92 | milestone-id            | pre-gate-history
+b7bd5004c90316edefeee0dd9b7f6127348fc9ce | private-decision-record | pre-gate-history
+bcfca600c3a18daa01267163ece3cdcc5725ca02 | milestone-id            | pre-gate-history
+bdb8d143fb60d18e9aa4837d0dd60e692a963983 | private-planning-path   | pre-gate-history
+bdfa3a1e86d6edd594164f916664a7a2b14f9528 | private-decision-record | pre-gate-history
+c0793810e94fea62630c249ecd128edd09ba62f5 | planning-card-id        | pre-gate-history
+c3c6725d326b2d16fa82a906bd6c0970653b2c8c | milestone-id            | pre-gate-history
+c41f7edc621aa93ef2c1a7f166670408db5fd3ad | planning-card-id        | pre-gate-history
+c4bf7a4b5f4d2003b236b915b229d6512593233a | milestone-id            | pre-gate-history
+c6263262b8f282fe8e1d3734ac823e33f05c643f | planning-card-id        | pre-gate-history
+c6946aed8ba1b8c315be54560d22d630bc7cc7a2 | planning-card-id        | pre-gate-history
+c899eeadefe23b6559f9b7e62c85f06b2c8405be | milestone-id            | pre-gate-history
+cd3b55dad29b8116893336277a05000104717587 | planning-card-id        | pre-gate-history
+ce5db184db14426eb3990958f9fef69780e0a7dd | planning-card-id        | pre-gate-history
+d08a03d24febccf8c2a58080b445665049e567c5 | private-planning-path   | pre-gate-history
+d09dd3bfa4952bdcb7f99e7c75915e7f2afdf8bd | private-doc-id          | pre-gate-history
+d3621dc69322b55a8dbd250ed4017c5ea4818d8e | planning-card-id        | pre-gate-history
+d6d7a736e6b4093670686ba2e4e31908ee286e09 | private-planning-path   | pre-gate-history
+d74ff71a52b1965a6de03c3f32643a5d6914370f | planning-card-id        | pre-gate-history
+d9a4d7c6c281185899ddd0a501b3c08a96191c7c | absolute-home-path      | pre-gate-history
+d9a4d7c6c281185899ddd0a501b3c08a96191c7c | milestone-id            | pre-gate-history
+db05422228c1d6a3d52277e98877cd486a1db9d9 | planning-card-id        | pre-gate-history
+db782bb6883b1ee85acc9e4758ad0572b01d6917 | planning-card-id        | pre-gate-history
+de6449f93bac55164d5f5465e005920d3da0dffd | private-planning-path   | pre-gate-history
+e1997957e1231fe38586184c47903b3ed6731d96 | planning-card-id        | pre-gate-history
+e2de73970bd1d4b660748442c9445e7ee2bb2671 | planning-card-id        | pre-gate-history
+e5e855961cb4182750852f45a89830d75289baa0 | milestone-id            | pre-gate-history
+e6049d976726d3729ba6d2bc906c1ed6ab949404 | milestone-id            | pre-gate-history
+e703afa84e34591756ad3c41fc7d304e97b0e56b | private-planning-path   | pre-gate-history
+eaf6b36c03f49095b7b24fcd805ec8dc7e4a3dae | private-decision-record | pre-gate-history
+eb4973f4ef6953829145681a91e5472203b7a4c3 | planning-card-id        | pre-gate-history
+ed37e110930349ff69ad2ae3875398785b1135b5 | private-decision-record | pre-gate-history
+f048cf7489f5a5ee8b858497e51f29270c9b8fbd | planning-card-id        | pre-gate-history
+f0e1cf9c02b9585e923d6cc0c1b0d2e6721551dd | planning-card-id        | pre-gate-history
+f150c3411e5a933e4eb5df55292094b395874104 | planning-card-id        | pre-gate-history
+f4165ac654f1ba39c09887705aeb25dd97cfe371 | planning-card-id        | pre-gate-history
+f516ba44c9a918a5130909560eeb1bb21c544560 | planning-card-id        | pre-gate-history

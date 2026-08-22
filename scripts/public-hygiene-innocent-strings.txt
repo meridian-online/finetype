@@ -54,3 +54,20 @@ Prose that names a spec or a choice without pointing into the planning tree
     Implements the contract in spec 2026-05-04-autonomous-type-inference.
     verbatim from choice 0065, amount-subtype-collapse-mechanism
     the 2026-05-10-pass2-prep-prompt contract
+
+Text the planning-identifier rules must stay silent on, added 2026-08-22
+-----------------------------------------------------------------------------
+Each line below is what one of those rules would match if it were one
+character looser, and each is text this repository really carries. The
+milestone rule is lower-case only for the first three; the card rule needs
+three or four digits for the next two.
+
+    Heliplataforma Equipo Modular M-10 Heliport,-52.5489,-68.3119,108,SA,AR
+    ### Milestone 3 — Validate & Report
+    Data scaling pipeline (M-3 to M-5), superseded multi-branch spec
+    Cycle-1 review-pr LOW finding M-1
+    a card in the renderer, and the card component it uses
+    see card 42 of the deck
+    the decision to defer was recorded in the changelog
+    rev = "AC#4afea48"
+    intermediate_doc.parquet, and the doc field beside it

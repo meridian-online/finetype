@@ -1,0 +1,132 @@
+# The shapes a public repository must not carry, as patterns.
+#
+# ONE definition, read by BOTH gates:
+#
+#   scripts/check-public-hygiene.sh   the content of tracked files
+#   scripts/check-history-hygiene.sh  commit messages, and pull request title and body
+#
+# They were two rule lists until a leak used the surface only one of them read.
+# A pattern list that lives inside one script is a pattern list the other script
+# does not have, and the second gate is always the one written later.
+#
+# FORMAT: one rule per line, "<label>|<PCRE>", split on the FIRST pipe. A label
+# may repeat: several patterns under one label are one rule, and a match is
+# reported once per (label, subject, line). Blank lines and whole-line `#`
+# comments are ignored. Anything else is a hard error (exit 2) in both gates --
+# a rules file that half-parses is a gate that is half-blind.
+#
+# A pattern may never MATCH a `|`. Both gates' declaration files are
+# pipe-separated and rely on matched text being unable to collide with the
+# separator. A pattern may CONTAIN one, as an alternation, because the split
+# takes the first pipe only.
+#
+# Patterns are PCRE, run through `git grep -P`. Not `grep -P`, which macOS does
+# not have, and not a second engine in a second language: two engines reading one
+# file is a shared definition in name only, and the divergence shows up as a rule
+# that fires on one surface and not the other.
+#
+# ---------------------------------------------------------------------------
+# EVERY PATTERN HERE WAS MEASURED AGAINST THIS TREE AND THIS HISTORY BEFORE IT
+# WAS TURNED ON, and the measurements are in the comments below. A gate that
+# cries wolf is switched off within the week, so a rule ported from a sibling
+# repository without measuring it here is a rule that has not been adopted, only
+# copied. Two of the sibling's rules are deliberately NOT here and the reason is
+# recorded at the foot of this file, because "we chose not to" and "we forgot"
+# are indistinguishable from an absence.
+# ---------------------------------------------------------------------------
+
+# The private planning tree's directory prefix. Anchored on the dot so a bare
+# `orbit/` -- a real word, and the name of a retired tool this repository's
+# history mentions -- is left alone. Written as a character class so that this
+# file, which is scanned like any other tracked file, does not contain the
+# literal prefix and go red on itself.
+private-planning-path|(?<![A-Za-z0-9_.-])[.]orbit/
+
+# An absolute home directory, macOS or Linux, stopped at the user component so
+# the matched text is stable and one allowlist entry can cover a file with
+# thousands of occurrences.
+#
+# Case-SENSITIVE, and the user component must start with a LETTER. Both guards
+# were bought: the first cut was `(?i)` over a digit-friendly class and it
+# matched `/users/862` -- a URL path segment -- several thousand times across the
+# generated fixtures in eval/datasets/csv. The residual is that a document
+# writing the lower-case form is missed; that is the cheaper mistake, because a
+# gate drowning in generated CSV gets switched off within the week.
+absolute-home-path|/(?:Users|home)/(?![Ss]hared/)[A-Za-z][A-Za-z0-9._-]*
+
+# A milestone identifier in the private planning tree.
+#
+# CASE-SENSITIVE, and ONE OR MORE digits -- both divergences from the sibling
+# repository's rule, and both were bought with a measurement on 2026-08-22:
+#
+#   case-insensitive, two-or-more digits (the sibling's rule): 29 commits, and
+#       one match in eval/datasets/gold_external/ourairports_airports.csv, which
+#       is an airport's name in a third-party dataset and is data, not prose;
+#   case-insensitive, one-or-more digits: 8 further matches across 4 commits,
+#       every one of them innocent -- a review-finding label and the stage labels
+#       of a superseded multi-branch spec;
+#   case-SENSITIVE, one-or-more digits (this rule): 31 commits, 9 distinct ids,
+#       and no match in that dataset.
+#
+# So the sibling's rule misses three real leaks in this history, and the obvious
+# widening of it fails four honest commits. Lower case with a single digit
+# allowed is the cut that takes the leaks and leaves the prose, and it is a
+# property of THIS history rather than a general truth -- re-measure before
+# porting it back.
+milestone-id|(?<![-_A-Za-z0-9/])m-[0-9]+(?![-_A-Za-z0-9])
+
+# The spelled-out form. The sibling's version of this pattern also accepts a
+# bare `milestone <N>`; that alternative is dropped here because this repository
+# publishes its own roadmap under exactly that heading -- docs/plans has five of
+# them -- and they are this project's public milestones, not the private
+# tracker's. Requiring the `m` keeps the spelled-out private form and leaves the
+# public roadmap alone. Measured 2026-08-22: 0 matches in the tree, 1 in history.
+milestone-id|(?i)(?<![A-Za-z0-9])milestones?[ _-]m[-_]?[0-9]+(?![-_A-Za-z0-9])
+
+# A decision record in the private planning tree. Ported unchanged from the
+# sibling. Measured 2026-08-22: 3 matches in 2 tracked files, 10 commits.
+private-decision-record|(?i)(?<![A-Za-z0-9])decision[-_][0-9]+
+
+# A card id in the private planning tree. Three or four digits required, so the
+# workflow vocabulary word "card" carries no number and is left alone. Ported
+# unchanged from the sibling. Measured 2026-08-22: 65 matches in 26 tracked
+# files and 77 commits -- the single largest shape in this history, and the one
+# the card that commissioned this gate did not count.
+planning-card-id|(?i)(?<![A-Za-z0-9])cards?[ _-]#?[0-9]{3,4}(?![0-9])
+
+# Acceptance-criterion shorthand. A match may not be followed by a hex digit:
+# that is what keeps lockfile git revisions out, where a rev can end in the same
+# three characters. Ported unchanged. Measured 2026-08-22: 0 in the tree, 2
+# commits.
+acceptance-criterion|(?i)(?<![A-Za-z0-9])ac ?#[0-9]+(?![0-9a-f])
+
+# A document id in the private planning tree. Ported unchanged. Measured
+# 2026-08-22: 1 match in the tree, inside a recorded dataset path and therefore
+# allowlisted as data, and 2 commits.
+private-doc-id|(?i)(?<![A-Za-z0-9])doc[-_][0-9]+(?![A-Za-z])
+
+# ---------------------------------------------------------------------------
+# NOT PORTED, and each with the measurement that refused it. Re-measure before
+# adding one: the reason is a property of this tree, and this tree changes.
+#
+# * A planning task id, `task[-_]<digits>`. 80 matches in 6 tracked files on
+#   2026-08-22 and every one is DATA -- table names in the GitTables corpus and
+#   in the gold-corpus TSVs, which other artefacts join on. 0 commits carry the
+#   shape. The rule would be 100% false positives here and would buy nothing.
+#
+# * A bare ticket reference, `T<digits>`. 11 matches in 3 tracked files and all
+#   11 are data: a city name in a GeoNames reference extract, a generated CSV
+#   fixture, and a mining diagnostic. 0 commits. Same verdict.
+#
+# * A spec acceptance-criterion id, `<prefix>_ac<digits>`. 129 matches in 21
+#   files in its guarded form and 3,779 in 457 files in its loose form, both
+#   dominated by this repository's own test-function names and its own output
+#   record filenames. 6 commits. The signal does not survive the noise, and the
+#   sibling's stance -- rename the test functions rather than exempt them -- is a
+#   sweep of hundreds of symbols, which is a different piece of work.
+#
+# * A cross-repository document path. 604 candidate matches across 124 files
+#   before the sibling's two resolution tests are applied; the tests need the
+#   path-resolution machinery, and the residual after them has not been measured
+#   here. Porting it without that measurement is how a gate gets switched off.
+# ---------------------------------------------------------------------------

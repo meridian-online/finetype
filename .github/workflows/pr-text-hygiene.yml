@@ -1,0 +1,40 @@
+name: PR text hygiene
+
+# The pull request's own title and body, re-read whenever they change.
+#
+# .github/workflows/ci.yml scans them too, and that is the scan that matters for
+# a pull request that is opened and left alone. This file exists for the one it
+# cannot cover: a body EDITED after the last CI run. `edited` is not in ci.yml's
+# triggers because adding it there re-runs every job in that file — the crate
+# build, the model download, the evidence suite — on every typo fix in a
+# description. Here it costs a checkout and a `git grep`.
+#
+# The two are deliberately the same one command, not two implementations of one
+# idea. If this file ever disagrees with the step in ci.yml, this file is wrong.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-text:
+    name: Private references in pull request text
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Shallow on purpose: this job reads the pull request's text and the rules
+      # file, and nothing in the history.
+      - uses: actions/checkout@v5
+      # Through the environment, never interpolated into the script: `${{ }}`
+      # inside a `run:` substitutes before the shell sees it, so a title
+      # containing a quote or a backtick would be executed rather than scanned.
+      - name: private references in the pull request title and body
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n%s\n' "$PR_TITLE" "$PR_BODY" >"$RUNNER_TEMP/pr-text.txt"
+          ./scripts/check-history-hygiene.sh --text "$RUNNER_TEMP/pr-text.txt"
