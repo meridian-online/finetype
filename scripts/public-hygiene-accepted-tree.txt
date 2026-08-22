@@ -1,0 +1,86 @@
+# Private planning identifiers already published in this repository's tracked
+# files, recorded rather than swept.
+#
+# WHAT THIS IS NOT. It is not scripts/public-hygiene-allowlist.txt. That file
+# says "this text in this file is legitimate and stays" -- a dataset value, a key
+# another artefact joins on. This file says the opposite: every line below is a
+# real leak, it is already published, and it is written down so that it is
+# refused the moment it grows and cannot be mistaken for nobody having looked.
+#
+# WHY NOT SWEPT. Three rules were turned on over a tree that already violated
+# them, measured 2026-08-22: 52 file-and-rule pairs, 137 matches. They sit in
+# frozen evidence records under output/, in Rust doc comments that another gate
+# reads for citations, in a CHANGELOG, and in .gitignore -- 47 files. Rewriting
+# them is a content change of a different shape and a different blast radius from
+# turning a gate on, and doing both in one diff makes neither reviewable. The
+# gate goes on now, because the rate is the part that is still recoverable; the
+# sweep follows, and every line it fixes is a line deleted from here.
+#
+# FORMAT, five pipe-separated fields:
+#
+#     <tracked file path> | <rule label> | <fingerprint> | <count> | <reason key>
+#
+# The fingerprint is the first 12 hex characters of the SHA-256 of the DISTINCT
+# matched strings for that file and rule, sorted and newline-joined. Nothing here
+# spells an identifier out: the file named on the line already contains it, so a
+# digest discloses nothing new, and it makes SWAPPING one identifier for another
+# -- which leaves the count alone -- as loud as adding one.
+#
+# THE RATCHET ONLY TIGHTENS. Growth is exit 1. Shrinkage is exit 2 and names the
+# figures to write back, because a record of a leak that is gone is a hole nobody
+# is watching. Do not add a line here to get a new violation past the gate; the
+# gate says so itself when it refuses one.
+#
+reason pre-gate-tree: On main before the rule existed, in an evidence record, a doc comment, a changelog or an ignore file. A sweep is a content change with a different blast radius and is not bundled with turning the gate on; this line is deleted when its file is swept.
+
+.claude/skills/finetype-cli/SKILL.md                             | planning-card-id        | 1b735d86309a |  1 | pre-gate-tree
+.gitignore                                                       | planning-card-id        | 8b35c0e1dd9a |  1 | pre-gate-tree
+CHANGELOG.md                                                     | milestone-id            | 841593870d26 |  2 | pre-gate-tree
+CHANGELOG.md                                                     | planning-card-id        | b03f7aef92f2 | 10 | pre-gate-tree
+CLAUDE.md                                                        | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+CLAUDE.md                                                        | planning-card-id        | 63e4f7a7bb1b |  2 | pre-gate-tree
+crates/finetype-cli/src/cmd_run.rs                               | planning-card-id        | 1b735d86309a |  1 | pre-gate-tree
+crates/finetype-cli/src/cmd_taxonomy.rs                          | planning-card-id        | 1b735d86309a |  1 | pre-gate-tree
+crates/finetype-cli/src/profile.rs                               | planning-card-id        | 8b35c0e1dd9a |  2 | pre-gate-tree
+crates/finetype-cli/tests/cli_golden.rs                          | planning-card-id        | 200da3e7f0c2 |  6 | pre-gate-tree
+crates/finetype-core/src/enum_domain.rs                          | planning-card-id        | b454ac18accc |  2 | pre-gate-tree
+crates/finetype-eval/src/bin/validate_corpus.rs                  | planning-card-id        | b454ac18accc |  1 | pre-gate-tree
+crates/finetype-mcp/src/json_schema.rs                           | planning-card-id        | 9fa7b65b83dc |  9 | pre-gate-tree
+crates/finetype-mcp/src/lib.rs                                   | planning-card-id        | dea51f220c0c |  1 | pre-gate-tree
+crates/finetype-model/src/column/mod.rs                          | private-decision-record | a451b5f9b7d7 |  2 | pre-gate-tree
+diagnostics/rhh_methodology.md                                   | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+docs/ARCHITECTURE.md                                             | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+docs/LOCALE_DETECTION_ARCHITECTURE.md                            | private-decision-record | d185387ea49c |  1 | pre-gate-tree
+eval/datasets/reference_data_inventory.md                        | planning-card-id        | 84a0083beeb6 |  8 | pre-gate-tree
+eval/gittables/SCHEMAS.md                                        | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+output/ceiling-and-rules-discovery/FINDING.md                    | planning-card-id        | cdd5448a3e3e |  7 | pre-gate-tree
+output/composed-accuracy-roadmap/BACKLOG.md                      | planning-card-id        | 896538cb4997 |  1 | pre-gate-tree
+output/corpus-honest-gate/ac02_oracle_honest_scorer.md           | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+output/corpus-honest-gate/ac03_four_verdict_reproduction.md      | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+output/corpus-honest-gate/ac06_pretrain_reach.md                 | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+output/destination-drift-precheck/latdec_ac05_results.md         | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+output/embed-frontier/ac00_embed_swap_audit.md                   | planning-card-id        | 9603608c771e |  1 | pre-gate-tree
+output/embed-frontier/ac01_verdict.md                            | planning-card-id        | 9603608c771e |  1 | pre-gate-tree
+output/eval-ceiling-diagnosis/header_hint_delete_decision.md     | milestone-id            | 841593870d26 |  5 | pre-gate-tree
+output/fossil-cleanup/manifest.md                                | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+output/gold-corpus/sizing_memo.md                                | planning-card-id        | 4938dc20efa2 |  2 | pre-gate-tree
+output/gold-eval-anchor/latdec_ac06_promotion_decision.md        | milestone-id            | 841593870d26 |  3 | pre-gate-tree
+output/next-train-research/RESEARCH.md                           | planning-card-id        | 1b735d86309a |  1 | pre-gate-tree
+output/representative-accuracy-gate/ac00_tier_and_band_policy.md | planning-card-id        | 8b35c0e1dd9a |  1 | pre-gate-tree
+output/representative-accuracy-gate/ac04_earns_its_keep.md       | planning-card-id        | 8b35c0e1dd9a |  1 | pre-gate-tree
+output/sharpen-audit/ac2_header_hint_ablation.md                 | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+output/sharpen-audit/tierA/BATCH1_RESULT.md                      | planning-card-id        | 896538cb4997 |  1 | pre-gate-tree
+output/v22-direction-review/decision.md                          | milestone-id            | 841593870d26 |  5 | pre-gate-tree
+output/v22-direction-review/gated_soak.md                        | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+output/v22-direction-review/next_move_options.md                 | milestone-id            | 841593870d26 | 17 | pre-gate-tree
+output/v23-precision-retrain/relitigation_memo.md                | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+output/v23-precision-retrain/relitigation_memo.md                | planning-card-id        | 00c2fc17e0b0 |  1 | pre-gate-tree
+scripts/archive/build_representative_fixture.py                  | planning-card-id        | 9f82acf3fcf1 |  1 | pre-gate-tree
+scripts/archive/validate_label_remap.py                          | milestone-id            | a9abaf28a3ed |  1 | pre-gate-tree
+scripts/compute_v22_cell_deltas.py                               | milestone-id            | 841593870d26 |  2 | pre-gate-tree
+scripts/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml | milestone-id            | 841593870d26 | 14 | pre-gate-tree
+scripts/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml | planning-card-id        | 40294adfda0d |  1 | pre-gate-tree
+scripts/eval_rule.sh                                             | planning-card-id        | 8b35c0e1dd9a |  1 | pre-gate-tree
+scripts/extract_ydf_specialist_training_data.py                  | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+scripts/mine_v21_hard_negatives.py                               | milestone-id            | 841593870d26 |  1 | pre-gate-tree
+scripts/overnight_v20_geography.sh                               | milestone-id            | 841593870d26 |  5 | pre-gate-tree

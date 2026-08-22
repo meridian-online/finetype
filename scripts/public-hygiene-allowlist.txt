@@ -137,3 +137,11 @@ datasets/README.md | /Users/hugh | The one remaining example is the `local_path`
 # no variable expansion. An absolute path is the only form these files can take.
 #
 scripts/launchd/* | /Users/hugh | launchd and newsyslog read these files directly and expand nothing; an absolute path is the only form they accept.
+
+# The private-doc-id rule, added 2026-08-22, matches a table name inside a frozen
+# corpus sampling record. It is the name of a source file in the GitTables
+# corpus, recorded so the sample can be reproduced, and the corpus pass joins on
+# it. Rewriting one side of that join does not error; it matches fewer rows and
+# returns a plausible wrong number.
+#
+output/corpus-honest-gate/stratified_sample.files.txt | doc_2 | A GitTables source-table name in a frozen sampling record the corpus pass joins on, not a reference to a planning document.
