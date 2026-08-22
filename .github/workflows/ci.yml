@@ -65,36 +65,70 @@ jobs:
         run: .github/scripts/gate-self-tests.py --self-test
 
   public-hygiene:
-    # Toolchain-free: it is `git grep` over tracked files and finishes in
-    # seconds, so a path into the private planning repo, or an absolute home
-    # directory, goes red long before the crate build has resolved a dependency.
-    # It depends on no other job, which is deliberate — see the routing step
-    # below.
+    # Toolchain-free: `git grep` over tracked files and `git log --grep` over the
+    # messages, both finished in seconds, so a private planning reference goes
+    # red long before the crate build has resolved a dependency. It depends on no
+    # other job, which is deliberate — see the routing step below.
     #
-    # This was the only one of the three public repositories with no such gate,
-    # and the most to sweep — 175 planning-tree paths across 99 tracked files.
-    name: Private paths in tracked files
+    # THREE SURFACES, TWO GATES, ONE RULE LIST. The tracked tree is read by
+    # scripts/check-public-hygiene.sh; commit messages and the pull request's
+    # title and body by scripts/check-history-hygiene.sh; and both read
+    # scripts/public-hygiene-rules.txt, so a shape added for one surface is added
+    # for all three. Splitting the rules is how the second surface came to be
+    # uncovered while the first was gated: 137 commits reached main carrying a
+    # reference the tracked-file gate would have refused in a file.
+    name: Private references in files, commit messages and pull request text
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
+        with:
+          # The commit-message scan reads every message reachable from HEAD and
+          # verifies the accepted-history record against them. A shallow checkout
+          # has one commit, so the scan would find nothing and the record would
+          # look entirely stale — a gate reporting clean over a history it cannot
+          # see. This repository is ~190 MB of git and 1,484 commits.
+          fetch-depth: 0
       - name: Which gates this diff changed
         id: route
         # In-job by design, and it audits before it plans; see the identical step
         # in the `gate-routing-self-test` job for why.
         run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
-      # The gate's own regression test runs FIRST when it runs at all. A hygiene
+      # The gates' own regression tests run FIRST when they run at all. A hygiene
       # gate fails silently in both directions — it can stop matching, or start
       # matching honest prose — so "the gate still works" has to be established
       # before "the tree is clean" means anything. Both directions were live
       # defects when this self-test was first run against the gate it tests.
-      # Routed: only a diff that touches the gate, its allowlist or its fixture
-      # can have broken it.
+      # Routed: only a diff that touches a gate, its rules, its allowlist, its
+      # record or its fixture can have broken it.
       - name: hygiene gate self-test
         if: steps.route.outputs.public_hygiene == 'true'
         run: ./scripts/check-public-hygiene-selftest.sh
-      - name: private planning paths and absolute home paths
+      - name: history hygiene gate self-test
+        if: steps.route.outputs.history_hygiene == 'true'
+        run: ./scripts/check-history-hygiene-selftest.sh
+      - name: private references in tracked files
         run: ./scripts/check-public-hygiene.sh
+      - name: private references in commit messages
+        run: ./scripts/check-history-hygiene.sh
+      # The pull request's own text, which is not in the repository and so is in
+      # neither scan above. Passed through the environment rather than
+      # interpolated into the script: `${{ }}` inside a `run:` substitutes before
+      # the shell sees it, so a title containing a quote or a backtick would be
+      # executed rather than scanned.
+      #
+      # This step reads the body AS OF THE EVENT THAT STARTED THIS RUN. A body
+      # edited afterwards is covered by .github/workflows/pr-text-hygiene.yml,
+      # which triggers on `edited` and runs this one step; that trigger is not
+      # here because it would re-run every job in this file on every typo fix.
+      - name: private references in the pull request title and body
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n%s\n' "$PR_TITLE" "$PR_BODY" >"$RUNNER_TEMP/pr-text.txt"
+          ./scripts/check-history-hygiene.sh --text "$RUNNER_TEMP/pr-text.txt"
 
   formula-asset:
     # The odd job here: the check it covers cannot run on a pull request at all.

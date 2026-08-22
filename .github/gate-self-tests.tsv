@@ -61,7 +61,8 @@
 # is the mutation harness that proves the suite detects.
 #
 # id	commands	paths
-public_hygiene	./scripts/check-public-hygiene-selftest.sh	scripts/check-public-hygiene.sh, scripts/check-public-hygiene-selftest.sh, scripts/public-hygiene-allowlist.txt, scripts/public-hygiene-innocent-strings.txt
+public_hygiene	./scripts/check-public-hygiene-selftest.sh	scripts/check-public-hygiene.sh, scripts/check-public-hygiene-selftest.sh, scripts/public-hygiene-rules.txt, scripts/public-hygiene-allowlist.txt, scripts/public-hygiene-accepted-tree.txt, scripts/public-hygiene-innocent-strings.txt
+history_hygiene	./scripts/check-history-hygiene-selftest.sh	scripts/check-history-hygiene.sh, scripts/check-history-hygiene-selftest.sh, scripts/public-hygiene-rules.txt, scripts/public-hygiene-accepted-history.txt
 formula_asset	./scripts/check-formula-asset-selftest.sh, ./scripts/check-formula-asset-mutations.sh	scripts/check-formula-asset.sh, scripts/check-formula-asset-selftest.sh, scripts/check-formula-asset-mutations.sh
 ci_model_drift	.github/scripts/check-ci-model-drift.sh --self-test	.github/scripts/check-ci-model-drift.sh
 evidence	scripts/test_evidence_mutations.sh	scripts/evidence.py, scripts/test_evidence.sh, scripts/test_evidence_mutations.sh
