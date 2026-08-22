@@ -17,12 +17,18 @@
 #   5. an allowlist entry that suppresses nothing is fatal;
 #   6. a well-formed allowlist entry actually suppresses its match;
 #   7. a GLOB entry suppresses across a subtree — and does not reach outside it;
+#  7b. an allowlist entry cannot be written wider than it declares, and cannot be
+#      written over the whole repository at all — proved against the REAL,
+#      committed allowlist with its real reaches and its real ordering, mutated
+#      at the first entry, at the last, and below the last, because position is
+#      what the previous version of this guard depended on;
 #   8. the rules file IS the rule list — an absent or malformed one is fatal, and
 #      a gate with no rules never reports clean;
 #   9. the accepted-tree record behaves as a ratchet in every direction: an exact
 #      record passes, growth is refused, a same-count SUBSTITUTION is refused, a
-#      record that matches nothing is refused, and an entry whose reason key
-#      nobody declared is refused;
+#      record that matches nothing is refused, an entry whose reason key nobody
+#      declared is refused, and the totals it states about ITSELF are checked
+#      against the entries it carries;
 #  10. matched text is redacted when CI is set, and printed when it is not.
 #
 # Every violating string below is assembled at runtime from harmless pieces
@@ -252,7 +258,7 @@ printf '%s\n' "$subject_line" >"$d/subject.txt"
 printf 'subject.txt | %s\n' "$HOME_ABS" >"$d/scripts/public-hygiene-allowlist.txt"
 out="$(run_gate "$d")"
 rc=$?
-if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "expected 3 '|'-separated fields"; then
+if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "expected 4 '|'-separated fields"; then
 	ok "an entry that does not parse is a hard error"
 else
 	bad "an unparseable allowlist entry was not rejected (exit $rc)"
@@ -262,7 +268,7 @@ fi
 # 4b. Parses, but the explanation is empty.
 d="$(new_repo)"
 printf '%s\n' "$subject_line" >"$d/subject.txt"
-printf 'subject.txt | %s |\n' "$HOME_ABS" >"$d/scripts/public-hygiene-allowlist.txt"
+printf 'subject.txt | %s | 1 |\n' "$HOME_ABS" >"$d/scripts/public-hygiene-allowlist.txt"
 out="$(run_gate "$d")"
 rc=$?
 if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "all required"; then
@@ -275,7 +281,7 @@ fi
 # 5. Stale entry — well formed, matches nothing.
 d="$(new_repo)"
 printf '%s\n' "$subject_line" >"$d/subject.txt"
-printf 'subject.txt | %s | quoted from a file that has since moved\n' \
+printf 'subject.txt | %s | 1 | quoted from a file that has since moved\n' \
 	"$(printf '/%s/%s' Users someone-else)" >"$d/scripts/public-hygiene-allowlist.txt"
 out="$(run_gate "$d")"
 rc=$?
@@ -289,7 +295,7 @@ fi
 # 6. Legitimate entry — must actually suppress.
 d="$(new_repo)"
 printf '%s\n' "$subject_line" >"$d/subject.txt"
-printf 'subject.txt | %s | a dataset root this script opens\n' \
+printf 'subject.txt | %s | 1 | a dataset root this script opens\n' \
 	"$HOME_ABS" >"$d/scripts/public-hygiene-allowlist.txt"
 out="$(run_gate "$d")"
 rc=$?
@@ -309,7 +315,7 @@ printf '%s\n' "$subject_line" >"$d/output/run-a/manifest.json"
 printf '%s\n' "$subject_line" >"$d/output/run-b/manifest.json"
 printf '%s\n' "$subject_line" >"$d/crates/thing/src/lib.rs"
 : >"$d/subject.txt"
-printf 'output/*.json | %s | frozen run records\n' \
+printf 'output/*.json | %s | 2 | frozen run records\n' \
 	"$HOME_ABS" >"$d/scripts/public-hygiene-allowlist.txt"
 out="$(run_gate "$d")"
 rc=$?
@@ -320,6 +326,163 @@ if [[ $rc -eq 1 ]] &&
 else
 	bad "the glob entry did not scope correctly (exit $rc)"
 	printf '%s\n' "$out" | sed 's/^/        /'
+fi
+
+# ---------------------------------------------------------------------------
+# 7b-7d. An allowlist entry may not be written wider than it declares.
+#
+# The synthetic cases first, then the real file. The synthetic ones fix the
+# messages; only the real one has ordering pressure, and ordering is what let
+# this through: the stale rule catches a widened entry by STARVING a later one,
+# so it never fires for the last entry of its text or for a line appended at the
+# end. A fixture with two files and two entries cannot express that.
+# ---------------------------------------------------------------------------
+
+# 7b. A first path segment carrying a wildcard is inexpressible.
+d="$(new_repo)"
+printf '%s\n' "$subject_line" >"$d/subject.txt"
+printf '* | %s | 1 | waive everything\n' "$HOME_ABS" >"$d/scripts/public-hygiene-allowlist.txt"
+out="$(run_gate "$d")"
+rc=$?
+if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "first segment must name"; then
+	ok "an unanchored path is refused"
+else
+	bad "a repo-wide glob was accepted (exit $rc)"
+	printf '%s\n' "$out" | sed 's/^/        /'
+fi
+
+# 7c. Declared reach that does not match the tree.
+d="$(new_repo)"
+printf '%s\n' "$subject_line" >"$d/subject.txt"
+printf 'subject.txt | %s | 5 | a dataset root this script opens\n' \
+	"$HOME_ABS" >"$d/scripts/public-hygiene-allowlist.txt"
+out="$(run_gate "$d")"
+rc=$?
+if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "declared reach 5, actual 1"; then
+	ok "a reach that does not match the tree is refused, naming both figures"
+else
+	bad "a false reach was accepted (exit $rc)"
+	printf '%s\n' "$out" | sed 's/^/        /'
+fi
+
+# 7d. Reach that is not a positive number.
+d="$(new_repo)"
+printf '%s\n' "$subject_line" >"$d/subject.txt"
+printf 'subject.txt | %s | 0 | a dataset root this script opens\n' \
+	"$HOME_ABS" >"$d/scripts/public-hygiene-allowlist.txt"
+out="$(run_gate "$d")"
+rc=$?
+if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "is not a positive number"; then
+	ok "a reach of zero is refused"
+else
+	bad "a zero reach was accepted (exit $rc)"
+	printf '%s\n' "$out" | sed 's/^/        /'
+fi
+
+# ---------------------------------------------------------------------------
+# 7e. THE REAL ALLOWLIST, UNDER ORDERING PRESSURE.
+#
+# Every entry of the committed file, in committed order, over a skeleton of this
+# repository's real tracked paths — so every glob has its real reach and every
+# line has its real neighbours. Empty files: the reach check reads `git ls-files`
+# and runs BEFORE anything is scanned, which is what makes it both cheap here and
+# impossible to reach past.
+#
+# The control asserts the committed file passes the reach and anchor checks, not
+# that the whole gate exits 0 — over empty files every entry suppresses nothing,
+# so the stale rule fires and should. That the committed reaches are TRUE over
+# the real tree is proved by the gate's own run in CI, on the real content.
+#
+# The mutations are applied at the FIRST entry, the LAST entry, and appended
+# below the last, because position is the variable under test.
+# ---------------------------------------------------------------------------
+echo "the real allowlist, under ordering pressure:"
+
+REPO_ROOT="$(git -C "$HERE" rev-parse --show-toplevel)"
+REAL_ALLOW="$HERE/public-hygiene-allowlist.txt"
+SKEL="$TMPROOT/skeleton"
+mkdir -p "$SKEL/scripts"
+(cd "$REPO_ROOT" && git ls-files -z) |
+	(cd "$SKEL" && xargs -0 -n 200 sh -c 'for f; do mkdir -p "$(dirname "$f")"; : >"$f"; done' _)
+git init -q "$SKEL"
+cp "$CHECK" "$SKEL/scripts/check-public-hygiene.sh"
+# The skeleton created every tracked path as an empty 644 file, including this
+# one, so the copy inherits a mode it cannot be run with.
+chmod +x "$SKEL/scripts/check-public-hygiene.sh"
+cp "$RULES" "$SKEL/scripts/public-hygiene-rules.txt"
+: >"$SKEL/scripts/public-hygiene-accepted-tree.txt"
+git -C "$SKEL" add -A >/dev/null 2>&1
+
+# The line numbers of the first and last entries of the real file, found rather
+# than written down: a hardcoded number here would rot on the next edit and the
+# case would silently stop testing the position it names.
+first_entry_ln="$(grep -n '^[^#[:space:]].*|' "$REAL_ALLOW" | head -1 | cut -d: -f1)"
+last_entry_ln="$(grep -n '^[^#[:space:]].*|' "$REAL_ALLOW" | tail -1 | cut -d: -f1)"
+
+skeleton_gate() {
+	cp "$REAL_ALLOW" "$SKEL/scripts/public-hygiene-allowlist.txt"
+	if [[ $# -gt 0 ]]; then
+		"$@" "$SKEL/scripts/public-hygiene-allowlist.txt"
+	fi
+	git -C "$SKEL" add -A >/dev/null 2>&1
+	(cd "$SKEL" && ./scripts/check-public-hygiene.sh 2>&1)
+}
+
+widen_line() {
+	# widen_line <lineno> <replacement path> <file>
+	perl -i -pe "s{^[^|]*\\|}{$2 |} if \$. == $1" "$3"
+}
+
+if [[ -z "$first_entry_ln" || -z "$last_entry_ln" || "$first_entry_ln" == "$last_entry_ln" ]]; then
+	bad "could not locate the real allowlist's first and last entries"
+else
+	out="$(skeleton_gate)"
+	if printf '%s\n' "$out" | grep -qE "declared reach|first segment must name"; then
+		bad "the committed allowlist does not satisfy its own reach or anchor rules"
+		printf '%s\n' "$out" | grep -E "declared reach|first segment" | sed 's/^/        /'
+	else
+		ok "the committed allowlist's declared reaches and anchors hold"
+	fi
+
+	out="$(skeleton_gate widen_line "$first_entry_ln" 'output/*')"
+	rc=$?
+	if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "^check-public-hygiene: scripts/public-hygiene-allowlist.txt:$first_entry_ln: declared reach"; then
+		ok "widening the FIRST entry reddens, and names that line"
+	else
+		bad "widening the first entry was not refused (exit $rc)"
+		printf '%s\n' "$out" | sed 's/^/        /' | head -5
+	fi
+
+	# The case that got through. Nothing below it competes for its text, so no
+	# later entry is starved and the stale rule never fires.
+	out="$(skeleton_gate widen_line "$last_entry_ln" 'output/*')"
+	rc=$?
+	if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "^check-public-hygiene: scripts/public-hygiene-allowlist.txt:$last_entry_ln: declared reach"; then
+		ok "widening the LAST entry reddens, with nothing below it to starve"
+	else
+		bad "widening the last entry was not refused (exit $rc)"
+		printf '%s\n' "$out" | sed 's/^/        /' | head -5
+	fi
+
+	append_wide() { printf '* | %s | 1585 | appended\n' "$HOME_ABS" >>"$1"; }
+	out="$(skeleton_gate append_wide)"
+	rc=$?
+	if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "first segment must name"; then
+		ok "an unanchored entry appended BELOW the last one reddens"
+	else
+		bad "an appended repo-wide entry was not refused (exit $rc)"
+		printf '%s\n' "$out" | sed 's/^/        /' | head -5
+	fi
+
+	append_deep() { printf 'output/* | %s | 3 | appended\n' "$HOME_ABS" >>"$1"; }
+	out="$(skeleton_gate append_deep)"
+	rc=$?
+	if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "declared reach 3, actual"; then
+		ok "an anchored entry appended below the last one still declares its reach"
+	else
+		bad "an appended subtree entry was not measured (exit $rc)"
+		printf '%s\n' "$out" | sed 's/^/        /' | head -5
+	fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -387,6 +550,7 @@ accept_repo() {
 		printf 'the %s corpus pass, run %s\n' "$MILESTONE" "$i" >>"$d/subject.txt"
 	done
 	{
+		printf 'total entries 1\ntotal matches %s\n' "$dc"
 		printf 'reason pre-gate-tree: published before the rule existed\n'
 		printf 'subject.txt | milestone-id | %s | %s | pre-gate-tree\n' "$dfp" "$dc"
 	} >"$d/scripts/public-hygiene-accepted-tree.txt"
@@ -422,6 +586,7 @@ fi
 d="$(new_repo)"
 printf 'the %s corpus pass\n' "$MILESTONE2" >"$d/subject.txt"
 {
+	printf 'total entries 1\ntotal matches 1\n'
 	printf 'reason pre-gate-tree: published before the rule existed\n'
 	printf 'subject.txt | milestone-id | %s | 1 | pre-gate-tree\n' "$FP_ONE"
 } >"$d/scripts/public-hygiene-accepted-tree.txt"
@@ -439,6 +604,7 @@ fi
 d="$(new_repo)"
 printf 'the corpus pass, no identifier here\n' >"$d/subject.txt"
 {
+	printf 'total entries 1\ntotal matches 1\n'
 	printf 'reason pre-gate-tree: published before the rule existed\n'
 	printf 'subject.txt | milestone-id | %s | 1 | pre-gate-tree\n' "$FP_ONE"
 } >"$d/scripts/public-hygiene-accepted-tree.txt"
@@ -454,7 +620,7 @@ fi
 # 9e. An entry whose reason nobody wrote down.
 d="$(new_repo)"
 printf 'the %s corpus pass\n' "$MILESTONE" >"$d/subject.txt"
-printf 'subject.txt | milestone-id | %s | 1 | some-key\n' "$FP_ONE" \
+printf 'total entries 1\ntotal matches 1\nsubject.txt | milestone-id | %s | 1 | some-key\n' "$FP_ONE" \
 	>"$d/scripts/public-hygiene-accepted-tree.txt"
 out="$(run_gate "$d")"
 rc=$?
@@ -469,6 +635,7 @@ fi
 d="$(new_repo)"
 printf 'the %s corpus pass\n' "$MILESTONE" >"$d/subject.txt"
 {
+	printf 'total entries 1\ntotal matches 1\n'
 	printf 'reason pre-gate-tree: published before the rule existed\n'
 	printf 'subject.txt | milestone-id | %s | 1\n' "$FP_ONE"
 } >"$d/scripts/public-hygiene-accepted-tree.txt"
@@ -487,6 +654,7 @@ d="$(new_repo)"
 printf 'the %s corpus pass\n' "$MILESTONE" >"$d/subject.txt"
 printf 'the %s corpus pass\n' "$MILESTONE" >"$d/elsewhere.txt"
 {
+	printf 'total entries 1\ntotal matches 1\n'
 	printf 'reason pre-gate-tree: published before the rule existed\n'
 	printf 'subject.txt | milestone-id | %s | 1 | pre-gate-tree\n' "$FP_ONE"
 } >"$d/scripts/public-hygiene-accepted-tree.txt"
@@ -497,6 +665,65 @@ if [[ $rc -eq 1 ]] && printf '%s\n' "$out" | grep -q "^elsewhere.txt:1: mileston
 	ok "a record covers its own file and no other"
 else
 	bad "the accepted record leaked outside its file (exit $rc)"
+	printf '%s\n' "$out" | sed 's/^/        /'
+fi
+
+# 9h-9k. The record's own declared totals.
+#
+# The header of that file used to carry its counts in prose, and one of them was
+# wrong -- 52 pairs and 137 matches against a real 51 and 136 -- for as long as
+# nothing read it. These four cases are why it cannot be wrong again.
+
+totals_repo() {
+	# totals_repo <header lines...>
+	local d
+	d="$(new_repo)"
+	printf 'the %s corpus pass\n' "$MILESTONE" >"$d/subject.txt"
+	{
+		printf '%s\n' "$@"
+		printf 'reason pre-gate-tree: published before the rule existed\n'
+		printf 'subject.txt | milestone-id | %s | 1 | pre-gate-tree\n' "$FP_ONE"
+	} >"$d/scripts/public-hygiene-accepted-tree.txt"
+	printf '%s' "$d"
+}
+
+d="$(totals_repo 'total entries 2' 'total matches 1')"
+out="$(run_gate "$d")"
+rc=$?
+if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "declares 'total entries 2', parsed 1"; then
+	ok "a wrong entry total is refused"
+else
+	bad "a wrong entry total was accepted (exit $rc)"
+	printf '%s\n' "$out" | sed 's/^/        /'
+fi
+
+d="$(totals_repo 'total entries 1' 'total matches 9')"
+out="$(run_gate "$d")"
+rc=$?
+if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "declares 'total matches 9', entries sum to 1"; then
+	ok "a wrong match total is refused"
+else
+	bad "a wrong match total was accepted (exit $rc)"
+	printf '%s\n' "$out" | sed 's/^/        /'
+fi
+
+d="$(totals_repo '# no totals at all')"
+out="$(run_gate "$d")"
+rc=$?
+if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "needs a 'total entries"; then
+	ok "a record with entries and no declared totals is refused"
+else
+	bad "a record with no totals was accepted (exit $rc)"
+	printf '%s\n' "$out" | sed 's/^/        /'
+fi
+
+d="$(totals_repo 'total entries 1' 'total matches 1' 'total wibble 3')"
+out="$(run_gate "$d")"
+rc=$?
+if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "unknown total 'wibble'"; then
+	ok "a total nobody reads is refused rather than ignored"
+else
+	bad "an unknown total was ignored (exit $rc)"
 	printf '%s\n' "$out" | sed 's/^/        /'
 fi
 

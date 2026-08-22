@@ -16,8 +16,9 @@
 #      and nothing else -- not another commit, not another rule;
 #   4. a record that is reachable and no longer matching is FATAL, and one that
 #      has simply left the range is not;
-#   5. a malformed record, an abbreviated sha, and an undeclared reason key are
-#      each fatal;
+#   5. a malformed record, an abbreviated sha, an undeclared reason key and a
+#      total the record states about itself that its entries contradict are each
+#      fatal;
 #   6. --text catches the same shapes and accepts NOTHING: an identifier in a
 #      pull request body fails even when a recorded commit carries the same one;
 #   7. a rule that cannot run, an absent rules file and a rules file that
@@ -186,7 +187,9 @@ record() {
 	# record <repo> <line>...
 	local d="$1"
 	shift
+	local n=$#
 	{
+		printf 'total entries %s\ntotal commits %s\n' "$n" "$n"
 		printf 'reason pre-gate-history: on main before the gate existed\n'
 		printf '%s\n' "$@"
 	} >"$d/scripts/public-hygiene-accepted-history.txt"
@@ -293,7 +296,7 @@ fi
 # 5c. A reason nobody declared.
 d="$(new_repo "$(printf 'Close the %s eval-corpus work' "$MILESTONE")")"
 sha="$(git -C "$d" rev-parse HEAD)"
-printf '%s | milestone-id | some-key\n' "$sha" \
+printf 'total entries 1\ntotal commits 1\n%s | milestone-id | some-key\n' "$sha" \
 	>"$d/scripts/public-hygiene-accepted-history.txt"
 out="$(run_gate "$d")"
 rc=$?
@@ -301,6 +304,38 @@ if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "is never declared"; then
 	ok "an entry whose reason key is undeclared is refused"
 else
 	bad "an entry with no declared reason was accepted (exit $rc)"
+	printf '%s\n' "$out" | sed 's/^/        /'
+fi
+
+# 5d-5e. The record's own declared totals.
+d="$(new_repo "$(printf 'Close the %s eval-corpus work' "$MILESTONE")")"
+sha="$(git -C "$d" rev-parse HEAD)"
+{
+	printf 'total entries 4\ntotal commits 1\n'
+	printf 'reason pre-gate-history: on main before the gate existed\n'
+	printf '%s | milestone-id | pre-gate-history\n' "$sha"
+} >"$d/scripts/public-hygiene-accepted-history.txt"
+out="$(run_gate "$d")"
+rc=$?
+if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "declares 'total entries 4', parsed 1"; then
+	ok "a wrong entry total is refused"
+else
+	bad "a wrong entry total was accepted (exit $rc)"
+	printf '%s\n' "$out" | sed 's/^/        /'
+fi
+
+d="$(new_repo "$(printf 'Close the %s eval-corpus work' "$MILESTONE")")"
+sha="$(git -C "$d" rev-parse HEAD)"
+{
+	printf 'reason pre-gate-history: on main before the gate existed\n'
+	printf '%s | milestone-id | pre-gate-history\n' "$sha"
+} >"$d/scripts/public-hygiene-accepted-history.txt"
+out="$(run_gate "$d")"
+rc=$?
+if [[ $rc -eq 2 ]] && printf '%s\n' "$out" | grep -q "needs a 'total entries"; then
+	ok "a record with entries and no declared totals is refused"
+else
+	bad "a record with no totals was accepted (exit $rc)"
 	printf '%s\n' "$out" | sed 's/^/        /'
 fi
 

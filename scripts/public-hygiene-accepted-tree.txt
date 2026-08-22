@@ -8,13 +8,18 @@
 # refused the moment it grows and cannot be mistaken for nobody having looked.
 #
 # WHY NOT SWEPT. Three rules were turned on over a tree that already violated
-# them, measured 2026-08-22: 52 file-and-rule pairs, 137 matches. They sit in
-# frozen evidence records under output/, in Rust doc comments that another gate
-# reads for citations, in a CHANGELOG, and in .gitignore -- 47 files. Rewriting
-# them is a content change of a different shape and a different blast radius from
-# turning a gate on, and doing both in one diff makes neither reviewable. The
-# gate goes on now, because the rate is the part that is still recoverable; the
-# sweep follows, and every line it fixes is a line deleted from here.
+# them, measured 2026-08-22. The figures are the two `total` lines below, and the
+# gate refuses this file if either stops matching the entries -- an earlier draft
+# of this paragraph said 52 pairs and 137 matches against a real 51 and 136, and
+# nothing noticed, because a count in prose is a count nobody checks.
+#
+# They sit in frozen evidence records under output/, in Rust doc comments that
+# another gate reads for citations, in a CHANGELOG, in CLAUDE.md and in
+# .gitignore. Rewriting them is a content change of a different shape and a
+# different blast radius from turning a gate on, and doing both in one diff makes
+# neither reviewable. The gate goes on now, because the rate is the part that is
+# still recoverable; the sweep follows, and every line it fixes is a line deleted
+# from here.
 #
 # FORMAT, five pipe-separated fields:
 #
@@ -31,6 +36,9 @@
 # is watching. Do not add a line here to get a new violation past the gate; the
 # gate says so itself when it refuses one.
 #
+total entries 51
+total matches 136
+
 reason pre-gate-tree: On main before the rule existed, in an evidence record, a doc comment, a changelog or an ignore file. A sweep is a content change with a different blast radius and is not bundled with turning the gate on; this line is deleted when its file is swept.
 
 .claude/skills/finetype-cli/SKILL.md                             | planning-card-id        | 1b735d86309a |  1 | pre-gate-tree

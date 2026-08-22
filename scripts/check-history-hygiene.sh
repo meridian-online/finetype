@@ -203,6 +203,8 @@ declare -a ACC_REASON=()
 declare -a ACC_LINENO=()
 declare -a ACC_SEEN=()
 ACC_REASON_KEYS=""
+TOTAL_ENTRIES=""
+TOTAL_COMMITS=""
 
 if [[ -f "$ACCEPTED" ]]; then
 	lineno=0
@@ -213,6 +215,29 @@ if [[ -f "$ACCEPTED" ]]; then
 		trimmed="$(trim "$line")"
 		[[ -z "$trimmed" ]] && continue
 		[[ "$trimmed" == \#* ]] && continue
+
+		# A `total` directive states a figure about this file that this file
+		# can be checked against, so a count in the header cannot quietly stop
+		# being true.
+		if [[ "$trimmed" == total\ * ]]; then
+			t_rest="$(trim "${trimmed#total }")"
+			t_what="${t_rest%% *}"
+			t_val="$(trim "${t_rest#* }")"
+			case "$t_what" in
+			entries) TOTAL_ENTRIES="$t_val" ;;
+			commits) TOTAL_COMMITS="$t_val" ;;
+			*)
+				echo "check-history-hygiene: $ACCEPTED:$lineno: unknown total '$t_what'" >&2
+				echo "    known totals: entries, commits" >&2
+				bad_acc=1
+				;;
+			esac
+			if [[ ! "$t_val" =~ ^[0-9]+$ ]]; then
+				echo "check-history-hygiene: $ACCEPTED:$lineno: total $t_what '$t_val' is not a number" >&2
+				bad_acc=1
+			fi
+			continue
+		fi
 
 		if [[ "$trimmed" == reason\ * ]]; then
 			rkey="$(trim "${trimmed#reason }")"
@@ -265,6 +290,29 @@ if [[ -f "$ACCEPTED" ]]; then
 fi
 
 ACC_N=${#ACC_SHA[@]}
+
+# Only when there is something to declare.
+if [[ $ACC_N -gt 0 ]]; then
+	distinct="$(printf '%s\n' "${ACC_SHA[@]:-}" | LC_ALL=C sort -u | grep -c . )"
+	bad_acc=0
+	if [[ -z "$TOTAL_ENTRIES" || -z "$TOTAL_COMMITS" ]]; then
+		echo "check-history-hygiene: $ACCEPTED: needs a 'total entries <n>' and a 'total commits <n>' line" >&2
+		echo "    observed: $ACC_N entries over $distinct commits" >&2
+		bad_acc=1
+	else
+		if [[ "$TOTAL_ENTRIES" -ne "$ACC_N" ]]; then
+			echo "check-history-hygiene: $ACCEPTED: declares 'total entries $TOTAL_ENTRIES', parsed $ACC_N" >&2
+			bad_acc=1
+		fi
+		if [[ "$TOTAL_COMMITS" -ne "$distinct" ]]; then
+			echo "check-history-hygiene: $ACCEPTED: declares 'total commits $TOTAL_COMMITS', entries name $distinct" >&2
+			bad_acc=1
+		fi
+	fi
+	if [[ $bad_acc -ne 0 ]]; then
+		exit 2
+	fi
+fi
 
 bad_acc=0
 for ((i = 0; i < ACC_N; i++)); do

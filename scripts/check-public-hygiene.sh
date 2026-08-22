@@ -197,12 +197,12 @@ show() {
 # ---------------------------------------------------------------------------
 # ALLOWLIST.
 #
-# Format, one entry per line, THREE pipe-separated fields:
+# Format, one entry per line, FOUR pipe-separated fields:
 #
-#     <tracked file path or glob> | <exact offending text> | <why this is legitimate>
+#     <tracked file path or glob> | <exact offending text> | <reach> | <why this is legitimate>
 #
 # `|` is the separator precisely because no rule pattern can ever match a `|`,
-# so the offending text can never collide with the separator. All three fields
+# so the offending text can never collide with the separator. All four fields
 # are required and none may be empty. Anything that does not parse is a hard
 # error (exit 2), so the escape hatch cannot be used silently or by accident.
 #
@@ -210,18 +210,62 @@ show() {
 # repos' version of this file, where it is an exact path. `*` matches any run of
 # characters INCLUDING `/`, so `output/*.json` covers a whole subtree. This tree
 # has families of frozen run records that carry the same recorded path in the
-# same field, and the alternative was forty entries repeating one reason. A glob
-# still has to earn its place: it must match something, and it carries a reason
-# like any other entry. Prefer the narrowest glob that does the job.
+# same field, and the alternative was forty entries repeating one reason.
+#
+# ---------------------------------------------------------------------------
+# WHY AN ENTRY DECLARES ITS REACH, AND WHAT IT COST NOT TO
+# ---------------------------------------------------------------------------
+# REACH is the number of TRACKED FILES the path glob matches — what the entry
+# COULD suppress, not what it happens to suppress today. It is checked before any
+# scanning, and a mismatch is a hard error naming both figures.
+#
+# It is here because the allowlist was the one declaration file in this gate that
+# declared nothing about its own effect. The two accepted-* records each carry a
+# count, so a change in what they cover reddens. This file carried a path, a
+# string and a sentence, and the only thing standing between it and a repo-wide
+# waiver was the stale rule below — which fires only when a widened entry STARVES
+# a later one, and therefore not at all for the last entry of its text, or for a
+# new entry appended to the end.
+#
+# Measured on this file: widening one entry's path from `scripts/launchd/*` to
+# `*` — a nine-character deletion — left the gate reporting `clean (62626
+# allowlisted match(es))`, exit 0, in a message shaped exactly like a healthy
+# one. It then swallowed a freshly-planted home path in a new file, still exit 0.
+# Nothing was starved, because no later entry waived that string. A privacy gate
+# that reports clean while suppressing everything is the worst failure available
+# to it, and it was one character away, from any position in the file.
+#
+# So three properties now hold, and NONE of them depends on another entry, which
+# is what makes them independent of where a line sits:
+#
+#   ANCHORED   the first path segment carries no wildcard, so `*`, `*.json` and
+#              `*/x` are inexpressible. A waiver has to name a directory it lives
+#              under. This is structural rather than a magnitude threshold: it
+#              cannot be tuned and it cannot rot as the tree grows.
+#   REACH      declared, exact, and checked against `git ls-files`. Any widening
+#              inside the anchored space moves the number and reddens. The
+#              largest honest entry here reaches 136 of 1,585 tracked files; a
+#              bare `*` would reach all of them.
+#   LIVE       every entry must still suppress something (the stale rule below).
+#
+# Reach moves when the tree grows — a new frozen record under `output/` moves
+# `output/*.json`. That is not noise, it is the event worth seeing: the waiver
+# just got wider, and the gate says so and names the new figure. Write it, or
+# narrow the glob.
+#
+# WHAT THIS STILL DOES NOT DECIDE. An anchored entry with a large declared reach
+# — `output/* | … | 400 | …` — parses and passes. It is a visible, deliberate act
+# with a number attached, and a mechanical check cannot go further than that
+# without judging intent. Read the reach column in review; it is there to be
+# read.
 #
 # Line numbers are deliberately NOT part of an entry — they drift on every edit.
-# Instead every entry must MATCH SOMETHING: an entry that suppresses nothing is
-# also a hard error, so a stale allowlist cannot rot into fake coverage.
 #
 # Blank lines and whole-line `#` comments are ignored.
 # ---------------------------------------------------------------------------
 declare -a ALLOW_PATH=()
 declare -a ALLOW_TEXT=()
+declare -a ALLOW_REACH=()
 declare -a ALLOW_LINENO=()
 declare -a ALLOW_HITS=()
 
@@ -250,25 +294,49 @@ if [[ -f "$ALLOWLIST" ]]; then
 		# exists to refuse — arrived as two fields and was reported as a
 		# malformed line instead of a reasonless one.
 		seps="${line//[^|]/}"
-		if [[ ${#seps} -ne 2 ]]; then
-			echo "check-public-hygiene: $ALLOWLIST:$lineno: expected 3 '|'-separated fields, got $((${#seps} + 1))" >&2
+		if [[ ${#seps} -ne 3 ]]; then
+			echo "check-public-hygiene: $ALLOWLIST:$lineno: expected 4 '|'-separated fields, got $((${#seps} + 1))" >&2
 			echo "    $line" >&2
-			echo "    format: <tracked/file/path or glob> | <exact offending text> | <why this is legitimate>" >&2
+			echo "    format: <tracked/file/path or glob> | <exact offending text> | <reach> | <why this is legitimate>" >&2
 			bad_allow=1
 			continue
 		fi
 		rest="${line#*|}"
 		a_path="$(trim "${line%%|*}")"
 		a_text="$(trim "${rest%%|*}")"
+		rest="${rest#*|}"
+		a_reach="$(trim "${rest%%|*}")"
 		a_reason="$(trim "${rest#*|}")"
-		if [[ -z "$a_path" || -z "$a_text" || -z "$a_reason" ]]; then
-			echo "check-public-hygiene: $ALLOWLIST:$lineno: path, text and explanation are all required" >&2
+		if [[ -z "$a_path" || -z "$a_text" || -z "$a_reach" || -z "$a_reason" ]]; then
+			echo "check-public-hygiene: $ALLOWLIST:$lineno: path, text, reach and explanation are all required" >&2
 			echo "    $line" >&2
 			bad_allow=1
 			continue
 		fi
+		if [[ ! "$a_reach" =~ ^[0-9]+$ ]] || [[ "$a_reach" -lt 1 ]]; then
+			echo "check-public-hygiene: $ALLOWLIST:$lineno: reach '$a_reach' is not a positive number" >&2
+			echo "    reach is how many TRACKED FILES the path glob matches" >&2
+			bad_allow=1
+			continue
+		fi
+		# ANCHORED. The first path segment may carry no wildcard, so a waiver
+		# cannot be written over the whole repository. Structural rather than a
+		# magnitude threshold: nothing to tune, and nothing that rots as the
+		# tree grows. `output/*.json` is fine; `*`, `*.json` and `*/x` are not.
+		a_first="${a_path%%/*}"
+		case "$a_first" in
+		*[\*?\[]*)
+			echo "check-public-hygiene: $ALLOWLIST:$lineno: the path's first segment must name a real directory or file" >&2
+			echo "    $a_path" >&2
+			echo "    a wildcard there waives text across the whole repository. Anchor the" >&2
+			echo "    entry on the directory it lives under: <dir>/... , not *..." >&2
+			bad_allow=1
+			continue
+			;;
+		esac
 		ALLOW_PATH+=("$a_path")
 		ALLOW_TEXT+=("$a_text")
+		ALLOW_REACH+=("$a_reach")
 		ALLOW_LINENO+=("$lineno")
 		ALLOW_HITS+=(0)
 	done <"$ALLOWLIST"
@@ -278,6 +346,43 @@ if [[ -f "$ALLOWLIST" ]]; then
 fi
 
 ALLOW_COUNT=${#ALLOW_PATH[@]}
+
+# ---------------------------------------------------------------------------
+# REACH, checked before anything is scanned.
+#
+# Before, not after, for two reasons. An entry whose glob has been widened must
+# be refused whether or not the widening currently suppresses anything -- reach
+# is what it COULD suppress. And a check that runs at parse time costs one
+# `git ls-files` rather than a scan, which is what lets the self-test exercise
+# this against the real, populated allowlist rather than a two-file stand-in.
+# ---------------------------------------------------------------------------
+if [[ $ALLOW_COUNT -gt 0 ]]; then
+	tracked_list="$(mktemp)" || exit 2
+	git ls-files >"$tracked_list" || exit 2
+	bad_allow=0
+	for ((i = 0; i < ALLOW_COUNT; i++)); do
+		reach=0
+		while IFS= read -r tf; do
+			# shellcheck disable=SC2053  # glob match is the point
+			[[ "$tf" == ${ALLOW_PATH[$i]} ]] && reach=$((reach + 1))
+		done <"$tracked_list"
+		if [[ $reach -ne ${ALLOW_REACH[$i]} ]]; then
+			echo "check-public-hygiene: $ALLOWLIST:${ALLOW_LINENO[$i]}: declared reach ${ALLOW_REACH[$i]}, actual $reach" >&2
+			echo "    ${ALLOW_PATH[$i]} | ${ALLOW_TEXT[$i]}" >&2
+			if [[ $reach -gt ${ALLOW_REACH[$i]} ]]; then
+				echo "    this waiver got WIDER. Narrow the glob, or write $reach and say why in review." >&2
+			else
+				echo "    this waiver got narrower. Write $reach, or delete the entry if it is spent." >&2
+			fi
+			bad_allow=1
+		fi
+	done
+	rm -f "$tracked_list"
+	if [[ $bad_allow -ne 0 ]]; then
+		echo "    reach is the number of tracked files the path glob matches, from git ls-files." >&2
+		exit 2
+	fi
+fi
 
 # Returns 0 — and marks the entry used — when this file/text pair is allowlisted.
 # The path comparison is an unquoted RHS inside [[ ]], which is bash pattern
@@ -346,6 +451,8 @@ declare -a ACC_REASON=()
 declare -a ACC_LINENO=()
 declare -a ACC_SEEN=()
 ACC_REASON_KEYS=""
+TOTAL_ENTRIES=""
+TOTAL_MATCHES=""
 
 # The fingerprint hash, from whichever of the two portable tools is present.
 # macOS ships `shasum`, Linux ships `sha256sum`, and a machine with neither
@@ -368,6 +475,30 @@ if [[ -f "$ACCEPTED" ]]; then
 		trimmed="$(trim "$line")"
 		[[ -z "$trimmed" ]] && continue
 		[[ "$trimmed" == \#* ]] && continue
+
+		# A `total` directive states a figure about this file that this file
+		# can be checked against. The header used to carry its counts in prose
+		# and one of them was wrong -- 52 pairs and 137 matches against a real
+		# 51 and 136 -- which is what a number nothing verifies does.
+		if [[ "$trimmed" == total\ * ]]; then
+			t_rest="$(trim "${trimmed#total }")"
+			t_what="${t_rest%% *}"
+			t_val="$(trim "${t_rest#* }")"
+			case "$t_what" in
+			entries) TOTAL_ENTRIES="$t_val" ;;
+			matches) TOTAL_MATCHES="$t_val" ;;
+			*)
+				echo "check-public-hygiene: $ACCEPTED:$lineno: unknown total '$t_what'" >&2
+				echo "    known totals: entries, matches" >&2
+				bad_acc=1
+				;;
+			esac
+			if [[ ! "$t_val" =~ ^[0-9]+$ ]]; then
+				echo "check-public-hygiene: $ACCEPTED:$lineno: total $t_what '$t_val' is not a number" >&2
+				bad_acc=1
+			fi
+			continue
+		fi
 
 		if [[ "$trimmed" == reason\ * ]]; then
 			rkey="$(trim "${trimmed#reason }")"
@@ -424,6 +555,36 @@ if [[ -f "$ACCEPTED" ]]; then
 fi
 
 ACC_COUNT_N=${#ACC_PATH[@]}
+
+# The declared totals against the entries actually parsed. Both are required: a
+# figure that may be omitted is a figure that gets omitted the first time it is
+# inconvenient, which is the same hole as one nobody checks.
+# Only when there is something to declare: an empty record declares nothing and
+# has nothing to be wrong about.
+if [[ $ACC_COUNT_N -gt 0 ]]; then
+	acc_sum=0
+	for ((i = 0; i < ACC_COUNT_N; i++)); do
+		acc_sum=$((acc_sum + ACC_COUNT[i]))
+	done
+	bad_acc=0
+	if [[ -z "$TOTAL_ENTRIES" || -z "$TOTAL_MATCHES" ]]; then
+		echo "check-public-hygiene: $ACCEPTED: needs a 'total entries <n>' and a 'total matches <n>' line" >&2
+		echo "    observed: $ACC_COUNT_N entries, $acc_sum matches" >&2
+		bad_acc=1
+	else
+		if [[ "$TOTAL_ENTRIES" -ne "$ACC_COUNT_N" ]]; then
+			echo "check-public-hygiene: $ACCEPTED: declares 'total entries $TOTAL_ENTRIES', parsed $ACC_COUNT_N" >&2
+			bad_acc=1
+		fi
+		if [[ "$TOTAL_MATCHES" -ne "$acc_sum" ]]; then
+			echo "check-public-hygiene: $ACCEPTED: declares 'total matches $TOTAL_MATCHES', entries sum to $acc_sum" >&2
+			bad_acc=1
+		fi
+	fi
+	if [[ $bad_acc -ne 0 ]]; then
+		exit 2
+	fi
+fi
 
 # Every entry's reason key has to have been declared. An entry carrying a key
 # nobody wrote down is an entry with no reason, which is the shape this file
@@ -629,7 +790,11 @@ if [[ $violations -gt 0 ]]; then
 	echo "does not error; it matches fewer rows and returns a plausible wrong number."
 	echo "Add a line to $ALLOWLIST in the form:"
 	echo
-	echo "    path/or/glob | <exact matched text> | why this is legitimate"
+	echo "    <dir>/path/or/glob | <exact matched text> | <reach> | why this is legitimate"
+	echo
+	echo "reach is how many tracked files the glob matches (git ls-files). The gate"
+	echo "prints the number it measured, so an entry cannot be written wider than the"
+	echo "figure beside it."
 	echo
 	echo "$ACCEPTED is NOT the place to put a new one. It records what was already"
 	echo "published when the rule was turned on, and it only shrinks."

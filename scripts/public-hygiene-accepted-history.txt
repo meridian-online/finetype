@@ -1,8 +1,10 @@
 # Private planning identifiers already published in this repository's COMMIT
 # MESSAGES, recorded because they cannot be taken back.
 #
-# 137 of the 1484 commits reachable from main carry one, in 7 rule shapes,
-# measured 2026-08-22, earliest 2026-02-10, latest 2026-08-08:
+# The two `total` lines below are the count, and the gate refuses this file if
+# either stops matching the entries -- a figure in prose is a figure nobody
+# checks. Measured 2026-08-22 over every commit reachable from main, earliest
+# 2026-02-10, latest 2026-08-08, in 7 rule shapes:
 #
 #     planning-card-id          77
 #     milestone-id              31
@@ -34,6 +36,9 @@
 # THIS FILE IS NOT AN ESCAPE HATCH. A commit that is not yet pushed can be
 # amended or rebased, so a new violation is always fixable and is always refused.
 # The gate says so itself when it refuses one.
+
+total entries 146
+total commits 137
 
 reason pre-gate-history: On main before any gate read a commit message. Rewriting it would rewrite every commit after it and break every published release hash, a cost out of all proportion to removing a string that has already been served to every reader and mirror.
 

@@ -1,17 +1,51 @@
 # Allowlist for scripts/check-public-hygiene.sh.
 #
-# Format, one entry per line, THREE pipe-separated fields:
+# Format, one entry per line, FOUR pipe-separated fields:
 #
-#     <tracked file path or glob> | <exact matched text> | why this one is legitimate
+#     <tracked file path or glob> | <exact matched text> | <reach> | why this one is legitimate
 #
 # `|` is the separator because no rule pattern can ever match a `|`, so the
-# matched text can never collide with it. All three fields are required; an entry
+# matched text can never collide with it. All four fields are required; an entry
 # that does not parse, or whose explanation is empty, fails the check with exit 2,
 # so nothing is waved through silently.
 #
 # Line numbers are not part of an entry — they drift. Instead, every entry must
 # match something: an entry that suppresses nothing is exit 2 too, so a stale
 # allowlist cannot rot into fake coverage.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# REACH, the third field, and why it exists
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# It is how many TRACKED FILES the path glob matches — what the entry COULD
+# suppress, not what it happens to suppress today — and the gate checks it
+# against `git ls-files` before it scans anything.
+#
+# Until 2026-08-22 this file declared nothing about its own effect, and the only
+# thing between it and a repo-wide waiver was the stale rule above: a widened
+# entry is caught when it STARVES a later entry of its matches, which never
+# happens for the last entry of its text, or for a line appended at the end.
+# Measured then: widening one entry from `scripts/launchd/*` to `*` — deleting
+# nine characters — left the gate reporting `clean (62626 allowlisted match(es))`
+# and exit 0, and it then swallowed a freshly-planted home path in a new file,
+# still exit 0.
+#
+# Two rules now hold and neither looks at any other entry, which is what makes
+# them independent of where a line sits:
+#
+#   the first path segment carries NO WILDCARD, so `*` and `*.json` cannot be
+#       written at all — a waiver has to name a directory it lives under;
+#   the reach is EXACT, so any widening inside that anchored space moves the
+#       number and the gate names both figures.
+#
+# Reach moves when the tree grows: a new frozen record under output/ moves
+# `output/*.json`. That is the event worth seeing rather than noise — the waiver
+# just got wider. The gate prints the number it measured; write it, or narrow the
+# glob.
+#
+# An anchored entry with a large declared reach still parses. It is a visible,
+# deliberate act with a number beside it, and no mechanical check gets further
+# than that without judging intent. Read the column in review.
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 # THE TEST FOR ADDING A LINE HERE
@@ -49,15 +83,15 @@
 # digest. Editing one character of it invalidates every score in that manifest, on
 # top of breaking the join.
 #
-eval/gold/*.tsv | /Users/hugh | The gittables corpus path is the join key for the evaluation substrate — 603 rows of gold_corpus.tsv match columns.parquet and v19_gated.parquet on it, and gold_corpus.tsv is registered by sha256 in evidence/fixtures.json. A rewrite breaks every gate join silently and yields a plausible wrong number.
-eval/gittables/holdout_paths.txt | /Users/hugh | The frozen gittables holdout list, joined against the same corpus paths by scripts/gittables_holdout_freeze.py. Rewriting one side of that comparison silently empties the holdout.
-eval/gittables/.gitignore | /Users/hugh | An ignore pattern matching generated corpus paths; a rewrite would stop it ignoring them.
-eval/datasets/snapshots/*.json | /Users/hugh | Recorded dataset-snapshot provenance: where the bytes were read from on the run that produced the snapshot. Editing it makes the record describe a run that did not happen.
-eval/datasets/sources.yaml | /Users/hugh | `local_path` values the dataset registry resolves at read time; scripts/dataset_verify.py opens exactly these strings.
-eval/gittables/ydf_labelled_accuracy.json | /Users/hugh | Recorded measurement provenance — the model and eval files that produced this accuracy figure.
-eval/gittables/ydf_leakage_audit.json | /Users/hugh | Recorded measurement provenance — the manifest and eval files this leakage audit was computed over.
-eval/gittables/ydf_labelled_accuracy.json | .orbit/ | Recorded measurement provenance: the eval file this figure was computed from, at the path it was read from.
-eval/gittables/ydf_leakage_audit.json | .orbit/ | Recorded measurement provenance: the eval file this audit was computed from, at the path it was read from.
+eval/gold/*.tsv | /Users/hugh | 11 | The gittables corpus path is the join key for the evaluation substrate — 603 rows of gold_corpus.tsv match columns.parquet and v19_gated.parquet on it, and gold_corpus.tsv is registered by sha256 in evidence/fixtures.json. A rewrite breaks every gate join silently and yields a plausible wrong number.
+eval/gittables/holdout_paths.txt | /Users/hugh | 1 | The frozen gittables holdout list, joined against the same corpus paths by scripts/gittables_holdout_freeze.py. Rewriting one side of that comparison silently empties the holdout.
+eval/gittables/.gitignore | /Users/hugh | 1 | An ignore pattern matching generated corpus paths; a rewrite would stop it ignoring them.
+eval/datasets/snapshots/*.json | /Users/hugh | 15 | Recorded dataset-snapshot provenance: where the bytes were read from on the run that produced the snapshot. Editing it makes the record describe a run that did not happen.
+eval/datasets/sources.yaml | /Users/hugh | 1 | `local_path` values the dataset registry resolves at read time; scripts/dataset_verify.py opens exactly these strings.
+eval/gittables/ydf_labelled_accuracy.json | /Users/hugh | 1 | Recorded measurement provenance — the model and eval files that produced this accuracy figure.
+eval/gittables/ydf_leakage_audit.json | /Users/hugh | 1 | Recorded measurement provenance — the manifest and eval files this leakage audit was computed over.
+eval/gittables/ydf_labelled_accuracy.json | .orbit/ | 1 | Recorded measurement provenance: the eval file this figure was computed from, at the path it was read from.
+eval/gittables/ydf_leakage_audit.json | .orbit/ | 1 | Recorded measurement provenance: the eval file this audit was computed from, at the path it was read from.
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 # 2. FROZEN RUN RECORDS UNDER output/ AND diagnostics/
@@ -69,13 +103,13 @@ eval/gittables/ydf_leakage_audit.json | .orbit/ | Recorded measurement provenanc
 # tidier, it makes it false — and these are precisely the files someone reaches
 # for when a published figure is questioned.
 #
-output/*.json | /Users/hugh | Frozen run record: the inputs and outputs of one experiment, as that run saw them.
-output/*.txt | /Users/hugh | Frozen run record: paths the run read and wrote, quoted from its own log.
-output/*.tsv | /Users/hugh | Frozen run record: the mined rows of one experiment, keyed by the corpus path they came from — the same join key as section 1.
-output/*.sh | /Users/hugh | A run script kept verbatim beside its results so the experiment can be re-read exactly as it was executed.
-output/*.py | /Users/hugh | A one-off analysis script kept verbatim beside its results; the dataset path is what it opened.
-diagnostics/* | /Users/hugh | Frozen diagnostic output: build and model paths as the recorded run saw them.
-docs/compact-date-residual.tsv | /Users/hugh | A residual table whose first column records WHICH binary produced each row; the path distinguishes the shipped release from a local build, so it is the identifying value.
+output/*.json | /Users/hugh | 136 | Frozen run record: the inputs and outputs of one experiment, as that run saw them.
+output/*.txt | /Users/hugh | 53 | Frozen run record: paths the run read and wrote, quoted from its own log.
+output/*.tsv | /Users/hugh | 109 | Frozen run record: the mined rows of one experiment, keyed by the corpus path they came from — the same join key as section 1.
+output/*.sh | /Users/hugh | 7 | A run script kept verbatim beside its results so the experiment can be re-read exactly as it was executed.
+output/*.py | /Users/hugh | 37 | A one-off analysis script kept verbatim beside its results; the dataset path is what it opened.
+diagnostics/* | /Users/hugh | 20 | Frozen diagnostic output: build and model paths as the recorded run saw them.
+docs/compact-date-residual.tsv | /Users/hugh | 1 | A residual table whose first column records WHICH binary produced each row; the path distinguishes the shipped release from a local build, so it is the identifying value.
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 # 3. PATHS A PROGRAM OPENS
@@ -86,8 +120,8 @@ docs/compact-date-residual.tsv | /Users/hugh | A residual table whose first colu
 # resolves somewhere else, and the diff looks like any other harmless string
 # change.
 #
-scripts/amvg/*.py | .orbit/ | A filesystem path constant these diagnostics open; rewriting the string changes what they read, which is not the same act as rewriting a sentence about them.
-scripts/archive/generate_triage.py | .orbit/ | The default value of a `--triage` path argument, passed to Path() and opened.
+scripts/amvg/*.py | .orbit/ | 7 | A filesystem path constant these diagnostics open; rewriting the string changes what they read, which is not the same act as rewriting a sentence about them.
+scripts/archive/generate_triage.py | .orbit/ | 1 | The default value of a `--triage` path argument, passed to Path() and opened.
 #
 # NOTE ON ORDERING: is_allowed() returns on its FIRST match, so a broad glob
 # placed above a narrower entry starves it and the narrow one is then reported as
@@ -107,27 +141,27 @@ scripts/archive/generate_triage.py | .orbit/ | The default value of a `--triage`
 #
 # Per-entry detail is on the entry itself.
 #
-scripts/build_diagnostic_report.py | .orbit/ | The two MADR choice files whose SHAs compose cascade_version, which feeds corpus_pass_id. Read behind `if p.exists()`, so a rewrite silently drops them from the composite instead of erroring.
-scripts/archive/*.py | .orbit/ | Two argparse `--tsv`/`--labelled-eval` defaults and one json.load target, in archived scripts. Values passed to the filesystem, not sentences about it.
-scripts/overnight_v11_retraining.sh | .orbit/ | A `PROGRESS=` path consumed by `[[ -f "$PROGRESS" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
-scripts/overnight_v12_retraining.sh | .orbit/ | A `PROGRESS=` path consumed by `[[ -f "$PROGRESS" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
-scripts/overnight_v13_retraining.sh | .orbit/ | A `SPEC=` path consumed by `[[ -f "$SPEC" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
-scripts/archive/*.py | /Users/hugh | A dataset-root constant these archived scripts open.
-scripts/probe_column_stats.py | /Users/hugh | A dataset-root constant this probe opens.
-scripts/probe_sibling_context.py | /Users/hugh | A dataset-root constant this probe opens; the comment beside it records that the gittables corpus lives there.
-scripts/sweep_decisive_stats.py | /Users/hugh | A dataset-root constant this sweep opens.
-scripts/audit_clean_labels.py | /Users/hugh | Reference-dataset roots this audit opens.
-scripts/generate_wikidata_person_columns.py | /Users/hugh | The default source root, passed to Path() and opened.
-scripts/fetch_geonames.sh | /Users/hugh | The download destination root this script writes into.
-scripts/fetch_wikidata_persons.sh | /Users/hugh | The download destination root this script writes into.
-scripts/gittables_holdout_freeze.py | /Users/hugh | The corpus root whose paths become the frozen holdout list — the join key of section 1, at the point it is produced.
-scripts/spike_dbpedia_overlap.py | /Users/hugh | Corpus paths this spike reads.
-scripts/mining_factory/leakage_firewall.py | /Users/hugh | The corpus root the firewall compares training rows against.
-scripts/eval_leakage/test_gate_harness.py | /Users/hugh | A corpus path fixture the harness asserts on; changing it changes what the test proves.
-scripts/cron_cycle.sh | /Users/hugh | The corpus root the scheduled cycle reads.
-scripts/contracts/*.yaml | /Users/hugh | A path recorded in an executed contract, and compared against at run time.
-scripts/test_dataset_provenance.sh | /Users/hugh | This test cd's to the checkout it was written for.
-datasets/README.md | /Users/hugh | The one remaining example is the `local_path` VALUE that eval/datasets/sources.yaml actually carries; the surrounding prose was rewritten to `$HOME`.
+scripts/build_diagnostic_report.py | .orbit/ | 1 | The two MADR choice files whose SHAs compose cascade_version, which feeds corpus_pass_id. Read behind `if p.exists()`, so a rewrite silently drops them from the composite instead of erroring.
+scripts/archive/*.py | .orbit/ | 52 | Two argparse `--tsv`/`--labelled-eval` defaults and one json.load target, in archived scripts. Values passed to the filesystem, not sentences about it.
+scripts/overnight_v11_retraining.sh | .orbit/ | 1 | A `PROGRESS=` path consumed by `[[ -f "$PROGRESS" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
+scripts/overnight_v12_retraining.sh | .orbit/ | 1 | A `PROGRESS=` path consumed by `[[ -f "$PROGRESS" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
+scripts/overnight_v13_retraining.sh | .orbit/ | 1 | A `SPEC=` path consumed by `[[ -f "$SPEC" ]]` to decide whether to add it to the run bundle; a rewrite silently drops the file from the bundle.
+scripts/archive/*.py | /Users/hugh | 52 | A dataset-root constant these archived scripts open.
+scripts/probe_column_stats.py | /Users/hugh | 1 | A dataset-root constant this probe opens.
+scripts/probe_sibling_context.py | /Users/hugh | 1 | A dataset-root constant this probe opens; the comment beside it records that the gittables corpus lives there.
+scripts/sweep_decisive_stats.py | /Users/hugh | 1 | A dataset-root constant this sweep opens.
+scripts/audit_clean_labels.py | /Users/hugh | 1 | Reference-dataset roots this audit opens.
+scripts/generate_wikidata_person_columns.py | /Users/hugh | 1 | The default source root, passed to Path() and opened.
+scripts/fetch_geonames.sh | /Users/hugh | 1 | The download destination root this script writes into.
+scripts/fetch_wikidata_persons.sh | /Users/hugh | 1 | The download destination root this script writes into.
+scripts/gittables_holdout_freeze.py | /Users/hugh | 1 | The corpus root whose paths become the frozen holdout list — the join key of section 1, at the point it is produced.
+scripts/spike_dbpedia_overlap.py | /Users/hugh | 1 | Corpus paths this spike reads.
+scripts/mining_factory/leakage_firewall.py | /Users/hugh | 1 | The corpus root the firewall compares training rows against.
+scripts/eval_leakage/test_gate_harness.py | /Users/hugh | 1 | A corpus path fixture the harness asserts on; changing it changes what the test proves.
+scripts/cron_cycle.sh | /Users/hugh | 1 | The corpus root the scheduled cycle reads.
+scripts/contracts/*.yaml | /Users/hugh | 1 | A path recorded in an executed contract, and compared against at run time.
+scripts/test_dataset_provenance.sh | /Users/hugh | 1 | This test cd's to the checkout it was written for.
+datasets/README.md | /Users/hugh | 1 | The one remaining example is the `local_path` VALUE that eval/datasets/sources.yaml actually carries; the surrounding prose was rewritten to `$HOME`.
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 # 4. MACHINE CONFIGURATION THAT CANNOT BE RELATIVE
@@ -136,7 +170,7 @@ datasets/README.md | /Users/hugh | The one remaining example is the `local_path`
 # launchd plists and newsyslog configuration are read by the OS, which performs
 # no variable expansion. An absolute path is the only form these files can take.
 #
-scripts/launchd/* | /Users/hugh | launchd and newsyslog read these files directly and expand nothing; an absolute path is the only form they accept.
+scripts/launchd/* | /Users/hugh | 4 | launchd and newsyslog read these files directly and expand nothing; an absolute path is the only form they accept.
 
 # The private-doc-id rule, added 2026-08-22, matches a table name inside a frozen
 # corpus sampling record. It is the name of a source file in the GitTables
@@ -144,4 +178,4 @@ scripts/launchd/* | /Users/hugh | launchd and newsyslog read these files directl
 # it. Rewriting one side of that join does not error; it matches fewer rows and
 # returns a plausible wrong number.
 #
-output/corpus-honest-gate/stratified_sample.files.txt | doc_2 | A GitTables source-table name in a frozen sampling record the corpus pass joins on, not a reference to a planning document.
+output/corpus-honest-gate/stratified_sample.files.txt | doc_2 | 1 | A GitTables source-table name in a frozen sampling record the corpus pass joins on, not a reference to a planning document.
