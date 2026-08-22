@@ -4,10 +4,12 @@
 #
 # scripts/check-public-hygiene.sh reads the content of tracked files. Its own
 # header used to say, honestly, that commit messages and pull request text were
-# nobody's job. They were the surface the leak used: 117 of the 1,484 commits on
-# this repository's main carry a private planning identifier in their message,
-# across 5 rule shapes. None of them was stopped by anything, because nothing was
-# looking.
+# nobody's job. They were the surface the leak used: 137 of the 1,484 commits on
+# this repository's main carry a private planning reference in their message,
+# across 7 rule shapes. None of them was stopped by anything, because nothing was
+# looking. The count is not a claim in prose -- it is the number of distinct shas
+# in scripts/public-hygiene-accepted-history.txt, and this gate reddens when that
+# file and the history disagree.
 #
 # THE RULES ARE NOT IN THIS FILE. scripts/public-hygiene-rules.txt holds them and
 # both gates read it, so the tracked tree and the history are judged by one list
@@ -47,9 +49,9 @@
 # A tracked file can be swept. A published commit message cannot: rewriting it
 # rewrites every commit after it, which on a public repository with published
 # releases and a downstream package tap breaks every recorded hash, every tag a
-# release refers to, and every clone anyone has. So the 117 are recorded in
+# release refers to, and every clone anyone has. So they are recorded in
 # scripts/public-hygiene-accepted-history.txt with the reason, and this gate
-# refuses the 118th.
+# refuses the next one.
 #
 # That record is a DECLARED SET compared against an OBSERVED SET. It is not a
 # pattern matched against prose and it is not a reviewer remembering: the gate
@@ -192,8 +194,8 @@ trim() {
 # place, in a file whose whole point is that the first place cannot be fixed.
 #
 # An entry naming a key nobody declared is a hard error, so an entry cannot
-# arrive without a reason. One reason covers a batch, because 117 copies of one
-# sentence is not accountability.
+# arrive without a reason. One reason covers a batch, because a hundred-odd copies
+# of one sentence is not accountability.
 # ---------------------------------------------------------------------------
 declare -a ACC_SHA=()
 declare -a ACC_RULE=()

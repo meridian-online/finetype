@@ -46,10 +46,11 @@
 #   * commit messages, over the whole history reachable from HEAD;
 #   * a pull request's title and body, passed to it as text.
 # This list used to say those were nobody's job, and it was right for as long as
-# it stood: 117 commits on this repository's main carry a private planning
-# identifier in their message and none of them were stopped by anything. Neither
-# gate can undo that -- see scripts/public-hygiene-accepted-history.txt, which
-# records them -- and both stop the next one.
+# it stood: 137 commits on this repository's main carry a private planning
+# reference in their message and none of them were stopped by anything. Neither
+# gate can undo that -- scripts/public-hygiene-accepted-history.txt enumerates
+# them, one line per commit and rule, and the sibling gate reddens if that file
+# stops describing the history -- and both stop the next one.
 #
 # STILL NOT COVERED, and you have to watch these yourself:
 #   * review comments on a pull request,
