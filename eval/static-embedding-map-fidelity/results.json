@@ -1,0 +1,177 @@
+{
+  "seed": 42,
+  "limit": 3000,
+  "umap": {
+    "metric": "cosine",
+    "n_neighbors": 15,
+    "random_state": 42
+  },
+  "agreement_k": 20,
+  "platform": "Darwin arm64 python3.12.12",
+  "corpora": [
+    {
+      "key": "20news-body",
+      "shape": "long-form",
+      "description": "20 Newsgroups posts, headers/footers/quotes stripped"
+    },
+    {
+      "key": "20news-subject",
+      "shape": "short",
+      "description": "The Subject: line of the same posts, same labels"
+    },
+    {
+      "key": "finetype-columns",
+      "shape": "very-short",
+      "description": "Column names from finetype's representative corpus, labelled by semantic type"
+    }
+  ],
+  "results": [
+    {
+      "corpus": "20news-body",
+      "shape": "long-form",
+      "description": "20 Newsgroups posts, headers/footers/quotes stripped",
+      "rows": 3000,
+      "classes": 20,
+      "embedders": [
+        {
+          "embedder": "minilm",
+          "kind": "transformer",
+          "model": "sentence-transformers/all-MiniLM-L6-v2",
+          "dim": 384,
+          "ami_map": 0.5593857689926706,
+          "ami_vectors": 0.5237431842387439,
+          "retention_vs_minilm": 1.0,
+          "map_overlap_with_minilm": 1.0
+        },
+        {
+          "embedder": "potion-8m",
+          "kind": "static",
+          "model": "minishlab/potion-base-8M",
+          "dim": 256,
+          "ami_map": 0.39741463383681447,
+          "ami_vectors": 0.3765213315777184,
+          "retention_vs_minilm": 0.7100476592015872,
+          "map_overlap_with_minilm": 0.13185
+        },
+        {
+          "embedder": "potion-4m",
+          "kind": "static",
+          "model": "minishlab/potion-base-4M",
+          "dim": 128,
+          "ami_map": 0.38270113841484327,
+          "ami_vectors": 0.36846419778224443,
+          "retention_vs_minilm": 0.6837083214250004,
+          "map_overlap_with_minilm": 0.12383333333333334
+        },
+        {
+          "embedder": "random-384",
+          "kind": "control",
+          "model": null,
+          "dim": 384,
+          "ami_map": 0.0007728096702785231,
+          "ami_vectors": -0.0009539903803247722,
+          "retention_vs_minilm": 0.0,
+          "map_overlap_with_minilm": 0.006866666666666667
+        }
+      ]
+    },
+    {
+      "corpus": "20news-subject",
+      "shape": "short",
+      "description": "The Subject: line of the same posts, same labels",
+      "rows": 3000,
+      "classes": 20,
+      "embedders": [
+        {
+          "embedder": "minilm",
+          "kind": "transformer",
+          "model": "sentence-transformers/all-MiniLM-L6-v2",
+          "dim": 384,
+          "ami_map": 0.4495179118466433,
+          "ami_vectors": 0.4593543361839039,
+          "retention_vs_minilm": 1.0,
+          "map_overlap_with_minilm": 1.0
+        },
+        {
+          "embedder": "potion-8m",
+          "kind": "static",
+          "model": "minishlab/potion-base-8M",
+          "dim": 256,
+          "ami_map": 0.3015493607333583,
+          "ami_vectors": 0.33090773881545565,
+          "retention_vs_minilm": 0.6673529911222751,
+          "map_overlap_with_minilm": 0.27758333333333335
+        },
+        {
+          "embedder": "potion-4m",
+          "kind": "static",
+          "model": "minishlab/potion-base-4M",
+          "dim": 128,
+          "ami_map": 0.2981616993491365,
+          "ami_vectors": 0.3120033261807069,
+          "retention_vs_minilm": 0.6597372145395254,
+          "map_overlap_with_minilm": 0.2644166666666667
+        },
+        {
+          "embedder": "random-384",
+          "kind": "control",
+          "model": null,
+          "dim": 384,
+          "ami_map": 0.0046963828255433965,
+          "ami_vectors": -0.0011657923226777644,
+          "retention_vs_minilm": 0.0,
+          "map_overlap_with_minilm": 0.006616666666666667
+        }
+      ]
+    },
+    {
+      "corpus": "finetype-columns",
+      "shape": "very-short",
+      "description": "Column names from finetype's representative corpus, labelled by semantic type",
+      "rows": 216,
+      "classes": 12,
+      "embedders": [
+        {
+          "embedder": "minilm",
+          "kind": "transformer",
+          "model": "sentence-transformers/all-MiniLM-L6-v2",
+          "dim": 384,
+          "ami_map": 0.36873197459290563,
+          "ami_vectors": 0.35104332615987555,
+          "retention_vs_minilm": 1.0,
+          "map_overlap_with_minilm": 1.0
+        },
+        {
+          "embedder": "potion-8m",
+          "kind": "static",
+          "model": "minishlab/potion-base-8M",
+          "dim": 256,
+          "ami_map": 0.3194578656312519,
+          "ami_vectors": 0.3924410423872217,
+          "retention_vs_minilm": 0.875025145607051,
+          "map_overlap_with_minilm": 0.4030092592592593
+        },
+        {
+          "embedder": "potion-4m",
+          "kind": "static",
+          "model": "minishlab/potion-base-4M",
+          "dim": 128,
+          "ami_map": 0.31933974524263264,
+          "ami_vectors": 0.3929212578082587,
+          "retention_vs_minilm": 0.8747255546315954,
+          "map_overlap_with_minilm": 0.38587962962962963
+        },
+        {
+          "embedder": "random-384",
+          "kind": "control",
+          "model": null,
+          "dim": 384,
+          "ami_map": -0.025540210807886217,
+          "ami_vectors": 0.005348273750237371,
+          "retention_vs_minilm": 0.0,
+          "map_overlap_with_minilm": 0.09236111111111113
+        }
+      ]
+    }
+  ]
+}
