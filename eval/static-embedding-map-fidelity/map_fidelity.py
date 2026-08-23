@@ -50,6 +50,11 @@ from pathlib import Path
 
 import numpy as np
 
+# The default, and the ONLY seed the module reads directly. Everything downstream takes
+# `args.seed` as an argument -- the corpus shuffle and the noise control included -- so
+# `--seed 7` reseeds the whole run rather than half of it. It used to reseed UMAP and
+# k-means while leaving the control and the document order pinned at 42, which is the
+# shape of bug that makes a seed sweep look like a real effect.
 SEED = 42
 
 # Mirrors embedding_atlas/projection.py:_run_umap defaults, which is what makes
@@ -84,7 +89,7 @@ EMBEDDERS = [
 ]
 
 
-def load_corpus(corpus: Corpus, limit: int, repo_root: Path) -> tuple[list[str], np.ndarray]:
+def load_corpus(corpus: Corpus, limit: int, repo_root: Path, seed: int) -> tuple[list[str], np.ndarray]:
     """Return (texts, labels). Labels are integer class ids."""
     if corpus.key.startswith("20news"):
         from sklearn.datasets import fetch_20newsgroups
@@ -92,7 +97,7 @@ def load_corpus(corpus: Corpus, limit: int, repo_root: Path) -> tuple[list[str],
         bunch = fetch_20newsgroups(
             subset="train",
             remove=("headers", "footers", "quotes"),
-            random_state=SEED,
+            random_state=seed,
             shuffle=True,
         )
         texts_raw = list(bunch.data)
@@ -101,7 +106,7 @@ def load_corpus(corpus: Corpus, limit: int, repo_root: Path) -> tuple[list[str],
         if corpus.key == "20news-subject":
             # The Subject: line is stripped by remove=("headers",), so re-read it
             # from the unstripped copy. Same documents, same order, same labels.
-            full = fetch_20newsgroups(subset="train", random_state=SEED, shuffle=True)
+            full = fetch_20newsgroups(subset="train", random_state=seed, shuffle=True)
             texts_raw = [_subject_of(d) for d in full.data]
 
         keep = [i for i, t in enumerate(texts_raw) if len(t.strip()) >= 8]
@@ -137,9 +142,9 @@ def _subject_of(document: str) -> str:
     return ""
 
 
-def embed(key: str, model_name: str | None, texts: list[str]) -> np.ndarray:
+def embed(key: str, model_name: str | None, texts: list[str], seed: int) -> np.ndarray:
     if key == "random-384":
-        rng = np.random.default_rng(SEED)
+        rng = np.random.default_rng(seed)
         return rng.normal(size=(len(texts), 384)).astype(np.float32)
     if model_name is not None and model_name.startswith("minishlab/"):
         from model2vec import StaticModel
@@ -215,13 +220,13 @@ def main() -> int:
 
     results: list[dict] = []
     for corpus in corpora:
-        texts, labels = load_corpus(corpus, args.limit, repo_root)
+        texts, labels = load_corpus(corpus, args.limit, repo_root, args.seed)
         print(f"[{corpus.key}] {len(texts)} rows, {len(np.unique(labels))} classes", file=sys.stderr)
 
         maps: dict[str, np.ndarray] = {}
         rows: dict[str, dict] = {}
         for key, model_name, kind in EMBEDDERS:
-            vectors = embed(key, model_name, texts)
+            vectors = embed(key, model_name, texts, args.seed)
             points = project(vectors, args.seed)
             maps[key] = points
             rows[key] = {
