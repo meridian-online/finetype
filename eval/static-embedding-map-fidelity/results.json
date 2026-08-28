@@ -19,31 +19,31 @@
       "base_model": [
         "nreimers/MiniLM-L6-H384-uncased"
       ],
-      "read_at": "2026-08-28T05:29:06+00:00"
+      "read_at": "2026-08-28T07:25:46+00:00"
     },
     "minishlab/potion-base-4M": {
       "licence": "mit",
       "source": "huggingface model card metadata",
       "base_model": null,
-      "read_at": "2026-08-28T05:29:06+00:00"
+      "read_at": "2026-08-28T07:25:47+00:00"
     },
     "minishlab/potion-base-8M": {
       "licence": "mit",
       "source": "huggingface model card metadata",
       "base_model": null,
-      "read_at": "2026-08-28T05:29:07+00:00"
+      "read_at": "2026-08-28T07:25:47+00:00"
     },
     "minishlab/potion-base-32M": {
       "licence": "mit",
       "source": "huggingface model card metadata",
       "base_model": null,
-      "read_at": "2026-08-28T05:29:07+00:00"
+      "read_at": "2026-08-28T07:25:47+00:00"
     },
     "minishlab/potion-retrieval-32M": {
       "licence": "mit",
       "source": "huggingface model card metadata",
       "base_model": "minishlab/potion-base-32M",
-      "read_at": "2026-08-28T05:29:07+00:00"
+      "read_at": "2026-08-28T07:25:47+00:00"
     }
   },
   "corpora": [
@@ -94,6 +94,7 @@
           "pairwise_ap_near_duplicate": 0.9997800323955873,
           "retention_vs_minilm": 1.0,
           "map_overlap_with_minilm": 1.0,
+          "vector_overlap_with_minilm": 1.0,
           "lift_over_random": 1.0
         },
         {
@@ -114,6 +115,7 @@
           "pairwise_ap_near_duplicate": 0.9991151299082714,
           "retention_vs_minilm": 0.6837083214250004,
           "map_overlap_with_minilm": 0.12383333333333334,
+          "vector_overlap_with_minilm": 0.23081666666666667,
           "lift_over_random": 0.7398259233121619
         },
         {
@@ -134,6 +136,7 @@
           "pairwise_ap_near_duplicate": 0.9991794780075263,
           "retention_vs_minilm": 0.7100476592015872,
           "map_overlap_with_minilm": 0.13185,
+          "vector_overlap_with_minilm": 0.24108333333333334,
           "lift_over_random": 0.7633498000470477
         },
         {
@@ -154,6 +157,7 @@
           "pairwise_ap_near_duplicate": 0.9994203324067473,
           "retention_vs_minilm": 0.765639800651982,
           "map_overlap_with_minilm": 0.14286666666666667,
+          "vector_overlap_with_minilm": 0.25211666666666666,
           "lift_over_random": 0.8052223006351447
         },
         {
@@ -174,6 +178,7 @@
           "pairwise_ap_near_duplicate": 0.9998575855490572,
           "retention_vs_minilm": 0.7981988159326738,
           "map_overlap_with_minilm": 0.16025,
+          "vector_overlap_with_minilm": 0.26890000000000003,
           "lift_over_random": 0.8365090566925428
         },
         {
@@ -194,6 +199,7 @@
           "pairwise_ap_near_duplicate": 0.5206937112142029,
           "retention_vs_minilm": 0.0,
           "map_overlap_with_minilm": 0.006866666666666667,
+          "vector_overlap_with_minilm": 0.006333333333333335,
           "lift_over_random": 0.0
         },
         {
@@ -215,6 +221,7 @@
           "pairwise_score_calibration": "uncalibrated across queries",
           "retention_vs_minilm": null,
           "map_overlap_with_minilm": null,
+          "vector_overlap_with_minilm": null,
           "lift_over_random": 0.7461773700305809
         }
       ]
@@ -249,6 +256,7 @@
           "pairwise_ap_near_duplicate": 0.998376076013749,
           "retention_vs_minilm": 1.0,
           "map_overlap_with_minilm": 1.0,
+          "vector_overlap_with_minilm": 1.0,
           "lift_over_random": 1.0
         },
         {
@@ -269,6 +277,7 @@
           "pairwise_ap_near_duplicate": 0.9923968754817684,
           "retention_vs_minilm": 0.6597372145395254,
           "map_overlap_with_minilm": 0.2644166666666667,
+          "vector_overlap_with_minilm": 0.38061666666666666,
           "lift_over_random": 0.8297451125958921
         },
         {
@@ -289,6 +298,7 @@
           "pairwise_ap_near_duplicate": 0.9947233338531418,
           "retention_vs_minilm": 0.6673529911222751,
           "map_overlap_with_minilm": 0.27758333333333335,
+          "vector_overlap_with_minilm": 0.40876666666666667,
           "lift_over_random": 0.8530066815144768
         },
         {
@@ -309,6 +319,7 @@
           "pairwise_ap_near_duplicate": 0.9956227534003573,
           "retention_vs_minilm": 0.7597016995862861,
           "map_overlap_with_minilm": 0.2920666666666667,
+          "vector_overlap_with_minilm": 0.4282333333333333,
           "lift_over_random": 0.9123979213066075
         },
         {
@@ -329,6 +340,7 @@
           "pairwise_ap_near_duplicate": 0.9963980048810404,
           "retention_vs_minilm": 0.7082460428034557,
           "map_overlap_with_minilm": 0.28613333333333335,
+          "vector_overlap_with_minilm": 0.4141166666666667,
           "lift_over_random": 0.9386290522147983
         },
         {
@@ -349,6 +361,7 @@
           "pairwise_ap_near_duplicate": 0.5206937112142029,
           "retention_vs_minilm": 0.0,
           "map_overlap_with_minilm": 0.006616666666666667,
+          "vector_overlap_with_minilm": 0.006716666666666666,
           "lift_over_random": 0.0
         },
         {
@@ -370,6 +383,7 @@
           "pairwise_score_calibration": "uncalibrated across queries",
           "retention_vs_minilm": null,
           "map_overlap_with_minilm": null,
+          "vector_overlap_with_minilm": null,
           "lift_over_random": 0.6938876515713933
         }
       ]
@@ -404,6 +418,7 @@
           "pairwise_ap_near_duplicate": 0.9434343943058652,
           "retention_vs_minilm": 1.0,
           "map_overlap_with_minilm": 1.0,
+          "vector_overlap_with_minilm": 1.0,
           "lift_over_random": 1.0
         },
         {
@@ -424,6 +439,7 @@
           "pairwise_ap_near_duplicate": 0.9080145712219796,
           "retention_vs_minilm": 0.8747255546315954,
           "map_overlap_with_minilm": 0.38587962962962963,
+          "vector_overlap_with_minilm": 0.47152777777777777,
           "lift_over_random": 0.8875453446191053
         },
         {
@@ -444,6 +460,7 @@
           "pairwise_ap_near_duplicate": 0.9113258379733241,
           "retention_vs_minilm": 0.875025145607051,
           "map_overlap_with_minilm": 0.4030092592592593,
+          "vector_overlap_with_minilm": 0.4993055555555555,
           "lift_over_random": 0.882708585247884
         },
         {
@@ -464,6 +481,7 @@
           "pairwise_ap_near_duplicate": 0.919994871159553,
           "retention_vs_minilm": 0.8864529590540967,
           "map_overlap_with_minilm": 0.41412037037037036,
+          "vector_overlap_with_minilm": 0.49560185185185185,
           "lift_over_random": 0.9032648125755744
         },
         {
@@ -484,6 +502,7 @@
           "pairwise_ap_near_duplicate": 0.9024240120824735,
           "retention_vs_minilm": 0.8295825256637869,
           "map_overlap_with_minilm": 0.3997685185185186,
+          "vector_overlap_with_minilm": 0.4819444444444444,
           "lift_over_random": 0.9201934703748491
         },
         {
@@ -504,6 +523,7 @@
           "pairwise_ap_near_duplicate": 0.4669485622868648,
           "retention_vs_minilm": 0.0,
           "map_overlap_with_minilm": 0.09236111111111113,
+          "vector_overlap_with_minilm": 0.09097222222222223,
           "lift_over_random": 0.0
         },
         {
@@ -525,6 +545,7 @@
           "pairwise_score_calibration": "uncalibrated across queries",
           "retention_vs_minilm": null,
           "map_overlap_with_minilm": null,
+          "vector_overlap_with_minilm": null,
           "lift_over_random": 0.5876662636033856
         }
       ]

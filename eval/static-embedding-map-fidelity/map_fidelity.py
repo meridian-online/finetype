@@ -673,6 +673,12 @@ def main() -> int:
         nd_pairs_rows = [(int(probe[i]), j) for i, j in nd_pairs]
 
         maps: dict[str, np.ndarray] = {}
+        # The full-dimension vectors kept alongside the maps, so the SAME overlap
+        # metric can be taken at both stages. Without this only `maps` survives the
+        # arm loop, and the only full-dimension number available for comparison is
+        # `ami_vectors` — which answers a different question, and comparing the two
+        # is what made the first draft blame the projection.
+        vecs: dict[str, np.ndarray] = {}
         rows: dict[str, dict] = {}
         for key, model_name, kind in EMBEDDERS:
             vectors = embed(key, model_name, models.get(key), texts, args.seed)
@@ -684,6 +690,7 @@ def main() -> int:
             dup_vectors = embed(key, model_name, models.get(key), corruptions, args.seed + 4)
             points = project(vectors, args.seed)
             maps[key] = points
+            vecs[key] = vectors
             v_types, v_tokens = vocab_coverage(vocabs.get(key), texts)
             entry = vocabs.get(key)
             row = {
@@ -763,9 +770,19 @@ def main() -> int:
             if row["ami_map"] is None:
                 row["retention_vs_minilm"] = None
                 row["map_overlap_with_minilm"] = None
+                row["vector_overlap_with_minilm"] = None
             else:
                 row["retention_vs_minilm"] = None if span <= 0 else (row["ami_map"] - floor) / span
                 row["map_overlap_with_minilm"] = map_overlap(maps[key], maps["minilm"], AGREEMENT_K)
+                # The SAME metric one stage earlier, on the raw vectors. Without it a
+                # reader can only compare neighbour-agreement-with-MiniLM (2D) against
+                # label-agreement (full dimension), which are different QUESTIONS as
+                # well as different stages — so any gap between them says nothing about
+                # which stage caused it. This column is what makes that attributable,
+                # and it is why the first draft of FINDINGS.md blamed the projection.
+                row["vector_overlap_with_minilm"] = map_overlap(
+                    vecs[key], vecs["minilm"], AGREEMENT_K
+                )
             # precision@k does NOT floor at zero -- a uniform random retriever
             # scores the class prior -- so the comparable number is normalised
             # against the measured control the same way retention is.

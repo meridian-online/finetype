@@ -6,7 +6,14 @@ Run: seed 42, 3,000 rows per corpus and 216 for `finetype-columns`, 800 probes p
 
 ## The one-line answer
 
-**Neither of the two readings on offer: the neighbourhood weakness is a property of the 2D projection, not of the embedder.** Vocabulary and the retrieval objective are each real and each close part of the *ranked* gap — together 31%, 58% and 32% of it on the three corpora — while the full ladder from `potion-base-8M` to `potion-retrieval-32M` moves map kNN overlap by +0.028, +0.009 and −0.003. A cause that lived in the embedder would move both.
+**Neither of the two readings on offer, and the third one this document first reached is also wrong.** Vocabulary and the retrieval objective are each real and each close part of the *ranked* gap — together 31%, 58% and 32% of it on the three corpora. But the full ladder from `potion-base-8M` to `potion-retrieval-32M` barely moves agreement with MiniLM's neighbour picks, **and it barely moves it at both stages**: +0.028 / +0.005 / −0.017 on the raw vectors, against +0.029 / +0.009 / −0.003 on the 2D map. So getting the coarse class right and matching another model's specific neighbours are different targets, and nothing in this ladder moves the second. Which property is charging for the *ranked* gap is answered — size, vocabulary and objective, split below. Which property costs the neighbourhoods is **not answered by this run**.
+
+> [!warning]- This section claimed the projection was the cause, and that was wrong
+> The first version read: *"the neighbourhood weakness is a property of the 2D projection, not of the embedder … a cause that lived in the embedder would move both."* It compared `map_overlap_with_minilm` (2D, agreement with MiniLM's specific neighbour picks) against `ami_vectors` (full-dimension, agreement with ground-truth labels) and attributed the gap between them to the projection stage. Those are different **questions**, not only different stages, so the comparison could not attribute anything to a stage.
+>
+> Caught by the lane's independent verifier, which supplied the missing measurement using this file's own functions. `vector_overlap_with_minilm` — the same metric one stage earlier — is now computed by the harness, and it tracks the 2D figure closely on all three corpora while sitting about 0.10–0.11 higher. The projection costs a roughly constant slice of overlap and does not create the flatness.
+>
+> The general form, worth recognising elsewhere: **an asymmetry between two stages attributes to a stage only if the same metric is taken at both.** `map_overlap` was called once, on the UMAP output, and the full-dimension vectors were discarded at the end of each arm — so the code made the wrong comparison the convenient one.
 
 ## What was varied, and why these four models
 
