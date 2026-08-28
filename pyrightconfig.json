@@ -38,7 +38,8 @@
     "scripts/check_sample_patterns.py",
     "scripts/encoder_dtype.py",
     "scripts/encoder_dtype_record_diff.py",
-    "scripts/encoder_dtype_record_diff_mutations.py"
+    "scripts/encoder_dtype_record_diff_mutations.py",
+    "eval/static-embedding-map-fidelity/check_results.py"
   ],
   "pythonVersion": "3.13",
   "typeCheckingMode": "standard",
