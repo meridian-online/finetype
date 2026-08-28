@@ -121,15 +121,20 @@ def emit_table(payload: dict) -> str:
             return "--"
         return f"{v:.{places}f}" if isinstance(v, float) else str(v)
 
-    head = ("| corpus | arm | AMI (map) | retention | kNN overlap | P@k | lift | AP same-class | AP near-dup |\n"
-            "|---|---|---|---|---|---|---|---|---|")
+    # `vec overlap` is the SAME metric as `kNN overlap`, one stage earlier, and it is in
+    # this table because the document's central retraction rests on comparing the two.
+    # It was measured but unpinned for one commit, so the prose that depends on it was
+    # not checked against anything — which is how a figure outlives the run that made it.
+    head = ("| corpus | arm | AMI (map) | retention | kNN overlap | vec overlap | P@k | lift | AP same-class | AP near-dup |\n"
+            "|---|---|---|---|---|---|---|---|---|---|")
     lines = [head]
     for corpus in payload["results"]:
         for arm in corpus["embedders"]:
             lines.append(
                 f"| {corpus['corpus']} | `{arm['embedder']}` | "
                 f"{cell(arm['ami_map'])} | {cell(arm['retention_vs_minilm'], 3)} | "
-                f"{cell(arm['map_overlap_with_minilm'])} | {cell(arm['precision_at_k'])} | "
+                f"{cell(arm['map_overlap_with_minilm'])} | "
+                f"{cell(arm.get('vector_overlap_with_minilm'))} | {cell(arm['precision_at_k'])} | "
                 f"{cell(arm['lift_over_random'], 3)} | {cell(arm['pairwise_ap_same_class'])} | "
                 f"{cell(arm['pairwise_ap_near_duplicate'])} |"
             )

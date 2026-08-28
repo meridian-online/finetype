@@ -6,12 +6,12 @@ Run: seed 42, 3,000 rows per corpus and 216 for `finetype-columns`, 800 probes p
 
 ## The one-line answer
 
-**Neither of the two readings on offer, and the third one this document first reached is also wrong.** Vocabulary and the retrieval objective are each real and each close part of the *ranked* gap — together 31%, 58% and 32% of it on the three corpora. But the full ladder from `potion-base-8M` to `potion-retrieval-32M` barely moves agreement with MiniLM's neighbour picks, **and it barely moves it at both stages**: +0.028 / +0.005 / −0.017 on the raw vectors, against +0.029 / +0.009 / −0.003 on the 2D map. So getting the coarse class right and matching another model's specific neighbours are different targets, and nothing in this ladder moves the second. Which property is charging for the *ranked* gap is answered — size, vocabulary and objective, split below. Which property costs the neighbourhoods is **not answered by this run**.
+**Neither of the two readings on offer, and the third one this document first reached is also wrong.** Vocabulary and the retrieval objective are each real and each close part of the *ranked* gap — together 31%, 58% and 32% of it on the three corpora. But the full ladder from `potion-base-8M` to `potion-retrieval-32M` barely moves agreement with MiniLM's neighbour picks, **and it barely moves it at both stages**: +0.028 / +0.005 / −0.017 on the raw vectors, against +0.028 / +0.009 / −0.003 on the 2D map. So getting the coarse class right and matching another model's specific neighbours are different targets, and nothing in this ladder moves the second. Which property is charging for the *ranked* gap is answered — size, vocabulary and objective, split below. Which property costs the neighbourhoods is **not answered by this run**.
 
 > [!warning]- This section claimed the projection was the cause, and that was wrong
 > The first version read: *"the neighbourhood weakness is a property of the 2D projection, not of the embedder … a cause that lived in the embedder would move both."* It compared `map_overlap_with_minilm` (2D, agreement with MiniLM's specific neighbour picks) against `ami_vectors` (full-dimension, agreement with ground-truth labels) and attributed the gap between them to the projection stage. Those are different **questions**, not only different stages, so the comparison could not attribute anything to a stage.
 >
-> Caught by the lane's independent verifier, which supplied the missing measurement using this file's own functions. `vector_overlap_with_minilm` — the same metric one stage earlier — is now computed by the harness, and it tracks the 2D figure closely on all three corpora while sitting about 0.10–0.11 higher. The projection costs a roughly constant slice of overlap and does not create the flatness.
+> Caught by the lane's independent verifier, which supplied the missing measurement using this file's own functions. `vector_overlap_with_minilm` — the same metric one stage earlier — is now computed by the harness, and it tracks the 2D figure on all three corpora while sitting above it by 0.107–0.109 on bodies, 0.116–0.136 on subjects and 0.082–0.096 on column names. The projection subtracts an offset and does not create the flatness.
 >
 > The general form, worth recognising elsewhere: **an asymmetry between two stages attributes to a stage only if the same metric is taken at both.** `map_overlap` was called once, on the UMAP output, and the full-dimension vectors were discarded at the end of each arm — so the code made the wrong comparison the convenient one.
 
@@ -35,29 +35,29 @@ Three questions, kept apart because this model class is strong at one and weak a
 **Two floors, and they do not sit at the same place.** `random-384` embeds nothing. `bm25` is DuckDB's `fts` extension over the same corpora — what an analyst has without any model, so a dense arm that does not beat it has not earned its download. AMI and kNN overlap floor at ~0; `P@k` floors at the class prior, so read `lift`, which normalises against the measured control; pooled AP floors at 0.5, fixed by one positive and one negative pair per anchor.
 
 <!-- generated table: check_results.py --emit-table -->
-| corpus | arm | AMI (map) | retention | kNN overlap | P@k | lift | AP same-class | AP near-dup |
-|---|---|---|---|---|---|---|---|---|
-| 20news-body | `minilm` | 0.5594 | 1.000 | 1.0000 | 0.5785 | 1.000 | 0.8108 | 0.9998 |
-| 20news-body | `potion-4m` | 0.3827 | 0.684 | 0.1238 | 0.4403 | 0.740 | 0.7068 | 0.9991 |
-| 20news-body | `potion-8m` | 0.3974 | 0.710 | 0.1318 | 0.4527 | 0.763 | 0.7016 | 0.9992 |
-| 20news-body | `potion-32m` | 0.4285 | 0.766 | 0.1429 | 0.4750 | 0.805 | 0.7161 | 0.9994 |
-| 20news-body | `potion-retrieval-32m` | 0.4467 | 0.798 | 0.1603 | 0.4916 | 0.837 | 0.7551 | 0.9999 |
-| 20news-body | `random-384` | 0.0008 | 0.000 | 0.0069 | 0.0471 | 0.000 | 0.5003 | 0.5207 |
-| 20news-body | `bm25` | -- | -- | -- | 0.4436 | 0.746 | 0.6143 | 0.9971 |
-| 20news-subject | `minilm` | 0.4495 | 1.000 | 1.0000 | 0.5544 | 1.000 | 0.7756 | 0.9984 |
-| 20news-subject | `potion-4m` | 0.2982 | 0.660 | 0.2644 | 0.4684 | 0.830 | 0.7069 | 0.9924 |
-| 20news-subject | `potion-8m` | 0.3015 | 0.667 | 0.2776 | 0.4801 | 0.853 | 0.7117 | 0.9947 |
-| 20news-subject | `potion-32m` | 0.3426 | 0.760 | 0.2921 | 0.5101 | 0.912 | 0.7413 | 0.9956 |
-| 20news-subject | `potion-retrieval-32m` | 0.3197 | 0.708 | 0.2861 | 0.5234 | 0.939 | 0.7213 | 0.9964 |
-| 20news-subject | `random-384` | 0.0047 | 0.000 | 0.0066 | 0.0493 | 0.000 | 0.4745 | 0.5207 |
-| 20news-subject | `bm25` | -- | -- | -- | 0.3997 | 0.694 | 0.5325 | 0.9362 |
-| finetype-columns | `minilm` | 0.3687 | 1.000 | 1.0000 | 0.5519 | 1.000 | 0.6815 | 0.9434 |
-| finetype-columns | `potion-4m` | 0.3193 | 0.875 | 0.3859 | 0.5088 | 0.888 | 0.6841 | 0.9080 |
-| finetype-columns | `potion-8m` | 0.3195 | 0.875 | 0.4030 | 0.5069 | 0.883 | 0.6862 | 0.9113 |
-| finetype-columns | `potion-32m` | 0.3240 | 0.886 | 0.4141 | 0.5148 | 0.903 | 0.6866 | 0.9200 |
-| finetype-columns | `potion-retrieval-32m` | 0.3015 | 0.830 | 0.3998 | 0.5213 | 0.920 | 0.6793 | 0.9024 |
-| finetype-columns | `random-384` | -0.0255 | 0.000 | 0.0924 | 0.1690 | 0.000 | 0.5390 | 0.4669 |
-| finetype-columns | `bm25` | -- | -- | -- | 0.3940 | 0.588 | 0.6141 | 0.7262 |
+| corpus | arm | AMI (map) | retention | kNN overlap | vec overlap | P@k | lift | AP same-class | AP near-dup |
+|---|---|---|---|---|---|---|---|---|---|
+| 20news-body | `minilm` | 0.5594 | 1.000 | 1.0000 | 1.0000 | 0.5785 | 1.000 | 0.8108 | 0.9998 |
+| 20news-body | `potion-4m` | 0.3827 | 0.684 | 0.1238 | 0.2308 | 0.4403 | 0.740 | 0.7068 | 0.9991 |
+| 20news-body | `potion-8m` | 0.3974 | 0.710 | 0.1318 | 0.2411 | 0.4527 | 0.763 | 0.7016 | 0.9992 |
+| 20news-body | `potion-32m` | 0.4285 | 0.766 | 0.1429 | 0.2521 | 0.4750 | 0.805 | 0.7161 | 0.9994 |
+| 20news-body | `potion-retrieval-32m` | 0.4467 | 0.798 | 0.1603 | 0.2689 | 0.4916 | 0.837 | 0.7551 | 0.9999 |
+| 20news-body | `random-384` | 0.0008 | 0.000 | 0.0069 | 0.0063 | 0.0471 | 0.000 | 0.5003 | 0.5207 |
+| 20news-body | `bm25` | -- | -- | -- | -- | 0.4436 | 0.746 | 0.6143 | 0.9971 |
+| 20news-subject | `minilm` | 0.4495 | 1.000 | 1.0000 | 1.0000 | 0.5544 | 1.000 | 0.7756 | 0.9984 |
+| 20news-subject | `potion-4m` | 0.2982 | 0.660 | 0.2644 | 0.3806 | 0.4684 | 0.830 | 0.7069 | 0.9924 |
+| 20news-subject | `potion-8m` | 0.3015 | 0.667 | 0.2776 | 0.4088 | 0.4801 | 0.853 | 0.7117 | 0.9947 |
+| 20news-subject | `potion-32m` | 0.3426 | 0.760 | 0.2921 | 0.4282 | 0.5101 | 0.912 | 0.7413 | 0.9956 |
+| 20news-subject | `potion-retrieval-32m` | 0.3197 | 0.708 | 0.2861 | 0.4141 | 0.5234 | 0.939 | 0.7213 | 0.9964 |
+| 20news-subject | `random-384` | 0.0047 | 0.000 | 0.0066 | 0.0067 | 0.0493 | 0.000 | 0.4745 | 0.5207 |
+| 20news-subject | `bm25` | -- | -- | -- | -- | 0.3997 | 0.694 | 0.5325 | 0.9362 |
+| finetype-columns | `minilm` | 0.3687 | 1.000 | 1.0000 | 1.0000 | 0.5519 | 1.000 | 0.6815 | 0.9434 |
+| finetype-columns | `potion-4m` | 0.3193 | 0.875 | 0.3859 | 0.4715 | 0.5088 | 0.888 | 0.6841 | 0.9080 |
+| finetype-columns | `potion-8m` | 0.3195 | 0.875 | 0.4030 | 0.4993 | 0.5069 | 0.883 | 0.6862 | 0.9113 |
+| finetype-columns | `potion-32m` | 0.3240 | 0.886 | 0.4141 | 0.4956 | 0.5148 | 0.903 | 0.6866 | 0.9200 |
+| finetype-columns | `potion-retrieval-32m` | 0.3015 | 0.830 | 0.3998 | 0.4819 | 0.5213 | 0.920 | 0.6793 | 0.9024 |
+| finetype-columns | `random-384` | -0.0255 | 0.000 | 0.0924 | 0.0910 | 0.1690 | 0.000 | 0.5390 | 0.4669 |
+| finetype-columns | `bm25` | -- | -- | -- | -- | 0.3940 | 0.588 | 0.6141 | 0.7262 |
 <!-- end generated table -->
 
 ## Reading it
@@ -72,9 +72,19 @@ Three questions, kept apart because this model class is strong at one and weak a
 
 Both steps move in the same direction on all three corpora and neither dominates. Together they close roughly a third of the gap on long-form text and column names, and over half of it on short subject lines — so the honest statement is that the earlier finding under-attributed *and* the remainder is still the largest term.
 
-**But the kNN-overlap column, which is the one the deferral cited, barely moves at all.** Across the whole ladder it goes 0.1318 → 0.1603 on bodies, 0.2776 → 0.2861 on subjects, and 0.4030 → 0.3998 on column names — the last one *down*. The same models gained 0.073, 0.086 and 0.037 of ranked lift over the same span, against 0.028, 0.009 and −0.003 of neighbourhood agreement. Whatever is destroying the neighbourhoods is not something a bigger vocabulary or a retrieval objective touches, which is the signature of the projection rather than the embedder.
+**But the kNN-overlap column, which is the one the deferral cited, barely moves at all.** Across the whole ladder it goes 0.1318 → 0.1603 on bodies, 0.2776 → 0.2861 on subjects, and 0.4030 → 0.3998 on column names — the last one *down*. The same models gained 0.073, 0.086 and 0.037 of ranked lift over the same span, against 0.028, 0.009 and −0.003 of neighbourhood agreement.
 
-`finetype-columns` makes the point without any of the ladder: `potion-base-8M` **beats** MiniLM in the raw vector space (`ami_vectors` 0.3924 against 0.3510) and reaches 0.883 of its ranked lift, while agreeing with its map on 40% of neighbours. A model cannot be simultaneously better than MiniLM at the structure and half as good at the neighbourhoods unless the thing losing the neighbourhoods sits after both.
+**That says the ladder does not buy neighbourhood agreement. It does not say which stage costs it**, and the two are easy to conflate — this document did conflate them, and the retraction at the head of the file is why. The figure that separates them is `vector_overlap_with_minilm`, the same metric one stage earlier, on the raw vectors:
+
+| corpus | vectors, 8M → retrieval-32M | 2D map, same span |
+|---|---|---|
+| 20news-body | 0.2411 → 0.2689 (+0.028) | 0.1318 → 0.1603 (+0.028) |
+| 20news-subject | 0.4088 → 0.4141 (+0.005) | 0.2776 → 0.2861 (+0.009) |
+| finetype-columns | 0.4993 → 0.4819 (−0.017) | 0.4030 → 0.3998 (−0.003) |
+
+The flatness is present in both, so it is not introduced by the projection. The projection subtracts an offset — 0.107–0.109 on bodies, 0.116–0.136 on subjects, 0.082–0.096 on column names — and leaves the shape alone. **Which property costs the neighbourhoods is not answered here.**
+
+`finetype-columns` is where the temptation to over-read is strongest, so state it carefully. `potion-base-8M` **beats** MiniLM in the raw vector space (`ami_vectors` 0.3924 against 0.3510) and reaches 0.883 of its ranked lift, while agreeing with MiniLM's map on 40% of neighbours. That looks like a contradiction resolved by blaming the projection, and it is not one: `ami_vectors` measures agreement with **ground-truth labels** and the overlap columns measure agreement with **MiniLM's own neighbour picks**, which are different questions. Asked the same question at both stages, the vector figure is 0.4993 against the map's 0.4030 — the same story, one offset apart. Being better than MiniLM at the coarse structure and unlike it at the fine neighbours is not paradoxical; they are separate properties.
 
 **Pairwise was never in question, and now that is our number rather than a citation.** On `finetype-columns` three of the four static arms beat MiniLM at *is A like B* (`AP same-class` 0.6841, 0.6862 and 0.6866 against 0.6815) and the fourth, `potion-retrieval-32M`, is 0.0022 below it — while BM25 gets 0.6141 and noise gets 0.5390. On long-form text the static arms take 0.70–0.76 against MiniLM's 0.81. Near-duplicate detection is saturated on both 20 Newsgroups corpora — every arm including BM25 scores above 0.93, so that column discriminates nothing there and should not be quoted for those two. On column names it does discriminate: 0.9024–0.9200 for the static arms, 0.9434 for MiniLM, **0.7262 for BM25**.
 
