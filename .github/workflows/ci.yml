@@ -707,6 +707,45 @@ jobs:
         # argument here would silently override the config's file set.
         run: pyright
 
+  map-fidelity:
+    # `eval/static-embedding-map-fidelity/` measures what a static embedding
+    # costs against two floors: seeded Gaussian noise, and DuckDB BM25. Nothing
+    # else in this file reads `eval/`, and the measurement itself cannot run
+    # here -- five models, a corpus download, about an hour. What runs here is
+    # the refusal: a committed results file whose control has climbed off its
+    # floor, whose ceiling no longer separates from it, or whose arms turn out
+    # to have produced identical vectors under different model names.
+    #
+    # That last one is why this job exists rather than a reviewer reading the
+    # table. A file where two arms silently loaded the same model has every
+    # number in range and simply reports that the two agree, which is the shape
+    # of a finding -- so it reads as a result rather than as a fault.
+    #
+    # Stdlib only, so no dependency install and a local run sees what CI sees.
+    name: Static-embedding map fidelity floors
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          # Matched to the python-types job, which type-checks this same file.
+          python-version: "3.13"
+      - name: Which gates this diff changed
+        id: route
+        # In-job by design, and it audits before it plans; see the identical step
+        # in the `gate-routing-self-test` job for why.
+        run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: The committed measurement's floors still hold
+        run: eval/static-embedding-map-fidelity/check_results.py
+      - name: ...and the floor check detects a file whose floors have moved
+        # A case per rule, each mutating a fixture that passes clean and
+        # requiring exactly that rule to fire. The case list is checked against
+        # the rule list in both directions, so a rule added without a case, or a
+        # case naming a rule that no longer exists, reddens here.
+        if: steps.route.outputs.map_fidelity_results == 'true'
+        run: eval/static-embedding-map-fidelity/check_results.py --self-test
+
   check:
     name: Taxonomy Check
     runs-on: ubuntu-latest

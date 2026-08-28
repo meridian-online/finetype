@@ -74,4 +74,5 @@ sample_patterns	scripts/check_sample_patterns.py --self-test	scripts/check_sampl
 sql_examples	scripts/check_sql_examples.py --self-test	scripts/check_sql_examples.py
 encoder_dtype	scripts/encoder_dtype.py self-test	scripts/encoder_dtype.py
 encoder_record_diff	scripts/encoder_dtype_record_diff.py self-test, scripts/encoder_dtype_record_diff_mutations.py	scripts/encoder_dtype_record_diff.py, scripts/encoder_dtype_record_diff_mutations.py
+map_fidelity_results	eval/static-embedding-map-fidelity/check_results.py --self-test	eval/static-embedding-map-fidelity/check_results.py, eval/static-embedding-map-fidelity/map_fidelity.py
 gate_routing	.github/scripts/gate-self-tests.py --self-test	.github/scripts/gate-self-tests.py, .github/gate-self-tests.tsv
