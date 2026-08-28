@@ -380,9 +380,13 @@ assert_contains "ragged CSV keeps its header's column count" \
     "$RAGGED_ERR" 'Found 3 columns: ["id", "name", "city"]'
 
 RAGGED_JSON=$("$FINETYPE" profile -f "$RAGGED" -o json 2>/dev/null)
+# `|| echo none` matters: under `set -o pipefail` a grep that matches nothing
+# aborts the whole script, which would end the suite before this assertion could
+# report — the run still exits non-zero, but the assertion that pins the padding
+# never speaks. It has to be able to FAIL, not to kill the harness.
 RAGGED_NULLS=$(printf '%s\n' "$RAGGED_JSON" | tr -d ' ' \
     | grep -A20 '"column":"city"' | grep '"null":' | head -1 \
-    | sed 's/.*"null"://; s/,$//')
+    | sed 's/.*"null"://; s/,$//' || echo none)
 assert_eq "short rows are padded, not dropped" "$RAGGED_NULLS" "2"
 
 
