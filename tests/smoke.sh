@@ -325,9 +325,70 @@ fi
 
 rm -rf "$TMPORDDIR"
 
+# ── Column count is the file's, not the sniffer's ─────────────────────────────
+
+section "10. Profile — the sniffer cannot widen the schema"
+
+# `read_csv_input` passed `null_padding=true` alongside `auto_detect=true`.
+# `null_padding` pads a short ragged row with NULLs, which is why it is there.
+# It ALSO lets the sniffer widen the schema: with row widths no longer required
+# to agree, a delimiter that splits only some rows becomes acceptable. Measured
+# on duckdb v1.5.5, the two prose fixtures below reported EIGHT and FIVE columns
+# respectively under that option, the extra ones named `column1`…`columnN` and
+# carrying labels and confidences into the descriptor as though they were real.
+#
+# The fix sniffs the shape first and reads with the column list the sniff
+# pinned, so the two properties are separable: the count comes from the sniff,
+# the padding from the read. Every assertion here is on `profile`'s own output.
+
+# ── The real-data case: 459 NAICS descriptions, one column, semicolon-heavy
+# prose, written by duckdb's own COPY. Under the defect: 8 columns.
+NAICS="$REPO_ROOT/tests/fixtures/label_stability/naics_description.csv"
+NAICS_ERR=$("$FINETYPE" profile -f "$NAICS" -o json 2>&1 >/dev/null) || true
+assert_contains "single-column prose CSV profiles as one column" \
+    "$NAICS_ERR" 'Found 1 columns: ["description"]'
+
+# ── The same defect on a fixture small enough to assert a VALUE against. Its
+# descriptions carry 0, 1, 2, 3 and 4 semicolons — the inconsistency is what
+# moves the sniffer — and there are few enough distinct values that
+# `x-finetype-enum` publishes the domain verbatim, which is the only surface on
+# which `profile` shows what it actually read. Under the defect this column is
+# cut at the first semicolon and the domain holds fragments.
+PROSE="$REPO_ROOT/tests/fixtures/prose_semicolons.csv"
+PROSE_ERR=$("$FINETYPE" profile -f "$PROSE" -o json 2>&1 >/dev/null) || true
+assert_contains "semicolon-heavy prose profiles as one column" \
+    "$PROSE_ERR" 'Found 1 columns: ["description"]'
+
+PROSE_SCHEMA=$("$FINETYPE" profile -f "$PROSE" -o json-schema 2>/dev/null)
+assert_contains "a semicolon-bearing value is read back whole" \
+    "$PROSE_SCHEMA" \
+    "cutting timber; transporting timber; and producing wood chips in the field"
+
+# ── The property `null_padding` was added for, which the fix has to keep: a
+# genuinely ragged file — rows with FEWER fields than the header — still
+# profiles, and the short rows are padded rather than the run failing. Two of
+# the 40 rows are missing their third field.
+#
+# Both halves are asserted. The column count alone is not enough: a strict sniff
+# with no padding at all finds no delimiter whose widths agree on this file and
+# collapses it to ONE column named `id,name,city`, so a fix that only stopped
+# the widening would report a wrong count here and pass any count-free check.
+# The null count is what proves the pad happened.
+RAGGED="$REPO_ROOT/tests/fixtures/ragged_short_rows.csv"
+RAGGED_ERR=$("$FINETYPE" profile -f "$RAGGED" -o json 2>&1 >/dev/null) || true
+assert_contains "ragged CSV keeps its header's column count" \
+    "$RAGGED_ERR" 'Found 3 columns: ["id", "name", "city"]'
+
+RAGGED_JSON=$("$FINETYPE" profile -f "$RAGGED" -o json 2>/dev/null)
+RAGGED_NULLS=$(printf '%s\n' "$RAGGED_JSON" | tr -d ' ' \
+    | grep -A20 '"column":"city"' | grep '"null":' | head -1 \
+    | sed 's/.*"null"://; s/,$//')
+assert_eq "short rows are padded, not dropped" "$RAGGED_NULLS" "2"
+
+
 # ── Error Handling ────────────────────────────────────────────────────────────
 
-section "10. Error Handling"
+section "11. Error Handling"
 
 # Missing subcommand should show help (non-zero exit is OK)
 OUT=$("$FINETYPE" 2>&1) || true
