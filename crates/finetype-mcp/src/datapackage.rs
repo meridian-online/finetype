@@ -409,6 +409,24 @@ geography.location.country_code:
   validation:
     type: string
     pattern: "^[A-Z]{2}$"
+datetime.date.iso:
+  broad_type: DATE
+  frictionless:
+    type: date
+    format: "%Y-%m-%d"
+  validation:
+    type: string
+    pattern: '^\d{4}-\d{2}-\d{2}$'
+    minLength: 10
+    maxLength: 10
+representation.numeric.integer_number:
+  broad_type: BIGINT
+  frictionless:
+    type: integer
+  validation:
+    type: string
+    pattern: '^-?\d+$'
+    minimum: 0
 "#,
         )
         .expect("test taxonomy parses")
@@ -607,5 +625,112 @@ geography.location.country_code:
         let core: Vec<_> = obj.keys().filter(|k| !k.starts_with("x-")).collect();
         assert!(core.contains(&&"name".to_string()));
         assert!(core.contains(&&"type".to_string()));
+    }
+
+    #[test]
+    fn a_date_field_carries_its_off_type_constraints_beside_it() {
+        // `datetime.date.iso` states a pattern and a fixed length, and all three
+        // are true of the column. v2's `date` branch has a place for none of
+        // them, and `frictionless==5.19.0` refuses the package over each one
+        // ("constraint \"maxLength\" is not supported by type \"date\"").
+        let field = field_for("datetime.date.iso", &["2026-08-28", "1999-01-01"]);
+        assert_eq!(field["type"], json!("date"));
+        assert!(
+            field.get("constraints").is_none(),
+            "nothing in this label's validation is legal on a v2 `date`, so the \
+             field should carry no `constraints` at all: {field}"
+        );
+
+        // Filtered, not dropped: every keyword is readable beside the field.
+        let off = &field["x-finetype-unsupported-constraints"];
+        assert_eq!(off["pattern"], json!(r"^\d{4}-\d{2}-\d{2}$"));
+        assert_eq!(off["minLength"], json!(10));
+        assert_eq!(off["maxLength"], json!(10));
+        assert_eq!(
+            off.as_object().map(|o| o.len()),
+            Some(3),
+            "exactly the three keywords the type has no place for"
+        );
+    }
+
+    #[test]
+    fn an_integer_field_keeps_minimum_and_sheds_pattern() {
+        // The routing is per keyword, not per field: `minimum` IS in v2's
+        // `integer` vocabulary and stays; `pattern` is not and moves.
+        let field = field_for("representation.numeric.integer_number", &["42", "7"]);
+        assert_eq!(field["type"], json!("integer"));
+        assert_eq!(field["constraints"]["minimum"], json!(0.0));
+        assert!(
+            field["constraints"].get("pattern").is_none(),
+            "a v2 `integer` field may not carry `pattern`: {field}"
+        );
+        assert_eq!(
+            field["x-finetype-unsupported-constraints"]["pattern"],
+            json!(r"^-?\d+$")
+        );
+    }
+
+    #[test]
+    fn a_string_field_is_untouched_by_the_routing() {
+        // The vocabulary is per type, so the type that owns `pattern`,
+        // `minLength` and `maxLength` keeps all three in `constraints` and gains
+        // no custom key.
+        let field = field_for("identity.person.email", &["a@b.com"]);
+        assert_eq!(field["type"], json!("string"));
+        assert_eq!(field["constraints"]["pattern"], json!("^.+@.+$"));
+        assert_eq!(field["constraints"]["minLength"], json!(5));
+        assert_eq!(field["constraints"]["maxLength"], json!(254));
+        assert!(field.get("x-finetype-unsupported-constraints").is_none());
+    }
+
+    #[test]
+    fn the_routing_loses_no_keyword() {
+        // The two halves partition: whatever the emitter computed is in exactly
+        // one of `constraints` and `x-finetype-unsupported-constraints`.
+        for (label, values) in [
+            ("datetime.date.iso", &["2026-08-28"][..]),
+            ("representation.numeric.integer_number", &["42"][..]),
+            ("identity.person.email", &["a@b.com"][..]),
+        ] {
+            let field = field_for(label, values);
+            let kept: BTreeSet<String> = field
+                .get("constraints")
+                .and_then(|c| c.as_object())
+                .map(|o| o.keys().cloned().collect())
+                .unwrap_or_default();
+            let off: BTreeSet<String> = field
+                .get("x-finetype-unsupported-constraints")
+                .and_then(|c| c.as_object())
+                .map(|o| o.keys().cloned().collect())
+                .unwrap_or_default();
+            assert!(
+                kept.is_disjoint(&off),
+                "{label}: a keyword appears on both sides"
+            );
+
+            let def = test_taxonomy().get(label).cloned().expect("label in fixture");
+            let v = def.validation.as_ref().expect("fixture labels all validate");
+            let mut expected: BTreeSet<String> = BTreeSet::new();
+            if v.pattern.is_some() {
+                expected.insert("pattern".into());
+            }
+            if v.min_length.is_some() {
+                expected.insert("minLength".into());
+            }
+            if v.max_length.is_some() {
+                expected.insert("maxLength".into());
+            }
+            if v.minimum.is_some() {
+                expected.insert("minimum".into());
+            }
+            if v.maximum.is_some() {
+                expected.insert("maximum".into());
+            }
+            let seen: BTreeSet<String> = kept.union(&off).cloned().collect();
+            assert_eq!(
+                seen, expected,
+                "{label}: the routing must move every keyword, not lose one"
+            );
+        }
     }
 }
