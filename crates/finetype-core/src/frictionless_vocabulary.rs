@@ -53,25 +53,26 @@ pub const PROFILE_FIELD_TYPES: &[&str] = &[
 /// the defect this table exists to prevent, not a pass.
 ///
 /// Keywords are sorted within a type; types are in profile branch order.
+//
+// Kept as an aligned table rather than reflowed: this is data read against the
+// profile keyword by keyword, and one row per type is how it is checked by eye.
+#[rustfmt::skip]
 const CONSTRAINT_VOCABULARY: &[(&str, &[&str])] = &[
-    (
-        "string",
-        &["enum", "maxLength", "minLength", "pattern", "required", "unique"],
-    ),
-    ("number", &["enum", "maximum", "minimum", "required", "unique"]),
-    ("integer", &["enum", "maximum", "minimum", "required", "unique"]),
-    ("date", &["enum", "maximum", "minimum", "required", "unique"]),
-    ("time", &["enum", "maximum", "minimum", "required", "unique"]),
-    ("datetime", &["enum", "maximum", "minimum", "required", "unique"]),
-    ("year", &["enum", "maximum", "minimum", "required", "unique"]),
+    ("string",    &["enum", "maxLength", "minLength", "pattern", "required", "unique"]),
+    ("number",    &["enum", "maximum", "minimum", "required", "unique"]),
+    ("integer",   &["enum", "maximum", "minimum", "required", "unique"]),
+    ("date",      &["enum", "maximum", "minimum", "required", "unique"]),
+    ("time",      &["enum", "maximum", "minimum", "required", "unique"]),
+    ("datetime",  &["enum", "maximum", "minimum", "required", "unique"]),
+    ("year",      &["enum", "maximum", "minimum", "required", "unique"]),
     ("yearmonth", &["enum", "maximum", "minimum", "required", "unique"]),
-    ("boolean", &["enum", "required"]),
-    ("object", &["enum", "maxLength", "minLength", "required", "unique"]),
-    ("geopoint", &["enum", "required", "unique"]),
-    ("geojson", &["enum", "required", "unique"]),
-    ("array", &["enum", "maxLength", "minLength", "required", "unique"]),
-    ("duration", &["enum", "required", "unique"]),
-    ("any", &["enum", "required", "unique"]),
+    ("boolean",   &["enum", "required"]),
+    ("object",    &["enum", "maxLength", "minLength", "required", "unique"]),
+    ("geopoint",  &["enum", "required", "unique"]),
+    ("geojson",   &["enum", "required", "unique"]),
+    ("array",     &["enum", "maxLength", "minLength", "required", "unique"]),
+    ("duration",  &["enum", "required", "unique"]),
+    ("any",       &["enum", "required", "unique"]),
 ];
 
 /// Where `frictionless==5.19.0` refuses a keyword the vendored profile's branch
@@ -86,21 +87,19 @@ const CONSTRAINT_VOCABULARY: &[(&str, &[&str])] = &[
 /// with the standard: its per-type `supported_constraints` lists omit
 /// `exclusiveMinimum`/`exclusiveMaximum` everywhere, `jsonSchema` entirely,
 /// `minLength`/`maxLength` on `geojson`, and `minimum`/`maximum` on `duration`.
+#[rustfmt::skip]
 pub const REFERENCE_IMPLEMENTATION_NARROWING: &[(&str, &[&str])] = &[
-    ("number", &["exclusiveMaximum", "exclusiveMinimum"]),
-    ("integer", &["exclusiveMaximum", "exclusiveMinimum"]),
-    ("date", &["exclusiveMaximum", "exclusiveMinimum"]),
-    ("time", &["exclusiveMaximum", "exclusiveMinimum"]),
-    ("datetime", &["exclusiveMaximum", "exclusiveMinimum"]),
-    ("year", &["exclusiveMaximum", "exclusiveMinimum"]),
+    ("number",    &["exclusiveMaximum", "exclusiveMinimum"]),
+    ("integer",   &["exclusiveMaximum", "exclusiveMinimum"]),
+    ("date",      &["exclusiveMaximum", "exclusiveMinimum"]),
+    ("time",      &["exclusiveMaximum", "exclusiveMinimum"]),
+    ("datetime",  &["exclusiveMaximum", "exclusiveMinimum"]),
+    ("year",      &["exclusiveMaximum", "exclusiveMinimum"]),
     ("yearmonth", &["exclusiveMaximum", "exclusiveMinimum"]),
-    ("object", &["jsonSchema"]),
-    ("geojson", &["maxLength", "minLength"]),
-    ("array", &["jsonSchema"]),
-    (
-        "duration",
-        &["exclusiveMaximum", "exclusiveMinimum", "maximum", "minimum"],
-    ),
+    ("object",    &["jsonSchema"]),
+    ("geojson",   &["maxLength", "minLength"]),
+    ("array",     &["jsonSchema"]),
+    ("duration",  &["exclusiveMaximum", "exclusiveMinimum", "maximum", "minimum"]),
 ];
 
 /// The constraint keywords legal beside `"type": {ftype}`, or `None` when

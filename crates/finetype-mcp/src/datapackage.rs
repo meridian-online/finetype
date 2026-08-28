@@ -708,8 +708,14 @@ representation.numeric.integer_number:
                 "{label}: a keyword appears on both sides"
             );
 
-            let def = test_taxonomy().get(label).cloned().expect("label in fixture");
-            let v = def.validation.as_ref().expect("fixture labels all validate");
+            let def = test_taxonomy()
+                .get(label)
+                .cloned()
+                .expect("label in fixture");
+            let v = def
+                .validation
+                .as_ref()
+                .expect("fixture labels all validate");
             let mut expected: BTreeSet<String> = BTreeSet::new();
             if v.pattern.is_some() {
                 expected.insert("pattern".into());
