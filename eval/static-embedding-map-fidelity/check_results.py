@@ -90,27 +90,70 @@ LEXICAL = "bm25"
 LADDER = ("potion-8m", "potion-32m", "potion-retrieval-32m")
 
 
+class RosterUnreadable(RuntimeError):
+    """The harness's arm roster could not be read in full."""
+
+
+def _parse_roster(src: str) -> tuple[str, ...]:
+    """Every arm name in the harness's `EMBEDDERS` block, or raise.
+
+    Pure so the self-test can hand it a mutated source. It RAISES rather than
+    returning a short list, because a silently short roster is the exact defect this
+    whole mechanism exists to prevent: a seventh review changed the quote style on one
+    arm's line, watched that arm vanish from the required set with no error, and then
+    passed a results file missing it entirely.
+
+    The completeness check is independent of the capture: count the tuple-opening lines
+    in the block, and refuse if fewer names came back than there are tuples. A regex
+    that captures what its author anticipated is a second enumeration wearing a
+    derivation's clothes, and it needs pinning against its own input, not only against
+    the payload it produces.
+    """
+    block = re.search(r"^EMBEDDERS = \[(.*?)^\]", src, re.S | re.M)
+    if block is None:
+        raise RosterUnreadable("map_fidelity.py has no EMBEDDERS block")
+    body = block.group(1)
+    tuples = len(re.findall(r"^\s*\(", body, re.M))
+    names = tuple(re.findall(r'^\s*\("([^"]+)"', body, re.M))
+    if not names:
+        raise RosterUnreadable("EMBEDDERS block parsed to no arm names")
+    if len(names) != tuples:
+        raise RosterUnreadable(
+            f"EMBEDDERS block has {tuples} entries and {len(names)} parsed to a name: "
+            f"{names}. An arm is unreadable, so the required set would be short."
+        )
+    # Counting is not enough: a reformat that changes the inner quotes leaves the
+    # opening `("` intact, so the regex captures the WHOLE tuple as one name and the
+    # count still matches. Found by a badly-written mutation in this file's own roster
+    # self-test, which is the argument for having one. An arm name is a short slug.
+    bad = [n for n in names if not re.fullmatch(r"[a-z0-9][a-z0-9.\-]*", n)]
+    if bad:
+        raise RosterUnreadable(
+            f"EMBEDDERS parsed to {len(names)} names but {bad} are not arm slugs, "
+            f"so the block was read wrongly rather than not at all."
+        )
+    return names
+
+
 def _measured_roster() -> tuple[str, ...]:
-    """Every arm the harness measures, read from the harness rather than restated.
+    """The roster the harness measures, read from the harness rather than restated.
 
     A hand-written list of required arms is incomplete by construction: it protects the
-    names somebody thought to type. Five review rounds closed three such gaps one at a
-    time — potion-32m, then a whole corpus, then a null lift — and a sixth found the one
-    still open, `potion-4m`, which the document makes a standalone claim about (it is the
-    only arm that loses to the lexical floor on long text) and which no category covered.
-    Nobody had forgotten to update the list; the list could never have been complete.
+    names somebody thought to type. Six review rounds closed four such gaps one at a
+    time — potion-32m, a whole corpus, a null lift, then potion-4m, which the document
+    makes a standalone claim about and no category covered. Nobody had forgotten to
+    update the list; the list could never have been complete.
 
-    So this reads `EMBEDDERS` out of `map_fidelity.py` by source rather than import — the
-    harness imports numpy, sklearn and umap at module scope, which this check must not
-    pay for or depend on. Add an eighth arm to the harness tomorrow and it is required
-    here the same day, with nothing to remember.
+    Read by source rather than by import: the harness pulls numpy, sklearn and umap at
+    module scope, and this check must neither pay for that nor depend on it.
+
+    It does NOT follow that adding an arm makes it required with nothing to remember —
+    an earlier version of this docstring said exactly that and it was false. A parse is
+    a second enumeration: it is complete only for the shape its author anticipated. What
+    makes the claim safe is that `_parse_roster` REFUSES a source it cannot read in
+    full, and that `_roster_self_test` mutates the harness's own source to prove it.
     """
-    src = (Path(__file__).with_name("map_fidelity.py")).read_text()
-    block = re.search(r"^EMBEDDERS = \[(.*?)^\]", src, re.S | re.M)
-    if block is None:  # pragma: no cover - the harness would have to be unrecognisable
-        return (CONTROL, CEILING, *LADDER)
-    names = tuple(re.findall(r'^\s*\("([^"]+)"', block.group(1), re.M))
-    return names or (CONTROL, CEILING, *LADDER)
+    return _parse_roster(Path(__file__).with_name("map_fidelity.py").read_text())
 
 
 REQUIRED_ARMS = (*_measured_roster(), LEXICAL)
@@ -713,8 +756,46 @@ CASES: list[tuple[str, str, Callable[[dict], dict]]] = [
 ]
 
 
+ROSTER_MUTATIONS: list[tuple[str, Callable[[str], str]]] = [
+    ("one arm's line uses single quotes, so the regex skips it",
+     lambda src: src.replace('("potion-4m", "minishlab/potion-base-4M", "static")',
+                             "('potion-4m', 'minishlab/potion-base-4M', 'static')")),
+    ("the whole block is reformatted to single quotes",
+     lambda src: src.replace('EMBEDDERS = [', 'EMBEDDERS = [', 1).replace('", "', "', '")),
+    ("the block is gone entirely", lambda src: src.replace("EMBEDDERS = [", "EMBEDDERS_OLD = [", 1)),
+]
+
+
+def _roster_self_test(failures: list[str]) -> None:
+    """Prove the roster parse refuses a source it cannot read in full.
+
+    Every case in CASES mutates the JSON payload. None mutates the harness's SOURCE,
+    which is the input this derivation actually reads — so until a seventh review
+    changed one arm's quote style and watched it vanish, the parsing path had no
+    coverage of its own failure mode at all. A derivation is not a proof of
+    completeness merely because it reads from source instead of a literal.
+    """
+    src = Path(__file__).with_name("map_fidelity.py").read_text()
+    try:
+        good = _parse_roster(src)
+    except RosterUnreadable as exc:
+        failures.append(f"roster: the real harness does not parse: {exc}")
+        return
+    if CONTROL not in good or CEILING not in good:
+        failures.append(f"roster: the real harness parsed to {good}, missing a floor or the ceiling")
+    for description, mutate in ROSTER_MUTATIONS:
+        try:
+            got = _parse_roster(mutate(src))
+        except RosterUnreadable:
+            print(f"  ok  roster: refused when {description}")
+            continue
+        failures.append(f"roster: NOT DETECTED when {description} -- parsed {got}")
+
+
 def self_test() -> int:
     failures: list[str] = []
+
+    _roster_self_test(failures)
 
     clean = check(_fixture())
     if clean:
@@ -739,7 +820,7 @@ def self_test() -> int:
 
     for line in failures:
         print(f"  FAIL  {line}", file=sys.stderr)
-    print(f"{len(CASES)} cases, {len(failures)} failures", file=sys.stderr)
+    print(f"{len(CASES) + len(ROSTER_MUTATIONS)} cases, {len(failures)} failures", file=sys.stderr)
     return 1 if failures else 0
 
 
