@@ -122,6 +122,134 @@ fn is_nullish(trimmed: &str) -> bool {
     trimmed.is_empty() || NULLISH_TOKENS.contains(&trimmed)
 }
 
+/// One `sniff_csv` verdict: the dialect it settled on, how many columns it
+/// claims, and the ready-made `read_csv(...)` call duckdb itself wrote for it.
+///
+/// `quote` carries duckdb's `(empty)` sentinel verbatim when the sniffer chose
+/// no quote character; `EMPTY_SENTINEL` is the only place that string is
+/// interpreted.
+#[derive(Debug, Clone)]
+struct CsvSniff {
+    delim: String,
+    quote: String,
+    skip: usize,
+    ncols: usize,
+    /// duckdb's own `FROM read_csv(...);` rendering, stripped to the call.
+    call: String,
+}
+
+/// `sniff_csv` renders an empty dialect character as this literal string
+/// rather than as an empty field.
+const EMPTY_SENTINEL: &str = "(empty)";
+
+/// Run `sniff_csv` once and parse its verdict, or `None` if duckdb refused the
+/// file or emitted something we cannot read. A refusal is not an error here:
+/// the caller ranks whatever verdicts it got and falls back when it has none.
+fn sniff_csv(input_literal: &str, delimiter: Option<char>, null_padding: bool) -> Option<CsvSniff> {
+    let mut opts = String::from("all_varchar=true");
+    if null_padding {
+        opts.push_str(", null_padding=true");
+    }
+    if let Some(delim) = delimiter {
+        opts.push_str(", sep=");
+        opts.push_str(&crate::sql::sql_quote(&delim.to_string()));
+    }
+    let query = format!(
+        "SELECT Delimiter AS delim, Quote AS quote, SkipRows AS skip, \
+         len(Columns) AS ncols, Prompt AS prompt FROM sniff_csv({input_literal}, {opts});"
+    );
+    let out = std::process::Command::new("duckdb")
+        .arg("-json")
+        .arg("-c")
+        .arg(&query)
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let rows: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
+    let row = rows.get(0)?;
+    let prompt = row.get("prompt")?.as_str()?;
+    Some(CsvSniff {
+        delim: row.get("delim")?.as_str()?.to_string(),
+        quote: row.get("quote")?.as_str()?.to_string(),
+        skip: row.get("skip")?.as_u64()? as usize,
+        ncols: row.get("ncols")?.as_u64()? as usize,
+        call: read_call_from_prompt(prompt)?,
+    })
+}
+
+/// Strip duckdb's `Prompt` rendering down to the bare `read_csv(...)` call.
+/// `FROM read_csv('f', …);` → `read_csv('f', …)`.
+fn read_call_from_prompt(prompt: &str) -> Option<String> {
+    let trimmed = prompt.trim().trim_end_matches(';').trim();
+    let call = trimmed.strip_prefix("FROM ")?.trim();
+    if !call.starts_with("read_csv(") || !call.ends_with(')') {
+        return None;
+    }
+    Some(call.to_string())
+}
+
+/// Append an option inside an existing `read_csv(...)` call.
+fn with_option(call: &str, option: &str) -> String {
+    format!("{}, {option})", &call[..call.len() - 1])
+}
+
+/// How many fields the file's first row splits into under `sniff`'s own
+/// dialect, or `None` when the dialect is not one the csv crate can express
+/// (a multi-byte delimiter) or the file cannot be read.
+///
+/// This is the arbiter between two sniffs that disagree: a CSV's first row
+/// names its columns, so a sniff claiming more columns than that row has
+/// fields has invented the difference.
+fn header_field_count(file: &std::path::Path, sniff: &CsvSniff) -> Option<usize> {
+    let delim = single_byte(&sniff.delim)?;
+    let mut builder = csv::ReaderBuilder::new();
+    builder.delimiter(delim).has_headers(false).flexible(true);
+    match single_byte(&sniff.quote) {
+        Some(q) => {
+            builder.quoting(true).quote(q);
+        }
+        None => {
+            builder.quoting(false);
+        }
+    }
+    let handle = std::fs::File::open(file).ok()?;
+    let mut reader = builder.from_reader(handle);
+    let mut records = reader.records();
+    for _ in 0..sniff.skip {
+        records.next()?.ok()?;
+    }
+    Some(records.next()?.ok()?.len())
+}
+
+/// The single byte a dialect character stands for, or `None` for duckdb's
+/// `(empty)` sentinel, the empty string, or anything wider than one byte.
+fn single_byte(s: &str) -> Option<u8> {
+    if s.is_empty() || s == EMPTY_SENTINEL || s.len() != 1 {
+        return None;
+    }
+    Some(s.as_bytes()[0])
+}
+
+/// Pick the column list to read with. Ranks the sniffs widest-first and takes
+/// the first one the header row confirms; ties keep the strict sniff, which is
+/// listed first and which `sort_by_key` is stable for.
+fn choose_sniff<'a>(
+    file: &std::path::Path,
+    strict: Option<&'a CsvSniff>,
+    padded: Option<&'a CsvSniff>,
+) -> Option<&'a CsvSniff> {
+    let mut ranked: Vec<&CsvSniff> = strict.into_iter().chain(padded).collect();
+    ranked.sort_by_key(|c| std::cmp::Reverse(c.ncols));
+    ranked
+        .iter()
+        .copied()
+        .find(|c| header_field_count(file, c) == Some(c.ncols))
+        .or(strict)
+        .or(padded)
+}
+
 /// Read CSV (or Parquet) input into (headers, columns, row_count) by shelling
 /// out to the external `duckdb` CLI (choice 0100). This replaces the bespoke
 /// csv-crate reader: DuckDB's parallel CSV sniffer handles dialect detection,
@@ -152,29 +280,70 @@ pub(crate) fn read_csv_input(
 
     // Build the SELECT source. Parquet: cast every column to VARCHAR so the
     // engine sees the same VARCHAR cells the CSV path produces (matches
-    // validate.rs's `COLUMNS(*)::VARCHAR` contract). CSV: auto-detect the
-    // dialect (honouring an explicit delimiter when given) with `all_varchar`
-    // + `null_padding` — short ragged rows are padded with NULLs, the duckdb
-    // analogue of the csv crate's `flexible(true)`.
-    // Build the SELECT source. Parquet has no fallback; CSV keeps its `opts`
-    // string so we can retry single-threaded on a parallel-scanner failure.
-    let (source, csv_opts) = if is_parquet {
+    // validate.rs's `COLUMNS(*)::VARCHAR` contract).
+    //
+    // CSV: SNIFF THE SHAPE FIRST, THEN READ WITH THE COLUMN LIST THE SNIFF
+    // PINNED. `null_padding=true` is what pads a short ragged row with NULLs —
+    // the duckdb analogue of the csv crate's `flexible(true)` — and it is the
+    // reason this option is here at all. What it COSTS, and what nobody wrote
+    // down until it shipped a wrong descriptor, is that it also licenses the
+    // SNIFFER to widen the schema: with widths no longer required to agree, a
+    // delimiter that splits only some rows becomes an acceptable delimiter.
+    // Measured on duckdb v1.5.5 against tests/fixtures/label_stability/
+    // naics_description.csv — one column of prose, written by duckdb's own
+    // COPY — `auto_detect=true, all_varchar=true, null_padding=true` reports
+    // EIGHT columns (`description`, `column1` … `column7`), splitting the prose
+    // on `;`, while the same call without `null_padding` reports one. The seven
+    // extra columns reach the descriptor carrying labels and confidences, and
+    // the real column is then measured on fragments cut at the first semicolon.
+    //
+    // Separating the two questions keeps both properties: the column count is a
+    // SCHEMA question and belongs to the sniff, the padding is a ROW question
+    // and belongs to the read. So we sniff, fix the column list, and pass it to
+    // `read_csv` explicitly alongside `null_padding=true` — which then pads
+    // short rows without being able to move the column count.
+    //
+    // Both sniffs are needed, because neither is right on its own. The strict
+    // sniff (no `null_padding`) is the one that gets the prose file right, but
+    // on a genuinely ragged file it finds NO delimiter whose widths agree and
+    // collapses the whole file to a single column named after the header line.
+    // The padded sniff is the one that gets the ragged file right. The header
+    // row arbitrates: a CSV's first row names its columns, so a sniff claiming
+    // more columns than that row has fields has invented the difference. Widest
+    // header-confirmed sniff wins; a tie keeps the strict one.
+    let (source, csv_call) = if is_parquet {
         (
             format!("SELECT COLUMNS(*)::VARCHAR FROM read_parquet({input_literal})"),
             None,
         )
     } else {
-        let mut opts = String::from("auto_detect=true, all_varchar=true, null_padding=true");
-        if let Some(delim) = delimiter {
-            // Render the delimiter as a SQL literal so quotes/backslashes are
-            // escaped safely; an explicit delimiter pins the sniffer.
-            opts.push_str(", sep=");
-            opts.push_str(&crate::sql::sql_quote(&delim.to_string()));
-        }
-        (
-            format!("SELECT * FROM read_csv({input_literal}, {opts})"),
-            Some(opts),
-        )
+        let strict = sniff_csv(&input_literal, delimiter, false);
+        let padded = sniff_csv(&input_literal, delimiter, true);
+        let call = match choose_sniff(file, strict.as_ref(), padded.as_ref()) {
+            Some(chosen) => {
+                // The padded sniff's own prompt already carries the option; the
+                // strict sniff's does not, and the read needs it either way.
+                if chosen.call.contains("null_padding=") {
+                    chosen.call.clone()
+                } else {
+                    with_option(&chosen.call, "null_padding=true")
+                }
+            }
+            // Last resort: duckdb refused to sniff the file at all, so there is
+            // no column list to pin and auto-detection is the only option left.
+            None => {
+                let mut opts =
+                    String::from("auto_detect=true, all_varchar=true, null_padding=true");
+                if let Some(delim) = delimiter {
+                    // Render the delimiter as a SQL literal so quotes and
+                    // backslashes are escaped safely.
+                    opts.push_str(", sep=");
+                    opts.push_str(&crate::sql::sql_quote(&delim.to_string()));
+                }
+                format!("read_csv({input_literal}, {opts})")
+            }
+        };
+        (format!("SELECT * FROM {call}"), Some(call))
     };
 
     // Re-emit as canonical CSV on the child's stdout via duckdb's `-csv` output
@@ -217,8 +386,8 @@ pub(crate) fn read_csv_input(
     // ragged/quoted files now parse rather than aborting the profile (and, in
     // batch mode, taking the rest of the run down with them).
     if !out.status.success() {
-        if let Some(opts) = csv_opts {
-            let retry = format!("SELECT * FROM read_csv({input_literal}, {opts}, parallel=false)");
+        if let Some(call) = csv_call {
+            let retry = format!("SELECT * FROM {}", with_option(&call, "parallel=false"));
             out = run_duckdb(&retry)?;
         }
     }
