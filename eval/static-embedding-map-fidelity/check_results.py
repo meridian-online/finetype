@@ -83,6 +83,19 @@ CONTROL = "random-384"
 CEILING = "minilm"
 LEXICAL = "bm25"
 
+# The ladder AC1 names: size, then training objective, on one tokenizer. These are
+# REQUIRED, not merely expected, because the gap and stages tables are computed from
+# them — and an arm missing from EVERY corpus uniformly is invisible to `rule_one_pass`,
+# which only compares corpora against each other. Without this, dropping potion-32m
+# made the gap table generate as a bare header, the committed block regenerated to
+# match, and the whole check reported clean. A published row can vanish and the only
+# thing that notices is a person re-reading the document.
+LADDER = ("potion-8m", "potion-32m", "potion-retrieval-32m")
+
+# The corpora one pass covers. Same argument one level up: every corpus vanishing
+# together is a shorter file that agrees with itself.
+REQUIRED_CORPORA = ("20news-body", "20news-subject", "finetype-columns")
+
 # How far the noise control may sit from a floor before the file is refused.
 # AMI and map overlap floor at zero; pooled average precision floors at the
 # declared positive rate. Both tolerances are wide enough for sampling noise at
@@ -233,12 +246,25 @@ def _arms(corpus: dict) -> dict[str, dict]:
 
 
 def rule_required_arms(payload: dict, f: Findings) -> None:
-    """Both floors and the ceiling are present in every corpus."""
+    """Every corpus this run covers, and every arm a figure is computed from.
+
+    Two floors, the ceiling, and the ladder. The ladder is here because the gap and
+    stages tables are DERIVED from it: a check that only compares generated against
+    committed authenticates that they agree, not that either says anything. Drop an
+    arm from every corpus and both tables generate empty, the document regenerates to
+    match, and nothing reddens.
+    """
+    seen = {c["corpus"] for c in payload["results"]}
+    for want in REQUIRED_CORPORA:
+        if want not in seen:
+            f.add(f"no {want} corpus, so every figure derived from it is absent rather than wrong")
     for corpus in payload["results"]:
         arms = _arms(corpus)
-        for want in (CONTROL, CEILING, LEXICAL):
+        for want in (CONTROL, CEILING, LEXICAL, *LADDER):
             if want not in arms:
                 f.add(f"{corpus['corpus']} has no {want} arm")
+            elif want in LADDER and arms[want].get("lift_over_random") is None:
+                f.add(f"{corpus['corpus']} {want} has no lift_over_random, so the gap table cannot be derived")
 
 
 def rule_one_pass(payload: dict, f: Findings) -> None:
@@ -478,8 +504,19 @@ def _fixture() -> dict:
                 _arm(CEILING, "transformer", "sentence-transformers/all-MiniLM-L6-v2"),
                 _arm("potion-8m", "static", "minishlab/potion-base-8M",
                      ami_map=0.30, precision_at_k=0.27, retention_vs_minilm=0.71,
-                     map_overlap_with_minilm=0.13, pairwise_ap_same_class=0.73,
+                     map_overlap_with_minilm=0.13, vector_overlap_with_minilm=0.24,
+                     pairwise_ap_same_class=0.73,
                      pairwise_ap_near_duplicate=0.94, lift_over_random=0.65),
+                _arm("potion-32m", "static", "minishlab/potion-base-32M",
+                     ami_map=0.32, precision_at_k=0.29, retention_vs_minilm=0.75,
+                     map_overlap_with_minilm=0.14, vector_overlap_with_minilm=0.25,
+                     pairwise_ap_same_class=0.74,
+                     pairwise_ap_near_duplicate=0.94, lift_over_random=0.70),
+                _arm("potion-retrieval-32m", "static", "minishlab/potion-retrieval-32M",
+                     ami_map=0.33, precision_at_k=0.30, retention_vs_minilm=0.78,
+                     map_overlap_with_minilm=0.15, vector_overlap_with_minilm=0.26,
+                     pairwise_ap_same_class=0.75,
+                     pairwise_ap_near_duplicate=0.95, lift_over_random=0.74),
                 _arm(CONTROL, "control", None,
                      ami_map=0.001, ami_vectors=-0.001, retention_vs_minilm=0.0,
                      map_overlap_with_minilm=0.01, precision_at_k=0.05, mrr_at_k=0.09,
@@ -500,8 +537,10 @@ def _fixture() -> dict:
         "licences": {
             "sentence-transformers/all-MiniLM-L6-v2": {"licence": "apache-2.0"},
             "minishlab/potion-base-8M": {"licence": "mit"},
+            "minishlab/potion-base-32M": {"licence": "mit"},
+            "minishlab/potion-retrieval-32M": {"licence": "mit"},
         },
-        "results": [corpus("20news-body"), corpus("finetype-columns")],
+        "results": [corpus(k) for k in REQUIRED_CORPORA],
     }
     blocks = "\n".join(
         f"{start}\n{EMITTERS[name](payload)}\n{end}"
@@ -517,8 +556,26 @@ def _drop_arm(p: dict) -> dict:
 
 
 def _extra_arm_in_one_corpus(p: dict) -> dict:
-    p["results"][1]["embedders"].append(_arm("potion-32m", "static", "minishlab/potion-base-32M"))
-    p["licences"]["minishlab/potion-base-32M"] = {"licence": "mit"}
+    p["results"][1]["embedders"].append(_arm("potion-4m", "static", "minishlab/potion-base-4M"))
+    p["licences"]["minishlab/potion-base-4M"] = {"licence": "mit"}
+    return p
+
+
+def _ladder_arm_gone_everywhere(p: dict) -> dict:
+    """The hole a fifth verifier found: uniform loss is invisible to rule_one_pass."""
+    for c in p["results"]:
+        c["embedders"] = [a for a in c["embedders"] if a["embedder"] != "potion-32m"]
+    return p
+
+
+def _corpus_gone(p: dict) -> dict:
+    p["results"] = [c for c in p["results"] if c["corpus"] != "20news-subject"]
+    return p
+
+
+def _ladder_lift_missing(p: dict) -> dict:
+    for c in p["results"]:
+        _arms(c)["potion-32m"]["lift_over_random"] = None
     return p
 
 
@@ -594,6 +651,9 @@ def _licence_blank(p: dict) -> dict:
 
 CASES: list[tuple[str, str, Callable[[dict], dict]]] = [
     ("required_arms", "the noise control is missing from a corpus", _drop_arm),
+    ("required_arms", "a ladder arm is gone from EVERY corpus, so one_pass cannot see it", _ladder_arm_gone_everywhere),
+    ("required_arms", "a whole corpus is absent", _corpus_gone),
+    ("required_arms", "a ladder arm has no lift, so the gap table derives from nothing", _ladder_lift_missing),
     ("one_pass", "one corpus carries an arm the other does not", _extra_arm_in_one_corpus),
     ("arms_are_distinct", "two arms named for different models produced identical vectors", _two_arms_one_model),
     ("control_on_its_floor", "the control's map AMI climbs to a real score", _control_climbs),
