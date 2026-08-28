@@ -19,6 +19,7 @@
 //!   nowhere, so the extensions validate cleanly.
 
 use finetype_core::enum_domain::{detect_enum_domain, label_is_enum_keyword_eligible, EnumConfig};
+use finetype_core::frictionless_vocabulary::constraint_vocabulary;
 use finetype_core::{PatternFit, Taxonomy};
 use serde_json::{json, Map, Value};
 use std::collections::BTreeSet;
@@ -215,19 +216,30 @@ fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold
         .and_then(|d| d.validation.as_ref())
         .and_then(|v| v.fit_pattern(col.values));
 
-    if let Some(constraints) = constraints_for(
+    let FieldConstraints { kept, off_type } = constraints_for(
         col.label,
         col.values,
         def,
         ftype,
         enum_threshold,
         fit.as_ref(),
-    ) {
-        field.insert("constraints".into(), constraints);
+    );
+    if !kept.is_empty() {
+        field.insert("constraints".into(), Value::Object(kept));
     }
 
     // ── ac-03 custom properties (lossless carriers the fold drops) ──
     field.insert("x-finetype-label".into(), json!(col.label));
+    // Constraints the type's own validation states but v2 has no place for on
+    // THIS declared type. Kept beside the field rather than dropped: a
+    // `datetime.date.iso` column really does match that pattern and really is
+    // ten characters long, and a reader may already be using it.
+    if !off_type.is_empty() {
+        field.insert(
+            "x-finetype-unsupported-constraints".into(),
+            Value::Object(off_type),
+        );
+    }
     // A widened or dropped pattern is stated rather than done silently: the
     // consumer can see which rule the type would have imposed and that the
     // column's own values are why it did not survive verbatim.
@@ -270,10 +282,33 @@ fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold
     Value::Object(field)
 }
 
+/// A field's `constraints`, split by whether Data Package v2 has a place for
+/// each keyword on the field's **declared type**.
+struct FieldConstraints {
+    /// Goes into `constraints`.
+    kept: Map<String, Value>,
+    /// Goes into `x-finetype-unsupported-constraints`.
+    off_type: Map<String, Value>,
+}
+
 /// Frictionless `constraints` for a field: `pattern`/`minLength`/`maxLength`/
 /// `minimum`/`maximum` from the type's static validation, plus `enum` ONLY when
-/// the column is a closed categorical (observed, enum-keyword-eligible). Returns
-/// `None` when no constraint applies.
+/// the column is a closed categorical (observed, enum-keyword-eligible).
+///
+/// Every keyword is then routed by the declared type's v2 vocabulary
+/// ([`finetype_core::frictionless_vocabulary`]). The field object in v2 is a
+/// fifteen-branch `oneOf`, one branch per type, each with its own `constraints`
+/// properties — so `pattern` beside `"type": "integer"` is not surplus
+/// information a reader skips, it is a descriptor `frictionless==5.19.0`
+/// refuses outright. Keywords with no place on the declared type move to
+/// `x-finetype-unsupported-constraints`; they are true of the column and the
+/// standard has nowhere to put them.
+///
+/// A declared type outside the profile's fifteen (the taxonomy's `list`, which
+/// v2 specifies and neither the vendored profile nor the reference
+/// implementation implements) has no vocabulary to route against, so its
+/// constraints are left where they are — filtering against a vocabulary we do
+/// not have would be a guess, and the field is refused for its type either way.
 ///
 /// `fit` is the reconciliation of the type's canonical `pattern` with this
 /// column's observed values; it decides whether a `pattern` is published, and
@@ -285,7 +320,7 @@ fn constraints_for(
     ftype: &str,
     enum_threshold: usize,
     fit: Option<&PatternFit>,
-) -> Option<Value> {
+) -> FieldConstraints {
     let mut c = Map::new();
 
     if let Some(v) = def.and_then(|d| d.validation.as_ref()) {
@@ -323,11 +358,23 @@ fn constraints_for(
         }
     }
 
-    if c.is_empty() {
-        None
-    } else {
-        Some(Value::Object(c))
+    let Some(vocabulary) = constraint_vocabulary(ftype) else {
+        return FieldConstraints {
+            kept: c,
+            off_type: Map::new(),
+        };
+    };
+
+    let mut kept = Map::new();
+    let mut off_type = Map::new();
+    for (keyword, value) in c {
+        if vocabulary.contains(&keyword.as_str()) {
+            kept.insert(keyword, value);
+        } else {
+            off_type.insert(keyword, value);
+        }
     }
+    FieldConstraints { kept, off_type }
 }
 
 #[cfg(test)]
@@ -362,6 +409,24 @@ geography.location.country_code:
   validation:
     type: string
     pattern: "^[A-Z]{2}$"
+datetime.date.iso:
+  broad_type: DATE
+  frictionless:
+    type: date
+    format: "%Y-%m-%d"
+  validation:
+    type: string
+    pattern: '^\d{4}-\d{2}-\d{2}$'
+    minLength: 10
+    maxLength: 10
+representation.numeric.integer_number:
+  broad_type: BIGINT
+  frictionless:
+    type: integer
+  validation:
+    type: string
+    pattern: '^-?\d+$'
+    minimum: 0
 "#,
         )
         .expect("test taxonomy parses")
@@ -560,5 +625,118 @@ geography.location.country_code:
         let core: Vec<_> = obj.keys().filter(|k| !k.starts_with("x-")).collect();
         assert!(core.contains(&&"name".to_string()));
         assert!(core.contains(&&"type".to_string()));
+    }
+
+    #[test]
+    fn a_date_field_carries_its_off_type_constraints_beside_it() {
+        // `datetime.date.iso` states a pattern and a fixed length, and all three
+        // are true of the column. v2's `date` branch has a place for none of
+        // them, and `frictionless==5.19.0` refuses the package over each one
+        // ("constraint \"maxLength\" is not supported by type \"date\"").
+        let field = field_for("datetime.date.iso", &["2026-08-28", "1999-01-01"]);
+        assert_eq!(field["type"], json!("date"));
+        assert!(
+            field.get("constraints").is_none(),
+            "nothing in this label's validation is legal on a v2 `date`, so the \
+             field should carry no `constraints` at all: {field}"
+        );
+
+        // Filtered, not dropped: every keyword is readable beside the field.
+        let off = &field["x-finetype-unsupported-constraints"];
+        assert_eq!(off["pattern"], json!(r"^\d{4}-\d{2}-\d{2}$"));
+        assert_eq!(off["minLength"], json!(10));
+        assert_eq!(off["maxLength"], json!(10));
+        assert_eq!(
+            off.as_object().map(|o| o.len()),
+            Some(3),
+            "exactly the three keywords the type has no place for"
+        );
+    }
+
+    #[test]
+    fn an_integer_field_keeps_minimum_and_sheds_pattern() {
+        // The routing is per keyword, not per field: `minimum` IS in v2's
+        // `integer` vocabulary and stays; `pattern` is not and moves.
+        let field = field_for("representation.numeric.integer_number", &["42", "7"]);
+        assert_eq!(field["type"], json!("integer"));
+        assert_eq!(field["constraints"]["minimum"], json!(0.0));
+        assert!(
+            field["constraints"].get("pattern").is_none(),
+            "a v2 `integer` field may not carry `pattern`: {field}"
+        );
+        assert_eq!(
+            field["x-finetype-unsupported-constraints"]["pattern"],
+            json!(r"^-?\d+$")
+        );
+    }
+
+    #[test]
+    fn a_string_field_is_untouched_by_the_routing() {
+        // The vocabulary is per type, so the type that owns `pattern`,
+        // `minLength` and `maxLength` keeps all three in `constraints` and gains
+        // no custom key.
+        let field = field_for("identity.person.email", &["a@b.com"]);
+        assert_eq!(field["type"], json!("string"));
+        assert_eq!(field["constraints"]["pattern"], json!("^.+@.+$"));
+        assert_eq!(field["constraints"]["minLength"], json!(5));
+        assert_eq!(field["constraints"]["maxLength"], json!(254));
+        assert!(field.get("x-finetype-unsupported-constraints").is_none());
+    }
+
+    #[test]
+    fn the_routing_loses_no_keyword() {
+        // The two halves partition: whatever the emitter computed is in exactly
+        // one of `constraints` and `x-finetype-unsupported-constraints`.
+        for (label, values) in [
+            ("datetime.date.iso", &["2026-08-28"][..]),
+            ("representation.numeric.integer_number", &["42"][..]),
+            ("identity.person.email", &["a@b.com"][..]),
+        ] {
+            let field = field_for(label, values);
+            let kept: BTreeSet<String> = field
+                .get("constraints")
+                .and_then(|c| c.as_object())
+                .map(|o| o.keys().cloned().collect())
+                .unwrap_or_default();
+            let off: BTreeSet<String> = field
+                .get("x-finetype-unsupported-constraints")
+                .and_then(|c| c.as_object())
+                .map(|o| o.keys().cloned().collect())
+                .unwrap_or_default();
+            assert!(
+                kept.is_disjoint(&off),
+                "{label}: a keyword appears on both sides"
+            );
+
+            let def = test_taxonomy()
+                .get(label)
+                .cloned()
+                .expect("label in fixture");
+            let v = def
+                .validation
+                .as_ref()
+                .expect("fixture labels all validate");
+            let mut expected: BTreeSet<String> = BTreeSet::new();
+            if v.pattern.is_some() {
+                expected.insert("pattern".into());
+            }
+            if v.min_length.is_some() {
+                expected.insert("minLength".into());
+            }
+            if v.max_length.is_some() {
+                expected.insert("maxLength".into());
+            }
+            if v.minimum.is_some() {
+                expected.insert("minimum".into());
+            }
+            if v.maximum.is_some() {
+                expected.insert("maximum".into());
+            }
+            let seen: BTreeSet<String> = kept.union(&off).cloned().collect();
+            assert_eq!(
+                seen, expected,
+                "{label}: the routing must move every keyword, not lose one"
+            );
+        }
     }
 }
