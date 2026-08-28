@@ -65,6 +65,20 @@ DEFAULT_FINDINGS = Path(__file__).resolve().parent / "FINDINGS.md"
 TABLE_START = "<!-- generated table: check_results.py --emit-table -->"
 TABLE_END = "<!-- end generated table -->"
 
+# Every DERIVED figure in FINDINGS.md lives in one of these blocks, and each is
+# generated from results.json and compared by `rule_findings_table`. There were three
+# blocks' worth of hand-typed figures until 2026-08-28; three successive corrections
+# each retyped one and one was wrong every time. The document's opening promise — that
+# a number in it cannot outlive the run that produced it — was true of the first block
+# and false of the rest, which is the gap this closes.
+BLOCKS = {
+    "measurement": (TABLE_START, TABLE_END),
+    "gap": ("<!-- generated gap table: check_results.py --emit-gap -->",
+            "<!-- end generated gap table -->"),
+    "stages": ("<!-- generated stages table: check_results.py --emit-stages -->",
+               "<!-- end generated stages table -->"),
+}
+
 CONTROL = "random-384"
 CEILING = "minilm"
 LEXICAL = "bm25"
@@ -156,7 +170,57 @@ def emit_table(payload: dict) -> str:
     return "\n".join(lines)
 
 
-def extract_table(findings: str) -> str | None:
+def _arm_of(payload: dict, corpus: str, name: str) -> dict | None:
+    """The named arm of the named corpus.
+
+    Deliberately NOT called `_arm`: the self-test defines its own `_arm` fixture
+    builder further down, and the later definition wins. The first version of this
+    helper was shadowed by it and the emitters silently read synthetic figures —
+    the gap table came out all zeros and the stages table raised KeyError.
+    """
+    for c in payload["results"]:
+        if c["corpus"] == corpus:
+            for a in c["embedders"]:
+                if a["embedder"] == name:
+                    return a
+    return None
+
+
+def emit_gap(payload: dict) -> str:
+    """How the ranked gap from potion-8m to MiniLM splits across the ladder."""
+    rows = ["| corpus | gap 8M → MiniLM | closed by size + vocabulary | closed by objective | left over |",
+            "|---|---|---|---|---|"]
+    for c in payload["results"]:
+        k = c["corpus"]
+        arms = [_arm_of(payload, k, n) for n in ("potion-8m", "potion-32m", "potion-retrieval-32m")]
+        if any(a is None or a.get("lift_over_random") is None for a in arms):
+            continue
+        base, mid, top = (a["lift_over_random"] for a in arms)
+        rows.append(f"| {k} | {1.0 - base:.3f} | +{mid - base:.3f} | +{top - mid:.3f} | {1.0 - top:.3f} |")
+    return "\n".join(rows)
+
+
+def emit_stages(payload: dict) -> str:
+    """The same overlap metric at both stages, across the ladder."""
+    rows = ["| corpus | vectors, 8M → retrieval-32M | 2D map, same span |", "|---|---|---|"]
+    for c in payload["results"]:
+        k = c["corpus"]
+        lo, hi = _arm_of(payload, k, "potion-8m"), _arm_of(payload, k, "potion-retrieval-32m")
+        if lo is None or hi is None:
+            continue
+        v0, v1 = lo.get("vector_overlap_with_minilm"), hi.get("vector_overlap_with_minilm")
+        m0, m1 = lo.get("map_overlap_with_minilm"), hi.get("map_overlap_with_minilm")
+        if None in (v0, v1, m0, m1):
+            continue
+        rows.append(f"| {k} | {v0:.4f} → {v1:.4f} ({v1 - v0:+.3f}) | {m0:.4f} → {m1:.4f} ({m1 - m0:+.3f}) |")
+    return "\n".join(rows)
+
+
+EMITTERS = {"measurement": emit_table, "gap": emit_gap, "stages": emit_stages}
+
+
+def extract_table(findings: str, block: str = "measurement") -> str | None:
+    TABLE_START, TABLE_END = BLOCKS[block]
     start = findings.find(TABLE_START)
     end = findings.find(TABLE_END)
     if start < 0 or end < 0 or end < start:
@@ -328,19 +392,21 @@ def rule_findings_table(payload: dict, f: Findings) -> None:
     if findings is None:
         f.add("FINDINGS.md was not supplied, so its figures are unchecked")
         return
-    have = extract_table(findings)
-    if have is None:
-        f.add(f"FINDINGS.md has no block between {TABLE_START!r} and {TABLE_END!r}")
-        return
-    want = emit_table(payload)
-    if have != want:
-        have_rows = have.splitlines()
-        want_rows = want.splitlines()
+    for block, (start_marker, end_marker) in BLOCKS.items():
+        have = extract_table(findings, block)
+        if have is None:
+            f.add(f"FINDINGS.md has no {block} block between {start_marker!r} and {end_marker!r}")
+            continue
+        want = EMITTERS[block](payload)
+        if have == want:
+            continue
+        have_rows, want_rows = have.splitlines(), want.splitlines()
         if len(have_rows) != len(want_rows):
-            f.add(f"FINDINGS.md table has {len(have_rows)} lines, results.json generates {len(want_rows)}")
+            f.add(f"FINDINGS.md {block} table has {len(have_rows)} lines, "
+                  f"results.json generates {len(want_rows)}")
         for h, w in zip(have_rows, want_rows):
             if h != w:
-                f.add(f"FINDINGS.md says {h!r}, results.json generates {w!r}")
+                f.add(f"FINDINGS.md {block} table says {h!r}, results.json generates {w!r}")
 
 
 RULES: list[Callable[[dict, Findings], None]] = [
@@ -437,7 +503,11 @@ def _fixture() -> dict:
         },
         "results": [corpus("20news-body"), corpus("finetype-columns")],
     }
-    payload["_findings_md"] = f"intro\n{TABLE_START}\n{emit_table(payload)}\n{TABLE_END}\nrest"
+    blocks = "\n".join(
+        f"{start}\n{EMITTERS[name](payload)}\n{end}"
+        for name, (start, end) in BLOCKS.items()
+    )
+    payload["_findings_md"] = f"intro\n{blocks}\nrest"
     return payload
 
 
@@ -578,7 +648,11 @@ def main() -> int:
     ap.add_argument("--findings", type=Path, default=DEFAULT_FINDINGS)
     ap.add_argument("--self-test", action="store_true", help="prove every rule can fire")
     ap.add_argument("--emit-table", action="store_true",
-                    help="print the table FINDINGS.md must carry, and exit")
+                    help="print the measurement table FINDINGS.md must carry, and exit")
+    ap.add_argument("--emit-gap", action="store_true",
+                    help="print the gap-attribution table FINDINGS.md must carry, and exit")
+    ap.add_argument("--emit-stages", action="store_true",
+                    help="print the both-stages overlap table FINDINGS.md must carry, and exit")
     args = ap.parse_args()
 
     if args.self_test:
@@ -592,6 +666,11 @@ def main() -> int:
     if not isinstance(payload, dict) or "results" not in payload:
         print(f"{args.results} is not a map-fidelity results file", file=sys.stderr)
         return 2
+
+    for flag, fn in (("emit_gap", emit_gap), ("emit_stages", emit_stages)):
+        if getattr(args, flag):
+            print(fn(payload))
+            return 0
 
     if args.emit_table:
         print(emit_table(payload))

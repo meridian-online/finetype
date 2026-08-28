@@ -1,6 +1,6 @@
 # What does a static embedding cost, and which property of the model is charging?
 
-**Answered 2026-08-28 by `map_fidelity.py`, in one pass over three corpora at seed 42. Every figure below is read from `results.json`, committed beside it — the table is *generated* from that file by `check_results.py --emit-table`, and CI refuses a mismatch, so a number here cannot outlive the run that produced it. Re-run rather than quoting from memory: vectors from two model versions are not comparable, so this question returns whenever a model is bumped.**
+**Answered 2026-08-28 by `map_fidelity.py`, in one pass over three corpora at seed 42. Every figure below is read from `results.json`, committed beside it. **Three tables are *generated* from that file** — the measurement, the gap attribution and the both-stages overlap — and `check_results.py` compares all three, so no derived figure here can outlive the run that produced it. That was true of one table until 2026-08-28 and stated as though it were true of the document; three corrections each retyped a derived figure and one was wrong every time before the generator covered them. Re-run rather than quoting from memory: vectors from two model versions are not comparable, so this question returns whenever a model is bumped.**
 
 Run: seed 42, 3,000 rows per corpus and 216 for `finetype-columns`, 800 probes per corpus and 216 for `finetype-columns`, `umap.UMAP(metric="cosine", n_neighbors=15, random_state=42)` over a precomputed kNN graph — the reference stack's own settings — on `Darwin arm64 python3.12.12`.
 
@@ -64,11 +64,13 @@ Three questions, kept apart because this model class is strong at one and weak a
 
 **The ranked gap splits, and both named causes are real and small.** Taking `potion-base-8M` as the starting point and MiniLM's lift as 1.000:
 
+<!-- generated gap table: check_results.py --emit-gap -->
 | corpus | gap 8M → MiniLM | closed by size + vocabulary | closed by objective | left over |
 |---|---|---|---|---|
 | 20news-body | 0.237 | +0.042 | +0.031 | 0.163 |
 | 20news-subject | 0.147 | +0.059 | +0.026 | 0.061 |
 | finetype-columns | 0.117 | +0.021 | +0.017 | 0.080 |
+<!-- end generated gap table -->
 
 Both steps move in the same direction on all three corpora and neither dominates. Together they close roughly a third of the gap on long-form text and column names, and over half of it on short subject lines — so the honest statement is that the earlier finding under-attributed *and* the remainder is still the largest term.
 
@@ -76,11 +78,13 @@ Both steps move in the same direction on all three corpora and neither dominates
 
 **That says the ladder does not buy neighbourhood agreement. It does not say which stage costs it**, and the two are easy to conflate — this document did conflate them, and the retraction at the head of the file is why. The figure that separates them is `vector_overlap_with_minilm`, the same metric one stage earlier, on the raw vectors:
 
+<!-- generated stages table: check_results.py --emit-stages -->
 | corpus | vectors, 8M → retrieval-32M | 2D map, same span |
 |---|---|---|
 | 20news-body | 0.2411 → 0.2689 (+0.028) | 0.1318 → 0.1603 (+0.028) |
 | 20news-subject | 0.4088 → 0.4141 (+0.005) | 0.2776 → 0.2861 (+0.009) |
-| finetype-columns | 0.4993 → 0.4819 (−0.017) | 0.4030 → 0.3998 (−0.003) |
+| finetype-columns | 0.4993 → 0.4819 (-0.017) | 0.4030 → 0.3998 (-0.003) |
+<!-- end generated stages table -->
 
 The flatness is present in both, so it is not introduced by the projection. The projection subtracts an offset — read it per arm from the `offset` column of the generated table above, which is `vec overlap` minus `kNN overlap` — and leaves the shape alone. **Which property costs the neighbourhoods is not answered here.**
 
