@@ -57,7 +57,7 @@ pub const PROFILE_FIELD_TYPES: &[&str] = &[
 // Kept as an aligned table rather than reflowed: this is data read against the
 // profile keyword by keyword, and one row per type is how it is checked by eye.
 #[rustfmt::skip]
-const CONSTRAINT_VOCABULARY: &[(&str, &[&str])] = &[
+pub const CONSTRAINT_VOCABULARY: &[(&str, &[&str])] = &[
     ("string",    &["enum", "maxLength", "minLength", "pattern", "required", "unique"]),
     ("number",    &["enum", "maximum", "minimum", "required", "unique"]),
     ("integer",   &["enum", "maximum", "minimum", "required", "unique"]),
