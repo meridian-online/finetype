@@ -205,10 +205,14 @@ def emit_gap(payload: dict) -> str:
             "|---|---|---|---|---|"]
     for c in payload["results"]:
         k = c["corpus"]
-        arms = [_arm_of(payload, k, n) for n in ("potion-8m", "potion-32m", "potion-retrieval-32m")]
-        if any(a is None or a.get("lift_over_random") is None for a in arms):
+        lo = _arm_of(payload, k, "potion-8m")
+        mi = _arm_of(payload, k, "potion-32m")
+        hi = _arm_of(payload, k, "potion-retrieval-32m")
+        if lo is None or mi is None or hi is None:
             continue
-        base, mid, top = (a["lift_over_random"] for a in arms)
+        base, mid, top = lo.get("lift_over_random"), mi.get("lift_over_random"), hi.get("lift_over_random")
+        if base is None or mid is None or top is None:
+            continue
         rows.append(f"| {k} | {1.0 - base:.3f} | +{mid - base:.3f} | +{top - mid:.3f} | {1.0 - top:.3f} |")
     return "\n".join(rows)
 
@@ -223,7 +227,7 @@ def emit_stages(payload: dict) -> str:
             continue
         v0, v1 = lo.get("vector_overlap_with_minilm"), hi.get("vector_overlap_with_minilm")
         m0, m1 = lo.get("map_overlap_with_minilm"), hi.get("map_overlap_with_minilm")
-        if None in (v0, v1, m0, m1):
+        if v0 is None or v1 is None or m0 is None or m1 is None:
             continue
         rows.append(f"| {k} | {v0:.4f} → {v1:.4f} ({v1 - v0:+.3f}) | {m0:.4f} → {m1:.4f} ({m1 - m0:+.3f}) |")
     return "\n".join(rows)
