@@ -56,6 +56,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 DEFAULT_RESULTS = Path(__file__).resolve().parent / "results.json"
+DEFAULT_FINDINGS = Path(__file__).resolve().parent / "FINDINGS.md"
+
+# FINDINGS.md carries the table between these markers and nothing hand-edits it.
+# Prose that quotes a measurement is a claim nothing reddens when it rots, and
+# the specific way it rots here is silent: a re-run writes new numbers into
+# results.json, the prose keeps the old ones, and the two read identically.
+TABLE_START = "<!-- generated table: check_results.py --emit-table -->"
+TABLE_END = "<!-- end generated table -->"
 
 CONTROL = "random-384"
 CEILING = "minilm"
@@ -99,6 +107,41 @@ class Findings(list):
 
     def add(self, message: str) -> None:
         self.append(f"{self.rule}: {message}")
+
+
+def emit_table(payload: dict) -> str:
+    """The whole measurement as one table, generated from the results file.
+
+    Every figure FINDINGS.md states sits here, so a number in that document is
+    checked rather than remembered. `rule_findings_table` compares the two, which
+    is why this returns a string instead of printing.
+    """
+    def cell(v: object, places: int = 4) -> str:
+        if v is None:
+            return "--"
+        return f"{v:.{places}f}" if isinstance(v, float) else str(v)
+
+    head = ("| corpus | arm | AMI (map) | retention | kNN overlap | P@k | lift | AP same-class | AP near-dup |\n"
+            "|---|---|---|---|---|---|---|---|---|")
+    lines = [head]
+    for corpus in payload["results"]:
+        for arm in corpus["embedders"]:
+            lines.append(
+                f"| {corpus['corpus']} | `{arm['embedder']}` | "
+                f"{cell(arm['ami_map'])} | {cell(arm['retention_vs_minilm'], 3)} | "
+                f"{cell(arm['map_overlap_with_minilm'])} | {cell(arm['precision_at_k'])} | "
+                f"{cell(arm['lift_over_random'], 3)} | {cell(arm['pairwise_ap_same_class'])} | "
+                f"{cell(arm['pairwise_ap_near_duplicate'])} |"
+            )
+    return "\n".join(lines)
+
+
+def extract_table(findings: str) -> str | None:
+    start = findings.find(TABLE_START)
+    end = findings.find(TABLE_END)
+    if start < 0 or end < 0 or end < start:
+        return None
+    return findings[start + len(TABLE_START):end].strip()
 
 
 def _arms(corpus: dict) -> dict[str, dict]:
@@ -253,6 +296,33 @@ def rule_arms_are_distinct(payload: dict, f: Findings) -> None:
             seen[digest] = arm["embedder"]
 
 
+def rule_findings_table(payload: dict, f: Findings) -> None:
+    """The write-up's table is the results file's table.
+
+    A number in prose is a claim nothing reddens when it goes stale, and staleness
+    here is invisible: a re-run rewrites results.json, the document keeps the
+    previous figures, and both read as measured now. So the table is generated and
+    this compares it, rather than a reviewer comparing them by eye.
+    """
+    findings = payload.get("_findings_md")
+    if findings is None:
+        f.add("FINDINGS.md was not supplied, so its figures are unchecked")
+        return
+    have = extract_table(findings)
+    if have is None:
+        f.add(f"FINDINGS.md has no block between {TABLE_START!r} and {TABLE_END!r}")
+        return
+    want = emit_table(payload)
+    if have != want:
+        have_rows = have.splitlines()
+        want_rows = want.splitlines()
+        if len(have_rows) != len(want_rows):
+            f.add(f"FINDINGS.md table has {len(have_rows)} lines, results.json generates {len(want_rows)}")
+        for h, w in zip(have_rows, want_rows):
+            if h != w:
+                f.add(f"FINDINGS.md says {h!r}, results.json generates {w!r}")
+
+
 RULES: list[Callable[[dict, Findings], None]] = [
     rule_required_arms,
     rule_arms_are_distinct,
@@ -262,6 +332,7 @@ RULES: list[Callable[[dict, Findings], None]] = [
     rule_pair_construction,
     rule_corruptions_corrupt,
     rule_licences_recorded,
+    rule_findings_table,
 ]
 
 
@@ -336,7 +407,7 @@ def _fixture() -> dict:
             ],
         }
 
-    return {
+    payload = {
         "seed": 42,
         "limit": 3000,
         "pairwise_positive_rate": 0.5,
@@ -346,6 +417,8 @@ def _fixture() -> dict:
         },
         "results": [corpus("20news-body"), corpus("finetype-columns")],
     }
+    payload["_findings_md"] = f"intro\n{TABLE_START}\n{emit_table(payload)}\n{TABLE_END}\nrest"
+    return payload
 
 
 def _drop_arm(p: dict) -> dict:
@@ -404,6 +477,21 @@ def _two_arms_one_model(p: dict) -> dict:
     return p
 
 
+def _table_stale(p: dict) -> dict:
+    p["_findings_md"] = p["_findings_md"].replace("0.4000", "0.9999").replace("| 0.40 |", "| 0.99 |")
+    return p
+
+
+def _table_absent(p: dict) -> dict:
+    p["_findings_md"] = "no table here at all"
+    return p
+
+
+def _results_moved_under_the_table(p: dict) -> dict:
+    _arms(p["results"][0])["potion-8m"]["precision_at_k"] = 0.31
+    return p
+
+
 def _licence_missing(p: dict) -> dict:
     del p["licences"]["minishlab/potion-base-8M"]
     return p
@@ -428,6 +516,9 @@ CASES: list[tuple[str, str, Callable[[dict], dict]]] = [
     ("corruptions_corrupt", "the corruption returned the input for every probe", _corruption_noop),
     ("licences_recorded", "a tested model has no licence entry", _licence_missing),
     ("licences_recorded", "a recorded licence is blank", _licence_blank),
+    ("findings_table", "the write-up quotes a figure the results file does not", _table_stale),
+    ("findings_table", "the write-up has no generated block", _table_absent),
+    ("findings_table", "a re-run moved a number and the write-up kept the old one", _results_moved_under_the_table),
 ]
 
 
@@ -464,7 +555,10 @@ def self_test() -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("results", nargs="?", type=Path, default=DEFAULT_RESULTS)
+    ap.add_argument("--findings", type=Path, default=DEFAULT_FINDINGS)
     ap.add_argument("--self-test", action="store_true", help="prove every rule can fire")
+    ap.add_argument("--emit-table", action="store_true",
+                    help="print the table FINDINGS.md must carry, and exit")
     args = ap.parse_args()
 
     if args.self_test:
@@ -477,6 +571,16 @@ def main() -> int:
         return 2
     if not isinstance(payload, dict) or "results" not in payload:
         print(f"{args.results} is not a map-fidelity results file", file=sys.stderr)
+        return 2
+
+    if args.emit_table:
+        print(emit_table(payload))
+        return 0
+
+    try:
+        payload["_findings_md"] = args.findings.read_text()
+    except OSError as exc:
+        print(f"cannot read {args.findings}: {exc}", file=sys.stderr)
         return 2
 
     try:
