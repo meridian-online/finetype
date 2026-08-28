@@ -19,6 +19,7 @@
 //!   nowhere, so the extensions validate cleanly.
 
 use finetype_core::enum_domain::{detect_enum_domain, label_is_enum_keyword_eligible, EnumConfig};
+use finetype_core::frictionless_vocabulary::constraint_vocabulary;
 use finetype_core::{PatternFit, Taxonomy};
 use serde_json::{json, Map, Value};
 use std::collections::BTreeSet;
@@ -215,19 +216,30 @@ fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold
         .and_then(|d| d.validation.as_ref())
         .and_then(|v| v.fit_pattern(col.values));
 
-    if let Some(constraints) = constraints_for(
+    let FieldConstraints { kept, off_type } = constraints_for(
         col.label,
         col.values,
         def,
         ftype,
         enum_threshold,
         fit.as_ref(),
-    ) {
-        field.insert("constraints".into(), constraints);
+    );
+    if !kept.is_empty() {
+        field.insert("constraints".into(), Value::Object(kept));
     }
 
     // ── ac-03 custom properties (lossless carriers the fold drops) ──
     field.insert("x-finetype-label".into(), json!(col.label));
+    // Constraints the type's own validation states but v2 has no place for on
+    // THIS declared type. Kept beside the field rather than dropped: a
+    // `datetime.date.iso` column really does match that pattern and really is
+    // ten characters long, and a reader may already be using it.
+    if !off_type.is_empty() {
+        field.insert(
+            "x-finetype-unsupported-constraints".into(),
+            Value::Object(off_type),
+        );
+    }
     // A widened or dropped pattern is stated rather than done silently: the
     // consumer can see which rule the type would have imposed and that the
     // column's own values are why it did not survive verbatim.
@@ -270,10 +282,33 @@ fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold
     Value::Object(field)
 }
 
+/// A field's `constraints`, split by whether Data Package v2 has a place for
+/// each keyword on the field's **declared type**.
+struct FieldConstraints {
+    /// Goes into `constraints`.
+    kept: Map<String, Value>,
+    /// Goes into `x-finetype-unsupported-constraints`.
+    off_type: Map<String, Value>,
+}
+
 /// Frictionless `constraints` for a field: `pattern`/`minLength`/`maxLength`/
 /// `minimum`/`maximum` from the type's static validation, plus `enum` ONLY when
-/// the column is a closed categorical (observed, enum-keyword-eligible). Returns
-/// `None` when no constraint applies.
+/// the column is a closed categorical (observed, enum-keyword-eligible).
+///
+/// Every keyword is then routed by the declared type's v2 vocabulary
+/// ([`finetype_core::frictionless_vocabulary`]). The field object in v2 is a
+/// fifteen-branch `oneOf`, one branch per type, each with its own `constraints`
+/// properties — so `pattern` beside `"type": "integer"` is not surplus
+/// information a reader skips, it is a descriptor `frictionless==5.19.0`
+/// refuses outright. Keywords with no place on the declared type move to
+/// `x-finetype-unsupported-constraints`; they are true of the column and the
+/// standard has nowhere to put them.
+///
+/// A declared type outside the profile's fifteen (the taxonomy's `list`, which
+/// v2 specifies and neither the vendored profile nor the reference
+/// implementation implements) has no vocabulary to route against, so its
+/// constraints are left where they are — filtering against a vocabulary we do
+/// not have would be a guess, and the field is refused for its type either way.
 ///
 /// `fit` is the reconciliation of the type's canonical `pattern` with this
 /// column's observed values; it decides whether a `pattern` is published, and
@@ -285,7 +320,7 @@ fn constraints_for(
     ftype: &str,
     enum_threshold: usize,
     fit: Option<&PatternFit>,
-) -> Option<Value> {
+) -> FieldConstraints {
     let mut c = Map::new();
 
     if let Some(v) = def.and_then(|d| d.validation.as_ref()) {
@@ -323,11 +358,23 @@ fn constraints_for(
         }
     }
 
-    if c.is_empty() {
-        None
-    } else {
-        Some(Value::Object(c))
+    let Some(vocabulary) = constraint_vocabulary(ftype) else {
+        return FieldConstraints {
+            kept: c,
+            off_type: Map::new(),
+        };
+    };
+
+    let mut kept = Map::new();
+    let mut off_type = Map::new();
+    for (keyword, value) in c {
+        if vocabulary.contains(&keyword.as_str()) {
+            kept.insert(keyword, value);
+        } else {
+            off_type.insert(keyword, value);
+        }
     }
+    FieldConstraints { kept, off_type }
 }
 
 #[cfg(test)]
