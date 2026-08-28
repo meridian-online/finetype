@@ -52,6 +52,7 @@ import argparse
 import copy
 import json
 import sys
+import re
 from pathlib import Path
 from typing import Any, Callable
 
@@ -83,14 +84,36 @@ CONTROL = "random-384"
 CEILING = "minilm"
 LEXICAL = "bm25"
 
-# The ladder AC1 names: size, then training objective, on one tokenizer. These are
-# REQUIRED, not merely expected, because the gap and stages tables are computed from
-# them — and an arm missing from EVERY corpus uniformly is invisible to `rule_one_pass`,
-# which only compares corpora against each other. Without this, dropping potion-32m
-# made the gap table generate as a bare header, the committed block regenerated to
-# match, and the whole check reported clean. A published row can vanish and the only
-# thing that notices is a person re-reading the document.
+# The ladder AC1 names: size, then training objective, on one tokenizer. The gap and
+# stages tables are computed from these three specifically, so they get a name of their
+# own — but they are NOT the required set. See REQUIRED_ARMS.
 LADDER = ("potion-8m", "potion-32m", "potion-retrieval-32m")
+
+
+def _measured_roster() -> tuple[str, ...]:
+    """Every arm the harness measures, read from the harness rather than restated.
+
+    A hand-written list of required arms is incomplete by construction: it protects the
+    names somebody thought to type. Five review rounds closed three such gaps one at a
+    time — potion-32m, then a whole corpus, then a null lift — and a sixth found the one
+    still open, `potion-4m`, which the document makes a standalone claim about (it is the
+    only arm that loses to the lexical floor on long text) and which no category covered.
+    Nobody had forgotten to update the list; the list could never have been complete.
+
+    So this reads `EMBEDDERS` out of `map_fidelity.py` by source rather than import — the
+    harness imports numpy, sklearn and umap at module scope, which this check must not
+    pay for or depend on. Add an eighth arm to the harness tomorrow and it is required
+    here the same day, with nothing to remember.
+    """
+    src = (Path(__file__).with_name("map_fidelity.py")).read_text()
+    block = re.search(r"^EMBEDDERS = \[(.*?)^\]", src, re.S | re.M)
+    if block is None:  # pragma: no cover - the harness would have to be unrecognisable
+        return (CONTROL, CEILING, *LADDER)
+    names = tuple(re.findall(r'^\s*\("([^"]+)"', block.group(1), re.M))
+    return names or (CONTROL, CEILING, *LADDER)
+
+
+REQUIRED_ARMS = (*_measured_roster(), LEXICAL)
 
 # The corpora one pass covers. Same argument one level up: every corpus vanishing
 # together is a shorter file that agrees with itself.
@@ -252,11 +275,11 @@ def _arms(corpus: dict) -> dict[str, dict]:
 def rule_required_arms(payload: dict, f: Findings) -> None:
     """Every corpus this run covers, and every arm a figure is computed from.
 
-    Two floors, the ceiling, and the ladder. The ladder is here because the gap and
-    stages tables are DERIVED from it: a check that only compares generated against
-    committed authenticates that they agree, not that either says anything. Drop an
-    arm from every corpus and both tables generate empty, the document regenerates to
-    match, and nothing reddens.
+    The required set is EVERY arm the harness measures, read from `map_fidelity.py`
+    rather than restated here — see `_measured_roster`. A check that only compares
+    generated against committed authenticates that they agree, not that either says
+    anything: drop an arm from every corpus and the tables regenerate shorter, the
+    document regenerates to match, and nothing reddens.
     """
     seen = {c["corpus"] for c in payload["results"]}
     for want in REQUIRED_CORPORA:
@@ -264,7 +287,7 @@ def rule_required_arms(payload: dict, f: Findings) -> None:
             f.add(f"no {want} corpus, so every figure derived from it is absent rather than wrong")
     for corpus in payload["results"]:
         arms = _arms(corpus)
-        for want in (CONTROL, CEILING, LEXICAL, *LADDER):
+        for want in REQUIRED_ARMS:
             if want not in arms:
                 f.add(f"{corpus['corpus']} has no {want} arm")
             elif want in LADDER and arms[want].get("lift_over_random") is None:
@@ -506,6 +529,11 @@ def _fixture() -> dict:
             "near_duplicate_unchanged": 3,
             "embedders": [
                 _arm(CEILING, "transformer", "sentence-transformers/all-MiniLM-L6-v2"),
+                _arm("potion-4m", "static", "minishlab/potion-base-4M",
+                     ami_map=0.29, precision_at_k=0.26, retention_vs_minilm=0.68,
+                     map_overlap_with_minilm=0.12, vector_overlap_with_minilm=0.23,
+                     pairwise_ap_same_class=0.72,
+                     pairwise_ap_near_duplicate=0.94, lift_over_random=0.62),
                 _arm("potion-8m", "static", "minishlab/potion-base-8M",
                      ami_map=0.30, precision_at_k=0.27, retention_vs_minilm=0.71,
                      map_overlap_with_minilm=0.13, vector_overlap_with_minilm=0.24,
@@ -540,6 +568,7 @@ def _fixture() -> dict:
         "pairwise_positive_rate": 0.5,
         "licences": {
             "sentence-transformers/all-MiniLM-L6-v2": {"licence": "apache-2.0"},
+            "minishlab/potion-base-4M": {"licence": "mit"},
             "minishlab/potion-base-8M": {"licence": "mit"},
             "minishlab/potion-base-32M": {"licence": "mit"},
             "minishlab/potion-retrieval-32M": {"licence": "mit"},
@@ -560,8 +589,8 @@ def _drop_arm(p: dict) -> dict:
 
 
 def _extra_arm_in_one_corpus(p: dict) -> dict:
-    p["results"][1]["embedders"].append(_arm("potion-4m", "static", "minishlab/potion-base-4M"))
-    p["licences"]["minishlab/potion-base-4M"] = {"licence": "mit"}
+    p["results"][1]["embedders"].append(_arm("gte-tiny", "static", "TaylorAI/gte-tiny"))
+    p["licences"]["TaylorAI/gte-tiny"] = {"licence": "mit"}
     return p
 
 
@@ -569,6 +598,13 @@ def _ladder_arm_gone_everywhere(p: dict) -> dict:
     """The hole a fifth verifier found: uniform loss is invisible to rule_one_pass."""
     for c in p["results"]:
         c["embedders"] = [a for a in c["embedders"] if a["embedder"] != "potion-32m"]
+    return p
+
+
+def _measured_arm_gone_everywhere(p: dict) -> dict:
+    """potion-4m: measured, named in the write-up, and in none of the old categories."""
+    for c in p["results"]:
+        c["embedders"] = [a for a in c["embedders"] if a["embedder"] != "potion-4m"]
     return p
 
 
@@ -657,6 +693,7 @@ CASES: list[tuple[str, str, Callable[[dict], dict]]] = [
     ("required_arms", "the noise control is missing from a corpus", _drop_arm),
     ("required_arms", "a ladder arm is gone from EVERY corpus, so one_pass cannot see it", _ladder_arm_gone_everywhere),
     ("required_arms", "a whole corpus is absent", _corpus_gone),
+    ("required_arms", "an arm the harness measures is gone from every corpus, though no category named it", _measured_arm_gone_everywhere),
     ("required_arms", "a ladder arm has no lift, so the gap table derives from nothing", _ladder_lift_missing),
     ("one_pass", "one corpus carries an arm the other does not", _extra_arm_in_one_corpus),
     ("arms_are_distinct", "two arms named for different models produced identical vectors", _two_arms_one_model),
