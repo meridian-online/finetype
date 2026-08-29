@@ -2,7 +2,7 @@
 measured: 2026-08-28
 binary: finetype 0.6.57 (released, embedded model)
 draws: 60 windows of 100 values per fixture, seed 20260828
-delimiter: pinned with --delimiter ',' — see the note at the foot
+read_path: pre-#124 — see "These figures predate the sniff-first read"
 ---
 
 # Label stability baseline
@@ -29,26 +29,31 @@ baseline records **and** that a column marked `undecided` is the only place `unk
 **Progress is the `undecided` count going to zero and the agreement column going to 1.000.** Update
 this file when either moves, in the commit that moves it.
 
-## Pin the delimiter when you reproduce these
+## These figures predate the sniff-first read, and nothing has re-measured them
 
-**`profile` reads the two NAICS fixtures as eight columns unless `--delimiter ','` is given, and the
-files are valid single-column CSV.** `read_csv_input` (`crates/finetype-cli/src/profile_io.rs:167`)
-shells DuckDB with `auto_detect=true, all_varchar=true, null_padding=true`, and `null_padding` is
-the option that does it — on DuckDB v1.5.5, against `naics_description.csv`:
+**Every number above was produced by `finetype 0.6.57` before #124 changed how a CSV is read**, and
+this branch carries no code that would notice if they moved. Treat the table as a recorded
+measurement with its instrument named, not as a baseline something defends — the test that consumes
+these fixtures is still unwritten, and writing it is where the figures get re-derived against the
+read path that ships.
 
-| options | columns |
-|---|---|
-| `auto_detect=true` | 1 |
-| `auto_detect=true, all_varchar=true` | 1 |
-| `auto_detect=true, null_padding=true` | **8** |
-| `auto_detect=true, all_varchar=true, null_padding=true` | **8** |
+The four non-NAICS fixtures were read as one column before #124 and are read as one column after it,
+so their agreements are expected to survive; *expected* is doing real work in that sentence and no
+run has replaced it.
 
-`sniff_csv` on the same file reports one column, delimiter `,`, quote `"`. Python's `csv` module
-reads it as 460 rows of exactly one field. The intent recorded at `profile_io.rs:158` is that
-`null_padding` pads *short* ragged rows — the analogue of the `csv` crate's `flexible(true)` — but it
-also lets the sniffer widen the schema, which is the opposite. Prose containing semicolons is what
-triggers it here; the first row that does is line 63 of `naics_description.csv`.
+## The delimiter pin this file used to require is gone, and #124 is why
 
-**The labels in the table above are unaffected** — the two NAICS fixtures return `unknown` at 1.000
-and 0.9997 either way, measured both with and without the pin. But a figure that agrees by luck is
-not a figure, so every run behind this file pins the delimiter.
+**This section recorded a defect and said it was not fixed here. It is fixed on `main` now** — by
+#124, which took `naics_description.csv` from this branch as its own regression fixture 16 hours
+after the pin was written.
+
+The defect was that `profile` read the two NAICS fixtures as eight columns unless `--delimiter ','`
+was given, because DuckDB's `null_padding=true` lets the sniffer widen a schema rather than only
+padding short ragged rows, and prose containing semicolons triggers it — first at line 63 of
+`naics_description.csv`. #124 sniffs the shape first and then reads with the column list the sniff
+pinned, so no pin is needed and none should be added back.
+
+`tests/smoke.sh:348` now asserts the fixed behaviour on this fixture by name — *"single-column prose
+CSV profiles as one column"*, expecting `Found 1 columns: ["description"]` — and that assertion runs
+in CI. **If a future reader reaches for `--delimiter ','` here, that smoke assertion is the thing to
+read first.**
