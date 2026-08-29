@@ -5,6 +5,145 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.58] - 2026-08-30
+
+### Fixed
+
+- **A field's constraints are routed by the type that field declares, so an
+  emitted descriptor is accepted by the reference Frictionless implementation.**
+  Data Package v2's Table Schema field object is a fifteen-branch `oneOf`, one
+  branch per type, and each branch gives `constraints` its own properties set. A
+  `pattern` beside `"type": "date"` is not surplus a reader skips —
+  `frictionless` 5.19.0 refuses the whole package with `constraint "pattern" is
+  not supported by type "date"`. Measured 2026-08-28 against the four committed
+  descriptors with `frictionless==5.19.0`: `edgar` rejected on a `pattern` on an
+  `integer`; `edgar_gleif` rejected on a `pattern` on a `number` and on
+  `pattern`/`minLength`/`maxLength` on a `date`; `gleif` rejected on
+  `pattern`/`minLength`/`maxLength` on a `date`, twice; `naics` accepted.
+  `constraints_for` had copied `pattern`, `minLength`, `maxLength`, `minimum`
+  and `maximum` off the label's `validation` block with no reference to the
+  declared type — censused over `labels/definitions_*.yaml`, 94 of 251 labels
+  would emit at least one constraint their declared type has no place for.
+  `finetype-core::frictionless_vocabulary` now owns the type → vocabulary
+  question, so a separate emitter can adopt it rather than keep a second table,
+  and `constraints_for` routes each keyword: those the declared type accepts go
+  to `constraints`, the rest to `x-finetype-unsupported-constraints` beside the
+  field. Nothing is dropped — `datetime.date.iso` really does match its pattern
+  and really is ten characters long, so a consumer that wants those facts about
+  a `date` column can still read them. The routing table is the profile's branch
+  vocabulary minus a measured narrowing where `frictionless` 5.19.0 lags the
+  profile: its per-type `supported_constraints` omits
+  `exclusiveMinimum`/`exclusiveMaximum` everywhere, `jsonSchema` entirely,
+  `minLength`/`maxLength` on `geojson` and `minimum`/`maximum` on `duration`. A
+  descriptor that clears the profile and is still refused by the reference
+  implementation is the defect, not a pass, so the narrowing is subtracted.
+  **This fix is why 0.6.58 exists** — it landed on `main` after 0.6.57, so no
+  installable version emitted a descriptor that `frictionless validate`
+  accepted, and a reader could not reproduce a corrected descriptor against a
+  released build. (#125)
+
+- **`finetype profile` no longer invents columns when it reads a CSV.** A valid
+  single-column CSV of prose was read as eight columns, and the seven it
+  invented were reported as though they were real. One option caused it:
+  `null_padding=true`, which `read_csv_input` passed unconditionally alongside
+  `auto_detect=true`. `null_padding` is there so a short ragged row is padded
+  with NULLs; what it also does, and what nobody had written down, is license
+  the sniffer to widen the schema — once row widths are no longer required to
+  agree, a delimiter that splits only some rows becomes an acceptable delimiter.
+  Measured on duckdb v1.5.5 against the fixture added here, 459 descriptions in
+  one column written by duckdb's own `COPY`: `auto_detect=true,
+  all_varchar=true, null_padding=true` reports 8 columns (`description`,
+  `column1` … `column7`), splitting the prose on `;`; the same call without
+  `null_padding` reports 1. The column count is a schema question and now
+  belongs to the sniff. `read_csv_input` runs `sniff_csv`, takes the column list
+  it pinned, and passes it to `read_csv` explicitly alongside
+  `null_padding=true`, which then pads short rows without being able to move the
+  column count. Two sniffs run and the header row arbitrates: the strict sniff
+  gets the prose file right but collapses a genuinely ragged file to one column
+  named after the whole header line, so a sniff claiming more columns than the
+  header row has fields has invented the difference. **If a CSV profiles to a
+  different column count than it did under 0.6.57, this is why.** (#124)
+
+### Changed
+
+- **Training is reproducible at a seed, and the training criterion rejects a
+  trainer that takes no step.** `MultiBranchTrainConfig::seed` reached batch
+  composition and nothing beyond it. candle 0.8's CPU backend draws every
+  `Tensor::rand` and `Tensor::randn` from `rand::rng()`, a per-thread generator
+  seeded by the OS, and `Device::set_seed` returns an error for `Device::Cpu`
+  rather than seeding anything — so two inputs to training were unreachable from
+  the caller's seed: every parameter's initial value, and every dropout mask.
+  A `StdRng` is now installed on the training thread and both are routed through
+  it, each falling back to candle when no generator is installed, so
+  `sense_train`, `sibling_train` and `entity` are bit-unchanged. Distribution
+  fidelity was measured rather than argued: over 262,144 draws for the values
+  `candle_nn::linear` requests, the seeded path reports kurtosis 2.9944 against
+  candle's 2.9862 — a normal's 3.0, where a uniform reads 1.8 — with sd 0.0626
+  against the analytic sqrt(2/512) = 0.0625. Separately, the `loss_4 < loss_0`
+  criterion was never evidence that training happened: with the learning rate
+  and its floor both forced to zero, so that no weight is ever updated, held-out
+  loss still fell to 0.8896 of its first epoch, because BatchNorm's running
+  statistics keep tracking the batches while the weights sit still. The
+  criterion is now held-out loss under a 0.6 ceiling, which sits in a real gap
+  rather than against the sampled seeds, and it rejects three distinct broken
+  trainers: a zero learning rate at 0.8896, an inverted gradient step at 2.1719,
+  and a loss that ignores its labels at 1.3853. The reproducibility claim holds
+  for the default configuration; when `value_attention` is configured,
+  `SelfAttnBlock::maybe_dropout` still calls candle's dropout directly and that
+  path remains unseeded.
+
+### Added
+
+- **A hygiene gate over commit messages and pull request text, reading the same
+  rule list as the tracked-tree gate.** The patterns move out of
+  `scripts/check-public-hygiene.sh` into `scripts/public-hygiene-rules.txt`, so
+  one list judges both surfaces, and `scripts/check-history-hygiene.sh` applies
+  it to every commit message reachable from `HEAD` and to a pull request's title
+  and body (`.github/workflows/pr-text-hygiene.yml`, which also triggers on an
+  edited body). Each gate has its own self-test that CI runs first, because a
+  gate of this shape fails silently in both directions. The pairs already
+  present when the gate landed are enumerated in
+  `scripts/public-hygiene-accepted-history.txt` and
+  `scripts/public-hygiene-accepted-tree.txt`, which are ratchets rather than
+  waivers: each reddens when it stops describing what is there. (#121)
+
+### Discovery
+
+- **A static embedding keeps the clusters in a 2D map and loses the
+  neighbourhoods.** The published static-embedding quality gap is a *retrieval*
+  gap; whether it reaches a 2D map was unmeasured, and that is the question that
+  decides whether a local-embedding path is a product or an overclaim. Every
+  corpus is embedded by every embedder and projected with identical seeded UMAP
+  settings — a precomputed kNN graph, then `UMAP(metric="cosine",
+  n_neighbors=15, random_state=42)` — so a difference between two maps is
+  attributable to the embedder rather than to the initialisation, and a
+  `random-384` control that embeds nothing scores −0.0255 to 0.0047 AMI, without
+  which a harness reporting nothing would look identical to one reporting
+  parity. potion-8M cluster retention against MiniLM is 0.710 on long-form text,
+  0.667 on short text and 0.875 on very short column-like text; kNN overlap with
+  MiniLM over the same maps is 0.132, 0.278 and 0.403. Reading a map as regions
+  is substantially preserved; reading it as "show me rows like this one" is not,
+  and one measurement does not cover both. (#122)
+
+- **The map-fidelity harness varies size and training objective, and has two
+  floors under it.** Measuring only potion-base-8M and -4M cannot separate
+  "static embeddings are weak at neighbourhoods" from "distillation without a
+  retrieval objective is weak at neighbourhoods", and those imply different
+  products. The ladder is now potion-base-4M, -8M, -32M and
+  potion-retrieval-32M — the last being potion-base-32M fine-tuned on a
+  retrieval objective, same base, same tokenizer, same 63,091-token vocabulary
+  and same Model2Vec on-disk format, so the 32M pair varies objective and
+  nothing else. Three questions are reported separately, because this model
+  class is strong at one and weak at another: the map (`ami_map`,
+  `retention_vs_minilm`, `map_overlap_with_minilm`, which reproduces the earlier
+  figures exactly — minilm 0.3687, potion-8m 0.3195, potion-4m 0.3193, random
+  −0.0255), ranked retrieval over the full-dimension vectors
+  (`precision_at_k`, `mrr_at_k`), and pooled pairwise average precision under
+  one global threshold. Two floors sit at different places: `random-384` embeds
+  nothing, and a bm25 arm over DuckDB's `fts` extension is what an analyst has
+  without any model at all, so a dense arm that does not beat it has not earned
+  its download. (#123)
+
 ## [0.6.57] - 2026-08-13
 
 ### Changed
