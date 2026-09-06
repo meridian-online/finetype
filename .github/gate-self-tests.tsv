@@ -52,7 +52,10 @@
 # `scripts/check_taxonomy_content.py`, so editing the imported module routes
 # `taxonomy_content` and NOT `sample_patterns`, whose self-test exercises code it
 # no longer re-proves. Add the imported file to the importing row when you notice
-# one; nothing here derives it.
+# one; nothing here derives it. `extension_stamp` watches
+# `.github/scripts/assemble-release-assets.sh` for the same reason: its release
+# rehearsal runs that script to produce the asset names its cases are then asked
+# about, so a change there changes what those cases exercise.
 #
 # THE BOUNDARY. A row belongs here when its command exists to prove a GATE can
 # fail. `.github/scripts/test-download-model.sh` and `scripts/test_score_clean_label.sh`
@@ -80,5 +83,5 @@ encoder_dtype	scripts/encoder_dtype.py self-test	scripts/encoder_dtype.py
 encoder_record_diff	scripts/encoder_dtype_record_diff.py self-test, scripts/encoder_dtype_record_diff_mutations.py	scripts/encoder_dtype_record_diff.py, scripts/encoder_dtype_record_diff_mutations.py
 map_fidelity_results	eval/static-embedding-map-fidelity/check_results.py --self-test	eval/static-embedding-map-fidelity/check_results.py, eval/static-embedding-map-fidelity/map_fidelity.py
 gate_routing	.github/scripts/gate-self-tests.py --self-test	.github/scripts/gate-self-tests.py, .github/gate-self-tests.tsv
-extension_stamp	scripts/check_extension_stamp.py --self-test --artifact target/release/finetype.duckdb_extension	scripts/check_extension_stamp.py, Makefile, .gitignore, .gitmodules, .github/workflows/release.yml, .github/workflows/MainDistributionPipeline.yml, .github/scripts/gate-self-tests.py
+extension_stamp	scripts/check_extension_stamp.py --self-test --artifact target/release/finetype.duckdb_extension	scripts/check_extension_stamp.py, Makefile, .gitignore, .gitmodules, .github/workflows/release.yml, .github/workflows/MainDistributionPipeline.yml, .github/scripts/gate-self-tests.py, .github/scripts/assemble-release-assets.sh
 

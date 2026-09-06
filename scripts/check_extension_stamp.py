@@ -1334,12 +1334,19 @@ def _stamp(
         )
 
 
-def _run(argv: list[str]) -> subprocess.CompletedProcess[str]:
-    """This script, in a real subprocess, so a case reads the exit code a job reads."""
+def _run(argv: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    """This script, in a real subprocess, so a case reads the exit code a job reads.
+
+    `env` is how a case substitutes the ENVIRONMENT rather than an argument --
+    the one rung below that needs a different answer from `duckdb` gets it by
+    putting a different `duckdb` on PATH, which is the only substitution that
+    reaches a value this file asks another program for.
+    """
     return subprocess.run(
         [sys.executable, str(Path(__file__).resolve()), *argv],
         capture_output=True,
         text=True,
+        env=env,
         check=False,
     )
 
@@ -1347,8 +1354,14 @@ def _run(argv: list[str]) -> subprocess.CompletedProcess[str]:
 def self_test(artifact: Path) -> int:
     failures: list[str] = []
 
-    def case(label: str, argv: list[str], want: int, expect_text: str = "") -> None:
-        proc = _run(argv)
+    def case(
+        label: str,
+        argv: list[str],
+        want: int,
+        expect_text: str = "",
+        env: dict[str, str] | None = None,
+    ) -> None:
+        proc = _run(argv, env)
         got = proc.returncode
         blob = proc.stdout + proc.stderr
         if got != want:
@@ -1644,6 +1657,56 @@ def self_test(artifact: Path) -> int:
             "no longer match what the stamper writes",
         )
 
+        # The two rungs that decide WHOSE reading this is. Both were deletable
+        # with every case above green, while the module doc claimed the second
+        # of them: a session that reports `installed` may be answering off a
+        # community build already on the runner rather than off the file named
+        # on the command line, and `loaded` false means the LOAD did not take
+        # and the row is about nothing. Neither can be reached from a file --
+        # a real LOAD of a real artefact sets loaded true and installed false --
+        # so each substitutes the session and leaves the rest of check_loaded
+        # real, exactly as the two rungs above do.
+        def substituted(**row) -> Callable[[], list[str]]:
+            reading = {"runtime": f"finetype {runtime}", "trailer": runtime, **row}
+            return lambda: check_loaded(paths["honest"], None, readings=lambda _path: reading)
+
+        rung(
+            "a session that did not report the artefact as loaded",
+            substituted(loaded=False, installed=False),
+            EXIT_CANNOT_RUN,
+            "did not report",
+        )
+        rung(
+            "a reading that may have come from an INSTALLED community build",
+            substituted(loaded=True, installed=True),
+            EXIT_CANNOT_RUN,
+            "INSTALLED as well as loaded",
+        )
+
+        # ── `here` is DUCKDB'S answer, not a literal ───────────────────────
+        # require_native's claim is that the platform it refuses over is the one
+        # DuckDB would refuse over. A literal there -- the runner's own platform,
+        # written in by hand -- is correct on the machine it names and wrong on
+        # every other, and NO FIXTURE CAN SEE IT: a fixture's platform field is
+        # compared against whatever `here` holds, so the comparison agrees with
+        # itself either way. What is substituted is therefore the ANSWER: a
+        # `duckdb` earlier on PATH reporting a platform no artefact carries. The
+        # refusal has to name it, which it can only do by having asked.
+        stub_bin = tmp_path / "stub-bin"
+        stub_bin.mkdir()
+        stub = stub_bin / "duckdb"
+        stub.write_text(
+            '#!/bin/sh\necho \'[{"platform":"STAMP-PROBE-PLATFORM"}]\'\n', encoding="utf-8"
+        )
+        stub.chmod(0o755)
+        case(
+            "the platform refused over is what duckdb answers, not a literal",
+            ["--artifact", arg("honest"), "--load"],
+            EXIT_CANNOT_RUN,
+            "this machine loads 'STAMP-PROBE-PLATFORM'",
+            env={**os.environ, "PATH": f"{stub_bin}{os.pathsep}{os.environ['PATH']}"},
+        )
+
         # ── AC2, against real git trees. `git ls-files` reads the INDEX, so a
         #    fixture needs `add` and no commit -- which also keeps a repository
         #    hook out of a case that is about neither. ───────────────────────
@@ -1817,12 +1880,145 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
             "the distribution stamp job behind a condition",
             {DISTRIBUTION_WORKFLOW: sub(
                 "  stamp:\n    name:", "  stamp:\n    if: github.ref_type == 'tag'\n    name:")},
-            EXIT_UNWIRED, "a skipped required check satisfies branch protection")
+            EXIT_UNWIRED, "a skipped job reports neutral, not red")
 
         wiring_case(
             "the distribution stamp job not needing the build",
             {DISTRIBUTION_WORKFLOW: sub("    needs: duckdb-stable-build\n", "")},
             EXIT_UNWIRED, "does not `needs:` the job that builds the binaries")
+
+        # ── Present, unguarded, before the publish, AND STILL WORTH NOTHING.
+        #    Every case below leaves the reading above satisfied. Each was
+        #    measured green before its rung existed. ────────────────────────
+        assemble_step = "      - name: Assemble release assets\n"
+        install_step = "      - name: Install duckdb CLI\n"
+        gate_call = '          scripts/check_extension_stamp.py "${args[@]}" --tag "${GITHUB_REF_NAME}"\n'
+
+        # `always()` and `!cancelled()` are the shapes this actually takes, and
+        # they read as resilience rather than as a switch: every stamp step
+        # stays exactly where it was and the publish stops caring what any of
+        # them decided.
+        wiring_case(
+            "the publish running whatever the stamp steps decided",
+            {RELEASE_WORKFLOW: sub(publish_step, publish_step + "        if: always()\n")},
+            EXIT_UNWIRED, "the step that publishes carries `if: always()`")
+        wiring_case(
+            "...and the same one written as `!cancelled()`",
+            {RELEASE_WORKFLOW: sub(
+                publish_step, publish_step + "        if: ${{ !cancelled() }}\n")},
+            EXIT_UNWIRED, "the step that publishes carries `if: ${{ !cancelled() }}`")
+        # The job reddens, the release is not created, and the three jobs that
+        # `needs:` it publish to crates.io, write the Homebrew formula and
+        # update the install site anyway.
+        wiring_case(
+            "a release job allowed to fail under its dependants",
+            {RELEASE_WORKFLOW: sub(
+                "  release:\n    name: Create Release\n",
+                "  release:\n    continue-on-error: true\n    name: Create Release\n")},
+            EXIT_UNWIRED, "every job whose `needs:` names `release`")
+        # A skipped job skips its dependants, and GitHub reports the workflow
+        # green. The stamp steps stay present, correctly wired, and never run.
+        wiring_case(
+            "the extension build switched off in the release",
+            {RELEASE_WORKFLOW: sub(
+                "  build-extension:\n    name: Build DuckDB extension\n",
+                "  build-extension:\n    if: false\n    name: Build DuckDB extension\n")},
+            EXIT_UNWIRED,
+            f"{RELEASE_WORKFLOW}: the job that builds the extension binaries "
+            "(`build-extension`) carries `if: false`")
+        wiring_case(
+            "the extension build switched off in the distribution pipeline",
+            {DISTRIBUTION_WORKFLOW: sub(
+                "  duckdb-stable-build:\n    name: Build extension binaries\n",
+                "  duckdb-stable-build:\n    if: false\n    name: Build extension binaries\n")},
+            EXIT_UNWIRED,
+            f"{DISTRIBUTION_WORKFLOW}: the job that builds the extension binaries "
+            "(`duckdb-stable-build`) carries `if: false`")
+        wiring_case(
+            "the distribution stamp job allowed to fail",
+            {DISTRIBUTION_WORKFLOW: sub(
+                "  stamp:\n    name:", "  stamp:\n    continue-on-error: true\n    name:")},
+            EXIT_UNWIRED, "the same nothing as not running it")
+
+        # A step whose `run:` MENTIONS this gate is not a step that runs it.
+        # Both shapes below leave the step, its name, its shell and its position
+        # exactly as they were.
+        wiring_case(
+            "a stamp step whose call is commented out",
+            {RELEASE_WORKFLOW: sub(gate_call, f"          # {gate_call.strip()}\n")},
+            EXIT_UNWIRED, "and no `--load`, found 0")
+        wiring_case(
+            "a stamp step that only echoes the call",
+            {RELEASE_WORKFLOW: sub(
+                gate_call, '          echo "ran scripts/check_extension_stamp.py"\n')},
+            EXIT_UNWIRED, "and no `--load`, found 0")
+
+        # Nothing names the assets, so the stamp steps read an empty directory
+        # -- and the rehearsal below has nothing to rehearse against.
+        wiring_case(
+            "the assembly step deleted",
+            {RELEASE_WORKFLOW: cut(assemble_step, byte_step)},
+            EXIT_UNWIRED, f"running `{ASSEMBLER}`, found 0")
+        # The load needs `duckdb` on PATH and a runner has none. Without this
+        # rung the install could be deleted and the load would exit 2 on a tag,
+        # which is the same release-only failure this whole mode exists for.
+        wiring_case(
+            "the duckdb CLI install deleted from the release job",
+            {RELEASE_WORKFLOW: cut(install_step, load_step)},
+            EXIT_UNWIRED, f"fetching `{DUCKDB_CLI_MARK}...`")
+
+        # ── THE REHEARSAL: the same steps, RUN. Every case above reads the
+        #    workflow; these execute it, against a tree assembled by the job's
+        #    own assembler, and are the only thing here that would have caught
+        #    a stamp step that cannot run at all. ──────────────────────────
+        def rehearsal_case(label: str, edits: dict, want: int, expect_text: str = "") -> None:
+            root = tmp_path / f"rehearsal-{next(counter)}"
+            (root / ".github" / "workflows").mkdir(parents=True)
+            # The scripts are the REAL ones: what a case here mutates is the
+            # workflow, never the gate it calls.
+            (root / "scripts").symlink_to(ROOT / "scripts", target_is_directory=True)
+            (root / ".github" / "scripts").symlink_to(
+                ROOT / ".github" / "scripts", target_is_directory=True
+            )
+            for rel in (RELEASE_WORKFLOW, DISTRIBUTION_WORKFLOW):
+                text = (ROOT / rel).read_text(encoding="utf-8")
+                if rel in edits:
+                    try:
+                        text = edits[rel](text)
+                    except LookupError as gone:
+                        failures.append(
+                            f"  MISS {label}: the mutation no longer applies to {rel} "
+                            f"({gone}), so this case would prove nothing"
+                        )
+                        return
+                (root / rel).write_text(text, encoding="utf-8")
+            case(
+                label,
+                ["--release-rehearsal", "--artifact", str(artifact), "--root", str(root)],
+                want,
+                expect_text,
+            )
+
+        rehearsal_case("the repository's own release job, RUN", {}, EXIT_OK)
+        # The defect this mode was written for, in the form it took: the load
+        # step naming a file the assembler does not write. Here the name is a
+        # target triple that is not one of the five; in the version that
+        # shipped it was the right name and DuckDB refused it for its dots.
+        rehearsal_case(
+            "the load step naming an asset the assembler never writes",
+            {RELEASE_WORKFLOW: sub(
+                '"release-assets/finetype-${GITHUB_REF_NAME}-x86_64-unknown-linux-gnu.duckdb_extension"',
+                '"release-assets/finetype-${GITHUB_REF_NAME}-x86_64-unknown-linux-musl.duckdb_extension"')},
+            EXIT_REHEARSAL, "and the one this runner can load agrees with itself and the tag) exited 2")
+        # The assembly and the reading pointed at different directories. Both
+        # steps are present, unguarded and in the right order; the release
+        # publishes nothing because the second finds no files.
+        rehearsal_case(
+            "the assembly writing somewhere the stamp steps do not read",
+            {RELEASE_WORKFLOW: sub(
+                "            --output-dir release-assets \\\n",
+                "            --output-dir elsewhere \\\n")},
+            EXIT_REHEARSAL, "expected 5 extension binaries in release-assets, found 0")
 
     if failures:
         print("")
