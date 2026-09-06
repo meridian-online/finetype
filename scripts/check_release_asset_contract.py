@@ -369,6 +369,88 @@ def check(workflow: Path, assembler: Path, coverage_script: Path) -> list[str]:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _run_cli(argv: list[str]) -> tuple[int, str]:
+    """Run THIS file as a real subprocess and return (exit code, combined output).
+
+    The cases below prove `check` returns the right failure strings. They say
+    nothing about whether the PROGRAM acts on them: changing `main`'s
+    `return 1` to `return 0` leaves every one of them green while the gate
+    prints its complaint to stderr and exits 0 over a release.yml that has
+    dropped an asset, and both steps of this gate's CI job pass. The
+    `Unreadable -> return 2` path is the more plausible edit of the two, since
+    this reader deliberately refuses a wide family of legitimate YAML and
+    softening that refusal into a warning is exactly the change someone would
+    make. Neither is visible from inside the process, so these cases go
+    through argv, `main` and `sys.exit`, and assert the exact code.
+
+    Same pattern, and for the same reason, as `_run_cli` in
+    scripts/check_model_coverage.py and scripts/check_schema_catalogue.py.
+    """
+    proc = subprocess.run(
+        [sys.executable, str(Path(__file__).resolve()), *argv],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return proc.returncode, proc.stdout + proc.stderr
+
+
+def _exit_code_cases(original: str, tmpdir: Path) -> int:
+    """Return the number of exit-code cases that did not behave as stated."""
+    failed = 0
+
+    dropped = tmpdir / "dropped.yml"
+    dropped.write_text(original.replace("            release-assets/taxonomy-schemas.json\n", "", 1), encoding="utf-8")
+    renamed = tmpdir / "renamed.yml"
+    renamed.write_text(original.replace(f"uses: {RELEASE_ACTION}@v2", "uses: other/release@v9", 1), encoding="utf-8")
+    not_a_workflow = tmpdir / "not-a-workflow.yml"
+    not_a_workflow.write_text("name: something else\n", encoding="utf-8")
+    intact = tmpdir / "intact.yml"
+    intact.write_text(original, encoding="utf-8")
+
+    # Exact codes, never "non-zero": exit 1 means the contract was read and
+    # broken, exit 2 means it could not be read. A defect that swaps one for
+    # the other refuses the right input for the wrong reason.
+    cases: list[tuple[str, list[str], int]] = [
+        ("the real release workflow exits 0", ["--workflow", str(intact)], 0),
+        (
+            "a release step that has dropped the catalogue exits 1",
+            ["--workflow", str(dropped)],
+            1,
+        ),
+        (
+            "a workflow whose release step cannot be found exits 2, not 1 and not 0",
+            ["--workflow", str(renamed)],
+            2,
+        ),
+        (
+            "a file that is not the release workflow exits 2, not 0",
+            ["--workflow", str(not_a_workflow)],
+            2,
+        ),
+        (
+            "a --workflow path that does not exist exits 2, not 0",
+            ["--workflow", str(tmpdir / "absent.yml")],
+            2,
+        ),
+        (
+            "an --assembler path that does not exist exits 2, not 0",
+            ["--workflow", str(intact), "--assembler", str(tmpdir / "absent.sh")],
+            2,
+        ),
+    ]
+    for name, argv, expected in cases:
+        code, output = _run_cli(argv)
+        if code != expected:
+            print(f"  MISS {name}: exited {code}")
+            last = output.strip().splitlines()
+            print(f"      last line of output: {last[-1] if last else '<none>'}")
+            failed += 1
+        else:
+            print(f"  ok   {name}")
+    return failed
+
+
 def self_test() -> int:
     # Mutations are applied to a COPY in a temp directory, never to the tracked
     # workflow. A self-test that edits a file another job may be reading, and
@@ -504,10 +586,17 @@ def self_test() -> int:
             print(f"  MISS {name}: returned a verdict {found} instead of refusing")
             failed += 1
 
+        # The verdict cases above end here; what follows drives the same
+        # workflows through the process boundary CI actually reads.
+        failed += _exit_code_cases(original, Path(tmpdir))
+
     if failed:
         print(f"\nself-test FAILED: {failed} case(s) not detected correctly")
         return 1
-    print(f"\nself-test passed: {len(cases)} contract mutations detected, {len(refusals)} ambiguities refused")
+    print(
+        f"\nself-test passed: {len(cases)} contract mutations detected, "
+        f"{len(refusals)} ambiguities refused, exit codes pinned"
+    )
     return 0
 
 

@@ -103,9 +103,7 @@ jobs:
           # a skipped upload into a failed job. What it does NOT buy: a
           # PARTIAL artifact. If `finetype-*.sha256` stopped matching while
           # `finetype-*.tar.gz` still did, the union is non-empty and this
-          # never fires. That case is caught downstream instead, by
-          # assemble-release-assets.sh's exit 4 and by
-          # scripts/check_release_asset_contract.py.
+          # never fires.
           if-no-files-found: error
           path: |
             finetype-*.tar.gz
@@ -244,7 +242,8 @@ jobs:
       # collision and missing-platform failure modes instead, on any pull
       # request whose diff touches that script or this file. Both paths are in
       # .github/gate-self-tests.tsv's `release_asset_assembly` row, which is
-      # what selects the proof; a diff touching neither skips it.
+      # what selects the proof; a diff touching neither, and not the routing,
+      # skips it.
       - name: Assemble release assets
         shell: bash
         run: |
