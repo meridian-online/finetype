@@ -207,6 +207,51 @@ jobs:
         if: steps.route.outputs.formula_asset == 'true'
         run: ./scripts/check-formula-asset-mutations.sh
 
+  schema-catalogue:
+    # Same shape as `formula-asset` above, and for the same reason: the check
+    # this proves (scripts/check_schema_catalogue.py) reads a release asset
+    # that release.yml generates from labels/definitions_*.yaml, and there is
+    # no release on a branch — so the check itself runs only on a tag, and its
+    # credibility runs here on every pull request. `--self-test` mutates
+    # synthetic catalogues in-process (an emptied array, entries that keep
+    # their label but lose every checkable keyword, entries that keep a
+    # keyword but lose their label) and requires the check to redden on each.
+    name: Taxonomy schema catalogue check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Which gates this diff changed
+        id: route
+        # In-job by design, and it audits before it plans; see the identical step
+        # in the `gate-routing-self-test` job for why.
+        run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: The check reddens on an emptied catalogue and on entries missing a label or a checkable keyword
+        if: steps.route.outputs.schema_catalogue == 'true'
+        run: python3 scripts/check_schema_catalogue.py --self-test
+
+  model-coverage:
+    # Same shape again: scripts/check_model_coverage.py reads the catalogue
+    # release.yml generates alongside the model's label_map.json it downloaded
+    # for that same tag, and both only exist together in a release job. The
+    # self-test proves the two failure directions AC6 names: an emptied
+    # catalogue against a real label map measures 0.0, and a label map
+    # carrying labels the catalogue does not mention measures a fraction the
+    # gate's MIN_COVERAGE threshold refuses.
+    name: Model coverage check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Which gates this diff changed
+        id: route
+        # In-job by design, and it audits before it plans; see the identical step
+        # in the `gate-routing-self-test` job for why.
+        run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: The check reddens on a label map carrying labels the catalogue does not mention
+        if: steps.route.outputs.model_coverage == 'true'
+        run: python3 scripts/check_model_coverage.py --self-test
+
   download-model-test:
     name: download-model.sh tests
     runs-on: ubuntu-latest
