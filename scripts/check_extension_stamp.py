@@ -1141,6 +1141,35 @@ def check_release_rehearsal(root: Path, artifact: Path) -> list[str]:
             "This mode rehearses all three and would otherwise report success over a "
             "release path it did not exercise -- --release-wiring says which is missing.",
         )
+    # EVERY `run:` BEFORE THE PUBLISH IS ACCOUNTED FOR, and this is what makes
+    # the mode close a class rather than a path. The defect was a line only a
+    # pushed tag executed; a step added to this job tomorrow is another one, and
+    # a rehearsal that quietly walked past it would read exactly like a
+    # rehearsal that covered it. Exactly one kind of step may be skipped: the
+    # DuckDB CLI install, which is a `curl` and a `sudo mv` that no contributor's
+    # machine can run. Its presence and position are checked by --release-wiring
+    # instead, which is a weaker guarantee and is why it is the only exemption.
+    unexercised = [
+        step
+        for step in steps
+        if step.job == publish.job
+        and step.lineno < publish.lineno
+        and step.commands
+        and step not in runnable
+        and not any(DUCKDB_CLI_MARK in line for line in step.commands)
+    ]
+    if unexercised:
+        raise Refused(
+            EXIT_REHEARSAL,
+            f"{RELEASE_WORKFLOW}: job `{publish.job}` runs step(s) before the publish "
+            "that this mode neither executes nor knowingly exempts:\n"
+            + "".join(
+                f"      line {s.lineno}: {s.name or '(unnamed)'}\n" for s in unexercised
+            )
+            + "    Only a pushed tag runs them, so nothing in this repository ever "
+            "finds out whether they work. Either make the step call the assembler or "
+            "this gate, so it is rehearsed, or say here why it cannot be.",
+        )
     for step in runnable:
         if any("<<" in line for line in step.commands):
             raise Refused(
@@ -1947,6 +1976,19 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
             "a stamp step whose call is commented out",
             {RELEASE_WORKFLOW: sub(gate_call, f"          # {gate_call.strip()}\n")},
             EXIT_UNWIRED, "and no `--load`, found 0")
+        # And a comment that DESCRIBES the call rather than repeating it. This
+        # is the shape the `#` filter in _logical_lines is for and the only one
+        # that reaches past the invocation pattern: `then` is a shell separator,
+        # so `... then scripts/check_extension_stamp.py exits 1` sits in command
+        # position as far as a regex is concerned. Workflow comments in this
+        # repository are written exactly like that sentence.
+        wiring_case(
+            "a stamp step left with a comment ABOUT the call",
+            {RELEASE_WORKFLOW: sub(
+                gate_call,
+                "          # if a trailer disagrees then "
+                "scripts/check_extension_stamp.py exits 1\n")},
+            EXIT_UNWIRED, "and no `--load`, found 0")
         wiring_case(
             "a stamp step that only echoes the call",
             {RELEASE_WORKFLOW: sub(
@@ -2013,6 +2055,16 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
         # The assembly and the reading pointed at different directories. Both
         # steps are present, unguarded and in the right order; the release
         # publishes nothing because the second finds no files.
+        # The class, not the instance: the defect was a line only a pushed tag
+        # executed, and a step added to this job tomorrow is another one.
+        rehearsal_case(
+            "a new step in the release job that nothing here would run",
+            {RELEASE_WORKFLOW: sub(
+                publish_step,
+                "      - name: Something a tag alone would run\n"
+                "        shell: bash\n"
+                "        run: ./tools/publish-notes.sh\n" + publish_step)},
+            EXIT_REHEARSAL, "neither executes nor knowingly exempts")
         rehearsal_case(
             "the assembly writing somewhere the stamp steps do not read",
             {RELEASE_WORKFLOW: sub(
