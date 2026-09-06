@@ -52,6 +52,35 @@ from pathlib import Path
 MIN_COVERAGE = 0.95
 
 
+class ShapeError(Exception):
+    """Parsed JSON exists but is not shaped the way this check expects.
+
+    Raised by the two `_require_*` narrowing helpers below and caught in
+    `coverage`, so the one message a caller sees names the exact defect
+    (an object where an array was expected, a non-string label) rather than
+    surfacing as an unstructured `TypeError` from indexing or iterating
+    something `json.load` handed back typed only as `Any`/`object`.
+    """
+
+
+def _require_array(value: object, what: str) -> list[object]:
+    """Narrow `value` to `list[object]` or raise `ShapeError` naming `what`."""
+    if not isinstance(value, list):
+        raise ShapeError(f"{what} top-level value is a {type(value).__name__}, not a JSON array")
+    return value
+
+
+def _require_label_array(value: object, what: str) -> list[str]:
+    """Narrow `value` to `list[str]` or raise `ShapeError` naming `what`."""
+    items = _require_array(value, what)
+    labels: list[str] = []
+    for item in items:
+        if not isinstance(item, str):
+            raise ShapeError(f"{what} contains a non-string entry: {item!r}")
+        labels.append(item)
+    return labels
+
+
 def coverage(catalogue: object, label_map: object) -> tuple[float, list[str], list[str]]:
     """Return (fraction, missing_labels, problems).
 
@@ -59,32 +88,24 @@ def coverage(catalogue: object, label_map: object) -> tuple[float, list[str], li
     (not lists, an empty label map, a label_map entry that is not a string) —
     those are usage/data errors (exit 2), not a real coverage measurement.
     """
-    problems: list[str] = []
-    if not isinstance(catalogue, list):
-        problems.append(f"catalogue top-level value is a {type(catalogue).__name__}, not a JSON array")
-    if not isinstance(label_map, list):
-        problems.append(f"label map top-level value is a {type(label_map).__name__}, not a JSON array")
-    if problems:
-        return 0.0, [], problems
+    try:
+        catalogue_entries = _require_array(catalogue, "catalogue")
+        labels = _require_label_array(label_map, "label map")
+    except ShapeError as exc:
+        return 0.0, [], [str(exc)]
 
-    non_string = [m for m in label_map if not isinstance(m, str)]
-    if non_string:
-        problems.append(f"label map contains {len(non_string)} non-string entr(y/ies)")
-        return 0.0, [], problems
-
-    if len(label_map) == 0:
-        problems.append("label map is empty — nothing to measure coverage against")
-        return 0.0, [], problems
+    if len(labels) == 0:
+        return 0.0, [], ["label map is empty — nothing to measure coverage against"]
 
     catalogue_labels = {
         entry.get("x-finetype-label")
-        for entry in catalogue
+        for entry in catalogue_entries
         if isinstance(entry, dict) and isinstance(entry.get("x-finetype-label"), str)
     }
 
-    missing = [label for label in label_map if label not in catalogue_labels]
-    covered = len(label_map) - len(missing)
-    fraction = covered / len(label_map)
+    missing = [label for label in labels if label not in catalogue_labels]
+    covered = len(labels) - len(missing)
+    fraction = covered / len(labels)
     return fraction, missing, []
 
 
@@ -152,13 +173,25 @@ def self_test() -> int:
     else:
         print(f"  ok   an empty label map is refused: {problems}")
 
-    # Case 4: catalogue is not a list.
+    # Case 4: catalogue is not a list — an object (dict), the shape a real
+    # `label_map.json`/catalogue mistakenly serialised as `{}` would parse to.
     fraction, missing, problems = coverage({"not": "a list"}, good_label_map)
     if not problems or "catalogue" not in problems[0]:
         print(f"  MISS a non-array catalogue should be flagged: {problems}")
         failed += 1
     else:
         print(f"  ok   a non-array catalogue is refused: {problems}")
+
+    # Case 5: label_map.json parses as JSON but is an object, not an array of
+    # strings — the same shape defect as case 4, on the other input. Named
+    # explicitly rather than only exercised as an unhandled `TypeError`: a
+    # `dict` is not a `TypeError` away from a `list`, it is a `ShapeError`.
+    fraction, missing, problems = coverage(good_catalogue, {"identity.person.email": True})
+    if not problems or "label map" not in problems[0]:
+        print(f"  MISS a non-array label map (an object) should be flagged: {problems}")
+        failed += 1
+    else:
+        print(f"  ok   a non-array label map (an object, not a JSON array) is refused: {problems}")
 
     if failed:
         print(f"\nself-test FAILED: {failed} case(s) not detected correctly")
@@ -226,6 +259,15 @@ def main(argv: list[str]) -> int:
             print(f"  - {problem}", file=sys.stderr)
         return 2
 
+    # `coverage` returning no problems is exactly its guarantee that both
+    # parsed values are JSON arrays (and every label_map entry a string) — the
+    # same two facts `_require_array`/`_require_label_array` just proved
+    # inside it. Reasserted here, explicitly, so the rest of this function
+    # works with real types rather than the `object` `json.load` hands back:
+    # pyright does not carry a callee's internal narrowing across the call.
+    assert isinstance(catalogue, list)
+    assert isinstance(label_map, list)
+
     print(
         f"coverage: {fraction:.4f} ({len(label_map) - len(missing)}/{len(label_map)} model labels "
         f"mentioned in {args.catalogue}), threshold {args.threshold}"
@@ -237,7 +279,7 @@ def main(argv: list[str]) -> int:
             "model": args.model,
             "catalogue": str(args.catalogue),
             "label_map_entries": len(label_map),
-            "catalogue_entries": len(catalogue) if isinstance(catalogue, list) else None,
+            "catalogue_entries": len(catalogue),
             "covered": len(label_map) - len(missing),
             "coverage_fraction": fraction,
             "threshold": args.threshold,
