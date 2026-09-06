@@ -97,6 +97,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: finetype-${{ matrix.target }}
+          # Default is `warn`: a path glob that stops matching would upload an
+          # empty artifact and leave this job green, and the `release` job
+          # would then build a release out of whatever did arrive. Make it the
+          # failure it is, here, where the name that stopped matching is.
+          if-no-files-found: error
           path: |
             finetype-*.tar.gz
             finetype-*.zip
@@ -188,6 +193,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: finetype-taxonomy-catalogue
+          # See the `build` job's upload for why this is `error` and not the
+          # default `warn`. assemble-release-assets.sh refuses (exit 4) if
+          # these four do not reach the assembled directory, which is the
+          # locally provable half; this is the half that names the job.
+          if-no-files-found: error
           path: |
             taxonomy-schemas.json
             taxonomy-schemas.json.sha256
@@ -239,6 +249,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          # Default is false: an entry below that matched nothing would be
+          # skipped with a warning and the release would be published without
+          # it. Every entry matches in a normal run — the `.zip` from the
+          # windows leg, the five `.duckdb_extension` files and their sidecars
+          # from the assembly step above, which has already refused if any is
+          # absent — so an unmatched glob here means something upstream
+          # changed, and that is worth a red release rather than a quiet one.
+          fail_on_unmatched_files: true
           files: |
             release-assets/finetype-*.tar.gz
             release-assets/finetype-*.zip

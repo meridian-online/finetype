@@ -46,6 +46,7 @@ import json
 import subprocess
 import sys
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 
 # Reproduced comment, not re-derived: brightfield's loader floor is 0.5. This
@@ -137,7 +138,7 @@ def _run_cli(argv: list[str]) -> tuple[int, str]:
     return proc.returncode, proc.stdout + proc.stderr
 
 
-def _exit_code_cases(catalogue: list[object], label_map: list[str], drifted_label_map: list[str]) -> int:
+def _exit_code_cases(catalogue: Sequence[object], label_map: Sequence[str], drifted_label_map: Sequence[str]) -> int:
     """Return the number of exit-code cases that did not behave as stated."""
     failed = 0
     with tempfile.TemporaryDirectory() as tmpdir:

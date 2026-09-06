@@ -32,6 +32,8 @@
 #   3  the artifacts tree holds an extension binary for a duckdb_arch that
 #      ARCH_TARGET_PAIRS below does not name, which would otherwise be dropped
 #      from the release in silence
+#   4  the taxonomy catalogue or the model manifest did not reach the output
+#      directory, so the release would carry the extension and no type source
 set -euo pipefail
 
 # arch:target pairs -- the five platforms MainDistributionPipeline.yml builds,
@@ -92,6 +94,24 @@ assemble() {
 		find "$dir" -maxdepth 1 -type f -exec cp {} "$output_dir/" \;
 	done
 
+	# The catalogue and the model manifest are the assets a consumer resolves a
+	# tag FOR, and the flatten above cannot tell an artifact that arrived empty
+	# from one that arrived full: `actions/upload-artifact` warns rather than
+	# fails when its path matches nothing, so an upload whose glob stopped
+	# matching leaves a green job and an empty directory. Without this, the
+	# release would carry five extension binaries and no type source, and
+	# `softprops/action-gh-release` would skip the unmatched entries with a
+	# warning. Named files, not a count: a count is satisfied by any four
+	# files.
+	local required missing_assets=""
+	for required in taxonomy-schemas.json taxonomy-schemas.json.sha256 finetype-model.json finetype-model.json.sha256; do
+		[ -f "${output_dir}/${required}" ] || missing_assets="${missing_assets} ${required}"
+	done
+	if [ -n "$missing_assets" ]; then
+		echo "::error::the taxonomy catalogue artifact did not deliver:${missing_assets} -- check the taxonomy-catalogue job's upload paths" >&2
+		return 4
+	fi
+
 	# An extension artifact for a duckdb_arch this script does not name is a
 	# FAILURE, not a silence. ARCH_TARGET_PAIRS above and release.yml's
 	# `exclude_archs` input are two independent lists with nothing tying them
@@ -126,6 +146,13 @@ assemble() {
 		src="${artifacts_dir}/finetype-${ext_version}-extension-${arch}/finetype.duckdb_extension"
 		if [ ! -f "$src" ]; then
 			echo "::error::missing extension artifact for ${arch} at ${src}" >&2
+			return 1
+		fi
+		# A zero-byte binary is an artifact that arrived and a platform that
+		# did not. It copies, checksums and uploads exactly like a real one,
+		# and the first thing that notices is a downloader's LOAD failing.
+		if [ ! -s "$src" ]; then
+			echo "::error::empty extension artifact for ${arch} at ${src}" >&2
 			return 1
 		fi
 		dest="${output_dir}/finetype-${tag}-${target}.duckdb_extension"
@@ -213,11 +240,12 @@ self_test() {
 		fixture_sha256 "$root/artifacts/finetype-taxonomy-catalogue/finetype-model.json"
 	}
 
-	# Runs the script under test and echoes its exit code, so a case can assert
-	# WHICH refusal fired rather than only that one did.
+	# Runs the script under test, echoes its exit code and leaves its output in
+	# $root/assembly.log, so a case can assert WHICH refusal fired and for
+	# which reason rather than only that one did.
 	run_assembly() {
 		local root="$1" rc=0
-		(cd "$root" && bash "$script" --artifacts-dir artifacts --output-dir release-assets --tag vSELFTEST --extension-duckdb-version vTEST >/dev/null 2>&1) || rc=$?
+		(cd "$root" && bash "$script" --artifacts-dir artifacts --output-dir release-assets --tag vSELFTEST --extension-duckdb-version vTEST) >"$root/assembly.log" 2>&1 || rc=$?
 		echo "$rc"
 	}
 
@@ -308,8 +336,14 @@ self_test() {
 	# ── Mutation: an artifacts directory with only the catalogue (no CLI, no
 	#    extensions at all) still refuses rather than silently succeeding with
 	#    zero extension binaries. ──
+	#    The catalogue artifact is COMPLETE here on purpose: the exit-4 rung
+	#    runs first, so an incomplete one would have this case pass for the
+	#    wrong reason and leave the extension rung unexercised.
 	mkdir -p "$tmp/empty/artifacts/finetype-taxonomy-catalogue"
 	echo '[]' >"$tmp/empty/artifacts/finetype-taxonomy-catalogue/taxonomy-schemas.json"
+	fixture_sha256 "$tmp/empty/artifacts/finetype-taxonomy-catalogue/taxonomy-schemas.json"
+	echo '{"model":"m2v8m-s43"}' >"$tmp/empty/artifacts/finetype-taxonomy-catalogue/finetype-model.json"
+	fixture_sha256 "$tmp/empty/artifacts/finetype-taxonomy-catalogue/finetype-model.json"
 	rc="$(run_assembly "$tmp/empty")"
 	if [ "$rc" != "1" ]; then
 		echo "  MISS an artifacts tree with no extension binaries at all: exit ${rc}, expected 1"
@@ -333,9 +367,60 @@ self_test() {
 	if [ "$rc" != "3" ]; then
 		echo "  MISS an extension artifact for a platform ARCH_TARGET_PAIRS does not name: exit ${rc}, expected 3"
 		failed=$((failed + 1))
+	elif ! grep -q "linux_amd64_musl" "$tmp/sixth/assembly.log"; then
+		echo "  WRONG an extension artifact for a platform ARCH_TARGET_PAIRS does not name: refused with exit 3 without naming the platform"
+		failed=$((failed + 1))
 	else
-		echo "  ok   an extension artifact for a platform ARCH_TARGET_PAIRS does not name: assembly refuses with exit 3 rather than dropping it"
+		echo "  ok   an extension artifact for a platform ARCH_TARGET_PAIRS does not name: assembly refuses with exit 3 and names it rather than dropping it"
 	fi
+
+	# ── Mutation: a platform's extension binary arrives ZERO BYTES. It copies,
+	#    checksums and uploads exactly like a real one, so nothing before a
+	#    downloader's LOAD would notice. The reason is asserted as well as the
+	#    rung: "empty" and "missing" are both exit 1, and a case that reads
+	#    only the code cannot tell which one fired. ──
+	mkdir -p "$tmp/emptybin"
+	build_fixture "$tmp/emptybin"
+	: >"$tmp/emptybin/artifacts/finetype-vTEST-extension-osx_arm64/finetype.duckdb_extension"
+	rc="$(run_assembly "$tmp/emptybin")"
+	if [ "$rc" != "1" ]; then
+		echo "  MISS a zero-byte extension binary: exit ${rc}, expected 1"
+		failed=$((failed + 1))
+	elif ! grep -q "empty extension artifact for osx_arm64" "$tmp/emptybin/assembly.log"; then
+		echo "  WRONG a zero-byte extension binary: refused with exit 1 but not as empty — $(cat "$tmp/emptybin/assembly.log")"
+		failed=$((failed + 1))
+	else
+		echo "  ok   a zero-byte extension binary: assembly refuses with exit 1 and names it empty, not missing"
+	fi
+
+	# ── Mutation: the taxonomy-catalogue artifact does not deliver, the shape
+	#    `actions/upload-artifact` produces when its path stops matching (it
+	#    warns rather than fails). Every extension binary is present, so the
+	#    release would carry five platforms of extension and no type source —
+	#    AC2 and AC5 unmet on a green run.
+	#
+	#    ONE CASE PER ASSET, each removing only that file. Removing all four at
+	#    once proves the rung fires and not which assets it requires: with a
+	#    single case, shortening the required list to two still passed. AC5
+	#    rides on finetype-model.json specifically, so the case that pins AC5
+	#    has to be the one where finetype-model.json is the only thing gone. ──
+	local absent
+	for absent in taxonomy-schemas.json taxonomy-schemas.json.sha256 finetype-model.json finetype-model.json.sha256; do
+		rm -rf "$tmp/nocatalogue"
+		mkdir -p "$tmp/nocatalogue"
+		build_fixture "$tmp/nocatalogue"
+		rm -f "$tmp/nocatalogue/artifacts/finetype-taxonomy-catalogue/${absent}"
+		rc="$(run_assembly "$tmp/nocatalogue")"
+		if [ "$rc" != "4" ]; then
+			echo "  MISS the catalogue artifact delivered everything but ${absent}: exit ${rc}, expected 4"
+			failed=$((failed + 1))
+		elif ! grep -q "${absent}" "$tmp/nocatalogue/assembly.log"; then
+			echo "  WRONG the catalogue artifact delivered everything but ${absent}: refused with exit 4 without naming it"
+			failed=$((failed + 1))
+		else
+			echo "  ok   the catalogue artifact delivered everything but ${absent}: assembly refuses with exit 4 and names it"
+		fi
+	done
 
 	if [ "$failed" -ne 0 ]; then
 		echo ""
