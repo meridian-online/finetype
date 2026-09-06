@@ -66,6 +66,7 @@ history_hygiene	./scripts/check-history-hygiene-selftest.sh	scripts/check-histor
 formula_asset	./scripts/check-formula-asset-selftest.sh, ./scripts/check-formula-asset-mutations.sh	scripts/check-formula-asset.sh, scripts/check-formula-asset-selftest.sh, scripts/check-formula-asset-mutations.sh
 schema_catalogue	python3 scripts/check_schema_catalogue.py --self-test	scripts/check_schema_catalogue.py
 model_coverage	python3 scripts/check_model_coverage.py --self-test	scripts/check_model_coverage.py
+release_asset_assembly	./.github/scripts/assemble-release-assets.sh --self-test	.github/scripts/assemble-release-assets.sh
 ci_model_drift	.github/scripts/check-ci-model-drift.sh --self-test	.github/scripts/check-ci-model-drift.sh
 evidence	scripts/test_evidence_mutations.sh	scripts/evidence.py, scripts/test_evidence.sh, scripts/test_evidence_mutations.sh
 doc_taxonomy_counts	scripts/check_doc_taxonomy_counts.py --self-test	scripts/check_doc_taxonomy_counts.py

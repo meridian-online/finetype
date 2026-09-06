@@ -252,6 +252,30 @@ jobs:
         if: steps.route.outputs.model_coverage == 'true'
         run: python3 scripts/check_model_coverage.py --self-test
 
+  release-asset-assembly:
+    # Same shape again: release.yml's `release` job is the only real caller of
+    # .github/scripts/assemble-release-assets.sh, and it only runs on a pushed
+    # tag. Its `--self-test` builds a synthetic `artifacts/` tree standing in
+    # for what `actions/download-artifact` (no merge-multiple) produces, and
+    # requires the script itself to: assemble all 24 expected files with each
+    # extension binary traced back to its own platform (no cross-platform
+    # collision), refuse when one platform's extension artifact is missing
+    # rather than silently shipping four, and refuse when none are present at
+    # all.
+    name: Release asset assembly check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Which gates this diff changed
+        id: route
+        # In-job by design, and it audits before it plans; see the identical step
+        # in the `gate-routing-self-test` job for why.
+        run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: The script reddens on a missing platform and assembles collision-free otherwise
+        if: steps.route.outputs.release_asset_assembly == 'true'
+        run: ./.github/scripts/assemble-release-assets.sh --self-test
+
   download-model-test:
     name: download-model.sh tests
     runs-on: ubuntu-latest

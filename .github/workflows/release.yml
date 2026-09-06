@@ -221,79 +221,21 @@ jobs:
         with:
           path: artifacts
 
+      # AC1's renaming logic (CLI tarballs and the taxonomy catalogue
+      # flattened as-is; the five identically-named extension binaries
+      # renamed into the finetype-<TAG>-<target> family and checksummed) lives
+      # in .github/scripts/assemble-release-assets.sh, not inline here — its
+      # own `--self-test` proves the collision and missing-platform failure
+      # modes on every pull request, since this step itself can only ever run
+      # on a pushed tag.
       - name: Assemble release assets
         shell: bash
         run: |
-          set -euo pipefail
-          mkdir -p release-assets
-          TAG="${GITHUB_REF_NAME}"
-
-          # CLI tarballs/zips/sha256 (already correctly named by the build
-          # job) and the taxonomy catalogue + model manifest (already
-          # correctly named by taxonomy-catalogue) — just flatten.
-          for dir in artifacts/finetype-*; do
-            [ -d "$dir" ] || continue
-            case "$(basename "$dir")" in
-              finetype-"${EXTENSION_DUCKDB_VERSION}"-extension-*) continue ;;  # handled below
-            esac
-            find "$dir" -maxdepth 1 -type f -exec cp {} release-assets/ \;
-          done
-
-          # DuckDB extension binaries: one per duckdb_arch, all sharing the
-          # in-artifact filename `finetype.duckdb_extension` (AC1). Renamed
-          # into the same `finetype-<TAG>-<target>` family the CLI tarballs
-          # already use, via the target-triple names release.yml's own `build`
-          # matrix uses for the exact same five platforms — so a downloader
-          # that knows its own Rust target triple and this tag computes the
-          # filename without knowing DuckDB's separate arch-naming scheme.
-          #
-          # A plain newline-delimited list rather than a `declare -A`
-          # associative array: `bash --version` on the runner is whatever
-          # ubuntu-latest ships (fine), but this file is also read and its
-          # logic proved by hand on a contributor's machine, and macOS ships
-          # bash 3.2 (no associative arrays; `declare -A` fails there) as
-          # `/bin/bash`. This form runs the same on both.
-          ARCH_TARGET_PAIRS="
-          linux_amd64:x86_64-unknown-linux-gnu
-          linux_arm64:aarch64-unknown-linux-gnu
-          osx_amd64:x86_64-apple-darwin
-          osx_arm64:aarch64-apple-darwin
-          windows_amd64:x86_64-pc-windows-msvc
-          "
-          found=0
-          total=0
-          for pair in $ARCH_TARGET_PAIRS; do
-            total=$((total + 1))
-            arch="${pair%%:*}"
-            target="${pair##*:}"
-            src="artifacts/finetype-${EXTENSION_DUCKDB_VERSION}-extension-${arch}/finetype.duckdb_extension"
-            if [ ! -f "$src" ]; then
-              echo "::error::missing extension artifact for ${arch} at ${src}" >&2
-              exit 1
-            fi
-            dest="release-assets/finetype-${TAG}-${target}.duckdb_extension"
-            cp "$src" "$dest"
-            found=$((found + 1))
-          done
-          if [ "$found" -ne "$total" ]; then
-            echo "::error::expected ${total} extension binaries, assembled $found" >&2
-            exit 1
-          fi
-
-          # Checksums for the extension binaries, in the same sidecar form the
-          # CLI tarballs and the taxonomy-catalogue job already use.
-          cd release-assets
-          for f in finetype-"${TAG}"-*.duckdb_extension; do
-            if command -v shasum &>/dev/null; then
-              shasum -a 256 "$f" > "${f}.sha256"
-            else
-              sha256sum "$f" > "${f}.sha256"
-            fi
-          done
-          cd ..
-
-          echo "Release assets:"
-          ls -la release-assets/
+          .github/scripts/assemble-release-assets.sh \
+            --artifacts-dir artifacts \
+            --output-dir release-assets \
+            --tag "${GITHUB_REF_NAME}" \
+            --extension-duckdb-version "${EXTENSION_DUCKDB_VERSION}"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
