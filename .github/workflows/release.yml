@@ -102,27 +102,210 @@ jobs:
             finetype-*.zip
             finetype-*.sha256
 
-  release:
-    name: Create Release
-    needs: build
+  # Builds finetype.duckdb_extension for the same five platforms
+  # MainDistributionPipeline.yml builds, using the identical reusable-workflow
+  # call (same @ref, ci_tools_version, extra_toolchains, exclude_archs — see
+  # weekly-duckdb-compat.yml's comment on why the version is a literal rather
+  # than an expression here). A SEPARATE call rather than reusing
+  # MainDistributionPipeline.yml's run for this tag: that workflow triggers on
+  # the same push and produces its own, independent run, and
+  # `actions/download-artifact` only ever sees the artifacts of ITS OWN
+  # workflow run. Calling the reusable workflow again here, inside this run,
+  # is what lets the `release` job below download its output without racing
+  # or polling a sibling run for completion.
+  #
+  # EXTENSION_DUCKDB_VERSION below must equal the `duckdb_version` given here
+  # verbatim: the reusable workflow bakes it into the artifact NAME
+  # (`finetype-<duckdb_version>-extension-<arch>`), and the `release` job
+  # reads that name back apart to find each platform's binary.
+  build-extension:
+    name: Build DuckDB extension
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.3
+    with:
+      duckdb_version: v1.5.3
+      ci_tools_version: v1.5.3
+      extension_name: finetype
+      extra_toolchains: 'rust;python3'
+      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
+
+  # Generates the taxonomy schema catalogue from labels/definitions_*.yaml AT
+  # THIS TAG — never committed, never hand-made (AC2) — and proves it against
+  # the two properties its one consumer relies on before it ever reaches a
+  # release: brightfield_engine::semantic::parse_schema_catalogue's shape
+  # (AC3, scripts/check_schema_catalogue.py) and catalogue_coverage against
+  # the model this same tag was built with (AC4, scripts/check_model_coverage.py).
+  # Both checks read the GENERATED FILE, not `finetype taxonomy`'s exit code —
+  # see each script's module doc for why that distinction is the point.
+  #
+  # Runs once on ubuntu-latest rather than once per platform: the catalogue is
+  # plain JSON with no platform-specific content, so building it five times
+  # would prove nothing five times over.
+  taxonomy-catalogue:
+    name: Generate + prove the taxonomy schema catalogue
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      - name: Download artifacts
+      - run: rustup show # installs toolchain from rust-toolchain.toml
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: taxonomy-catalogue
+
+      - name: Download model from HuggingFace
+        shell: bash
+        run: .github/scripts/download-model.sh
+
+      - name: Build finetype-cli
+        run: cargo build --release -p finetype-cli
+
+      - name: Generate the taxonomy schema catalogue
+        run: ./target/release/finetype taxonomy --output json-schema > taxonomy-schemas.json
+
+      - name: AC3 — the catalogue is shaped the way brightfield reads it
+        run: python3 scripts/check_schema_catalogue.py taxonomy-schemas.json
+
+      - name: AC4 — the catalogue still describes most of the shipped model's labels
+        run: |
+          python3 scripts/check_model_coverage.py \
+            --catalogue taxonomy-schemas.json \
+            --label-map "models/${FINETYPE_CI_MODEL}/label_map.json" \
+            --threshold 0.95 \
+            --write-manifest finetype-model.json \
+            --tag "${GITHUB_REF_NAME}" \
+            --model "${FINETYPE_CI_MODEL}"
+
+      - name: Generate SHA256 for the catalogue and the model manifest
+        shell: bash
+        run: |
+          for f in taxonomy-schemas.json finetype-model.json; do
+            if command -v shasum &>/dev/null; then
+              shasum -a 256 "$f" > "${f}.sha256"
+            else
+              sha256sum "$f" > "${f}.sha256"
+            fi
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: finetype-taxonomy-catalogue
+          path: |
+            taxonomy-schemas.json
+            taxonomy-schemas.json.sha256
+            finetype-model.json
+            finetype-model.json.sha256
+
+  release:
+    name: Create Release
+    needs: [build, build-extension, taxonomy-catalogue]
+    runs-on: ubuntu-latest
+    env:
+      # Must equal build-extension's `duckdb_version` input above verbatim —
+      # see that job's comment.
+      EXTENSION_DUCKDB_VERSION: v1.5.3
+    steps:
+      - uses: actions/checkout@v5
+
+      # NO merge-multiple here, and no `pattern:` either: every one of the
+      # five build-extension artifacts uploads a file with the IDENTICAL name
+      # (`finetype.duckdb_extension` — the reusable workflow's own naming, not
+      # ours). `merge-multiple: true` flattens every downloaded artifact into
+      # one directory, so five identically-named files would collide and
+      # silently leave four platforms missing from the release. Downloading
+      # with no `path`-flattening keeps each artifact in its own
+      # `artifacts/<artifact-name>/` directory instead, and the assembly step
+      # below reads them back out by that directory name.
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          merge-multiple: true
+
+      - name: Assemble release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          TAG="${GITHUB_REF_NAME}"
+
+          # CLI tarballs/zips/sha256 (already correctly named by the build
+          # job) and the taxonomy catalogue + model manifest (already
+          # correctly named by taxonomy-catalogue) — just flatten.
+          for dir in artifacts/finetype-*; do
+            [ -d "$dir" ] || continue
+            case "$(basename "$dir")" in
+              finetype-"${EXTENSION_DUCKDB_VERSION}"-extension-*) continue ;;  # handled below
+            esac
+            find "$dir" -maxdepth 1 -type f -exec cp {} release-assets/ \;
+          done
+
+          # DuckDB extension binaries: one per duckdb_arch, all sharing the
+          # in-artifact filename `finetype.duckdb_extension` (AC1). Renamed
+          # into the same `finetype-<TAG>-<target>` family the CLI tarballs
+          # already use, via the target-triple names release.yml's own `build`
+          # matrix uses for the exact same five platforms — so a downloader
+          # that knows its own Rust target triple and this tag computes the
+          # filename without knowing DuckDB's separate arch-naming scheme.
+          #
+          # A plain newline-delimited list rather than a `declare -A`
+          # associative array: `bash --version` on the runner is whatever
+          # ubuntu-latest ships (fine), but this file is also read and its
+          # logic proved by hand on a contributor's machine, and macOS ships
+          # bash 3.2 (no associative arrays; `declare -A` fails there) as
+          # `/bin/bash`. This form runs the same on both.
+          ARCH_TARGET_PAIRS="
+          linux_amd64:x86_64-unknown-linux-gnu
+          linux_arm64:aarch64-unknown-linux-gnu
+          osx_amd64:x86_64-apple-darwin
+          osx_arm64:aarch64-apple-darwin
+          windows_amd64:x86_64-pc-windows-msvc
+          "
+          found=0
+          total=0
+          for pair in $ARCH_TARGET_PAIRS; do
+            total=$((total + 1))
+            arch="${pair%%:*}"
+            target="${pair##*:}"
+            src="artifacts/finetype-${EXTENSION_DUCKDB_VERSION}-extension-${arch}/finetype.duckdb_extension"
+            if [ ! -f "$src" ]; then
+              echo "::error::missing extension artifact for ${arch} at ${src}" >&2
+              exit 1
+            fi
+            dest="release-assets/finetype-${TAG}-${target}.duckdb_extension"
+            cp "$src" "$dest"
+            found=$((found + 1))
+          done
+          if [ "$found" -ne "$total" ]; then
+            echo "::error::expected ${total} extension binaries, assembled $found" >&2
+            exit 1
+          fi
+
+          # Checksums for the extension binaries, in the same sidecar form the
+          # CLI tarballs and the taxonomy-catalogue job already use.
+          cd release-assets
+          for f in finetype-"${TAG}"-*.duckdb_extension; do
+            if command -v shasum &>/dev/null; then
+              shasum -a 256 "$f" > "${f}.sha256"
+            else
+              sha256sum "$f" > "${f}.sha256"
+            fi
+          done
+          cd ..
+
+          echo "Release assets:"
+          ls -la release-assets/
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            artifacts/finetype-*.tar.gz
-            artifacts/finetype-*.zip
-            artifacts/finetype-*.sha256
+            release-assets/finetype-*.tar.gz
+            release-assets/finetype-*.zip
+            release-assets/finetype-*.duckdb_extension
+            release-assets/*.sha256
+            release-assets/taxonomy-schemas.json
+            release-assets/finetype-model.json
 
   publish-crates:
     name: Publish to crates.io

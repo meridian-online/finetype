@@ -180,6 +180,14 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--catalogue", type=Path, help="path to the generated catalogue JSON")
     parser.add_argument("--label-map", type=Path, help="path to the model's label_map.json")
     parser.add_argument("--threshold", type=float, default=MIN_COVERAGE, help=f"minimum covered fraction (default {MIN_COVERAGE})")
+    parser.add_argument(
+        "--write-manifest",
+        type=Path,
+        default=None,
+        help="also record the measurement (model, tag, coverage) as JSON at this path — AC5",
+    )
+    parser.add_argument("--tag", default=None, help="release tag, recorded in --write-manifest's output")
+    parser.add_argument("--model", default=None, help="model name, recorded in --write-manifest's output")
     parser.add_argument("--self-test", action="store_true", help="prove the gate detects")
     args = parser.parse_args(argv)
 
@@ -222,6 +230,21 @@ def main(argv: list[str]) -> int:
         f"coverage: {fraction:.4f} ({len(label_map) - len(missing)}/{len(label_map)} model labels "
         f"mentioned in {args.catalogue}), threshold {args.threshold}"
     )
+
+    if args.write_manifest is not None:
+        manifest = {
+            "tag": args.tag,
+            "model": args.model,
+            "catalogue": str(args.catalogue),
+            "label_map_entries": len(label_map),
+            "catalogue_entries": len(catalogue) if isinstance(catalogue, list) else None,
+            "covered": len(label_map) - len(missing),
+            "coverage_fraction": fraction,
+            "threshold": args.threshold,
+        }
+        args.write_manifest.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        print(f"wrote {args.write_manifest}")
+
     if fraction < args.threshold:
         print(f"FAIL: coverage {fraction:.4f} is below threshold {args.threshold}", file=sys.stderr)
         print(f"missing ({len(missing)}): {missing}", file=sys.stderr)
