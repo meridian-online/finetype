@@ -97,32 +97,187 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: finetype-${{ matrix.target }}
+          # Default is `warn`. What this buys, exactly: the action evaluates
+          # `filesToUpload.length === 0` over the UNION of the globs below, so
+          # `error` turns "not one of these three matched" from a warning and
+          # a skipped upload into a failed job. What it does NOT buy: a
+          # PARTIAL artifact. If `finetype-*.sha256` stopped matching while
+          # `finetype-*.tar.gz` still did, the union is non-empty and this
+          # never fires.
+          if-no-files-found: error
           path: |
             finetype-*.tar.gz
             finetype-*.zip
             finetype-*.sha256
 
-  release:
-    name: Create Release
-    needs: build
+  # Builds finetype.duckdb_extension for the same five platforms
+  # MainDistributionPipeline.yml builds, using the identical reusable-workflow
+  # call (same @ref, ci_tools_version, extra_toolchains, exclude_archs — see
+  # weekly-duckdb-compat.yml's comment on why the version is a literal rather
+  # than an expression here). A SEPARATE call rather than reusing
+  # MainDistributionPipeline.yml's run for this tag: that workflow triggers on
+  # the same push and produces its own, independent run. Calling the reusable
+  # workflow again here, inside this run, is what lets the `release` job below
+  # download its output without racing or polling a sibling run for completion.
+  #
+  # EXTENSION_DUCKDB_VERSION below must equal the `duckdb_version` given here
+  # verbatim: the reusable workflow bakes it into the artifact NAME
+  # (`finetype-<duckdb_version>-extension-<arch>`), and the `release` job
+  # reads that name back apart to find each platform's binary.
+  build-extension:
+    name: Build DuckDB extension
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.3
+    with:
+      duckdb_version: v1.5.3
+      ci_tools_version: v1.5.3
+      extension_name: finetype
+      extra_toolchains: 'rust;python3'
+      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
+
+  # Generates the taxonomy schema catalogue from labels/definitions_*.yaml AT
+  # THIS TAG — never committed, never hand-made (AC2) — and proves it against
+  # the two properties its one consumer relies on before it ever reaches a
+  # release: brightfield_engine::semantic::parse_schema_catalogue's shape
+  # (AC3, scripts/check_schema_catalogue.py) and catalogue_coverage against
+  # the model this same tag was built with (AC4, scripts/check_model_coverage.py).
+  # Both checks read the GENERATED FILE, not `finetype taxonomy`'s exit code —
+  # see each script's module doc for why that distinction is the point.
+  #
+  # Runs once on ubuntu-latest rather than once per platform: the catalogue is
+  # plain JSON with no platform-specific content, so building it five times
+  # would prove nothing five times over.
+  taxonomy-catalogue:
+    name: Generate + prove the taxonomy schema catalogue
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      - name: Download artifacts
+      - run: rustup show # installs toolchain from rust-toolchain.toml
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: taxonomy-catalogue
+
+      - name: Download model from HuggingFace
+        shell: bash
+        run: .github/scripts/download-model.sh
+
+      - name: Build finetype-cli
+        run: cargo build --release -p finetype-cli
+
+      - name: Generate the taxonomy schema catalogue
+        run: ./target/release/finetype taxonomy --output json-schema > taxonomy-schemas.json
+
+      - name: AC3 — the catalogue is shaped the way brightfield reads it
+        run: python3 scripts/check_schema_catalogue.py taxonomy-schemas.json
+
+      - name: AC4 — the catalogue still describes most of the shipped model's labels
+        run: |
+          python3 scripts/check_model_coverage.py \
+            --catalogue taxonomy-schemas.json \
+            --label-map "models/${FINETYPE_CI_MODEL}/label_map.json" \
+            --threshold 0.95 \
+            --write-manifest finetype-model.json \
+            --tag "${GITHUB_REF_NAME}" \
+            --model "${FINETYPE_CI_MODEL}"
+
+      - name: Generate SHA256 for the catalogue and the model manifest
+        shell: bash
+        run: |
+          for f in taxonomy-schemas.json finetype-model.json; do
+            if command -v shasum &>/dev/null; then
+              shasum -a 256 "$f" > "${f}.sha256"
+            else
+              sha256sum "$f" > "${f}.sha256"
+            fi
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: finetype-taxonomy-catalogue
+          # See the `build` job's upload for what `error` does and does not
+          # cover — it fires only when all four globs below come up empty.
+          # assemble-release-assets.sh refuses with exit 4 if any one of these
+          # four does not reach the assembled directory, which is the half
+          # that catches a partial upload and the half a pull request can
+          # prove.
+          if-no-files-found: error
+          path: |
+            taxonomy-schemas.json
+            taxonomy-schemas.json.sha256
+            finetype-model.json
+            finetype-model.json.sha256
+
+  release:
+    name: Create Release
+    needs: [build, build-extension, taxonomy-catalogue]
+    runs-on: ubuntu-latest
+    env:
+      # Must equal build-extension's `duckdb_version` input above verbatim —
+      # see that job's comment.
+      EXTENSION_DUCKDB_VERSION: v1.5.3
+    steps:
+      - uses: actions/checkout@v5
+
+      # NO merge-multiple here, and no `pattern:` either: every one of the
+      # five build-extension artifacts uploads a file with the IDENTICAL name
+      # (`finetype.duckdb_extension` — the reusable workflow's own naming, not
+      # ours). `merge-multiple: true` flattens every downloaded artifact into
+      # one directory, so five identically-named files would collide and
+      # silently leave four platforms missing from the release. Downloading
+      # with no `path`-flattening keeps each artifact in its own
+      # `artifacts/<artifact-name>/` directory instead, and the assembly step
+      # below reads them back out by that directory name.
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          merge-multiple: true
+
+      # AC1's renaming logic (CLI tarballs and the taxonomy catalogue
+      # flattened as-is; the five identically-named extension binaries
+      # renamed into the finetype-<TAG>-<target> family and checksummed) lives
+      # in .github/scripts/assemble-release-assets.sh, not inline here — this
+      # step can only run on a pushed tag, so its own `--self-test` carries the
+      # collision and missing-platform failure modes instead, on any pull
+      # request whose diff touches that script or this file. Both paths are in
+      # .github/gate-self-tests.tsv's `release_asset_assembly` row, which is
+      # what selects the proof; a diff touching neither, and not the routing,
+      # skips it.
+      - name: Assemble release assets
+        shell: bash
+        run: |
+          .github/scripts/assemble-release-assets.sh \
+            --artifacts-dir artifacts \
+            --output-dir release-assets \
+            --tag "${GITHUB_REF_NAME}" \
+            --extension-duckdb-version "${EXTENSION_DUCKDB_VERSION}"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          # Default is false: an entry below that matched nothing would be
+          # skipped with a warning and the release published without it. Every
+          # entry matches in a normal run — the `.zip` from the windows leg,
+          # the five `.duckdb_extension` files and their sidecars from the
+          # assembly step above, which has already refused if any is absent —
+          # so an unmatched glob here means something upstream changed, and
+          # that is worth a red release rather than a quiet one.
+          #
+          # It does nothing about an entry that is DELETED from the list,
+          # which is the way this list actually loses an asset.
+          # scripts/check_release_asset_contract.py is what covers that: it
+          # runs the assembler and requires these globs to match everything it
+          # wrote, and requires every glob here to match something.
+          fail_on_unmatched_files: true
           files: |
-            artifacts/finetype-*.tar.gz
-            artifacts/finetype-*.zip
-            artifacts/finetype-*.sha256
+            release-assets/finetype-*.tar.gz
+            release-assets/finetype-*.zip
+            release-assets/finetype-*.duckdb_extension
+            release-assets/*.sha256
+            release-assets/taxonomy-schemas.json
+            release-assets/finetype-model.json
 
   publish-crates:
     name: Publish to crates.io

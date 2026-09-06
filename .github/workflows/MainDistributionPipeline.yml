@@ -5,6 +5,13 @@ name: DuckDB Extension Distribution
 # duckdb/community-extensions CI uses when it rebuilds the registered
 # extension. A green run here proves a tagged ref is buildable by community
 # CI without manual steps. See spec 2026-06-02-duckdb-extension-republish.
+#
+# This is a PROOF, not the release path: it uploads to GitHub Actions
+# artifacts, which expire, and nothing downstream reads them. release.yml
+# calls this same reusable workflow again on the same tag, in its own run, and
+# attaches THAT build's binaries to the GitHub release as durable, checksummed
+# assets — see its `build-extension` job for why a second build rather than a
+# cross-run artifact fetch.
 
 on:
   push:
