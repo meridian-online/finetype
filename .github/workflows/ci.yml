@@ -212,7 +212,11 @@ jobs:
     # this proves (scripts/check_schema_catalogue.py) reads a release asset
     # that release.yml generates from labels/definitions_*.yaml, and there is
     # no release on a branch — so the check itself runs only on a tag, and its
-    # credibility runs here on every pull request. `--self-test` mutates
+    # credibility runs here on any pull request whose diff touches
+    # scripts/check_schema_catalogue.py, which is the path
+    # .github/gate-self-tests.tsv's row for this gate watches. A pull request
+    # touching neither that script nor the routing skips this proof.
+    # `--self-test` mutates
     # synthetic catalogues in-process (an emptied array, entries that keep
     # their label but lose every checkable keyword, entries that keep a
     # keyword but lose their label) and requires the check to redden on each,
@@ -284,6 +288,32 @@ jobs:
       - name: The script reddens on a missing platform and assembles collision-free otherwise
         if: steps.route.outputs.release_asset_assembly == 'true'
         run: ./.github/scripts/assemble-release-assets.sh --self-test
+
+  release-asset-contract:
+    # The third link. assemble-release-assets.sh guards the artifacts tree and
+    # `if-no-files-found` guards the uploads, and closing those two is what
+    # makes this one dangerous: delete an entry from the release step's
+    # `files:` list and every other check here stays green while the tag
+    # publishes without it. `fail_on_unmatched_files: true` fires on an entry
+    # that is present and matches nothing, never on one that is gone. This job
+    # runs the assembler for real and requires the release step's globs to
+    # match exactly what it wrote, in both directions.
+    name: Release asset contract check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Which gates this diff changed
+        id: route
+        # In-job by design, and it audits before it plans; see the identical step
+        # in the `gate-routing-self-test` job for why.
+        run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: The release step ships exactly what the assembler assembles
+        if: steps.route.outputs.release_asset_contract == 'true'
+        run: python3 scripts/check_release_asset_contract.py
+      - name: ...and the contract check reddens when the release step drops an asset
+        if: steps.route.outputs.release_asset_contract == 'true'
+        run: python3 scripts/check_release_asset_contract.py --self-test
 
   download-model-test:
     name: download-model.sh tests

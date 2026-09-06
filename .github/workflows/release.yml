@@ -97,10 +97,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: finetype-${{ matrix.target }}
-          # Default is `warn`: a path glob that stops matching would upload an
-          # empty artifact and leave this job green, and the `release` job
-          # would then build a release out of whatever did arrive. Make it the
-          # failure it is, here, where the name that stopped matching is.
+          # Default is `warn`. What this buys, exactly: the action evaluates
+          # `filesToUpload.length === 0` over the UNION of the globs below, so
+          # `error` turns "not one of these three matched" from a warning and
+          # a skipped upload into a failed job. What it does NOT buy: a
+          # PARTIAL artifact. If `finetype-*.sha256` stopped matching while
+          # `finetype-*.tar.gz` still did, the union is non-empty and this
+          # never fires. That case is caught downstream instead, by
+          # assemble-release-assets.sh's exit 4 and by
+          # scripts/check_release_asset_contract.py.
           if-no-files-found: error
           path: |
             finetype-*.tar.gz
@@ -193,10 +198,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: finetype-taxonomy-catalogue
-          # See the `build` job's upload for why this is `error` and not the
-          # default `warn`. assemble-release-assets.sh refuses (exit 4) if
-          # these four do not reach the assembled directory, which is the
-          # locally provable half; this is the half that names the job.
+          # See the `build` job's upload for what `error` does and does not
+          # cover — it fires only when all four globs below come up empty.
+          # assemble-release-assets.sh refuses with exit 4 if any one of these
+          # four does not reach the assembled directory, which is the half
+          # that catches a partial upload and the half a pull request can
+          # prove.
           if-no-files-found: error
           path: |
             taxonomy-schemas.json
@@ -232,10 +239,12 @@ jobs:
       # AC1's renaming logic (CLI tarballs and the taxonomy catalogue
       # flattened as-is; the five identically-named extension binaries
       # renamed into the finetype-<TAG>-<target> family and checksummed) lives
-      # in .github/scripts/assemble-release-assets.sh, not inline here — its
-      # own `--self-test` proves the collision and missing-platform failure
-      # modes on every pull request, since this step itself can only ever run
-      # on a pushed tag.
+      # in .github/scripts/assemble-release-assets.sh, not inline here — this
+      # step can only run on a pushed tag, so its own `--self-test` carries the
+      # collision and missing-platform failure modes instead, on any pull
+      # request whose diff touches that script or this file. Both paths are in
+      # .github/gate-self-tests.tsv's `release_asset_assembly` row, which is
+      # what selects the proof; a diff touching neither skips it.
       - name: Assemble release assets
         shell: bash
         run: |
@@ -250,12 +259,18 @@ jobs:
         with:
           generate_release_notes: true
           # Default is false: an entry below that matched nothing would be
-          # skipped with a warning and the release would be published without
-          # it. Every entry matches in a normal run — the `.zip` from the
-          # windows leg, the five `.duckdb_extension` files and their sidecars
-          # from the assembly step above, which has already refused if any is
-          # absent — so an unmatched glob here means something upstream
-          # changed, and that is worth a red release rather than a quiet one.
+          # skipped with a warning and the release published without it. Every
+          # entry matches in a normal run — the `.zip` from the windows leg,
+          # the five `.duckdb_extension` files and their sidecars from the
+          # assembly step above, which has already refused if any is absent —
+          # so an unmatched glob here means something upstream changed, and
+          # that is worth a red release rather than a quiet one.
+          #
+          # It does nothing about an entry that is DELETED from the list,
+          # which is the way this list actually loses an asset.
+          # scripts/check_release_asset_contract.py is what covers that: it
+          # runs the assembler and requires these globs to match everything it
+          # wrote, and requires every glob here to match something.
           fail_on_unmatched_files: true
           files: |
             release-assets/finetype-*.tar.gz

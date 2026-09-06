@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Assemble a release's flat asset directory from the artifacts a release.yml
 # run downloaded via `actions/download-artifact` with NO `merge-multiple` (see
-# release.yml's `release` job for why): five CLI tarballs, five DuckDB
-# extension binaries (one per duckdb_arch, each sharing the in-artifact
+# release.yml's `release` job for why): four CLI tarballs and one zip, five
+# DuckDB extension binaries (one per duckdb_arch, each sharing the in-artifact
 # filename `finetype.duckdb_extension` -- the reusable workflow's own naming,
 # not ours), and the taxonomy catalogue + model manifest.
 #
@@ -10,15 +10,22 @@
 # bash: release.yml only runs on a pushed tag, so this logic would otherwise
 # be exercised a handful of times a year, at the moment it is least welcome to
 # be wrong -- the shape scripts/check-formula-asset.sh's own comment names
-# for the same reason. `--self-test` proves it on every pull request instead,
-# against a synthetic artifacts/ tree standing in for what download-artifact
-# actually produces, run through THIS SCRIPT via a real subprocess -- not a
-# reimplementation of its logic that could drift from what release.yml calls.
+# for the same reason. `--self-test` proves it instead, against a synthetic
+# artifacts/ tree standing in for what download-artifact actually produces,
+# run through THIS SCRIPT via a real subprocess -- not a reimplementation of
+# its logic that could drift from what release.yml calls.
+#
+# WHEN THAT PROOF RUNS, precisely: on a pull request whose diff touches this
+# script or .github/workflows/release.yml, and on any pull request that
+# changes the routing itself. NOT on every pull request -- the row for this
+# gate in .github/gate-self-tests.tsv is what selects it, and a diff that
+# touches neither path skips it. release.yml is in that row because it is this
+# script's only caller and the likeliest place to break the property.
 #
 # WHY A PLAIN LIST, NOT A `declare -A` ASSOCIATIVE ARRAY: this script is read
 # and its logic proved by hand on a contributor's machine, and macOS ships
-# bash 3.2 as `/bin/bash` -- no associative arrays. `declare -A` there fails
-# with an "unbound variable" error under `set -u` that names none of this.
+# bash 3.2 as `/bin/bash` -- no associative arrays. `declare -A` there prints
+# `declare: -A: invalid option` and exits 2.
 #
 # USAGE
 #   assemble-release-assets.sh --artifacts-dir DIR --output-dir DIR \
@@ -421,6 +428,29 @@ self_test() {
 			echo "  ok   the catalogue artifact delivered everything but ${absent}: assembly refuses with exit 4 and names it"
 		fi
 	done
+
+	# ── Mutation: the catalogue artifact arrives under a directory name the
+	#    flatten's `finetype-*` glob does not match, so all four files exist in
+	#    the artifacts tree and none of them is copied. This is the case the
+	#    rung is FOR, and the only one that separates "present in the output
+	#    directory" from "present somewhere under artifacts/": replacing the
+	#    rung's `[ -f "${output_dir}/${required}" ]` with a `find` over
+	#    "$artifacts_dir" leaves the four cases above green, because they
+	#    delete the file and both forms agree on a file that is gone. Here the
+	#    forms disagree, and the wrong one ships a release with no type source.
+	mkdir -p "$tmp/misnamed"
+	build_fixture "$tmp/misnamed"
+	mv "$tmp/misnamed/artifacts/finetype-taxonomy-catalogue" "$tmp/misnamed/artifacts/taxonomy-catalogue"
+	rc="$(run_assembly "$tmp/misnamed")"
+	if [ "$rc" != "4" ]; then
+		echo "  MISS the catalogue artifact arrived under a name the flatten does not match: exit ${rc}, expected 4"
+		failed=$((failed + 1))
+	elif ! grep -q "taxonomy-schemas.json" "$tmp/misnamed/assembly.log"; then
+		echo "  WRONG the catalogue artifact arrived under a name the flatten does not match: refused with exit 4 without naming the absent assets"
+		failed=$((failed + 1))
+	else
+		echo "  ok   the catalogue artifact arrived under a name the flatten does not match: assembly refuses with exit 4 rather than reading it where it was not copied"
+	fi
 
 	if [ "$failed" -ne 0 ]; then
 		echo ""

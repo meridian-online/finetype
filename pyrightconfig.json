@@ -38,6 +38,7 @@
     "scripts/check_sample_patterns.py",
     "scripts/check_schema_catalogue.py",
     "scripts/check_model_coverage.py",
+    "scripts/check_release_asset_contract.py",
     "scripts/encoder_dtype.py",
     "scripts/encoder_dtype_record_diff.py",
     "scripts/encoder_dtype_record_diff_mutations.py",
