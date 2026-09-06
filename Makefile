@@ -476,13 +476,15 @@ all: release
 # prerequisite below is the whole mechanism.
 #
 # base.Makefile declares configure/extension_version.txt as a file target with
-# no prerequisites, so make treats an existing one as up to date and never runs
+# no prerequisites, so make treats an existing one as up to date and does not run
 # the autodetection again. Two consequences, and the first one shipped: the file
-# used to be tracked, so every checkout arrived with it and the autodetection has
-# never run in CI at all -- every published artefact carries the committed
-# literal. Untracking it fixes CI, where each checkout is fresh, and does nothing
+# used to be tracked, so a checkout arrived with it, the autodetection did not
+# run in CI, and the artefacts published between the commit that added the file
+# and the commit that removed it carry the committed literal rather than their
+# tag. Untracking it fixes CI, where each checkout is fresh, and does nothing
 # for a developer's tree, where the previous build's file persists and a second
 # tag built in it keeps the FIRST tag's version.
+
 #
 # A phony prerequisite is never up to date, so the target never is. This adds a
 # prerequisite to the included rule rather than redefining its recipe: a second

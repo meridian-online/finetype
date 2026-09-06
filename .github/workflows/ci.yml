@@ -482,7 +482,23 @@ jobs:
         # include; no toolchain.
         run: scripts/check_extension_stamp.py --regenerates-version-file
 
+      - name: The release path still invokes the stamp gate where it has to
+        # Every other stamp step in this job proves the GATE detects. This one
+        # proves the gate is still CALLED — unguarded, and before the bytes are
+        # published — at the three places a wrong stamp escapes: the two steps
+        # in release.yml and the stamp job in MainDistributionPipeline.yml.
+        # Those are workflow YAML, so nothing in this repository read them: one
+        # `continue-on-error: true` on the release step turned the refusal into
+        # a warning with every check here, including that gate's own
+        # `--self-test`, still at exit 0.
+        #
+        # Unguarded and in a required context on purpose. A routed step is
+        # skipped on a diff that does not touch the gate, and a skipped required
+        # check satisfies branch protection.
+        run: scripts/check_extension_stamp.py --release-wiring
+
       - run: rustup show
+
       - uses: Swatinem/rust-cache@v2
       - name: Install duckdb CLI
         # Both gates below read the catalog / run the examples through this CLI.
@@ -512,9 +528,14 @@ jobs:
 
       - name: ...and the stamp gate detects a trailer that is not the release
         # Fixtures are copies of the artefact above, re-stamped with the real
-        # extension-ci-tools stamper — so each still loads, and the run-time
-        # mismatch case is driven by an artefact that genuinely disagrees with
-        # itself rather than by a mutated comparison.
+        # extension-ci-tools stamper. Every trailer field but the version — the
+        # platform, the ABI type, the DuckDB floor — is read off that artefact,
+        # so the fixtures load wherever it does and the run-time mismatch case
+        # is driven by an artefact that genuinely disagrees with itself rather
+        # than by a mutated comparison. A literal for any of those three is a
+        # constant of the machine that wrote it, and the proof then only passes
+        # on that machine.
+
         if: steps.route.outputs.extension_stamp == 'true'
         run: scripts/check_extension_stamp.py --self-test --artifact target/release/finetype.duckdb_extension
 

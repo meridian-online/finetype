@@ -8,8 +8,12 @@ WHY THIS EXISTS
     the file's last 512 bytes. Anyone who has to tell two builds apart reads
     that field and nothing else.
 
-    Every extension this project has ever published carries `0.6.23`, whatever
-    tag it was built from. The cause is one committed file. The build contract
+    Every extension this project published between 2026-06-28, when
+    configure/extension_version.txt was committed, and the commit that removed
+    it carries `0.6.23`, whatever tag it was built from -- and the file was
+    still there when this was written. The cause is that one committed file.
+    The build contract
+
     writes the version through this rule, in
     extension-ci-tools/makefiles/c_api_extensions/base.Makefile:
 
@@ -18,11 +22,11 @@ WHY THIS EXISTS
 
     A file target with no prerequisites is never remade once it exists, so a
     tree that ARRIVES with the file already in it never runs VERSION_COMMAND at
-    all. The file was tracked in git, so every checkout arrived with it, so the
-    autodetection has never run in CI, and the committed literal has been
-    stamped onto every artefact since it was committed. Measured on the local
-    build of 2026-06-04: trailer offset 128 reads `0.6.23` while the tree was
-    at 0.6.58.
+    all. The file was tracked in git, so a checkout arrived with it, so the
+    autodetection did not run in CI, and the committed literal was stamped onto
+    each artefact built after it was committed. Measured on the local build of
+    2026-06-04: trailer offset 128 reads `0.6.23` while the tree was at 0.6.58.
+
 
     The fix is to stop tracking the file and let the build write it. That fix
     is invisible -- a file that regenerates silently is the same shape of trust
@@ -53,13 +57,21 @@ which is why each has its own exit code rather than a shared 1:
         `duckdb_extensions().extension_version` is DuckDB's own reading of the
         trailer. Two independent sources, one file, one LOAD.
 
-        THE LOAD IS THE ONLY THING HERE THAT ESTABLISHES IDENTITY. Any valid
-        shared library stamped by extension-ci-tools' append_extension_metadata
-        script passes a trailer read; only running it proves the artefact is
-        this extension. That is why this mode exists as well as the one above,
-        and why it also requires DuckDB to report the extension as loaded and
-        NOT installed -- an installed community build could otherwise answer
-        for the file on disk.
+        THE LOAD IS WHAT ESTABLISHES IDENTITY, and the byte reading above
+        cannot: any valid shared library stamped by extension-ci-tools'
+        append_extension_metadata script passes a trailer read. Most of the
+        refusing is DuckDB's own -- it dlsyms an init symbol derived from the
+        FILE NAME, so a re-stamped stranger renamed finetype.duckdb_extension
+        does not load at all. The `ft_version()` name check in this file is the
+        backstop for what DuckDB would accept, a library that does export that
+        symbol, and the self-test reaches it by substituting the session's
+        reading because no file on disk produces it. This mode also requires
+        DuckDB to report the extension as loaded and NOT installed -- an
+        installed community build could otherwise answer for the file on disk.
+
+        The artefact must be one this machine can load, and it is refused BY
+        NAME when it is not: see require_native.
+
 
     --untracked-version-file        (exit 4, exit 5)
         Nothing under configure/ is tracked in git, and
@@ -67,7 +79,18 @@ which is why each has its own exit code rather than a shared 1:
         fail differently: a tracked file disables the rule that writes it, and
         an un-ignored one comes back on the next `git add`.
 
+    --release-wiring                (exit 8)
+        This gate is invoked at each point a wrong stamp can escape, unguarded,
+        and before the bytes are published. Every mode above refuses something;
+        NOTHING MAKES THEM RUN except the two release workflows, and those are
+        YAML that no check in this repository read. One `continue-on-error:
+        true` turns the refusal into a warning and leaves this file's own
+        --self-test green. Read as structure -- jobs, guards, steps, order --
+        through the reader in .github/scripts/gate-self-tests.py, so there is
+        one parser of a workflow in this repository rather than two that drift.
+
     --regenerates-version-file      (exit 6)
+
         The Makefile forces the version file to be regenerated even when one is
         already on disk. Untracking the file fixes CI, where every checkout is
         fresh; it does not fix a developer's tree, where a file written by the
@@ -102,7 +125,9 @@ USAGE
     scripts/check_extension_stamp.py --artifact F --load [--tag TAG]
     scripts/check_extension_stamp.py --untracked-version-file
     scripts/check_extension_stamp.py --regenerates-version-file
+    scripts/check_extension_stamp.py --release-wiring
     scripts/check_extension_stamp.py --self-test --artifact F
+
 
 EXIT CODES
     0  clean
@@ -113,11 +138,15 @@ EXIT CODES
     5  configure/extension_version.txt is not ignored, so it can be re-added
     6  the Makefile does not force the version file to be regenerated
     7  a loaded extension's run-time version disagrees with its own trailer
+    8  the release path no longer invokes this gate where it has to
 """
+
 
 from __future__ import annotations
 
 import argparse
+import importlib.util
+import itertools
 import json
 import os
 import re
@@ -125,9 +154,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parent.parent
+
 
 # The DuckDB metadata trailer: the last 512 bytes are eight 32-byte NUL-padded
 # ASCII fields written LAST-FIRST, then 256 bytes of signature space. Field 1
@@ -168,8 +200,22 @@ EXIT_TRACKED = 4
 EXIT_NOT_IGNORED = 5
 EXIT_NO_REGENERATION = 6
 EXIT_RUNTIME_DISAGREES = 7
+EXIT_UNWIRED = 8
 
 SHORT_SHA = re.compile(r"^[0-9a-f]{7,40}$")
+
+# The platforms this project distributes -- the `exclude_archs` input in
+# .github/workflows/MainDistributionPipeline.yml is what decides the set. Used
+# to pick a platform that is NOT the one under test; nothing here requires the
+# list to be complete for that.
+DISTRIBUTED_PLATFORMS = (
+    "linux_amd64",
+    "linux_arm64",
+    "osx_amd64",
+    "osx_arm64",
+    "windows_amd64",
+)
+
 
 
 class Refused(Exception):
@@ -303,7 +349,69 @@ def check_against_commit(artifacts: list[Path], sha: str) -> list[str]:
 
 # ── the load ────────────────────────────────────────────────────────────────
 
+
+def host_platform() -> str:
+    """DuckDB's own name for the platform this machine can load extensions for.
+
+    Asked of DuckDB rather than derived from `platform.machine()` and
+    `sys.platform`, because the string being compared against is the one DuckDB
+    wrote into the trailer and the one it refuses a LOAD over. A derivation of
+    ours agreeing with it is a coincidence maintained by hand.
+    """
+    if shutil.which("duckdb") is None:
+        raise Refused(
+            EXIT_CANNOT_RUN,
+            "duckdb is not on PATH -- this mode loads the artefact and asks it",
+        )
+    proc = subprocess.run(
+        ["duckdb", "-no-init", "-json", "-c", "SELECT platform FROM pragma_platform();"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise Refused(
+            EXIT_CANNOT_RUN,
+            f"duckdb exited {proc.returncode} reporting its platform:\n{proc.stderr.strip()}",
+        )
+    try:
+        rows = json.loads(proc.stdout.strip() or "[]")
+        return str(rows[0]["platform"])
+    except (json.JSONDecodeError, IndexError, KeyError) as exc:
+        raise Refused(
+            EXIT_CANNOT_RUN,
+            f"could not read a platform out of `pragma_platform()` ({exc}):\n"
+            f"{proc.stdout[:400]}",
+        ) from None
+
+
+def require_native(path: Path, fields: dict[str, str]) -> str:
+    """Refuse, by name, an artefact this machine cannot load. Returns the platform.
+
+    DuckDB refuses a foreign binary itself, but it does so from inside the LOAD
+    with a message about platforms wearing the exit code this file uses for
+    "the tool could not run". Asked here, BEFORE the load, the refusal says
+    which platform the artefact is for and which one this is -- and it is a
+    refusal rather than a skip, because a mode that quietly passed when it
+    could not load the file would read exactly like a mode that checked it.
+    """
+    here = host_platform()
+    built_for = fields["platform"]
+    if built_for != here:
+        raise Refused(
+            EXIT_CANNOT_RUN,
+            f"{path} was built for platform {built_for!r} and this machine loads "
+            f"{here!r}, so nothing here can make it answer for itself.\n"
+            "    This is not a verdict on its version: the byte reading "
+            "(--tag / --expect-commit) works on any platform's artefact and is what "
+            "the four non-native binaries of a release get. Run this mode on a "
+            f"{built_for} runner.",
+        )
+    return here
+
+
 LOAD_SQL = """
+
 SELECT ft_version() AS runtime,
        (SELECT extension_version FROM duckdb_extensions()
          WHERE extension_name = 'finetype') AS trailer,
@@ -346,10 +454,24 @@ def duckdb_readings(extension: Path) -> dict:
     return rows[0]
 
 
-def check_loaded(extension: Path, tag: str | None) -> list[str]:
-    """AC5 -- run-time version and trailer version, off one artefact, in one session."""
+def check_loaded(
+    extension: Path,
+    tag: str | None,
+    readings: Callable[[Path], dict] = duckdb_readings,
+) -> list[str]:
+    """AC5 -- run-time version and trailer version, off one artefact, in one session.
+
+    `readings` is the DuckDB session, and it is a parameter for one reason: two
+    of the rungs below answer a reading that no file on disk can produce here.
+    A library that is not this extension does not reach them -- DuckDB dlsyms an
+    init symbol derived from the FILE NAME and exits first -- so the self-test
+    substitutes the reading and leaves everything else real. Production passes
+    nothing and gets the real session.
+    """
     fields = stamp_fields(extension)
-    row = duckdb_readings(extension)
+    require_native(extension, fields)
+    row = readings(extension)
+
 
     if not row.get("loaded"):
         raise Refused(
@@ -366,6 +488,10 @@ def check_loaded(extension: Path, tag: str | None) -> list[str]:
     runtime_raw = str(row["runtime"])
     # `ft_version()` returns `finetype <version>`; the name half is what proves
     # the loaded artefact is THIS extension rather than any stamped library.
+    # DuckDB's dlsym of the filename-derived init symbol refuses most strangers
+    # before this, which is why the self-test drives this rung with a
+    # substituted reading rather than with a file.
+
     if not runtime_raw.startswith("finetype "):
         raise Refused(
             EXIT_RUNTIME_DISAGREES,
@@ -498,21 +624,247 @@ def check_regenerates(root: Path, makefile: Path | None = None) -> list[str]:
     return ["   make remakes the version file even when one is already on disk"]
 
 
+# ── the wiring ──────────────────────────────────────────────────────────────
+#
+# THE THREE PLACES THIS GATE ACTUALLY REFUSES A RELEASE ARE WORKFLOW YAML, and
+# until this mode existed nothing read them. Measured: put `continue-on-error:
+# true` on the release workflow's stamp step and every check in this repository
+# still exits 0 -- including this file's own --self-test, which never opens the
+# workflow. What a user gets under that one line: the step goes
+# red-but-ignored, the release attaches the mis-stamped binaries, and the
+# consumer refuses the bundle it has just downloaded. Delete both stamp steps,
+# or delete the whole stamp job from the distribution pipeline, and the same
+# nothing happens.
+#
+# So the declarations are read as STRUCTURE -- jobs, their guards, their steps
+# and the order of them -- through the reader in .github/scripts/gate-self-tests.py
+# rather than a second parser of this file's own. Every job here is identified
+# by what it CALLS or RUNS rather than by its name: a renamed job is a rename,
+# and a deleted refusal is the defect.
+
+ROUTER_REL = ".github/scripts/gate-self-tests.py"
+RELEASE_WORKFLOW = ".github/workflows/release.yml"
+DISTRIBUTION_WORKFLOW = ".github/workflows/MainDistributionPipeline.yml"
+
+# The step that publishes. Everything this gate does in release.yml has to
+# happen before it, because after it the bytes are on a permanent public URL.
+PUBLISH_ACTION = "softprops/action-gh-release"
+# The reusable workflow that builds the five extension binaries. The job that
+# checks them has to depend on the job that makes them, or it checks nothing.
+EXTENSION_BUILD_CALL = "duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml"
+GATE_INVOCATION = "check_extension_stamp.py"
+
+
+def _workflow_reader():
+    """gate-self-tests.py's workflow reader, imported rather than reimplemented."""
+    path = ROOT / ROUTER_REL
+    spec = importlib.util.spec_from_file_location("gate_self_tests", path)
+    if spec is None or spec.loader is None:
+        raise Refused(EXIT_CANNOT_RUN, f"{ROUTER_REL} could not be imported")
+    module = importlib.util.module_from_spec(spec)
+    # Registered BEFORE it executes: `@dataclass` resolves its field types
+    # through `sys.modules[cls.__module__]`, which is None for a module that is
+    # only half imported.
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+
+    except Exception as exc:  # noqa: BLE001 -- any import failure is "cannot run"
+        raise Refused(EXIT_CANNOT_RUN, f"{ROUTER_REL} could not be imported: {exc}") from None
+    return module
+
+
+def _gate_steps(steps: list, job_id: str) -> list:
+    return [
+        step
+        for step in steps
+        if step.job == job_id and any(GATE_INVOCATION in line for line in step.commands)
+    ]
+
+
+def _runs(step, needle: str) -> bool:
+    return any(needle in line for line in step.commands)
+
+
+def _unguarded(step, where: str, problems: list[str]) -> None:
+    """The three ways a step that is present still refuses nothing."""
+    if step.condition:
+        problems.append(
+            f"{where} carries `if: {step.condition}` -- a skipped step is a GREEN job, "
+            "so a condition here is a switch that turns the refusal off without "
+            "deleting it"
+        )
+    if step.continue_on_error:
+        problems.append(
+            f"{where} carries `continue-on-error: {step.continue_on_error}` -- the step "
+            "reddens, the job stays green, and the release publishes the artefacts the "
+            "step refused"
+        )
+    if step.shell != "bash":
+        problems.append(
+            f"{where} runs under shell {step.shell or '<the runner default>'!r}, not "
+            "`bash`. The default shell on a Linux runner has no `pipefail`, so a "
+            "refusal piped anywhere reports the exit code of the last command instead"
+        )
+
+
+def check_release_wiring(root: Path) -> list[str]:
+    """This gate is invoked, unguarded, at each point a wrong stamp can escape."""
+    reader = _workflow_reader()
+    problems: list[str] = []
+
+    try:
+        jobs, steps = reader.scan_workflow(root, RELEASE_WORKFLOW)
+        dist_jobs, dist_steps = reader.scan_workflow(root, DISTRIBUTION_WORKFLOW)
+    except Exception as exc:  # noqa: BLE001 -- Fatal is the reader's, not ours
+        raise Refused(EXIT_CANNOT_RUN, f"the workflow could not be read: {exc}") from None
+
+    # ── release.yml: the tag path ────────────────────────────────────────────
+    publishing = [step for step in steps if step.uses.startswith(PUBLISH_ACTION)]
+    if len(publishing) != 1:
+        raise Refused(
+            EXIT_CANNOT_RUN,
+            f"{RELEASE_WORKFLOW}: expected exactly one step using `{PUBLISH_ACTION}`, "
+            f"found {len(publishing)}. This file cannot say what runs before publishing "
+            "if it cannot see the publish.",
+        )
+    publish = publishing[0]
+    release_job = jobs[publish.job]
+
+    if release_job.condition:
+        problems.append(
+            f"{RELEASE_WORKFLOW}: the job that publishes (`{publish.job}`) carries "
+            f"`if: {release_job.condition}` -- a job-level condition skips its steps and "
+            "every refusal in them together"
+        )
+    builders = [job for job in jobs.values() if EXTENSION_BUILD_CALL in job.uses]
+    if not builders:
+        problems.append(
+            f"{RELEASE_WORKFLOW}: no job calls `{EXTENSION_BUILD_CALL}`, so nothing here "
+            "builds the extension binaries this gate reads"
+        )
+    elif not any(builder.id in release_job.needs for builder in builders):
+        problems.append(
+            f"{RELEASE_WORKFLOW}: the job that publishes (`{publish.job}`) does not "
+            f"`needs:` the job that builds the extension "
+            f"({', '.join(b.id for b in builders)}) -- without that edge the stamp steps "
+            "read whatever artefacts happen to be there, or none"
+        )
+
+    gate = _gate_steps(steps, publish.job)
+    byte_reads = [step for step in gate if not _runs(step, "--load")]
+    load_reads = [step for step in gate if _runs(step, "--load")]
+
+    if len(byte_reads) != 1:
+        problems.append(
+            f"{RELEASE_WORKFLOW}: expected exactly one step in `{publish.job}` reading "
+            f"the trailers with `{GATE_INVOCATION}` and no `--load`, found "
+            f"{len(byte_reads)}. That step is the only thing that reads the four "
+            "platforms this runner cannot load"
+        )
+    if len(load_reads) != 1:
+        problems.append(
+            f"{RELEASE_WORKFLOW}: expected exactly one step in `{publish.job}` running "
+            f"`{GATE_INVOCATION} --load`, found {len(load_reads)}. That step is the only "
+            "thing that makes an artefact answer for itself before it is published"
+        )
+    for step in gate:
+        _unguarded(step, f"{RELEASE_WORKFLOW}:{step.lineno} ({step.name or 'the stamp step'})", problems)
+        if step.lineno > publish.lineno:
+            problems.append(
+                f"{RELEASE_WORKFLOW}:{step.lineno} ({step.name or 'the stamp step'}) runs "
+                f"AFTER the publish at line {publish.lineno}. A refusal after the release "
+                "is created is a red run over bytes the world already has"
+            )
+    if not gate:
+        problems.append(
+            f"{RELEASE_WORKFLOW}: job `{publish.job}` runs `{GATE_INVOCATION}` nowhere, so "
+            "a tag publishes whatever version the build stamped"
+        )
+
+    # ── MainDistributionPipeline.yml: the every-commit path ──────────────────
+    dist_builders = [job for job in dist_jobs.values() if EXTENSION_BUILD_CALL in job.uses]
+    checking = sorted({step.job for step in dist_steps if GATE_INVOCATION in " ".join(step.commands)})
+    if len(checking) != 1:
+        problems.append(
+            f"{DISTRIBUTION_WORKFLOW}: expected exactly one job running "
+            f"`{GATE_INVOCATION}`, found {len(checking)}. This is the only place the "
+            "stamp is read on a pull request, where the expected answer is the "
+            "abbreviated commit -- without it the autodetection is observed a few days "
+            "a year, on tags"
+        )
+    else:
+        stamp_job = dist_jobs[checking[0]]
+        if stamp_job.condition:
+            problems.append(
+                f"{DISTRIBUTION_WORKFLOW}: job `{stamp_job.id}` carries "
+                f"`if: {stamp_job.condition}` -- a skipped required check satisfies "
+                "branch protection"
+            )
+        if not dist_builders:
+            problems.append(
+                f"{DISTRIBUTION_WORKFLOW}: no job calls `{EXTENSION_BUILD_CALL}`"
+            )
+        elif not any(builder.id in stamp_job.needs for builder in dist_builders):
+            problems.append(
+                f"{DISTRIBUTION_WORKFLOW}: job `{stamp_job.id}` does not `needs:` the job "
+                f"that builds the binaries ({', '.join(b.id for b in dist_builders)}), so "
+                "it downloads artefacts that may not exist yet"
+            )
+        for step in _gate_steps(dist_steps, stamp_job.id):
+            _unguarded(
+                step,
+                f"{DISTRIBUTION_WORKFLOW}:{step.lineno} ({step.name or 'the stamp step'})",
+                problems,
+            )
+
+    if problems:
+        raise Refused(
+            EXIT_UNWIRED,
+            "the release path no longer refuses a wrong stamp:\n"
+            + "".join(f"      {line}\n" for line in problems)
+            + "    Each of these leaves every other check in this repository green.",
+        )
+    return [
+        f"   {RELEASE_WORKFLOW}: `{publish.job}` reads the trailers and loads one "
+        f"artefact, unguarded, before the publish at line {publish.lineno}",
+        f"   {DISTRIBUTION_WORKFLOW}: `{checking[0]}` reads the stamp of every build",
+    ]
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SELF-TEST -- a gate that is only known to pass is not known to detect
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 STAMPER = "extension-ci-tools/scripts/append_extension_metadata.py"
 
 
-def _stamp(source: Path, out: Path, version: str, name: str = "finetype") -> None:
+def _stamp(
+    source: Path,
+    out: Path,
+    version: str,
+    base: dict[str, str],
+    platform: str | None = None,
+    name: str = "finetype",
+) -> None:
     """Stamp a copy of `source` using the REAL upstream stamper.
 
     Not a local reimplementation: the whole point of a fixture here is that its
     trailer was written by the same code that writes a released artefact's, so a
     change in that code is seen rather than mirrored. It is stdlib-only and
     needs no venv.
+
+    EVERY FIELD BUT THE VERSION COMES OFF THE ARTEFACT UNDER TEST -- that is
+    what `base` is, its own `stamp_fields`. A literal here is a constant of the
+    machine that WROTE this file, and the proof then only runs where it was
+    written: the first cut passed `-p osx_arm64`, and on a linux runner the
+    three LOAD cases failed with "built for the platform 'osx_arm64', but we can
+    only load extensions built for platform 'linux_amd64'". The ABI type and the
+    DuckDB floor are the same shape of constant and are read the same way. Pass
+    `platform` only to make a fixture that is DELIBERATELY not this machine's.
     """
+
     script = ROOT / STAMPER
     if not script.is_file():
         raise Refused(
@@ -532,14 +884,16 @@ def _stamp(source: Path, out: Path, version: str, name: str = "finetype") -> Non
             "-n",
             name,
             "-dv",
-            "v1.2.0",
+            base["duckdb_version"],
             "-p",
-            "osx_arm64",
+            platform or base["platform"],
             "-ev",
+
             version,
             "--abi-type",
-            "C_STRUCT",
+            base["abi_type"],
         ],
+
         capture_output=True,
         text=True,
         check=False,
@@ -579,18 +933,55 @@ def self_test(artifact: Path) -> int:
         else:
             print(f"  ok   {label}")
 
+    def rung(label: str, call, want: int, expect_text: str) -> None:
+        """A refusal the command line cannot reach, driven in-process.
+
+        Two rungs of check_loaded answer a READING rather than a file, and no
+        file on this disk produces either: DuckDB dlsyms an init symbol derived
+        from the file name, so a library that is not this extension is refused
+        before the reading is taken, and DuckDB's own trailer reading cannot
+        disagree with this file's while both use the same offsets. Each is
+        driven by substituting exactly one thing -- the session, or the offset
+        constant -- and leaving the rest of check_loaded real, including the
+        LOAD in the second. Neither is disclosed as covered by the CLI cases
+        above, because neither is.
+        """
+        try:
+            call()
+        except Refused as refusal:
+            blob = str(refusal)
+            if refusal.code != want:
+                failures.append(f"  MISS {label}: exit {refusal.code}, expected {want}\n{blob}")
+            elif expect_text not in blob:
+                failures.append(
+                    f"  WRONG {label}: exit {want} without saying {expect_text!r}\n{blob}"
+                )
+            else:
+                print(f"  ok   {label}")
+            return
+        failures.append(f"  MISS {label}: nothing refused")
+
     with tempfile.TemporaryDirectory(prefix="stamp-selftest-") as tmp:
+
         tmp_path = Path(tmp)
 
         # ── Fixtures stamped by the real stamper ───────────────────────────
         # `artifact` is a REAL built extension. Every version fixture below is a
-        # copy of it re-stamped, so each one still LOADS -- the AC5 cases need
-        # that, and it keeps the byte-level cases off a shape DuckDB would never
-        # accept. Only the trailer is replaced: the 512 bytes stripped here are
-        # the eight metadata fields and the signature space, which is the whole
-        # of what a reader looks at.
+        # copy of it re-stamped, so each one loads wherever the artefact does --
+        # the AC5 cases need that, and it keeps the byte-level cases off a shape
+        # DuckDB would never accept. Only the trailer is replaced: the 512 bytes
+        # stripped here are the eight metadata fields and the signature space,
+        # which is the whole of what a reader looks at.
+        #
+        # `base` is the artefact's own trailer, and it is what every fixture
+        # field except the version is taken from -- see _stamp for what a
+        # literal there costs. require_native refuses, by name, an artefact this
+        # machine cannot load, rather than letting the first LOAD case die of it.
+        base = stamp_fields(artifact)
+        here = require_native(artifact, base)
         plain = tmp_path / "unstamped.bin"
         plain.write_bytes(artifact.read_bytes()[:-TRAILER_LEN])
+
 
         # The version the artefact reports at RUN TIME, compiled into it from
         # Cargo.toml. Read once and used to build the AC5 fixtures, so those
@@ -616,11 +1007,16 @@ def self_test(artifact: Path) -> int:
         # every AC5 case would then report instead of the verdict it is for.
         overlong_tag = "v1.4.7-and-a-tag-name-far-past-the-field"
 
-        def fixture(key: str, version: str) -> Path:
+        # A platform this machine is not, for the fixture that has to be
+        # unloadable HERE for a reason that is nothing to do with its version.
+        foreign_platform = next(p for p in DISTRIBUTED_PLATFORMS if p != here)
+
+        def fixture(key: str, version: str, platform: str | None = None) -> Path:
             out = tmp_path / key / "finetype.duckdb_extension"
             out.parent.mkdir(parents=True, exist_ok=True)
-            _stamp(plain, out, version)
+            _stamp(plain, out, version, base, platform)
             return out
+
 
         fixtures = {
             # Byte-level cases: the version and the tag are both chosen here, so
@@ -635,12 +1031,55 @@ def self_test(artifact: Path) -> int:
             "overlong": overlong_tag,
             # AC5 cases: stamped from what this artefact actually is.
             "honest": runtime,
+            # The exact shape a release has: `git tag --points-at HEAD` writes
+            # the tag verbatim, so the trailer carries the `v` and Cargo.toml's
+            # compiled-in version does not. Both `core()` calls on the --load
+            # path are exercised by the one case that uses this, and removing
+            # either reddens it.
+            "vhonest": f"v{core(runtime)}",
             "mislabelled": other,
         }
         paths = {key: fixture(key, version) for key, version in fixtures.items()}
+        # Correct in every field but the platform, which is deliberately not
+        # this machine's. Nothing about its VERSION is wrong.
+        paths["foreign"] = fixture("foreign", runtime, foreign_platform)
 
         def arg(key: str) -> str:
             return str(paths[key])
+
+        # ── THE FIXTURES ARE THE ARTEFACT, in every field but the one under
+        #    test. This is the case that fails when a constant of one machine
+        #    is written into a proof that has to run on another; the first cut
+        #    had three of them and only ran where it was written. It reads each
+        #    fixture's trailer BACK, rather than trusting the arguments _stamp
+        #    was given, because the stamper is the thing under observation. ───
+        for key in sorted(paths):
+            if key == "overlong":
+                # The one fixture this cannot be asked of, and the reason is the
+                # reason it exists: its version is longer than the 32-byte field,
+                # so the trailer is longer than 512 bytes and every field read at
+                # a fixed offset in the last 512 is shifted by the overflow. What
+                # that shift does to the VERSION is the point, and the case
+                # `a tag longer than the 32-byte field` below is what pins it.
+                continue
+            want_platform = foreign_platform if key == "foreign" else base["platform"]
+
+            got = stamp_fields(paths[key])
+            wrong = [
+                f"{field_name}={got[field_name]!r}, not {want!r}"
+                for field_name, want in (
+                    ("abi_type", base["abi_type"]),
+                    ("duckdb_version", base["duckdb_version"]),
+                    ("platform", want_platform),
+                )
+                if got[field_name] != want
+            ]
+            label = f"the {key} fixture carries the artefact's own trailer fields"
+            if wrong:
+                failures.append(f"  MISS {label}: {'; '.join(wrong)}")
+            else:
+                print(f"  ok   {label}")
+
 
         # ── Controls ───────────────────────────────────────────────────────
         case("a tag-stamped artefact under its own tag", [
@@ -721,6 +1160,64 @@ def self_test(artifact: Path) -> int:
         case("a real artefact whose run-time version is not the tag", [
             "--artifact", arg("honest"), "--load", "--tag", f"v{other}"],
             EXIT_STAMP_DISAGREES, "at run time and was built from tag")
+        # THE EXACT SHAPE OF A RELEASE, which no case above had: a v-prefixed
+        # trailer, a bare compiled-in version, and the v-prefixed tag both are
+        # measured against. Removing either `core()` call on this path reddens
+        # this and nothing else.
+        case("the release shape -- a v-prefixed stamp under its own v-prefixed tag", [
+            "--artifact", arg("vhonest"), "--load", "--tag", f"v{core(runtime)}"], EXIT_OK)
+        # An artefact this machine cannot load is refused BY NAME and for the
+        # right reason -- the platform, which is nothing to do with its version.
+        # A mode that skipped instead would read exactly like one that passed,
+        # and this is the case that says which happened.
+        case("an artefact built for another platform", [
+            "--artifact", arg("foreign"), "--load"],
+            EXIT_CANNOT_RUN, f"was built for platform {foreign_platform!r}")
+
+        # ── The two rungs no file reaches. See `rung` for why each needs a
+        #    substitution and what stays real in it. ────────────────────────
+        rung(
+            "a loaded library that is not this extension",
+            lambda: check_loaded(
+                paths["honest"],
+                None,
+                readings=lambda _path: {
+                    "runtime": "notfinetype 1.4.7",
+                    "trailer": runtime,
+                    "loaded": True,
+                    "installed": False,
+                },
+            ),
+            EXIT_RUNTIME_DISAGREES,
+            "does not name finetype",
+        )
+
+        def drifted_offsets() -> None:
+            """A real LOAD of a real fixture, read at an offset that has moved.
+
+            The rung fires when the constants at the top of this file stop
+            agreeing with what the stamper writes -- which is the
+            extension-ci-tools bump nothing else here would notice. It cannot
+            be provoked from a fixture, because DuckDB and this file read the
+            same bytes at the same offsets; the only way they disagree is for
+            one side to move, and DuckDB's side is not ours to move.
+            """
+            global OFF_EXTENSION_VERSION
+            saved = OFF_EXTENSION_VERSION
+            OFF_EXTENSION_VERSION = OFF_ABI
+            try:
+                check_loaded(paths["honest"], None)
+            finally:
+                OFF_EXTENSION_VERSION = saved
+
+        rung(
+            "this file's trailer offsets drifted from the stamper's",
+            drifted_offsets,
+            EXIT_RUNTIME_DISAGREES,
+            "no longer match what the stamper writes",
+        )
+
+
 
         # ── AC2, against real git trees. `git ls-files` reads the INDEX, so a
         #    fixture needs `add` and no commit -- which also keeps a repository
@@ -762,6 +1259,133 @@ def self_test(artifact: Path) -> int:
             "--regenerates-version-file", "--makefile", str(mutated)],
             EXIT_NO_REGENERATION, "would NOT rewrite")
 
+        # ── The wiring, against real copies of the two release workflows and
+        #    against one-edit mutations of them. Every mutation below leaves
+        #    every other check in this repository at exit 0, including the
+        #    cases above: this is the only thing that reads these files. ────
+        counter = itertools.count()
+
+        def sub(old: str, new: str):
+            """One textual edit, refused unless its anchor is where it says."""
+
+            def edit(text: str) -> str:
+                if text.count(old) != 1:
+                    raise LookupError(f"{old!r} occurs {text.count(old)} times")
+                return text.replace(old, new)
+
+            return edit
+
+        def cut(start: str, end: str):
+            """Delete from `start` up to `end`, both anchored exactly once."""
+
+            def edit(text: str) -> str:
+                for anchor in (start, end):
+                    if text.count(anchor) != 1:
+                        raise LookupError(f"{anchor!r} occurs {text.count(anchor)} times")
+                return text[: text.index(start)] + text[text.index(end) :]
+
+            return edit
+
+        def swap(first: str, second: str, after: str):
+            """Put the `second` block before the `first` one, in file order."""
+
+            def edit(text: str) -> str:
+                for anchor in (first, second, after):
+                    if text.count(anchor) != 1:
+                        raise LookupError(f"{anchor!r} occurs {text.count(anchor)} times")
+                a, b, c = (text.index(anchor) for anchor in (first, second, after))
+                if not a < b < c:
+                    raise LookupError("the three anchors are not in file order")
+                return text[:a] + text[b:c] + text[a:b] + text[c:]
+
+            return edit
+
+        def drop_to_end(start: str):
+            """Delete from `start` to the end of the file."""
+
+            def edit(text: str) -> str:
+                if text.count(start) != 1:
+                    raise LookupError(f"{start!r} occurs {text.count(start)} times")
+                return text[: text.index(start)]
+
+            return edit
+
+        def wiring_case(
+label: str, edits: dict, want: int, expect_text: str = "") -> None:
+
+            root = tmp_path / f"wiring-{next(counter)}"
+            (root / ".github" / "workflows").mkdir(parents=True)
+            for rel in (RELEASE_WORKFLOW, DISTRIBUTION_WORKFLOW):
+                text = (ROOT / rel).read_text(encoding="utf-8")
+                if rel in edits:
+                    try:
+                        text = edits[rel](text)
+                    except LookupError as gone:
+                        # The anchor moved. Say so rather than reporting a case
+                        # that mutated nothing as a case that passed.
+                        failures.append(
+                            f"  MISS {label}: the mutation no longer applies to {rel} "
+                            f"({gone}), so this case would prove nothing"
+                        )
+                        return
+                (root / rel).write_text(text, encoding="utf-8")
+            case(label, ["--release-wiring", "--root", str(root)], want, expect_text)
+
+        byte_step = "      - name: The extension binaries carry this tag, read off their own bytes\n"
+        load_step = "      - name: ...and the one this runner can load agrees with itself and the tag\n"
+        publish_step = "      - name: Create release\n"
+
+        wiring_case("the repository's own release workflows", {}, EXIT_OK)
+        wiring_case(
+            "a stamp step whose failure is ignored",
+            {RELEASE_WORKFLOW: sub(byte_step, byte_step + "        continue-on-error: true\n")},
+            EXIT_UNWIRED, "continue-on-error: true")
+        wiring_case(
+            "a stamp step behind a condition",
+            {RELEASE_WORKFLOW: sub(load_step, load_step + "        if: github.event_name == 'push'\n")},
+            EXIT_UNWIRED, "a skipped step is a GREEN job")
+        wiring_case(
+            "a stamp step on the runner's default shell",
+            {RELEASE_WORKFLOW: sub(byte_step + "        shell: bash\n", byte_step)},
+            EXIT_UNWIRED, "`pipefail`")
+
+        wiring_case(
+            "both stamp steps deleted from the release",
+            {RELEASE_WORKFLOW: cut(byte_step, publish_step)},
+            EXIT_UNWIRED, "runs `check_extension_stamp.py` nowhere")
+        wiring_case(
+            "the stamp steps moved after the publish",
+            {RELEASE_WORKFLOW: swap(byte_step, publish_step, "\n  publish-crates:\n")},
+            EXIT_UNWIRED, "runs AFTER the publish")
+        wiring_case(
+            "the release job no longer needing the extension build",
+
+            {RELEASE_WORKFLOW: sub(
+                "    needs: [build, build-extension, taxonomy-catalogue]\n",
+                "    needs: [build, taxonomy-catalogue]\n")},
+            EXIT_UNWIRED, "does not `needs:` the job that builds the extension")
+        wiring_case(
+            "the whole release job behind a condition",
+            {RELEASE_WORKFLOW: sub(
+                "  release:\n    name: Create Release\n",
+                "  release:\n    if: github.event_name == 'workflow_dispatch'\n    name: Create Release\n")},
+            EXIT_UNWIRED, "a job-level condition skips its steps")
+        wiring_case(
+            "the stamp job deleted from the distribution pipeline",
+            {DISTRIBUTION_WORKFLOW: drop_to_end("  stamp:\n")},
+            EXIT_UNWIRED, "expected exactly one job running")
+        wiring_case(
+            "the distribution stamp job behind a condition",
+            {DISTRIBUTION_WORKFLOW: sub(
+                "  stamp:\n    name:", "  stamp:\n    if: github.ref_type == 'tag'\n    name:")},
+            EXIT_UNWIRED, "a skipped required check satisfies branch protection")
+
+        wiring_case(
+            "the distribution stamp job not needing the build",
+            {DISTRIBUTION_WORKFLOW: sub("    needs: duckdb-stable-build\n", "")},
+            EXIT_UNWIRED, "does not `needs:` the job that builds the binaries")
+
+
     if failures:
         print("")
         for line in failures:
@@ -783,7 +1407,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--load", action="store_true")
     parser.add_argument("--untracked-version-file", action="store_true")
     parser.add_argument("--regenerates-version-file", action="store_true")
+    parser.add_argument("--release-wiring", action="store_true")
     parser.add_argument("--self-test", action="store_true")
+
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--makefile", type=Path)
     args = parser.parse_args(argv)
@@ -809,6 +1435,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.regenerates_version_file:
             reported += check_regenerates(args.root, args.makefile)
             did_something = True
+        if args.release_wiring:
+            reported += check_release_wiring(args.root)
+            did_something = True
+
         if args.load:
             if len(args.artifact) != 1:
                 raise Refused(EXIT_CANNOT_RUN, "--load needs exactly one --artifact")
