@@ -233,6 +233,15 @@ class Job:
     # release workflows are built out of those, so the second consumer of this
     # reader identifies a job by what it calls rather than by its name.
     uses: str = ""
+    # `continue-on-error:` at JOB level, which is a different defect from the
+    # step-level key below: the job reddens, and every job whose `needs:` names
+    # it runs anyway. scripts/check_extension_stamp.py reads it because the
+    # release job has three dependants that publish.
+    continue_on_error: str = ""
+    # Job-level `env:`. Read so a consumer that re-runs a step's `run:` text
+    # outside Actions can supply the variables the step expands, rather than
+    # writing its own copy of a value the workflow already states.
+    env: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -388,6 +397,33 @@ def scan_workflow(root: Path, rel: str = WORKFLOW_REL) -> tuple[dict[str, Job], 
                 job.uses = inline
                 i += 1
                 continue
+            if key == "continue-on-error":
+                job.continue_on_error = inline
+                i += 1
+                continue
+            if key in ("outputs", "env"):
+                target = job.outputs if key == "outputs" else job.env
+                j = i + 1
+                while j < len(lines):
+                    nxt = lines[j]
+                    if not nxt.strip():
+                        j += 1
+                        continue
+                    if len(nxt) - len(nxt.lstrip()) <= 4:
+                        break
+                    if nxt.lstrip().startswith("#"):
+                        j += 1
+                        continue
+                    out_match = _JOB_OUTPUT_RE.match(nxt)
+                    if not out_match:
+                        raise Fatal(
+                            f"{rel}:{j + 1}: cannot read this line as an entry of "
+                            f"`{key}:` in job `{job.id}`"
+                        )
+                    target[out_match.group(1)] = out_match.group(2).strip()
+                    j += 1
+                i = j
+                continue
             if key == "needs":
                 if not inline:
 
@@ -400,25 +436,6 @@ def scan_workflow(root: Path, rel: str = WORKFLOW_REL) -> tuple[dict[str, Job], 
                     n.strip() for n in inline.strip("[]").split(",") if n.strip()
                 )
                 i += 1
-                continue
-            if key == "outputs":
-                j = i + 1
-                while j < len(lines):
-                    nxt = lines[j]
-                    if not nxt.strip():
-                        j += 1
-                        continue
-                    if len(nxt) - len(nxt.lstrip()) <= 4:
-                        break
-                    out_match = _JOB_OUTPUT_RE.match(nxt)
-                    if not out_match:
-                        raise Fatal(
-                            f"{rel}:{j + 1}: cannot read this line as an output of "
-                            f"job `{job.id}`"
-                        )
-                    job.outputs[out_match.group(1)] = out_match.group(2).strip()
-                    j += 1
-                i = j
                 continue
             i += 1
             continue
@@ -1055,6 +1072,21 @@ def self_test() -> int:
     def missing_watched_path(root: Path) -> None:
         (root / "scripts/beta_gate.sh").unlink()
 
+    def no_jobs_at_all(root: Path) -> None:
+        """A workflow the reader finds no jobs in.
+
+        `scan_workflow` is line-structured, so the way it fails on a shape it
+        cannot read is by finding NOTHING -- no jobs, no steps, no guards -- and
+        every rule below it then has nothing to object to. The audit would
+        report clean and `--release-wiring`, which asks this same reader whether
+        the release path still refuses a wrong stamp, would report that it does.
+        The refusal at the end of `scan_workflow` is the only thing standing
+        between "the reader could not read this" and "there is nothing wrong
+        here", and until this case existed it could be deleted with every check
+        in this repository green.
+        """
+        _write(root, WORKFLOW_REL, "name: scratch\non:\n  pull_request:\njobs:\n")
+
     def unrouted_root_trigger(root: Path) -> None:
         text = (root / MANIFEST_REL).read_text(encoding="utf-8")
         _write(root, MANIFEST_REL, text.replace(", .github/gate-self-tests.tsv", ""))
@@ -1195,6 +1227,11 @@ def self_test() -> int:
             "the manifest not watching itself reddens",
             unrouted_root_trigger,
             f"`{MANIFEST_REL}` re-routes every gate when it changes and no row watches it",
+        ),
+        (
+            "a workflow the reader finds no jobs in is REFUSED, not audited clean",
+            no_jobs_at_all,
+            "no jobs found -- the reader is looking at the wrong shape",
         ),
     ]
 

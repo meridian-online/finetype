@@ -526,15 +526,30 @@ jobs:
         # proves it is this extension.
         run: scripts/check_extension_stamp.py --artifact target/release/finetype.duckdb_extension --load
 
+      # UNGUARDED, like --release-wiring above and for a stronger reason. This
+      # runs the `release` job's own assemble and stamp commands — its `run:`
+      # text, read out of release.yml, with GITHUB_REF_NAME supplied — against
+      # a directory of real assembled asset names. release.yml runs only on a
+      # pushed tag, so until this step existed nothing had ever executed those
+      # lines: the step that loads an asset named it under the name the
+      # assembler writes, DuckDB derives the init symbol it dlsyms from that
+      # name, and every tag would have exited 2 there and published nothing.
+      # A routed step would skip on any diff that does not touch the gate,
+      # which is most of the diffs that could break the release path.
+      - name: The release job's own stamp commands still run against real asset names
+        run: scripts/check_extension_stamp.py --release-rehearsal --artifact target/release/finetype.duckdb_extension
+
       - name: ...and the stamp gate detects a trailer that is not the release
         # Fixtures are copies of the artefact above, re-stamped with the real
         # extension-ci-tools stamper. Every trailer field but the version — the
         # platform, the ABI type, the DuckDB floor — is read off that artefact,
-        # so the fixtures load wherever it does and the run-time mismatch case
-        # is driven by an artefact that genuinely disagrees with itself rather
-        # than by a mutated comparison. A literal for any of those three is a
-        # constant of the machine that wrote it, and the proof then only passes
-        # on that machine.
+        # so a literal for any of those three would be a constant of the
+        # machine that wrote it and the proof would then only pass on that
+        # machine. It is also what makes the run-time mismatch case an artefact
+        # that genuinely disagrees with itself rather than a mutated comparison.
+        # One fixture is stamped for a platform this runner is NOT, on purpose,
+        # and does not load: that is the case proving an unloadable artefact is
+        # refused by name rather than skipped.
 
         if: steps.route.outputs.extension_stamp == 'true'
         run: scripts/check_extension_stamp.py --self-test --artifact target/release/finetype.duckdb_extension

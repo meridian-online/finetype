@@ -69,6 +69,12 @@ which is why each has its own exit code rather than a shared 1:
         DuckDB to report the extension as loaded and NOT installed -- an
         installed community build could otherwise answer for the file on disk.
 
+        THE FILE IS PRESENTED TO DUCKDB AS finetype.duckdb_extension whatever
+        the caller called it, because that same filename rule refuses a
+        legitimate artefact under a release's name: a published asset is
+        `finetype-v0.6.58-<target>.duckdb_extension` and the symbol derived from
+        it is `finetype-v0_init_c_api`. See duckdb_readings.
+
         The artefact must be one this machine can load, and it is refused BY
         NAME when it is not: see require_native.
 
@@ -88,6 +94,17 @@ which is why each has its own exit code rather than a shared 1:
         --self-test green. Read as structure -- jobs, guards, steps, order --
         through the reader in .github/scripts/gate-self-tests.py, so there is
         one parser of a workflow in this repository rather than two that drift.
+
+    --release-rehearsal --artifact F  (exit 9)
+        The release job's OWN assemble and stamp commands, executed against a
+        tree of real assembled asset names, on a pull request. --release-wiring
+        reads those steps as text and reported the release path sound while the
+        step that loads an artefact named it under a name DuckDB refuses to
+        load -- so on every tag it would have exited 2 and nothing would ever
+        have been published. This mode runs the `run:` text of each of those
+        steps, with GITHUB_REF_NAME and the job's `env:` supplied, over the
+        output of the job's own call to assemble-release-assets.sh. See "the
+        rehearsal" below for what it substitutes and what it does not.
 
     --regenerates-version-file      (exit 6)
 
@@ -114,8 +131,13 @@ UNTAGGED BUILDS
     -- a short commit sha -- when no tag points at HEAD. That fallback is kept
     unchanged: a pull-request build stamps its sha, which is a true statement
     about what was built and is what the community CI does for every other
-    extension. `--tag` is never passed on an untagged build, because the only
-    workflow that passes it triggers on `tags: ['v*']`. A tagged build cannot
+    extension. `--tag` is never passed on an untagged build, and it takes both
+    workflows that pass it to say so. release.yml triggers on `tags: ['v*']`, so
+    every build it checks has one. MainDistributionPipeline.yml runs on pushes
+    to main, on pull requests and on dispatch as well, so the trigger settles
+    nothing there -- what does is the `GITHUB_REF_TYPE` test in its stamp step,
+    which passes `--tag` only when the ref IS a tag and `--expect-commit`
+    otherwise. A tagged build cannot
     pass with a fallback stamp: a short sha does not equal the tag, so the
     comparison refuses and says which of the two it is looking at.
 
@@ -139,6 +161,7 @@ EXIT CODES
     6  the Makefile does not force the version file to be regenerated
     7  a loaded extension's run-time version disagrees with its own trailer
     8  the release path no longer invokes this gate where it has to
+    9  the release path invokes this gate and does not survive being run
 """
 
 
@@ -201,6 +224,15 @@ EXIT_NOT_IGNORED = 5
 EXIT_NO_REGENERATION = 6
 EXIT_RUNTIME_DISAGREES = 7
 EXIT_UNWIRED = 8
+EXIT_REHEARSAL = 9
+
+# The name DuckDB has to see. It derives the init symbol it dlsyms from the FILE
+# NAME, stemming at the FIRST dot -- so
+# `finetype-v0.6.58-x86_64-unknown-linux-gnu.duckdb_extension`, which is exactly
+# what a release asset is called, makes it look for `finetype-v0_init_c_api` and
+# the LOAD dies. Every artefact this file loads is presented under this name; see
+# duckdb_readings.
+CANONICAL_NAME = "finetype.duckdb_extension"
 
 SHORT_SHA = re.compile(r"^[0-9a-f]{7,40}$")
 
@@ -422,25 +454,58 @@ SELECT ft_version() AS runtime,
 
 
 def duckdb_readings(extension: Path) -> dict:
-    """Load one artefact and read its run-time and trailer versions in one session."""
+    """Load one artefact and read its run-time and trailer versions in one session.
+
+    THE BYTES ARE LOADED UNDER `finetype.duckdb_extension`, ALWAYS, whatever the
+    caller named the file. DuckDB derives the init symbol it dlsyms from the file
+    name, stemming at the FIRST dot, so an artefact called
+    `finetype-v0.6.58-x86_64-unknown-linux-gnu.duckdb_extension` -- the name
+    .github/scripts/assemble-release-assets.sh gives every published extension
+    binary -- makes it look for `finetype-v0_init_c_api` and the LOAD fails with
+    `did not contain function`, exit 2, before any version is read.
+
+    That rule cost this repository a release path that could not publish: the
+    step in release.yml that loads one asset named it under its assembled name,
+    so every tag would have failed there and `Create release` would never have
+    run. Making the CHECKER immune is what closes it for every call site rather
+    than for the one that was noticed -- a caller cannot hit the rule if the name
+    it passes is never the name DuckDB sees.
+
+    A hard link where the filesystem allows one, a copy where it does not; either
+    way DuckDB reads the same bytes, and stamp_fields has already read the
+    trailer off the original.
+    """
     if shutil.which("duckdb") is None:
         raise Refused(
             EXIT_CANNOT_RUN,
             "duckdb is not on PATH -- this mode loads the artefact and asks it",
         )
     with tempfile.TemporaryDirectory(prefix="stamp-load-") as tmp:
-        prelude = f"SET extension_directory='{tmp}';\nLOAD '{extension.resolve()}';\n"
+        # Separate directories: DuckDB's extension_directory is where an
+        # INSTALLED extension would live, and check_loaded refuses a reading
+        # that reports finetype as installed. The file being loaded is kept out
+        # of it so that refusal keeps meaning what it says.
+        ext_dir = Path(tmp) / "extensions"
+        ext_dir.mkdir()
+        loadable = Path(tmp) / "load" / CANONICAL_NAME
+        loadable.parent.mkdir()
+        try:
+            os.link(extension.resolve(), loadable)
+        except OSError:
+            shutil.copyfile(extension.resolve(), loadable)
+        prelude = f"SET extension_directory='{ext_dir}';\nLOAD '{loadable}';\n"
         proc = subprocess.run(
             ["duckdb", "-unsigned", "-no-init", "-json", "-c", prelude + LOAD_SQL],
             capture_output=True,
             text=True,
-            env={**os.environ, "DUCKDB_EXTENSION_DIRECTORY": tmp},
+            env={**os.environ, "DUCKDB_EXTENSION_DIRECTORY": str(ext_dir)},
             check=False,
         )
     if proc.returncode != 0:
         raise Refused(
             EXIT_CANNOT_RUN,
-            f"duckdb exited {proc.returncode} loading {extension}:\n{proc.stderr.strip()}",
+            f"duckdb exited {proc.returncode} loading {extension} (presented to it as "
+            f"{CANONICAL_NAME}):\n{proc.stderr.strip()}",
         )
     try:
         rows = json.loads(proc.stdout.strip() or "[]")
@@ -625,14 +690,19 @@ def check_regenerates(root: Path, makefile: Path | None = None) -> list[str]:
 # ── the wiring ──────────────────────────────────────────────────────────────
 #
 # THE THREE PLACES THIS GATE ACTUALLY REFUSES A RELEASE ARE WORKFLOW YAML, and
-# until this mode existed nothing read them. Measured: put `continue-on-error:
-# true` on the release workflow's stamp step and every check in this repository
-# still exits 0 -- including this file's own --self-test, which never opens the
-# workflow. What a user gets under that one line: the step goes
-# red-but-ignored, the release attaches the mis-stamped binaries, and the
-# consumer refuses the bundle it has just downloaded. Delete both stamp steps,
-# or delete the whole stamp job from the distribution pipeline, and the same
-# nothing happens.
+# before this mode existed nothing read them. Measured then: with
+# `continue-on-error: true` on the release workflow's stamp step, every check in
+# this repository exited 0 -- including this file's own --self-test, which never
+# opened the workflow. What a user got under that one line: the step went
+# red-but-ignored, the release attached the mis-stamped binaries, and the
+# consumer refused the bundle it had just downloaded. Deleting both stamp steps,
+# or the whole stamp job from the distribution pipeline, bought the same
+# nothing. Each of those is a case in the self-test below now.
+#
+# WHAT THIS MODE STILL CANNOT SEE is whether the steps it finds would RUN. It
+# reads text: names, guards, order. --release-rehearsal executes them; the two
+# are separate modes because they fail differently and a green reading of a step
+# that cannot run is the defect that cost this repository its release path.
 #
 # So the declarations are read as STRUCTURE -- jobs, their guards, their steps
 # and the order of them -- through the reader in .github/scripts/gate-self-tests.py
@@ -651,6 +721,60 @@ PUBLISH_ACTION = "softprops/action-gh-release"
 # checks them has to depend on the job that makes them, or it checks nothing.
 EXTENSION_BUILD_CALL = "duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml"
 GATE_INVOCATION = "check_extension_stamp.py"
+# The script that names the release assets. The rehearsal below runs the release
+# job's own call to it, so the names its stamp steps read are the names a
+# release actually carries.
+ASSEMBLER = "assemble-release-assets.sh"
+# What an installation of the DuckDB CLI fetches. The step that LOADs an asset
+# needs `duckdb` on PATH, and the runner has none: an install step that goes
+# missing turns the load into "duckdb is not on PATH" on a tag and nowhere else.
+DUCKDB_CLI_MARK = "duckdb_cli-"
+
+
+def _logical_lines(step) -> list[str]:
+    """A step's `run:` as shell command lines: comments dropped, continuations joined.
+
+    THE POINT IS THAT A MENTION IS NOT AN INVOCATION. The first cut of this file
+    matched a step whose `run:` merely CONTAINED `check_extension_stamp.py`, so
+    commenting the call out, or replacing it with
+    `echo "check_extension_stamp.py"`, left the step counted and every check in
+    this repository green. A `#` line and a quoted argument are the two shapes
+    that reads as a call and is not one; dropping comments here and requiring
+    command position in _invokes is what separates them.
+    """
+    out: list[str] = []
+    pending = ""
+    for raw in step.commands:
+        line = raw.strip()
+        if not pending and line.startswith("#"):
+            continue
+        if line.endswith("\\"):
+            pending += line[:-1].rstrip() + " "
+            continue
+        out.append(pending + line)
+        pending = ""
+    if pending:
+        out.append(pending)
+    return out
+
+
+def _invocation_re(script: str) -> re.Pattern[str]:
+    """`script` run as a command: at the start of a line or after a shell separator.
+
+    Optionally through an interpreter and behind leading `VAR=value` assignments,
+    which is how a call is written when it is not written bare. Anything else --
+    inside a quoted string, after `echo`, behind a `#` -- is a mention.
+    """
+    return re.compile(
+        r"(?:^|[;&|]|\bthen\b|\bdo\b|\belse\b)[ \t]*"
+        r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*[ \t]+)*"
+        r"(?:(?:python3?|bash|sh)[ \t]+)?"
+        r"(?:\./)?(?:[\w./-]*/)?" + re.escape(script) + r"(?=[ \t]|$)"
+    )
+
+
+GATE_CALL = _invocation_re(GATE_INVOCATION)
+ASSEMBLER_CALL = _invocation_re(ASSEMBLER)
 
 
 def _workflow_reader():
@@ -672,16 +796,54 @@ def _workflow_reader():
     return module
 
 
+def _calls(step, pattern: re.Pattern[str]) -> list[str]:
+    """The logical lines of this step that INVOKE the command `pattern` names."""
+    return [line for line in _logical_lines(step) if pattern.search(line)]
+
+
 def _gate_steps(steps: list, job_id: str) -> list:
-    return [
-        step
-        for step in steps
-        if step.job == job_id and any(GATE_INVOCATION in line for line in step.commands)
-    ]
+    return [step for step in steps if step.job == job_id and _calls(step, GATE_CALL)]
 
 
 def _runs(step, needle: str) -> bool:
-    return any(needle in line for line in step.commands)
+    """`needle` appears as an argument of a real invocation of the gate.
+
+    Read off the invocation and not off the step, because `--load` in a comment
+    or in an echoed string would otherwise decide which of the two release steps
+    this is -- and the two are counted separately precisely so that deleting
+    either one is named.
+    """
+    return any(needle in line for line in _calls(step, GATE_CALL))
+
+
+def _upstream_guards(rel: str, builders: list, verb: str) -> list[str]:
+    """A job that is SKIPPED skips everything downstream of it, silently.
+
+    `needs:` is checked elsewhere; this asks whether the job at the other end of
+    that edge can be turned off. `if: false` on the build job leaves the stamp
+    job present, correctly wired and never run, and GitHub reports the whole
+    workflow green -- the skip propagates down the `needs:` chain and a skipped
+    required check satisfies branch protection. `continue-on-error` at job level
+    is the other half: the build fails, its dependants run, and the stamp step
+    reads an artefacts directory that is empty or stale.
+    """
+    problems: list[str] = []
+    for builder in builders:
+        if builder.condition:
+            problems.append(
+                f"{rel}: the job that builds the extension binaries (`{builder.id}`) carries "
+                f"`if: {builder.condition}` -- a skipped job skips everything that "
+                f"`needs:` it, so the job that {verb} the stamp is skipped with it and the "
+                "workflow reports green"
+            )
+        if builder.continue_on_error:
+            problems.append(
+                f"{rel}: the job that builds the extension binaries (`{builder.id}`) carries "
+                f"`continue-on-error: {builder.continue_on_error}` -- the build fails, its "
+                f"dependants run anyway, and the job that {verb} the stamp reads an "
+                "artefacts directory that is empty or left over"
+            )
+    return problems
 
 
 def _unguarded(step, where: str, problems: list[str]) -> None:
@@ -735,6 +897,33 @@ def check_release_wiring(root: Path) -> list[str]:
             f"`if: {release_job.condition}` -- a job-level condition skips its steps and "
             "every refusal in them together"
         )
+    # A JOB-LEVEL `continue-on-error` is not the step-level one and does not fail
+    # the same way. The job still reddens; what changes is that every job whose
+    # `needs:` names it runs anyway. Three do -- publishing to crates.io, writing
+    # the Homebrew formula and updating the install site -- so a refused stamp
+    # would stop the GitHub release and nothing else, and a user installing by
+    # `brew` would get the formula for a release that was refused.
+    if release_job.continue_on_error:
+        problems.append(
+            f"{RELEASE_WORKFLOW}: the job that publishes (`{publish.job}`) carries "
+            f"`continue-on-error: {release_job.continue_on_error}` -- the job reddens and "
+            f"every job whose `needs:` names `{publish.job}` "
+            f"({', '.join(sorted(j.id for j in jobs.values() if publish.job in j.needs)) or 'none today'}) "
+            "runs anyway, off a release the stamp steps refused"
+        )
+    # NO CONDITION AT ALL on the step that publishes, not merely no `if: false`.
+    # `if: always()` and `if: ${{ !cancelled() }}` are the shapes that matter and
+    # they read like resilience: every stamp step above stays present, unguarded
+    # and before the publish -- which is all the reading above asks -- and the
+    # publish runs whatever any of them decided.
+    if publish.condition:
+        problems.append(
+            f"{RELEASE_WORKFLOW}:{publish.lineno}: the step that publishes carries "
+            f"`if: {publish.condition}`. A condition here lets the release be created "
+            "after a stamp step above it has refused; `always()` and `!cancelled()` do "
+            "exactly that. The publish must have no condition, so a refusal above it "
+            "stops it"
+        )
     builders = [job for job in jobs.values() if EXTENSION_BUILD_CALL in job.uses]
     if not builders:
         problems.append(
@@ -747,6 +936,26 @@ def check_release_wiring(root: Path) -> list[str]:
             f"`needs:` the job that builds the extension "
             f"({', '.join(b.id for b in builders)}) -- without that edge the stamp steps "
             "read whatever artefacts happen to be there, or none"
+        )
+    problems += _upstream_guards(RELEASE_WORKFLOW, builders, "reads")
+
+    # The step that names the assets. Every stamp step in this job reads files
+    # under names this script writes, so a rehearsal of those steps is only
+    # worth something if it assembles the tree the same way -- and the release
+    # cannot be checked at all if nothing assembles it.
+    assembling = [step for step in steps if step.job == publish.job and _calls(step, ASSEMBLER_CALL)]
+    if len(assembling) != 1:
+        problems.append(
+            f"{RELEASE_WORKFLOW}: expected exactly one step in `{publish.job}` running "
+            f"`{ASSEMBLER}`, found {len(assembling)}. That step is what gives every "
+            "published binary its name, and --release-rehearsal runs it to produce the "
+            "names the stamp steps are then asked about"
+        )
+    for step in assembling:
+        _unguarded(
+            step,
+            f"{RELEASE_WORKFLOW}:{step.lineno} ({step.name or 'the assembly step'})",
+            problems,
         )
 
     gate = _gate_steps(steps, publish.job)
@@ -780,6 +989,27 @@ def check_release_wiring(root: Path) -> list[str]:
             "a tag publishes whatever version the build stamped"
         )
 
+    # `--load` needs `duckdb` on PATH and a GitHub runner has none. The install
+    # is a step of its own rather than lines inside the stamp step, so that the
+    # stamp step's `run:` is the gate call and nothing else and --release-rehearsal
+    # can run it verbatim. The cost of that split is this rung: without an install
+    # step before it, the load exits 2 with "duckdb is not on PATH" -- on a tag,
+    # and nowhere else, which is the shape this whole mode exists to refuse.
+    installers = [
+        step
+        for step in steps
+        if step.job == publish.job and any(DUCKDB_CLI_MARK in line for line in step.commands)
+    ]
+    for step in load_reads:
+        if not any(inst.lineno < step.lineno for inst in installers):
+            problems.append(
+                f"{RELEASE_WORKFLOW}:{step.lineno} ({step.name or 'the stamp step'}) runs "
+                f"`{GATE_INVOCATION} --load` with no step above it in `{publish.job}` "
+                f"fetching `{DUCKDB_CLI_MARK}...`. The runner has no duckdb, so the load "
+                "would exit 2 -- the tool could not run -- and the release would fail on "
+                "every tag"
+            )
+
     # ── MainDistributionPipeline.yml: the every-commit path ──────────────────
     dist_builders = [job for job in dist_jobs.values() if EXTENSION_BUILD_CALL in job.uses]
     checking = sorted({step.job for step in dist_steps if GATE_INVOCATION in " ".join(step.commands)})
@@ -796,9 +1026,18 @@ def check_release_wiring(root: Path) -> list[str]:
         if stamp_job.condition:
             problems.append(
                 f"{DISTRIBUTION_WORKFLOW}: job `{stamp_job.id}` carries "
-                f"`if: {stamp_job.condition}` -- a skipped required check satisfies "
-                "branch protection"
+                f"`if: {stamp_job.condition}` -- a skipped job reports neutral, not red, "
+                "so the pull request stays mergeable and the stamp of every build goes "
+                "unread"
             )
+        if stamp_job.continue_on_error:
+            problems.append(
+                f"{DISTRIBUTION_WORKFLOW}: job `{stamp_job.id}` carries "
+                f"`continue-on-error: {stamp_job.continue_on_error}` -- the job reddens "
+                "and the workflow reports success, which is the same nothing as not "
+                "running it"
+            )
+        problems += _upstream_guards(DISTRIBUTION_WORKFLOW, dist_builders, "reads")
         if not dist_builders:
             problems.append(
                 f"{DISTRIBUTION_WORKFLOW}: no job calls `{EXTENSION_BUILD_CALL}`"
@@ -824,9 +1063,202 @@ def check_release_wiring(root: Path) -> list[str]:
             + "    Each of these leaves every other check in this repository green.",
         )
     return [
-        f"   {RELEASE_WORKFLOW}: `{publish.job}` reads the trailers and loads one "
-        f"artefact, unguarded, before the publish at line {publish.lineno}",
+        f"   {RELEASE_WORKFLOW}: `{publish.job}` assembles the assets, reads the trailers "
+        f"and loads one artefact, unguarded, before the publish at line {publish.lineno}",
         f"   {DISTRIBUTION_WORKFLOW}: `{checking[0]}` reads the stamp of every build",
+    ]
+
+
+# ── the rehearsal ───────────────────────────────────────────────────────────
+#
+# WHAT --release-wiring CANNOT SEE, AND WHAT IT COST. That mode reads the release
+# job as structure: which steps exist, what guards them, what order they are in.
+# Every one of its answers is about the TEXT of a step. It said the release path
+# refused a wrong stamp while the step that loads an artefact could not run at
+# all -- it named its file
+# `release-assets/finetype-${GITHUB_REF_NAME}-x86_64-unknown-linux-gnu.duckdb_extension`,
+# which is exactly what assemble-release-assets.sh writes, and DuckDB derives the
+# init symbol it dlsyms from the file name stemming at the first dot. Every tag
+# would have exited 2 there, `Create release` would never have run, and nothing
+# would have been published: the opposite of the outcome this file exists to make
+# safe. release.yml runs only on a pushed tag, so no check in this repository had
+# ever executed that line.
+#
+# So this mode EXECUTES those steps, on a pull request, against an assembled tree
+# with the real names. It is not a second reading of the workflow; it is the
+# workflow's own `run:` text, run by bash the way Actions runs it, with
+# GITHUB_REF_NAME and the job's `env:` supplied. What it cannot bring is the
+# runner: the artefacts come from a real local build re-stamped as a tag rather
+# than from five platform runners, so the FILE NAMES are a release's and, on a
+# host that is not linux_amd64, the bytes under the linux name are this machine's
+# own. Nothing on this path reads a platform out of a name -- require_native
+# reads the trailer -- so that substitution is invisible to every rung, and the
+# name, which is the thing that was wrong, is real.
+
+
+def _rehearsable(step) -> list[str]:
+    """The step's `run:` as a script, or [] if it is not one this can execute."""
+    return _logical_lines(step)
+
+
+def check_release_rehearsal(root: Path, artifact: Path) -> list[str]:
+    """The release job's own assemble and stamp commands, run against real names."""
+    reader = _workflow_reader()
+    try:
+        jobs, steps = reader.scan_workflow(root, RELEASE_WORKFLOW)
+    except Exception as exc:  # noqa: BLE001 -- Fatal is the reader's, not ours
+        raise Refused(EXIT_CANNOT_RUN, f"the workflow could not be read: {exc}") from None
+
+    publishing = [step for step in steps if step.uses.startswith(PUBLISH_ACTION)]
+    if len(publishing) != 1:
+        raise Refused(
+            EXIT_CANNOT_RUN,
+            f"{RELEASE_WORKFLOW}: expected exactly one step using `{PUBLISH_ACTION}`, "
+            f"found {len(publishing)}; this mode rehearses what runs BEFORE the publish "
+            "and cannot say what that is",
+        )
+    publish = publishing[0]
+    release_job = jobs[publish.job]
+
+    # In file order, and only what runs before the publish: the assembly that
+    # names the assets, then every step that invokes the gate.
+    runnable = [
+        step
+        for step in steps
+        if step.job == publish.job
+        and step.lineno < publish.lineno
+        and (_calls(step, ASSEMBLER_CALL) or _calls(step, GATE_CALL))
+    ]
+    assembling = [s for s in runnable if _calls(s, ASSEMBLER_CALL)]
+    gate = [s for s in runnable if _calls(s, GATE_CALL)]
+    loads = [s for s in gate if _runs(s, "--load")]
+    if not assembling or not loads or len(gate) == len(loads):
+        raise Refused(
+            EXIT_REHEARSAL,
+            f"{RELEASE_WORKFLOW}: job `{publish.job}` has "
+            f"{len(assembling)} assembly step(s), {len(gate) - len(loads)} step(s) reading "
+            f"trailers and {len(loads)} step(s) loading an artefact before the publish. "
+            "This mode rehearses all three and would otherwise report success over a "
+            "release path it did not exercise -- --release-wiring says which is missing.",
+        )
+    for step in runnable:
+        if any("<<" in line for line in step.commands):
+            raise Refused(
+                EXIT_CANNOT_RUN,
+                f"{RELEASE_WORKFLOW}:{step.lineno} ({step.name or 'a rehearsed step'}) "
+                "contains a heredoc. The reader hands this mode the step's lines with "
+                "their indentation stripped, which a heredoc body depends on, so running "
+                "it would not be running what the release runs.",
+            )
+
+    # The artefact has to be loadable HERE: the last rehearsed step loads one.
+    base = stamp_fields(artifact)
+    here = require_native(artifact, base)
+    # The exact shape of a release: `git tag --points-at HEAD` writes the tag
+    # verbatim, so the trailer carries a leading `v` that Cargo.toml's
+    # compiled-in version does not. Derived from the artefact rather than
+    # written here, so it cannot go stale at a version bump.
+    tag = f"v{core(base['extension_version'])}"
+
+    env_key = "EXTENSION_DUCKDB_VERSION"
+    if env_key not in release_job.env:
+        raise Refused(
+            EXIT_CANNOT_RUN,
+            f"{RELEASE_WORKFLOW}: job `{publish.job}` has no `{env_key}` in its `env:`. "
+            "The extension artifact directories are named for it, so this mode cannot "
+            "build the tree the assembly step reads.",
+        )
+    ext_version = release_job.env[env_key]
+
+    assembler = root / ".github" / "scripts" / ASSEMBLER
+    if not assembler.is_file():
+        raise Refused(EXIT_CANNOT_RUN, f"{assembler} is missing")
+
+    reported: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="stamp-rehearsal-") as tmp:
+        work = Path(tmp) / "workspace"
+        work.mkdir()
+        # The workspace a step sees: `scripts/…` and `.github/…` resolve exactly
+        # as they do in a checkout, and everything the steps write lands here.
+        for rel in ("scripts", ".github"):
+            (work / rel).symlink_to((root / rel).resolve(), target_is_directory=True)
+
+        fixture = subprocess.run(
+            [
+                str(assembler),
+                "--make-fixture",
+                str(work),
+                "--tag",
+                tag,
+                "--extension-duckdb-version",
+                ext_version,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if fixture.returncode != 0:
+            raise Refused(
+                EXIT_CANNOT_RUN,
+                f"{ASSEMBLER} --make-fixture exited {fixture.returncode}:\n"
+                f"{fixture.stderr.strip()}",
+            )
+
+        # Real bytes under the placeholder names. Each of the five is a copy of
+        # the artefact re-stamped with `tag` by the real upstream stamper, so
+        # what the assembly step copies and the stamp steps then read is a
+        # genuine extension carrying a genuine tag stamp.
+        plain = Path(tmp) / "unstamped.bin"
+        plain.write_bytes(artifact.read_bytes()[:-TRAILER_LEN])
+        binaries = sorted((work / "artifacts").glob(f"finetype-{ext_version}-extension-*"))
+        if len(binaries) != len(DISTRIBUTED_PLATFORMS):
+            raise Refused(
+                EXIT_CANNOT_RUN,
+                f"the fixture holds {len(binaries)} extension artifact directories, "
+                f"expected {len(DISTRIBUTED_PLATFORMS)}",
+            )
+        for directory in binaries:
+            _stamp(plain, directory / CANONICAL_NAME, tag, base)
+
+        env = {
+            **os.environ,
+            **release_job.env,
+            "GITHUB_REF_NAME": tag,
+            "GITHUB_REF_TYPE": "tag",
+        }
+        for step in runnable:
+            script = Path(tmp) / f"step-{step.lineno}.sh"
+            script.write_text("\n".join(_rehearsable(step)) + "\n", encoding="utf-8")
+            # `bash --noprofile --norc -eo pipefail {0}` is what Actions runs a
+            # `shell: bash` step with, `-u` deliberately absent. Matched here so
+            # a step that survives this survives the runner.
+            proc = subprocess.run(
+                ["bash", "--noprofile", "--norc", "-eo", "pipefail", str(script)],
+                cwd=work,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            label = step.name or f"the step at line {step.lineno}"
+            if proc.returncode != 0:
+                raise Refused(
+                    EXIT_REHEARSAL,
+                    f"{RELEASE_WORKFLOW}:{step.lineno} ({label}) exited "
+                    f"{proc.returncode} when run against the assets this job assembles, "
+                    f"at tag {tag}. On a pushed tag this step would fail and the release "
+                    "would not be created.\n"
+                    + "".join(
+                        f"      {line}\n"
+                        for line in (proc.stdout + proc.stderr).strip().splitlines()[-12:]
+                    ),
+                )
+            reported.append(f"   {RELEASE_WORKFLOW}:{step.lineno} ({label}): exit 0")
+
+    return [
+        f"   rehearsed the `{publish.job}` job at tag {tag} on {here}, against the asset "
+        f"names {ASSEMBLER} writes",
+        *reported,
     ]
 
 
@@ -1414,6 +1846,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--untracked-version-file", action="store_true")
     parser.add_argument("--regenerates-version-file", action="store_true")
     parser.add_argument("--release-wiring", action="store_true")
+    parser.add_argument("--release-rehearsal", action="store_true")
     parser.add_argument("--self-test", action="store_true")
 
     parser.add_argument("--root", type=Path, default=ROOT)
@@ -1444,6 +1877,19 @@ def main(argv: list[str] | None = None) -> int:
         if args.release_wiring:
             reported += check_release_wiring(args.root)
             did_something = True
+        if args.release_rehearsal:
+            if len(args.artifact) != 1:
+                raise Refused(
+                    EXIT_CANNOT_RUN,
+                    "--release-rehearsal needs exactly one --artifact: a real built "
+                    "extension this machine can load. It re-stamps five copies of it as "
+                    "a tag and runs the release job's own commands over them, and the "
+                    "last of those commands LOADs one.\n"
+                    "    Build one first: make build-extension",
+                )
+            reported += check_release_rehearsal(args.root, args.artifact[0])
+            did_something = True
+            args.artifact = []
 
         if args.load:
             if len(args.artifact) != 1:

@@ -31,6 +31,16 @@
 #   assemble-release-assets.sh --artifacts-dir DIR --output-dir DIR \
 #       --tag TAG --extension-duckdb-version VERSION
 #   assemble-release-assets.sh --self-test
+#   assemble-release-assets.sh --make-fixture DIR --tag TAG \
+#       --extension-duckdb-version VERSION
+#
+# --make-fixture writes the synthetic downloaded-artifacts tree this script's
+# own self-test runs against, into DIR/artifacts. It exists as a flag rather
+# than a private function because scripts/check_extension_stamp.py's release
+# rehearsal builds the same tree, swaps in real re-stamped extension binaries,
+# and then runs the `release` job's own commands over it -- and two statements
+# of what a downloaded artifacts tree looks like is how a rehearsal goes on
+# passing against a shape release.yml stopped producing.
 #
 # EXIT CODES
 #   0  every expected asset assembled
@@ -174,7 +184,68 @@ usage() {
 	cat >&2 <<'USAGE'
 usage: assemble-release-assets.sh --artifacts-dir DIR --output-dir DIR --tag TAG --extension-duckdb-version VERSION
        assemble-release-assets.sh --self-test
+       assemble-release-assets.sh --make-fixture DIR --tag TAG --extension-duckdb-version VERSION
 USAGE
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# THE FIXTURE — one builder, two callers
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# `build_fixture` writes the artifacts/ tree `actions/download-artifact` leaves
+# behind in the `release` job: one directory per uploaded artifact, extension
+# binaries all sharing the in-artifact name `finetype.duckdb_extension`.
+#
+# At file scope, and exposed as `--make-fixture`, because it now has a SECOND
+# caller: scripts/check_extension_stamp.py --release-rehearsal replaces the five
+# placeholder binaries with real re-stamped ones and then runs the `release`
+# job's own assemble and stamp commands over the result. A private copy of this
+# shape in that script would be a second statement of what a downloaded
+# artifacts tree looks like, and the rehearsal would go on passing against the
+# shape this file no longer produces.
+
+# Deliberately NOT sha256_of: the fixture stands in for the sidecars
+# release.yml's own `build` and `taxonomy-catalogue` jobs upload, which are
+# written by a different code path (their inline "Generate SHA256" steps,
+# running in the file's own directory). A fixture built by the function under
+# test would inherit that function's defects and could not detect them -- the
+# sidecar-form check in the self-test would pass against a broken sha256_of
+# because the expectation had moved with it.
+fixture_sha256() {
+	local dir base
+	dir="$(dirname "$1")"
+	base="$(basename "$1")"
+	if command -v shasum &>/dev/null; then
+		(cd "$dir" && shasum -a 256 "$base" >"$base.sha256")
+	else
+		(cd "$dir" && sha256sum "$base" >"$base.sha256")
+	fi
+}
+
+build_fixture() {
+	# $1: directory to build the fixture under
+	# $2: the tag the CLI artifacts are named for
+	# $3: the duckdb version baked into the extension artifact directory names
+	local root="$1" fx_tag="$2" fx_ext="$3"
+	mkdir -p "$root/artifacts"
+	local target ext=tar.gz
+	for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-msvc; do
+		mkdir -p "$root/artifacts/finetype-${target}"
+		ext=tar.gz
+		case "$target" in *windows*) ext=zip ;; esac
+		echo "cli-binary-for-${target}" >"$root/artifacts/finetype-${target}/finetype-${fx_tag}-${target}.${ext}"
+		fixture_sha256 "$root/artifacts/finetype-${target}/finetype-${fx_tag}-${target}.${ext}"
+	done
+	local arch
+	for arch in linux_amd64 linux_arm64 osx_amd64 osx_arm64 windows_amd64; do
+		mkdir -p "$root/artifacts/finetype-${fx_ext}-extension-${arch}"
+		echo "EXTENSION-CONTENT-FOR-${arch}" >"$root/artifacts/finetype-${fx_ext}-extension-${arch}/finetype.duckdb_extension"
+	done
+	mkdir -p "$root/artifacts/finetype-taxonomy-catalogue"
+	echo '[{"x-finetype-label":"a.b.c","pattern":"x"}]' >"$root/artifacts/finetype-taxonomy-catalogue/taxonomy-schemas.json"
+	fixture_sha256 "$root/artifacts/finetype-taxonomy-catalogue/taxonomy-schemas.json"
+	echo '{"model":"m2v8m-s43"}' >"$root/artifacts/finetype-taxonomy-catalogue/finetype-model.json"
+	fixture_sha256 "$root/artifacts/finetype-taxonomy-catalogue/finetype-model.json"
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -195,24 +266,6 @@ self_test() {
 	trap 'rm -rf "$SELFTEST_TMP"' EXIT
 	tmp="$SELFTEST_TMP"
 
-	# Deliberately NOT sha256_of: the fixture stands in for the sidecars
-	# release.yml's own `build` and `taxonomy-catalogue` jobs upload, which are
-	# written by a different code path (their inline "Generate SHA256" steps,
-	# running in the file's own directory). A fixture built by the function
-	# under test would inherit that function's defects and could not detect
-	# them -- the sidecar-form check below would pass against a broken
-	# sha256_of because the expectation had moved with it.
-	fixture_sha256() {
-		local dir base
-		dir="$(dirname "$1")"
-		base="$(basename "$1")"
-		if command -v shasum &>/dev/null; then
-			(cd "$dir" && shasum -a 256 "$base" >"$base.sha256")
-		else
-			(cd "$dir" && sha256sum "$base" >"$base.sha256")
-		fi
-	}
-
 	# Verifies one sidecar the way a downloader does: from inside the directory
 	# holding the asset, with the checker the release notes name.
 	verify_sidecar() {
@@ -223,28 +276,13 @@ self_test() {
 		fi
 	}
 
-	build_fixture() {
-		# $1: directory to build the fixture under
-		local root="$1"
-		mkdir -p "$root/artifacts"
-		local target ext=tar.gz
-		for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-msvc; do
-			mkdir -p "$root/artifacts/finetype-${target}"
-			ext=tar.gz
-			case "$target" in *windows*) ext=zip ;; esac
-			echo "cli-binary-for-${target}" >"$root/artifacts/finetype-${target}/finetype-vSELFTEST-${target}.${ext}"
-			fixture_sha256 "$root/artifacts/finetype-${target}/finetype-vSELFTEST-${target}.${ext}"
-		done
-		local arch
-		for arch in linux_amd64 linux_arm64 osx_amd64 osx_arm64 windows_amd64; do
-			mkdir -p "$root/artifacts/finetype-vTEST-extension-${arch}"
-			echo "EXTENSION-CONTENT-FOR-${arch}" >"$root/artifacts/finetype-vTEST-extension-${arch}/finetype.duckdb_extension"
-		done
-		mkdir -p "$root/artifacts/finetype-taxonomy-catalogue"
-		echo '[{"x-finetype-label":"a.b.c","pattern":"x"}]' >"$root/artifacts/finetype-taxonomy-catalogue/taxonomy-schemas.json"
-		fixture_sha256 "$root/artifacts/finetype-taxonomy-catalogue/taxonomy-schemas.json"
-		echo '{"model":"m2v8m-s43"}' >"$root/artifacts/finetype-taxonomy-catalogue/finetype-model.json"
-		fixture_sha256 "$root/artifacts/finetype-taxonomy-catalogue/finetype-model.json"
+	# Every case below builds its tree through the file-scope `build_fixture`,
+	# which is also what `--make-fixture` exposes to the stamp gate's release
+	# rehearsal. One builder: a tree shape this self-test invented for itself
+	# would let the rehearsal keep passing against a shape release.yml no
+	# longer produces.
+	build_fixture_here() {
+		build_fixture "$1" vSELFTEST vTEST
 	}
 
 	# Runs the script under test, echoes its exit code and leaves its output in
@@ -258,7 +296,7 @@ self_test() {
 
 	# ── Control: a complete tree assembles cleanly, no collisions ──────────
 	mkdir -p "$tmp/control"
-	build_fixture "$tmp/control"
+	build_fixture_here "$tmp/control"
 	if ! (cd "$tmp/control" && bash "$script" --artifacts-dir artifacts --output-dir release-assets --tag vSELFTEST --extension-duckdb-version vTEST >/dev/null); then
 		echo "  CONTROL FAILED — a complete artifacts tree did not assemble"
 		failed=$((failed + 1))
@@ -330,7 +368,7 @@ self_test() {
 	# ── Mutation (AC1's failure mode): one platform's extension is missing ──
 	local rc
 	mkdir -p "$tmp/missing"
-	build_fixture "$tmp/missing"
+	build_fixture_here "$tmp/missing"
 	rm -rf "$tmp/missing/artifacts/finetype-vTEST-extension-windows_amd64"
 	rc="$(run_assembly "$tmp/missing")"
 	if [ "$rc" != "1" ]; then
@@ -367,7 +405,7 @@ self_test() {
 	#    caught it for the wrong reason, which is a different defect wearing
 	#    this one's result. ──
 	mkdir -p "$tmp/sixth"
-	build_fixture "$tmp/sixth"
+	build_fixture_here "$tmp/sixth"
 	mkdir -p "$tmp/sixth/artifacts/finetype-vTEST-extension-linux_amd64_musl"
 	echo "EXTENSION-CONTENT-FOR-linux_amd64_musl" >"$tmp/sixth/artifacts/finetype-vTEST-extension-linux_amd64_musl/finetype.duckdb_extension"
 	rc="$(run_assembly "$tmp/sixth")"
@@ -387,7 +425,7 @@ self_test() {
 	#    rung: "empty" and "missing" are both exit 1, and a case that reads
 	#    only the code cannot tell which one fired. ──
 	mkdir -p "$tmp/emptybin"
-	build_fixture "$tmp/emptybin"
+	build_fixture_here "$tmp/emptybin"
 	: >"$tmp/emptybin/artifacts/finetype-vTEST-extension-osx_arm64/finetype.duckdb_extension"
 	rc="$(run_assembly "$tmp/emptybin")"
 	if [ "$rc" != "1" ]; then
@@ -415,7 +453,7 @@ self_test() {
 	for absent in taxonomy-schemas.json taxonomy-schemas.json.sha256 finetype-model.json finetype-model.json.sha256; do
 		rm -rf "$tmp/nocatalogue"
 		mkdir -p "$tmp/nocatalogue"
-		build_fixture "$tmp/nocatalogue"
+		build_fixture_here "$tmp/nocatalogue"
 		rm -f "$tmp/nocatalogue/artifacts/finetype-taxonomy-catalogue/${absent}"
 		rc="$(run_assembly "$tmp/nocatalogue")"
 		if [ "$rc" != "4" ]; then
@@ -439,7 +477,7 @@ self_test() {
 	#    delete the file and both forms agree on a file that is gone. Here the
 	#    forms disagree, and the wrong one ships a release with no type source.
 	mkdir -p "$tmp/misnamed"
-	build_fixture "$tmp/misnamed"
+	build_fixture_here "$tmp/misnamed"
 	mv "$tmp/misnamed/artifacts/finetype-taxonomy-catalogue" "$tmp/misnamed/artifacts/taxonomy-catalogue"
 	rc="$(run_assembly "$tmp/misnamed")"
 	if [ "$rc" != "4" ]; then
@@ -465,12 +503,16 @@ self_test() {
 # ══════════════════════════════════════════════════════════════════════════════
 
 main() {
-	local artifacts_dir="" output_dir="" tag="" ext_version=""
+	local artifacts_dir="" output_dir="" tag="" ext_version="" fixture_dir=""
 	while [ $# -gt 0 ]; do
 		case "$1" in
 		--self-test)
 			self_test
 			exit $?
+			;;
+		--make-fixture)
+			fixture_dir="$2"
+			shift 2
 			;;
 		--artifacts-dir)
 			artifacts_dir="$2"
@@ -495,6 +537,16 @@ main() {
 			;;
 		esac
 	done
+
+	if [ -n "$fixture_dir" ]; then
+		if [ -z "$tag" ] || [ -z "$ext_version" ]; then
+			usage
+			exit 2
+		fi
+		mkdir -p "$fixture_dir"
+		build_fixture "$fixture_dir" "$tag" "$ext_version"
+		exit 0
+	fi
 
 	if [ -z "$artifacts_dir" ] || [ -z "$output_dir" ] || [ -z "$tag" ] || [ -z "$ext_version" ]; then
 		usage
