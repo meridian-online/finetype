@@ -215,7 +215,10 @@ jobs:
     # credibility runs here on every pull request. `--self-test` mutates
     # synthetic catalogues in-process (an emptied array, entries that keep
     # their label but lose every checkable keyword, entries that keep a
-    # keyword but lose their label) and requires the check to redden on each.
+    # keyword but lose their label) and requires the check to redden on each,
+    # then re-runs them through the script as a subprocess and requires the
+    # exit code this job reads to be 1 rather than only the verdict to be
+    # right.
     name: Taxonomy schema catalogue check
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -234,10 +237,13 @@ jobs:
     # Same shape again: scripts/check_model_coverage.py reads the catalogue
     # release.yml generates alongside the model's label_map.json it downloaded
     # for that same tag, and both only exist together in a release job. The
-    # self-test proves the two failure directions AC6 names: an emptied
-    # catalogue against a real label map measures 0.0, and a label map
-    # carrying labels the catalogue does not mention measures a fraction the
-    # gate's MIN_COVERAGE threshold refuses.
+    # self-test proves the two failure directions AC6 names, against synthetic
+    # three-label inputs: a catalogue emptied to `[]` measures 0.0, and a label
+    # map carrying labels the catalogue does not mention measures a fraction
+    # the gate's MIN_COVERAGE threshold refuses. It then re-runs both through
+    # the script as a subprocess and requires exit 1, because measuring the
+    # right fraction and acting on it are two different things and only the
+    # second is what this job reads.
     name: Model coverage check
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -259,9 +265,12 @@ jobs:
     # for what `actions/download-artifact` (no merge-multiple) produces, and
     # requires the script itself to: assemble all 24 expected files with each
     # extension binary traced back to its own platform (no cross-platform
-    # collision), refuse when one platform's extension artifact is missing
-    # rather than silently shipping four, and refuse when none are present at
-    # all.
+    # collision), refuse with exit 1 when one platform's extension artifact is
+    # missing rather than silently shipping four, refuse with exit 3 when an
+    # artifact arrives for a platform its arch-to-target mapping does not name
+    # rather than dropping it, and write every sidecar in a form
+    # `shasum -a 256 -c` verifies from the directory a downloader unpacked
+    # into.
     name: Release asset assembly check
     runs-on: ubuntu-latest
     timeout-minutes: 5

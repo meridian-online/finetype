@@ -43,7 +43,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 # Reproduced comment, not re-derived: brightfield's loader floor is 0.5. This
@@ -112,6 +114,149 @@ def coverage(catalogue: object, label_map: object) -> tuple[float, list[str], li
 # ══════════════════════════════════════════════════════════════════════════════
 # SELF-TEST — a gate that is only known to pass is not known to detect
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+def _run_cli(argv: list[str]) -> tuple[int, str]:
+    """Run THIS file as a real subprocess and return (exit code, combined output).
+
+    The in-process cases below prove `coverage` measures the right fraction.
+    They say nothing about whether the PROGRAM acts on it: replacing `main`'s
+    `if fraction < args.threshold: ... return 1` with `return 0` leaves every
+    one of them green while the gate exits 0 over a catalogue mentioning none
+    of the model's labels -- a tag that ships an unusable type source past a
+    green CI job, which is the defect this file exists to catch. The measured
+    fraction and the exit code are two different altitudes and only the second
+    is what CI reads, so these cases go through argv, `main` and `sys.exit`.
+    """
+    proc = subprocess.run(
+        [sys.executable, str(Path(__file__).resolve()), *argv],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return proc.returncode, proc.stdout + proc.stderr
+
+
+def _exit_code_cases(catalogue: list[object], label_map: list[str], drifted_label_map: list[str]) -> int:
+    """Return the number of exit-code cases that did not behave as stated."""
+    failed = 0
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+
+        def write(name: str, text: str) -> str:
+            path = root / name
+            path.write_text(text, encoding="utf-8")
+            return str(path)
+
+        cat = write("catalogue.json", json.dumps(catalogue))
+        emptied_cat = write("emptied-catalogue.json", "[]")
+        object_cat = write("object-catalogue.json", '{"not": "a list"}')
+        not_json = write("not-json.json", "this is not JSON")
+        labels = write("label_map.json", json.dumps(label_map))
+        drifted = write("drifted_label_map.json", json.dumps(drifted_label_map))
+        empty_labels = write("empty_label_map.json", "[]")
+        absent = str(root / "absent.json")
+
+        # Exact codes, never "non-zero": exit 1 means coverage was measured and
+        # came in under the threshold, exit 2 means it could not be measured.
+        # A defect that swaps one for the other refuses the right input for the
+        # wrong reason, and "non-zero" cannot tell them apart. The
+        # `--threshold 0.4` case is the other direction: it proves the number
+        # is READ rather than that failure is the only outcome this can reach.
+        cases: list[tuple[str, list[str], int]] = [
+            ("a fully covered label map exits 0", ["--catalogue", cat, "--label-map", labels], 0),
+            (
+                "a label map with labels the catalogue does not mention exits 1 at the default threshold",
+                ["--catalogue", cat, "--label-map", drifted],
+                1,
+            ),
+            (
+                "the same drift below an explicit --threshold 0.4 exits 0, so the number is read",
+                ["--catalogue", cat, "--label-map", drifted, "--threshold", "0.4"],
+                0,
+            ),
+            (
+                "an emptied catalogue against a real label map exits 1",
+                ["--catalogue", emptied_cat, "--label-map", labels],
+                1,
+            ),
+            (
+                "an empty label map exits 2, not 0 and not 1",
+                ["--catalogue", cat, "--label-map", empty_labels],
+                2,
+            ),
+            (
+                "a catalogue that is an object exits 2, not 1",
+                ["--catalogue", object_cat, "--label-map", labels],
+                2,
+            ),
+            (
+                "a catalogue that is not JSON exits 2, not 1",
+                ["--catalogue", not_json, "--label-map", labels],
+                2,
+            ),
+            (
+                "a label-map path that does not exist exits 2, not 1",
+                ["--catalogue", cat, "--label-map", absent],
+                2,
+            ),
+            (
+                "a --threshold outside 0..1 exits 2, not 0",
+                ["--catalogue", cat, "--label-map", labels, "--threshold", "1.5"],
+                2,
+            ),
+            ("neither --catalogue nor --label-map exits 2, not 0", [], 2),
+        ]
+        for name, argv, expected in cases:
+            code, output = _run_cli(argv)
+            if code != expected:
+                print(f"  MISS {name}: exited {code}")
+                last = output.strip().splitlines()
+                print(f"      last line of output: {last[-1] if last else '<none>'}")
+                failed += 1
+            else:
+                print(f"  ok   {name}")
+
+        # AC5: the manifest is what a downstream pin reads to learn which model
+        # the catalogue was measured against, so its CONTENT is asserted, not
+        # merely its existence -- an empty file would satisfy the latter.
+        manifest_path = root / "finetype-model.json"
+        code, output = _run_cli(
+            [
+                "--catalogue", cat,
+                "--label-map", labels,
+                "--write-manifest", str(manifest_path),
+                "--tag", "vSELFTEST",
+                "--model", "m2v8m-s43",
+            ]
+        )
+        if code != 0:
+            print(f"  MISS --write-manifest on a passing measurement exited {code}, expected 0")
+            failed += 1
+        elif not manifest_path.exists():
+            print("  MISS --write-manifest did not write the manifest")
+            failed += 1
+        else:
+            written = json.loads(manifest_path.read_text(encoding="utf-8"))
+            expected_manifest = {
+                "tag": "vSELFTEST",
+                "model": "m2v8m-s43",
+                "coverage_fraction": 1.0,
+                "covered": len(label_map),
+                "label_map_entries": len(label_map),
+                "catalogue_entries": len(catalogue),
+            }
+            wrong = [
+                f"{key}={written.get(key)!r} (expected {value!r})"
+                for key, value in expected_manifest.items()
+                if written.get(key) != value
+            ]
+            if wrong:
+                print(f"  MISS the manifest does not record the measurement: {', '.join(wrong)}")
+                failed += 1
+            else:
+                print("  ok   the manifest records the tag, the model name and the measured fraction")
+    return failed
 
 
 def self_test() -> int:
@@ -193,10 +338,14 @@ def self_test() -> int:
     else:
         print(f"  ok   a non-array label map (an object, not a JSON array) is refused: {problems}")
 
+    # The measurement cases above end here; what follows drives the same
+    # inputs through the process boundary CI actually reads.
+    failed += _exit_code_cases(good_catalogue, good_label_map, drifted_label_map)
+
     if failed:
         print(f"\nself-test FAILED: {failed} case(s) not detected correctly")
         return 1
-    print("\nself-test passed")
+    print("\nself-test passed: measurements checked, control clean, exit codes pinned")
     return 0
 
 

@@ -42,7 +42,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 CHECKABLE_KEYWORDS = ("pattern", "enum", "minLength", "maxLength", "minimum", "maximum")
@@ -79,6 +81,70 @@ def check(catalogue: object) -> list[str]:
 # ══════════════════════════════════════════════════════════════════════════════
 # SELF-TEST — a gate that is only known to pass is not known to detect
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+def _run_cli(argv: list[str]) -> tuple[int, str]:
+    """Run THIS file as a real subprocess and return (exit code, combined output).
+
+    The in-process cases below prove `check` returns the right verdict. They
+    say nothing about whether the PROGRAM acts on it: replacing `main`'s
+    `failures = check(catalogue)` with `failures = []` leaves every one of them
+    green while the gate exits 0 over an emptied catalogue -- the exact defect
+    this file exists to catch, shipped past a green CI job. The verdict and the
+    exit code are two different altitudes and only the second is what CI reads,
+    so these cases go through argv, `main` and `sys.exit`.
+    """
+    proc = subprocess.run(
+        [sys.executable, str(Path(__file__).resolve()), *argv],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return proc.returncode, proc.stdout + proc.stderr
+
+
+def _exit_code_cases() -> int:
+    """Return the number of exit-code cases that did not behave as stated."""
+    failed = 0
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        qualifying = root / "qualifying.json"
+        qualifying.write_text(
+            json.dumps([{"x-finetype-label": "identity.person.email", "pattern": "^.+@.+$"}]),
+            encoding="utf-8",
+        )
+        emptied = root / "emptied.json"
+        emptied.write_text("[]", encoding="utf-8")
+        as_object = root / "object.json"
+        as_object.write_text('{"identity.person.email": {"pattern": "^.+@.+$"}}', encoding="utf-8")
+        unlabelled = root / "unlabelled.json"
+        unlabelled.write_text('[{"pattern": "^.+@.+$"}]', encoding="utf-8")
+        not_json = root / "not-json.json"
+        not_json.write_text("this is not JSON", encoding="utf-8")
+
+        # Exact codes, never "non-zero": exit 1 means the catalogue was read
+        # and refused, exit 2 means the check could not run. A defect that
+        # swaps one for the other refuses the right input for the wrong reason,
+        # and "non-zero" cannot tell them apart.
+        cases: list[tuple[str, list[str], int]] = [
+            ("a qualifying catalogue exits 0", [str(qualifying)], 0),
+            ("a deliberately emptied catalogue exits 1", [str(emptied)], 1),
+            ("a top-level object rather than an array exits 1", [str(as_object)], 1),
+            ("entries with a checkable keyword but no label exit 1", [str(unlabelled)], 1),
+            ("a file that is not JSON exits 2, not 1", [str(not_json)], 2),
+            ("a catalogue path that does not exist exits 2, not 1", [str(root / "absent.json")], 2),
+            ("no catalogue path at all exits 2, not 0", [], 2),
+        ]
+        for name, argv, expected in cases:
+            code, output = _run_cli(argv)
+            if code != expected:
+                print(f"  MISS {name}: exited {code}")
+                last = output.strip().splitlines()
+                print(f"      last line of output: {last[-1] if last else '<none>'}")
+                failed += 1
+            else:
+                print(f"  ok   {name}")
+    return failed
 
 
 def self_test() -> int:
@@ -143,10 +209,14 @@ def self_test() -> int:
         else:
             print(f"  ok   {name}")
 
+    # The verdict cases above end here; what follows drives the same mutations
+    # through the process boundary CI actually reads.
+    failed += _exit_code_cases()
+
     if failed:
-        print(f"\nself-test FAILED: {failed} of {len(cases)} mutations not detected")
+        print(f"\nself-test FAILED: {failed} case(s) not detected correctly")
         return 1
-    print(f"\nself-test passed: {len(cases)} mutations detected, control clean")
+    print(f"\nself-test passed: {len(cases)} verdict mutations detected, control clean, exit codes pinned")
     return 0
 
 

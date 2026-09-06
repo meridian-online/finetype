@@ -108,11 +108,9 @@ jobs:
   # weekly-duckdb-compat.yml's comment on why the version is a literal rather
   # than an expression here). A SEPARATE call rather than reusing
   # MainDistributionPipeline.yml's run for this tag: that workflow triggers on
-  # the same push and produces its own, independent run, and
-  # `actions/download-artifact` only ever sees the artifacts of ITS OWN
-  # workflow run. Calling the reusable workflow again here, inside this run,
-  # is what lets the `release` job below download its output without racing
-  # or polling a sibling run for completion.
+  # the same push and produces its own, independent run. Calling the reusable
+  # workflow again here, inside this run, is what lets the `release` job below
+  # download its output without racing or polling a sibling run for completion.
   #
   # EXTENSION_DUCKDB_VERSION below must equal the `duckdb_version` given here
   # verbatim: the reusable workflow bakes it into the artifact NAME

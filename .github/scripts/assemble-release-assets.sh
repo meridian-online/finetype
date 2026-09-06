@@ -27,9 +27,11 @@
 #
 # EXIT CODES
 #   0  every expected asset assembled
-#   1  a platform's extension binary is missing, or fewer than expected were
-#      assembled
+#   1  a platform's extension binary is missing from the artifacts tree
 #   2  bad usage (missing/unreadable required argument)
+#   3  the artifacts tree holds an extension binary for a duckdb_arch that
+#      ARCH_TARGET_PAIRS below does not name, which would otherwise be dropped
+#      from the release in silence
 set -euo pipefail
 
 # arch:target pairs -- the five platforms MainDistributionPipeline.yml builds,
@@ -47,13 +49,26 @@ windows_amd64:x86_64-pc-windows-msvc
 "
 
 sha256_of() {
+	# Writes `<hash>  <BARE FILENAME>` beside $1. shasum records the path
+	# exactly AS GIVEN, so hashing "$output_dir/finetype-..." would write a
+	# sidecar naming a path that does not exist in the directory a person
+	# downloaded the release into, and `shasum -a 256 -c` there would report
+	# "FAILED open or read" and exit 1. Running from inside the file's own
+	# directory is what makes the sidecar say the bare filename -- the form the
+	# CLI tarball sidecars this repo already publishes use, which is what the
+	# sibling release notes tell a downloader to run `-c` against.
+	#
 	# shasum is macOS/Linux; sha256sum is available in Git Bash on Windows and
-	# on every GitHub-hosted Linux runner. Mirrors release.yml's own
-	# "Generate SHA256" step for the CLI tarballs.
+	# on the GitHub-hosted Linux runners. Mirrors release.yml's own
+	# "Generate SHA256" step for the CLI tarballs, which gets the same form by
+	# running in the archive's own directory.
+	local dir base
+	dir="$(dirname "$1")"
+	base="$(basename "$1")"
 	if command -v shasum &>/dev/null; then
-		shasum -a 256 "$1" >"$1.sha256"
+		(cd "$dir" && shasum -a 256 "$base" >"$base.sha256")
 	else
-		sha256sum "$1" >"$1.sha256"
+		(cd "$dir" && sha256sum "$base" >"$base.sha256")
 	fi
 }
 
@@ -77,9 +92,35 @@ assemble() {
 		find "$dir" -maxdepth 1 -type f -exec cp {} "$output_dir/" \;
 	done
 
-	local found=0 total=0 arch target src dest
+	# An extension artifact for a duckdb_arch this script does not name is a
+	# FAILURE, not a silence. ARCH_TARGET_PAIRS above and release.yml's
+	# `exclude_archs` input are two independent lists with nothing tying them
+	# together: they agree today, but a platform that upstream starts building
+	# -- or one dropped from `exclude_archs` -- would otherwise be built,
+	# downloaded, and then left off the release while every step reported
+	# success. What a downloader gets is a 404 for a platform the project
+	# believes it ships. Checked BEFORE the mapping is used, because the
+	# question is whether the mapping is still complete.
+	local arch target src dest pair uncovered="" covered
+	for dir in "$artifacts_dir"/finetype-"${ext_version}"-extension-*; do
+		[ -d "$dir" ] || continue
+		base="$(basename "$dir")"
+		arch="${base#finetype-${ext_version}-extension-}"
+		covered=false
+		for pair in $ARCH_TARGET_PAIRS; do
+			if [ "${pair%%:*}" = "$arch" ]; then
+				covered=true
+				break
+			fi
+		done
+		[ "$covered" = true ] || uncovered="${uncovered} ${arch}"
+	done
+	if [ -n "$uncovered" ]; then
+		echo "::error::extension artifact for duckdb_arch not named by ARCH_TARGET_PAIRS:${uncovered} -- add each with its Rust target triple, or exclude it in release.yml's exclude_archs" >&2
+		return 3
+	fi
+
 	for pair in $ARCH_TARGET_PAIRS; do
-		total=$((total + 1))
 		arch="${pair%%:*}"
 		target="${pair##*:}"
 		src="${artifacts_dir}/finetype-${ext_version}-extension-${arch}/finetype.duckdb_extension"
@@ -90,12 +131,7 @@ assemble() {
 		dest="${output_dir}/finetype-${tag}-${target}.duckdb_extension"
 		cp "$src" "$dest"
 		sha256_of "$dest"
-		found=$((found + 1))
 	done
-	if [ "$found" -ne "$total" ]; then
-		echo "::error::expected ${total} extension binaries, assembled ${found}" >&2
-		return 1
-	fi
 
 	return 0
 }
@@ -125,6 +161,34 @@ self_test() {
 	trap 'rm -rf "$SELFTEST_TMP"' EXIT
 	tmp="$SELFTEST_TMP"
 
+	# Deliberately NOT sha256_of: the fixture stands in for the sidecars
+	# release.yml's own `build` and `taxonomy-catalogue` jobs upload, which are
+	# written by a different code path (their inline "Generate SHA256" steps,
+	# running in the file's own directory). A fixture built by the function
+	# under test would inherit that function's defects and could not detect
+	# them -- the sidecar-form check below would pass against a broken
+	# sha256_of because the expectation had moved with it.
+	fixture_sha256() {
+		local dir base
+		dir="$(dirname "$1")"
+		base="$(basename "$1")"
+		if command -v shasum &>/dev/null; then
+			(cd "$dir" && shasum -a 256 "$base" >"$base.sha256")
+		else
+			(cd "$dir" && sha256sum "$base" >"$base.sha256")
+		fi
+	}
+
+	# Verifies one sidecar the way a downloader does: from inside the directory
+	# holding the asset, with the checker the release notes name.
+	verify_sidecar() {
+		if command -v shasum &>/dev/null; then
+			shasum -a 256 -c "$1"
+		else
+			sha256sum -c "$1"
+		fi
+	}
+
 	build_fixture() {
 		# $1: directory to build the fixture under
 		local root="$1"
@@ -135,7 +199,7 @@ self_test() {
 			ext=tar.gz
 			case "$target" in *windows*) ext=zip ;; esac
 			echo "cli-binary-for-${target}" >"$root/artifacts/finetype-${target}/finetype-vSELFTEST-${target}.${ext}"
-			sha256_of "$root/artifacts/finetype-${target}/finetype-vSELFTEST-${target}.${ext}"
+			fixture_sha256 "$root/artifacts/finetype-${target}/finetype-vSELFTEST-${target}.${ext}"
 		done
 		local arch
 		for arch in linux_amd64 linux_arm64 osx_amd64 osx_arm64 windows_amd64; do
@@ -144,9 +208,17 @@ self_test() {
 		done
 		mkdir -p "$root/artifacts/finetype-taxonomy-catalogue"
 		echo '[{"x-finetype-label":"a.b.c","pattern":"x"}]' >"$root/artifacts/finetype-taxonomy-catalogue/taxonomy-schemas.json"
-		sha256_of "$root/artifacts/finetype-taxonomy-catalogue/taxonomy-schemas.json"
+		fixture_sha256 "$root/artifacts/finetype-taxonomy-catalogue/taxonomy-schemas.json"
 		echo '{"model":"m2v8m-s43"}' >"$root/artifacts/finetype-taxonomy-catalogue/finetype-model.json"
-		sha256_of "$root/artifacts/finetype-taxonomy-catalogue/finetype-model.json"
+		fixture_sha256 "$root/artifacts/finetype-taxonomy-catalogue/finetype-model.json"
+	}
+
+	# Runs the script under test and echoes its exit code, so a case can assert
+	# WHICH refusal fired rather than only that one did.
+	run_assembly() {
+		local root="$1" rc=0
+		(cd "$root" && bash "$script" --artifacts-dir artifacts --output-dir release-assets --tag vSELFTEST --extension-duckdb-version vTEST >/dev/null 2>&1) || rc=$?
+		echo "$rc"
 	}
 
 	# ── Control: a complete tree assembles cleanly, no collisions ──────────
@@ -186,15 +258,51 @@ self_test() {
 		fi
 	fi
 
+	# ── Control, second property: what each sidecar SAYS ───────────────────
+	# Counting files and comparing binary payloads (above) cannot see a wrong
+	# filename inside a sidecar, which is how five extension sidecars naming
+	# `release-assets/finetype-...` reached a review while every check was
+	# green. A sidecar is only useful if the command the release notes name
+	# works in the directory a person downloaded the assets into, so that is
+	# the assertion: `-c` from inside `release-assets`, plus the recorded name
+	# read back and compared to the bare filename.
+	local sidecar sidecar_name recorded sidecars=0
+	local sidecars_ok=true
+	for sidecar in "$tmp/control/release-assets"/*.sha256; do
+		[ -f "$sidecar" ] || continue
+		sidecars=$((sidecars + 1))
+		sidecar_name="$(basename "$sidecar")"
+		recorded="$(awk 'NR==1 {print $2}' "$sidecar")"
+		if [ "$recorded" != "${sidecar_name%.sha256}" ]; then
+			echo "  MISS ${sidecar_name} records '${recorded}', expected the bare filename '${sidecar_name%.sha256}'"
+			sidecars_ok=false
+		fi
+		if ! (cd "$tmp/control/release-assets" && verify_sidecar "$sidecar_name" >/dev/null 2>&1); then
+			echo "  MISS ${sidecar_name} does not verify with -c from inside the download directory"
+			sidecars_ok=false
+		fi
+	done
+	if [ "$sidecars" -ne 12 ]; then
+		echo "  MISS expected 12 sidecars in the assembled directory, found ${sidecars}"
+		sidecars_ok=false
+	fi
+	if [ "$sidecars_ok" = true ]; then
+		echo "  ok   every one of the ${sidecars} sidecars names its bare filename and verifies with -c from the download directory"
+	else
+		failed=$((failed + 1))
+	fi
+
 	# ── Mutation (AC1's failure mode): one platform's extension is missing ──
+	local rc
 	mkdir -p "$tmp/missing"
 	build_fixture "$tmp/missing"
 	rm -rf "$tmp/missing/artifacts/finetype-vTEST-extension-windows_amd64"
-	if (cd "$tmp/missing" && bash "$script" --artifacts-dir artifacts --output-dir release-assets --tag vSELFTEST --extension-duckdb-version vTEST >/dev/null 2>&1); then
-		echo "  MISS a platform's extension artifact is missing: assembly succeeded anyway"
+	rc="$(run_assembly "$tmp/missing")"
+	if [ "$rc" != "1" ]; then
+		echo "  MISS a platform's extension artifact is missing: exit ${rc}, expected 1"
 		failed=$((failed + 1))
 	else
-		echo "  ok   a platform's extension artifact is missing: assembly refuses rather than shipping four"
+		echo "  ok   a platform's extension artifact is missing: assembly refuses with exit 1 rather than shipping four"
 	fi
 
 	# ── Mutation: an artifacts directory with only the catalogue (no CLI, no
@@ -202,11 +310,31 @@ self_test() {
 	#    zero extension binaries. ──
 	mkdir -p "$tmp/empty/artifacts/finetype-taxonomy-catalogue"
 	echo '[]' >"$tmp/empty/artifacts/finetype-taxonomy-catalogue/taxonomy-schemas.json"
-	if (cd "$tmp/empty" && bash "$script" --artifacts-dir artifacts --output-dir release-assets --tag vSELFTEST --extension-duckdb-version vTEST >/dev/null 2>&1); then
-		echo "  MISS an artifacts tree with no extension binaries at all: assembly succeeded anyway"
+	rc="$(run_assembly "$tmp/empty")"
+	if [ "$rc" != "1" ]; then
+		echo "  MISS an artifacts tree with no extension binaries at all: exit ${rc}, expected 1"
 		failed=$((failed + 1))
 	else
-		echo "  ok   an artifacts tree with no extension binaries at all: assembly refuses"
+		echo "  ok   an artifacts tree with no extension binaries at all: assembly refuses with exit 1"
+	fi
+
+	# ── Mutation: a SIXTH platform, built and downloaded, that this script's
+	#    ARCH_TARGET_PAIRS does not name. The complete-tree control above
+	#    passes with it present unless the script looks for it, so without this
+	#    case a platform added upstream ships as a 404. Asserted as exit 3 and
+	#    not merely non-zero: exit 1 here would mean the missing-platform rung
+	#    caught it for the wrong reason, which is a different defect wearing
+	#    this one's result. ──
+	mkdir -p "$tmp/sixth"
+	build_fixture "$tmp/sixth"
+	mkdir -p "$tmp/sixth/artifacts/finetype-vTEST-extension-linux_amd64_musl"
+	echo "EXTENSION-CONTENT-FOR-linux_amd64_musl" >"$tmp/sixth/artifacts/finetype-vTEST-extension-linux_amd64_musl/finetype.duckdb_extension"
+	rc="$(run_assembly "$tmp/sixth")"
+	if [ "$rc" != "3" ]; then
+		echo "  MISS an extension artifact for a platform ARCH_TARGET_PAIRS does not name: exit ${rc}, expected 3"
+		failed=$((failed + 1))
+	else
+		echo "  ok   an extension artifact for a platform ARCH_TARGET_PAIRS does not name: assembly refuses with exit 3 rather than dropping it"
 	fi
 
 	if [ "$failed" -ne 0 ]; then
@@ -262,13 +390,19 @@ main() {
 		exit 2
 	fi
 
-	if assemble "$artifacts_dir" "$output_dir" "$tag" "$ext_version"; then
-		echo "Release assets:"
-		ls -la "$output_dir/"
-		exit 0
-	else
-		exit 1
+	# Propagate assemble's own code rather than collapsing every refusal to 1:
+	# "a platform is missing" (1) and "a platform is present that this script
+	# cannot name" (3) are different defects with different fixes, and a caller
+	# -- including the self-test below -- that cannot tell them apart cannot
+	# tell whether the rung it meant to exercise is the one that fired.
+	local status=0
+	assemble "$artifacts_dir" "$output_dir" "$tag" "$ext_version" || status=$?
+	if [ "$status" -ne 0 ]; then
+		exit "$status"
 	fi
+	echo "Release assets:"
+	ls -la "$output_dir/"
+	exit 0
 }
 
 main "$@"
