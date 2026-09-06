@@ -484,7 +484,6 @@ all: release
 # tag. Untracking it fixes CI, where each checkout is fresh, and does nothing
 # for a developer's tree, where the previous build's file persists and a second
 # tag built in it keeps the FIRST tag's version.
-
 #
 # A phony prerequisite is never up to date, so the target never is. This adds a
 # prerequisite to the included rule rather than redefining its recipe: a second

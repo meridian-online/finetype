@@ -217,7 +217,6 @@ DISTRIBUTED_PLATFORMS = (
 )
 
 
-
 class Refused(Exception):
     """A finding. Carries the exit code that says WHICH rung refused."""
 
@@ -471,7 +470,6 @@ def check_loaded(
     fields = stamp_fields(extension)
     require_native(extension, fields)
     row = readings(extension)
-
 
     if not row.get("loaded"):
         raise Refused(
@@ -982,7 +980,6 @@ def self_test(artifact: Path) -> int:
         plain = tmp_path / "unstamped.bin"
         plain.write_bytes(artifact.read_bytes()[:-TRAILER_LEN])
 
-
         # The version the artefact reports at RUN TIME, compiled into it from
         # Cargo.toml. Read once and used to build the AC5 fixtures, so those
         # cases pin "the trailer agrees with what this artefact says about
@@ -1016,7 +1013,6 @@ def self_test(artifact: Path) -> int:
             out.parent.mkdir(parents=True, exist_ok=True)
             _stamp(plain, out, version, base, platform)
             return out
-
 
         fixtures = {
             # Byte-level cases: the version and the tag are both chosen here, so
@@ -1079,7 +1075,6 @@ def self_test(artifact: Path) -> int:
                 failures.append(f"  MISS {label}: {'; '.join(wrong)}")
             else:
                 print(f"  ok   {label}")
-
 
         # ── Controls ───────────────────────────────────────────────────────
         case("a tag-stamped artefact under its own tag", [
@@ -1217,8 +1212,6 @@ def self_test(artifact: Path) -> int:
             "no longer match what the stamper writes",
         )
 
-
-
         # ── AC2, against real git trees. `git ls-files` reads the INDEX, so a
         #    fixture needs `add` and no commit -- which also keeps a repository
         #    hook out of a case that is about neither. ───────────────────────
@@ -1349,10 +1342,24 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
             {RELEASE_WORKFLOW: sub(byte_step + "        shell: bash\n", byte_step)},
             EXIT_UNWIRED, "`pipefail`")
 
+        # Three rungs, three cases, and the two below are why. Deleting BOTH
+        # stamp steps fires all three at once, so that case alone leaves the two
+        # counting rungs deletable: a lower rung catches the same input and says
+        # something else. Each of these leaves one step standing, so exactly one
+        # rung can answer it.
+        wiring_case(
+            "only the step that loads an artefact deleted",
+            {RELEASE_WORKFLOW: cut(load_step, publish_step)},
+            EXIT_UNWIRED, "running `check_extension_stamp.py --load`, found 0")
+        wiring_case(
+            "only the step that reads the five trailers deleted",
+            {RELEASE_WORKFLOW: cut(byte_step, load_step)},
+            EXIT_UNWIRED, "and no `--load`, found 0")
         wiring_case(
             "both stamp steps deleted from the release",
             {RELEASE_WORKFLOW: cut(byte_step, publish_step)},
             EXIT_UNWIRED, "runs `check_extension_stamp.py` nowhere")
+
         wiring_case(
             "the stamp steps moved after the publish",
             {RELEASE_WORKFLOW: swap(byte_step, publish_step, "\n  publish-crates:\n")},
@@ -1384,7 +1391,6 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
             "the distribution stamp job not needing the build",
             {DISTRIBUTION_WORKFLOW: sub("    needs: duckdb-stable-build\n", "")},
             EXIT_UNWIRED, "does not `needs:` the job that builds the binaries")
-
 
     if failures:
         print("")

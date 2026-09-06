@@ -235,7 +235,6 @@ class Job:
     uses: str = ""
 
 
-
 @dataclass
 class Step:
     job: str
@@ -447,7 +446,6 @@ def _apply_step_key(step: Step, key: str, values: list[str]) -> None:
         step.uses = " ".join(values)
     elif key == "shell":
         step.shell = " ".join(values)
-
 
 
 # ── discovery ───────────────────────────────────────────────────────────────
