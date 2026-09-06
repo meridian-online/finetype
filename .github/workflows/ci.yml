@@ -464,6 +464,24 @@ jobs:
         # In-job by design, and it audits before it plans; see the identical step
         # in the `gate-routing-self-test` job for why.
         run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+
+      - name: The extension's version file is generated, not committed
+        # Both halves of the defect that stamped one version onto every release
+        # for months. The build writes configure/ on the configure step, and a
+        # tracked copy arrives with every checkout — after which the rule that
+        # would rewrite it, which has no prerequisites, is never run. First here
+        # in the job because it costs milliseconds and nothing below it can be
+        # trusted while it is false.
+        run: scripts/check_extension_stamp.py --untracked-version-file
+
+      - name: ...and the build rewrites it even when one is already on disk
+        # Untracking fixes CI, where every checkout is fresh, and nothing else.
+        # Asked of make with `make -n`, so what is read is make's rebuild
+        # decision on the real Makefile rather than a string in it. Needs the
+        # extension-ci-tools submodule this job already checks out, for the
+        # include; no toolchain.
+        run: scripts/check_extension_stamp.py --regenerates-version-file
+
       - run: rustup show
       - uses: Swatinem/rust-cache@v2
       - name: Install duckdb CLI
@@ -478,6 +496,27 @@ jobs:
         # Just the cdylib + the metadata stamp — not the CLI, eval binaries or
         # trainer. `make build-release` would build all of them.
         run: make build-extension
+
+      - name: The extension's run-time version and its own trailer are one version
+        # ONE artefact, ONE load, two independent readings: `ft_version()` is
+        # compiled in from Cargo.toml, and `duckdb_extensions().extension_version`
+        # is DuckDB's own reading of the metadata trailer the build stamped.
+        # Asserting each against a literal instead would pass while the artefact
+        # disagreed with itself, which is the shape a consumer actually hits —
+        # it reads the trailer before loading and the function after.
+        #
+        # The LOAD is also the only thing here that establishes identity: any
+        # stamped shared library satisfies a trailer read, and only running one
+        # proves it is this extension.
+        run: scripts/check_extension_stamp.py --artifact target/release/finetype.duckdb_extension --load
+
+      - name: ...and the stamp gate detects a trailer that is not the release
+        # Fixtures are copies of the artefact above, re-stamped with the real
+        # extension-ci-tools stamper — so each still loads, and the run-time
+        # mismatch case is driven by an artefact that genuinely disagrees with
+        # itself rather than by a mutated comparison.
+        if: steps.route.outputs.extension_stamp == 'true'
+        run: scripts/check_extension_stamp.py --self-test --artifact target/release/finetype.duckdb_extension
 
       - name: The spike still compiles, off the default build
         # crates/finetype-duckdb/src/spike.rs is a trivial VTab kept as living

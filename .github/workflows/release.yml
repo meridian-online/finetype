@@ -253,6 +253,58 @@ jobs:
             --tag "${GITHUB_REF_NAME}" \
             --extension-duckdb-version "${EXTENSION_DUCKDB_VERSION}"
 
+      # ── The stamp, read off the bytes that are about to be published ──────
+      #
+      # THIS IS THE LAST POINT AT WHICH A WRONG VERSION CAN BE STOPPED. The
+      # `build-extension` job above is a bare `uses:` of a reusable workflow and
+      # cannot carry a step, so the artefacts are checked here, after they are
+      # downloaded and named and before `Create release` attaches them.
+      #
+      # The stamp is the only version an extension carries in a form a machine
+      # can read before loading it — DuckDB surfaces it as
+      # `duckdb_extensions().extension_version`, and a packager reads it
+      # straight out of the last 512 bytes. Read here off the artefact's own
+      # bytes, never from the file the build wrote into configure/: those two
+      # disagreeing is the whole defect this guards.
+      #
+      # A pull-request build is checked too, against the abbreviated commit
+      # rather than a tag, by the `stamp` job in MainDistributionPipeline.yml —
+      # so the autodetection is observed on every build and not only on the few
+      # days a year a tag is cut.
+      - name: The extension binaries carry this tag, read off their own bytes
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(release-assets/finetype-"${GITHUB_REF_NAME}"-*.duckdb_extension)
+          if [ "${#files[@]}" -ne 5 ]; then
+            echo "::error::expected 5 extension binaries in release-assets, found ${#files[@]}" >&2
+            exit 1
+          fi
+          args=()
+          for f in "${files[@]}"; do args+=(--artifact "$f"); done
+          scripts/check_extension_stamp.py "${args[@]}" --tag "${GITHUB_REF_NAME}"
+
+      # A correct trailer is not evidence the artefact is this extension: any
+      # stamped shared library passes the reading above. This loads the one
+      # binary a linux_amd64 runner can load and makes it answer for itself —
+      # `ft_version()` (compiled in from Cargo.toml) against its own trailer
+      # (written by the build contract from the tag), off one file in one
+      # session. It is also what refuses a tag cut against a tree whose
+      # Cargo.toml version says something else.
+      #
+      # The other four platforms are NOT load-verified here and cannot be on
+      # this runner; the byte reading above is all they get.
+      - name: ...and the one this runner can load agrees with itself and the tag
+        shell: bash
+        run: |
+          curl -fsSL -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
+          unzip -o duckdb.zip
+          sudo mv duckdb /usr/local/bin/duckdb
+          duckdb --version
+          scripts/check_extension_stamp.py \
+            --artifact "release-assets/finetype-${GITHUB_REF_NAME}-x86_64-unknown-linux-gnu.duckdb_extension" \
+            --load --tag "${GITHUB_REF_NAME}"
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:

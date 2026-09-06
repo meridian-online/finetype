@@ -472,6 +472,31 @@ endif
 configure: venv platform extension_version
 all: release
 
+# The version file is REWRITTEN on every configure step, and the phony
+# prerequisite below is the whole mechanism.
+#
+# base.Makefile declares configure/extension_version.txt as a file target with
+# no prerequisites, so make treats an existing one as up to date and never runs
+# the autodetection again. Two consequences, and the first one shipped: the file
+# used to be tracked, so every checkout arrived with it and the autodetection has
+# never run in CI at all -- every published artefact carries the committed
+# literal. Untracking it fixes CI, where each checkout is fresh, and does nothing
+# for a developer's tree, where the previous build's file persists and a second
+# tag built in it keeps the FIRST tag's version.
+#
+# A phony prerequisite is never up to date, so the target never is. This adds a
+# prerequisite to the included rule rather than redefining its recipe: a second
+# recipe would print "overriding recipe for target" and pin this repository to a
+# copy of upstream's implementation.
+#
+# `scripts/check_extension_stamp.py --regenerates-version-file` asks make itself
+# whether this still holds, and --untracked-version-file refuses the file's
+# return to git.
+.PHONY: extension_version_is_regenerated
+extension_version_is_regenerated:
+
+configure/extension_version.txt: extension_version_is_regenerated
+
 build_extension_library_release: check_configure
 	DUCKDB_EXTENSION_NAME=$(EXTENSION_NAME) DUCKDB_EXTENSION_MIN_DUCKDB_VERSION=$(TARGET_DUCKDB_VERSION) \
 		cargo build -p finetype_duckdb --release $(DUCKDB_CARGO_TARGET)
