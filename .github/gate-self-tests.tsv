@@ -30,8 +30,8 @@
 # along with the proofs. `--self-test` carries a named case per shape and that
 # case list, not a count in prose, is the enumeration.
 #
-# THE JOB-LEVEL `continue-on-error` IS ITS OWN SHAPE and this sentence claimed it
-# for a year without covering it. The step-level key leaves the JOB green; the
+# THE JOB-LEVEL `continue-on-error` IS ITS OWN SHAPE and the sentence above
+# claimed it without covering it. The step-level key leaves the JOB green; the
 # job-level key leaves the WORKFLOW green -- the job reddens and the run reports
 # success -- so every proof in it, and every always-on check beside them, can
 # fail on every pull request without blocking a merge. It is refused for routed

@@ -9,8 +9,8 @@ DECLARATION IN release.yml that some other file has to be read against.
                                  checksum is absent from what it was handed
     2. the artifact uploads   -- `if-no-files-found: error` fires only when the
                                  UNION of a step's globs comes up empty, so
-                                 dropping one glob of three is silent. E below
-                                 is what reads that
+                                 dropping one glob of three is silent.
+                                 `glob-not-load-bearing` reads that
     3. the release step's
        `files:` list          -- guarded by NOTHING before this file existed
 
@@ -22,44 +22,77 @@ nothing about an entry that is gone. The same shape applies to the
 `--threshold` the release workflow hands `check_model_coverage.py` -- set it to
 0.0 and the coverage gate is a no-op at release time with nothing in this
 repository noticing, and `continue-on-error: true` on that same step reaches
-the identical outcome by a different route (F).
+the identical outcome by a different route, which `advisory-step` reads.
 
-WHAT IS CHECKED
-    A  Every file `assemble-release-assets.sh` actually produces is matched by
-       at least one glob in the release step's `files:` list.
-    B  Every glob in that list matches at least one produced file. A glob that
-       can never match is what `fail_on_unmatched_files: true` turns into a
-       failed release, so it is a failure here, on a pull request, instead.
-    C  `fail_on_unmatched_files: true` is set, so B's property is enforced at
-       release time as well as here.
-    D  The `--threshold` the release workflow passes `check_model_coverage.py`
-       equals that script's own `MIN_COVERAGE`, and behaves: it refuses a
-       catalogue covering half the model's labels and accepts one covering all
-       of them. Equality is deliberate rather than a range. A release that
-       wants a stricter bar moves `MIN_COVERAGE`, where the reasoning for the
-       number already lives, and both places move together.
-    E  Every glob in an upload step's `path:` list is LOAD-BEARING: with that
-       one glob removed the release path refuses. This is the rung that reads
-       the build job's uploads. Drop `finetype-*.sha256` from them and nothing
-       else in this repository notices -- the union is non-empty so the upload
-       is silent, all five archives assemble, and the tag publishes them with
-       no checksum. It also enumerates the taxonomy upload's claim that its
-       four globs are exactly the assembler's exit-4 list: each one, removed,
-       has to produce that refusal.
-    F  No job and no step in the release workflow carries `continue-on-error`.
-       A refusal that leaves the job green is the same nothing as a deleted
-       refusal, and the coverage step is only one of the places it would land.
-    G  The tap formula's asset check runs, unguarded, before the step that
-       pushes the formula -- the ordering that comment claims for it.
-    H  Every artifact the assembler expects to download is uploaded by a step
-       here, and the Rust target triples it names extension binaries for are
-       exactly the ones the build matrix ships a CLI archive for -- so no
-       platform ends up with one half of a release and a 404 for the other.
+WHAT IS CHECKED, BY THE ID EACH FAILURE CARRIES
+    Named rather than lettered, and the names are the ids in `RUNGS` below. A
+    letter is a position in a list, so removing one rung renames the rest
+    underneath every sentence that referred to them -- which is exactly what
+    happened here when a rung was deleted and four cross-references were left
+    pointing at letters that had moved.
+
+    unshipped         Every file `assemble-release-assets.sh` produces is
+                      matched by at least one glob in the release step's
+                      `files:` list.
+    unassembled       ...and every file those globs match is one the assembler
+                      produced. The converse is a different claim and its
+                      absence was load-bearing: one added line,
+                      `artifacts/*/finetype.duckdb_extension`, publishes five
+                      raw downloaded binaries -- identically named, never
+                      renamed for the tag, never checksummed, and not the file
+                      the load step read a stamp off. Together the two make the
+                      published set and the produced set equal.
+    release-dead-glob Every glob in that list matches at least one produced
+                      file. A glob that can never match is what
+                      `fail_on_unmatched_files: true` turns into a failed
+                      release, so it is a failure here, on a pull request.
+    unmatched-setting `fail_on_unmatched_files: true` is set, so the rung above
+                      holds at release time as well as here.
+    threshold-drift, threshold-noop, threshold-refuses
+                      The `--threshold` the release workflow passes
+                      `check_model_coverage.py` equals that script's own
+                      `MIN_COVERAGE`, and behaves: it refuses a catalogue
+                      covering half the model's labels and accepts one covering
+                      all of them. Equality is deliberate rather than a range. A
+                      release that wants a stricter bar moves `MIN_COVERAGE`,
+                      where the reasoning for the number already lives, and both
+                      places move together.
+    glob-not-load-bearing
+                      Every glob in an upload step's `path:` list is
+                      LOAD-BEARING: with that one glob removed the release path
+                      refuses. This is the rung that reads the build job's
+                      uploads. Drop `finetype-*.sha256` from them and nothing
+                      else in this repository notices -- the union is non-empty
+                      so the upload is silent, all five archives assemble, and
+                      the tag publishes them with no checksum. It also
+                      enumerates the taxonomy upload's claim that its four globs
+                      are exactly the assembler's exit-4 list: each one,
+                      removed, has to produce that refusal.
+    upload-warn, upload-dead-glob, upload-undelivered
+                      The uploads themselves: `if-no-files-found: error` is set,
+                      no glob is dead, and what they deliver is what the
+                      assembler needs.
+    advisory-job, advisory-step
+                      No job and no step in the release workflow carries
+                      `continue-on-error`. A refusal that leaves the job green
+                      is the same nothing as a deleted refusal, and the coverage
+                      step is only one of the places it would land.
+    formula-count, formula-guard, formula-push, formula-order
+                      The tap formula's asset check is exactly one step, carries
+                      no `if:`, and runs before the step that pushes the formula
+                      -- the ordering that comment claims for it.
+    artifacts-mismatch, platform-mismatch
+                      Every artifact the assembler expects to download is
+                      uploaded by a step here, and the Rust target triples it
+                      names extension binaries for are exactly the ones the
+                      build matrix ships a CLI archive for -- so no platform
+                      ends up with one half of a release and a 404 for the
+                      other.
 
 HOW, AND WHY IT IS NOT A SOURCE SCAN
-    A, B, E and H RUN the assembler against a synthetic artifacts tree and
-    glob the real directory it writes; D IMPORTS `check_model_coverage` and
-    runs it as a subprocess. Nothing here parses the assembler's source or
+    Every rung above except the three threshold ones RUNS the assembler against
+    a synthetic artifacts tree and globs the real directory it writes; those
+    three IMPORT `check_model_coverage` and run it as a subprocess. Nothing here parses the assembler's source or
     reads a number out of it, because the defect this whole card kept producing
     is a check that reads the shape of some code instead of asking what the
     code does.
@@ -164,26 +197,49 @@ class Unreadable(Exception):
 # the next one has to be about the SET of failures rather than about any of
 # them, and the only set nothing can add to quietly is the one the emitting
 # constructor enforces.
-RUNGS = {
-    "advisory-job": "a job in the release workflow carries `continue-on-error`",
-    "advisory-step": "a step in the release workflow carries `continue-on-error`",
-    "formula-count": "the formula asset check is not exactly one step",
-    "formula-guard": "the formula asset check carries an `if:`",
-    "formula-push": "the formula job runs the check and never pushes",
-    "formula-order": "the formula asset check runs after the push",
-    "upload-warn": "an upload step is not `if-no-files-found: error`",
-    "upload-dead-glob": "an upload glob matches nothing the job produces",
-    "upload-undelivered": "the declared uploads do not deliver what the assembler needs",
-    "release-dead-glob": "a `files:` glob matches nothing the assembler produces",
-    "unshipped": "the assembler produces an asset no `files:` glob carries",
-    "unmatched-setting": "fail_on_unmatched_files is not `true`",
-    "artifacts-mismatch": "an artifact is built and not uploaded, or uploaded and not built",
-    "platform-mismatch": "the CLI archives and the extension binaries cover different platforms",
-    "glob-not-load-bearing": "removing an upload glob costs the release path nothing",
-    "threshold-drift": "the release threshold is not MIN_COVERAGE",
-    "threshold-noop": "at that threshold a half-covered catalogue is accepted",
-    "threshold-refuses": "at that threshold a fully covered catalogue is refused",
-}
+_RUNG_REGISTER: tuple[tuple[str, str], ...] = (
+    ("advisory-job", "a job in the release workflow carries `continue-on-error`"),
+    ("advisory-step", "a step in the release workflow carries `continue-on-error`"),
+    ("formula-count", "the formula asset check is not exactly one step"),
+    ("formula-guard", "the formula asset check carries an `if:`"),
+    ("formula-push", "the formula job runs the check and never pushes"),
+    ("formula-order", "the formula asset check runs after the push"),
+    ("upload-warn", "an upload step is not `if-no-files-found: error`"),
+    ("upload-dead-glob", "an upload glob matches nothing the job produces"),
+    ("upload-undelivered", "the declared uploads do not deliver what the assembler needs"),
+    ("release-dead-glob", "a `files:` glob matches nothing the assembler produces"),
+    ("unshipped", "the assembler produces an asset no `files:` glob carries"),
+    ("unassembled", "a `files:` glob carries a file the assembler did not produce"),
+    ("unmatched-setting", "fail_on_unmatched_files is not `true`"),
+    ("artifacts-mismatch", "an artifact is built and not uploaded, or uploaded and not built"),
+    ("platform-mismatch", "the CLI archives and the extension binaries cover different platforms"),
+    ("glob-not-load-bearing", "removing an upload glob costs the release path nothing"),
+    ("threshold-drift", "the release threshold is not MIN_COVERAGE"),
+    ("threshold-noop", "at that threshold a half-covered catalogue is accepted"),
+    ("threshold-refuses", "at that threshold a fully covered catalogue is refused"),
+)
+
+
+def _register(entries: tuple[tuple[str, str], ...]) -> dict[str, str]:
+    """The register as a mapping, refusing a repeated id rather than merging it.
+
+    It was a dict literal, and a repeated key in one of those MERGES: two rungs
+    took one id, the register silently shrank by one, and the sweep at the foot
+    of `self_test` reported "across all 17 rungs" and passed. A register that
+    can be added to and get smaller is not an enumeration of anything.
+    """
+    out: dict[str, str] = {}
+    for rung, description in entries:
+        if rung in out:
+            raise Unreadable(
+                f"`{rung}` is registered twice in RUNGS. Two rungs sharing an id leave one of "
+                "them unpinnable: a case declaring that id passes on the other one's failure"
+            )
+        out[rung] = description
+    return out
+
+
+RUNGS = _register(_RUNG_REGISTER)
 
 
 @dataclass(frozen=True)
@@ -662,7 +718,7 @@ def deliver(
 def platforms(
     ups: list[Upload], pristine: Path, produced: list[str], where: str
 ) -> list[Failure]:
-    """I: both halves of a release cover the same platforms, and every artifact is uploaded.
+    """`artifacts-mismatch` and `platform-mismatch`: one release, one set of platforms.
 
     Two independent lists that nothing ties together. `ARCH_TARGET_PAIRS` in
     the assembler names the Rust target triple each extension binary is
@@ -773,7 +829,7 @@ def coverage_exit(coverage_script: Path, root: Path, threshold: str, covered: in
 
 
 def advisory(jobs: dict, steps: list, where: str) -> list[Failure]:
-    """G: nothing in the release workflow may be allowed to fail quietly.
+    """`advisory-job` and `advisory-step`: nothing here may be allowed to fail quietly.
 
     The key is refused whatever its value. At `true` the thing it is on reddens
     and the workflow reports success; at `false` it is the default written out,
@@ -804,7 +860,7 @@ def advisory(jobs: dict, steps: list, where: str) -> list[Failure]:
 
 
 def formula_order(steps: list, where: str) -> list[Failure]:
-    """H: the formula's asset check runs, unguarded, before the formula is pushed."""
+    """`formula-*`: the asset check runs, unguarded, before the formula is pushed."""
     checks = [s for s in steps if any(FORMULA_CHECK in line for line in s.commands)]
     if len(checks) != 1:
         # Not `< 1`. TWO of them is the shape that matters and the one a zero
@@ -913,14 +969,38 @@ def check(workflow: Path, assembler: Path, coverage_script: Path) -> list[Failur
                     "`files:` list matches it, so the tag would not carry it",
                 ))
 
-        # A PAIRING RUNG OVER THE PUBLISHED SET USED TO SIT HERE, and it is
-        # deleted rather than pinned: it could not fail on its own. The two
-        # rungs above and beside it already say everything it said. `unshipped`
-        # requires every file the assembler produces to be carried by a `files:`
-        # glob, so the published set IS the produced set; the assembler exits 5
-        # on any produced file without its `.sha256`, so the produced set is
-        # paired. A rung whose only failures arrive alongside another rung's is
-        # not a check, it is a second sentence about one.
+        # THE OTHER DIRECTION, and the premise a deletion here rested on
+        # without it being true. `unshipped` says produced is a subset of
+        # published; it says nothing about a `files:` entry pointing OUTSIDE
+        # the directory the assembler wrote. Measured on this file's own
+        # fixture: adding one line, `artifacts/*/finetype.duckdb_extension`,
+        # publishes five raw downloaded binaries -- identically named, so the
+        # release carries whichever the action resolves; never renamed for the
+        # tag; never checksummed; and not the file the load step verified -- and
+        # every rung here was green over it.
+        #
+        # Behavioural, not a prefix test on the glob text: what is asked is
+        # whether the file the glob MATCHED is one the assembler wrote. That
+        # needs no constant naming the output directory and it catches the
+        # shapes a prefix would miss, such as a second copy of an asset under
+        # its artifact directory, which is paired, correctly named, and a
+        # duplicate upload.
+        for asset in sorted(matched - set(produced)):
+            failures.append(Failure(
+                "unassembled",
+                f"the release step's `files:` list carries `{asset}`, which the assembler did "
+                "not produce. The tag would publish bytes nothing here named for it, "
+                "checksummed, or read a stamp off",
+            ))
+
+        # A PAIRING RUNG OVER THE PUBLISHED SET USED TO SIT HERE, and it stays
+        # deleted -- but only now that the rung above exists. Its argument was
+        # that `unshipped` makes the published set the produced set, which is
+        # half true: `unshipped` gives produced subset of published, and
+        # `unassembled` gives published subset of produced. With BOTH, the two
+        # sets are equal, and the assembler exits 5 on any produced file
+        # without its `.sha256`, so every published file is paired. Both
+        # premises are rungs with cases; before, one of them was prose.
         if unmatched_setting != "true":
             failures.append(Failure(
                 "unmatched-setting",
@@ -928,7 +1008,7 @@ def check(workflow: Path, assembler: Path, coverage_script: Path) -> list[Failur
                 "so a glob that stops matching is skipped with a warning at release time",
             ))
 
-        # F, one glob at a time. Removing an entry from a `path:` list is
+        # `glob-not-load-bearing`, one glob at a time. Removing an entry is
         # exactly what `if-no-files-found: error` cannot see, and it is the way
         # the CLI sidecars went unrequired: the union stays non-empty, the
         # upload is silent, and the release path has to be the thing that says
@@ -1198,6 +1278,20 @@ def self_test() -> int:
             "advisory-step",
             "carries `continue-on-error: true`",
         ),
+        # ONE LINE, and the release publishes five raw downloaded binaries:
+        # identically named, so the action carries whichever it resolves; never
+        # renamed for the tag; never checksummed; and not the file the load step
+        # read a stamp off. It pins alone -- every other rung is green over it,
+        # which is how the deletion argument for the published-pairing rung came
+        # to be written with half a premise.
+        (
+            "a `files:` entry reaching outside what the assembler assembled",
+            "            release-assets/finetype-model.json\n",
+            "            release-assets/finetype-model.json\n"
+            "            artifacts/*/finetype.duckdb_extension\n",
+            "unassembled",
+            "which the assembler did not produce",
+        ),
         # ── the rungs this file shipped without a case, found in review ──────
         # A job-level `continue-on-error` is not the step-level one: the job
         # still reddens, and every job whose `needs:` names it runs anyway --
@@ -1361,6 +1455,30 @@ def self_test() -> int:
 
     failed = 0
     pinned: set[str] = set()
+
+    # ── the register, before anything reads it ──────────────────────────────
+    #
+    # It was a dict literal, and a repeated key MERGES: two rungs under one id
+    # left the register a line shorter, the sweep at the foot of this function
+    # printed "across all 17 rungs", and it passed. The cardinality is asserted
+    # here and the refusal is exercised, because a register that can be added to
+    # and get smaller enumerates nothing.
+    if len(RUNGS) != len(_RUNG_REGISTER):
+        print(
+            f"  MISS the register has {len(_RUNG_REGISTER)} entries and {len(RUNGS)} ids; "
+            "an id is written twice and one rung of the pair can never be pinned"
+        )
+        failed += 1
+    else:
+        print(f"  ok   the rung register holds {len(RUNGS)} ids, one per entry")
+    try:
+        _register(_RUNG_REGISTER + ((_RUNG_REGISTER[0][0], "a second entry under a taken id"),))
+    except Unreadable:
+        print("  ok   a repeated id is refused rather than merged away")
+    else:
+        print("  MISS a repeated id merged into the register instead of being refused")
+        failed += 1
+
     with tempfile.TemporaryDirectory() as tmpdir:
         mutated = Path(tmpdir) / "release.yml"
 

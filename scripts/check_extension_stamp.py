@@ -754,6 +754,9 @@ MODES = (
 )
 CI_WORKFLOW = ".github/workflows/ci.yml"
 MANIFEST_REL = ".github/gate-self-tests.tsv"
+# This file, as the routing manifest spells it. A guard on a step of this gate
+# has to name a row that watches this path, or it routes by something else.
+SELF_REL = "scripts/check_extension_stamp.py"
 
 
 def _logical_lines(step) -> list[str]:
@@ -810,10 +813,21 @@ CLI_FETCH_CALL = _invocation_re(DUCKDB_CLI_FETCH)
 ROUTING_GUARD = re.compile(r"steps\.[A-Za-z0-9_-]+\.outputs\.([a-z][a-z0-9_]*) == 'true'")
 
 
-def _is_routing_guard(condition: str, routed_ids: set[str]) -> bool:
-    """This `if:` routes the step, rather than switching it off."""
+def _is_routing_guard(condition: str, gates: list) -> bool:
+    """This `if:` routes the step BY THIS GATE, rather than switching it off.
+
+    Any registered id was enough until a review pointed at what that admits:
+    `steps.route.outputs.map_fidelity_results == 'true'` on a step of this gate
+    is a well-formed routing guard for a row that watches the fidelity
+    evaluation, so the mode would run only on diffs touching a directory it has
+    nothing to do with, and this rung would call it invoked. The row has to
+    watch THIS file, which is the only thing that makes "routed" mean "runs when
+    what it checks changes".
+    """
     match = ROUTING_GUARD.fullmatch(condition.strip())
-    return bool(match) and match.group(1) in routed_ids
+    if not match:
+        return False
+    return any(gate.id == match.group(1) and SELF_REL in gate.paths for gate in gates)
 
 
 def _installs_duckdb_cli(step) -> bool:
@@ -1122,7 +1136,7 @@ def check_release_wiring(root: Path) -> list[str]:
     except Exception as exc:  # noqa: BLE001 -- Fatal is the reader's, not ours
         raise Refused(EXIT_CANNOT_RUN, f"{CI_WORKFLOW} could not be read: {exc}") from None
     try:
-        routed_ids = {gate.id for gate in reader.load_manifest(root)}
+        gates = reader.load_manifest(root)
     except Exception as exc:  # noqa: BLE001
         raise Refused(EXIT_CANNOT_RUN, f"the routing manifest could not be read: {exc}") from None
     workflow_steps += ci_steps
@@ -1134,7 +1148,7 @@ def check_release_wiring(root: Path) -> list[str]:
         # what it checks, which is the arrangement .github/gate-self-tests.tsv
         # exists to make -- so a guard is accepted when it is exactly a routing
         # comparison naming a gate that manifest registers, and not otherwise.
-        if step.condition and not _is_routing_guard(step.condition, routed_ids):
+        if step.condition and not _is_routing_guard(step.condition, gates):
             continue
         for line in _calls(step, GATE_CALL):
             invoked.update(mode for mode in MODES if mode in line.split())
@@ -2133,6 +2147,18 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
         # ...and the same step still there, behind a condition that never
         # holds. Presence is what the rung read; this is the difference between
         # a step that exists and a step that runs.
+        # A guard that IS routing, for something else. Well-formed, names a
+        # real row, and routes this gate's mode by whether a diff touched the
+        # fidelity evaluation -- so the mode runs on almost no pull request that
+        # could break it.
+        wiring_case(
+            "a mode of this gate routed by another gate's row",
+            {CI_WORKFLOW: sub(
+                "        run: scripts/check_extension_stamp.py --regenerates-version-file\n",
+                "        if: steps.route.outputs.map_fidelity_results == 'true'\n"
+                "        run: scripts/check_extension_stamp.py --regenerates-version-file\n")},
+            EXIT_UNWIRED,
+            "--regenerates-version-file` is a mode this gate offers and no step")
         wiring_case(
             "a mode of this gate switched off with `if: false`",
             {CI_WORKFLOW: sub(
