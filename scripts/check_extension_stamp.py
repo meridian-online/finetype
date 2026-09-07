@@ -992,7 +992,7 @@ def check_release_wiring(root: Path) -> list[str]:
     # `--load` needs `duckdb` on PATH and a GitHub runner has none. The install
     # is a step of its own rather than lines inside the stamp step, so that the
     # stamp step's `run:` is the gate call and nothing else and --release-rehearsal
-    # can run it verbatim. The cost of that split is this rung: without an install
+    # can run it as it stands, comment lines dropped and continuations joined. The cost of that split is this rung: without an install
     # step before it, the load exits 2 with "duckdb is not on PATH" -- on a tag,
     # and nowhere else, which is the shape this whole mode exists to refuse.
     installers = [
@@ -1145,10 +1145,12 @@ def check_release_rehearsal(root: Path, artifact: Path) -> list[str]:
     # the mode close a class rather than a path. The defect was a line only a
     # pushed tag executed; a step added to this job tomorrow is another one, and
     # a rehearsal that quietly walked past it would read exactly like a
-    # rehearsal that covered it. Exactly one kind of step may be skipped: the
-    # DuckDB CLI install, which is a `curl` and a `sudo mv` that no contributor's
-    # machine can run. Its presence and position are checked by --release-wiring
-    # instead, which is a weaker guarantee and is why it is the only exemption.
+    # rehearsal that covered it. One kind of step is skipped: any step whose
+    # `run:` lines mention `duckdb_cli-`, meant as the DuckDB CLI install, which
+    # is a `curl` and a `sudo mv` that no contributor's machine can run. That is
+    # a match by mention -- a comment naming the marker exempts a step too, and
+    # --release-wiring's presence rung reads the same way -- so the exemption is
+    # wider than the one step it is for.
     unexercised = [
         step
         for step in steps

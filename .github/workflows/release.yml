@@ -288,7 +288,7 @@ jobs:
       # at the top of it. The stamp step's `run:` is then the gate call and
       # nothing else, which is what lets
       # `scripts/check_extension_stamp.py --release-rehearsal` execute that
-      # `run:` VERBATIM on a pull request — this workflow runs only on a pushed
+      # `run:` on a pull request, comment lines dropped and continuations joined — this workflow runs only on a pushed
       # tag, so nothing else ever executes it. A `curl | sudo mv` cannot be run
       # on a contributor's machine, so leaving it inside the stamp step would
       # have meant rehearsing an edited copy of the step, which is a rehearsal
