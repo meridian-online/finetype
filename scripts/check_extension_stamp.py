@@ -729,6 +729,15 @@ ASSEMBLER = "assemble-release-assets.sh"
 # needs `duckdb` on PATH, and the runner has none: an install step that goes
 # missing turns the load into "duckdb is not on PATH" on a tag and nowhere else.
 DUCKDB_CLI_MARK = "duckdb_cli-"
+# How it is fetched. The marker alone is a MENTION, and both places that read it
+# were reading mentions: a comment naming `duckdb_cli-` satisfied the rung below
+# that requires an install above the load, and exempted a step from the
+# rehearsal's enumeration. Measured: replacing the install step's `curl` with a
+# comment naming the marker and an `echo` left every check in this repository
+# green while a tag would exit 2 at the load, and a step whose entire `run:` was
+# `# same pin as the duckdb_cli- install above` / `exit 3` was never run by
+# anything. Same reason `_invocation_re` exists for the gate itself.
+DUCKDB_CLI_FETCH = "curl"
 
 
 def _logical_lines(step) -> list[str]:
@@ -775,6 +784,22 @@ def _invocation_re(script: str) -> re.Pattern[str]:
 
 GATE_CALL = _invocation_re(GATE_INVOCATION)
 ASSEMBLER_CALL = _invocation_re(ASSEMBLER)
+CLI_FETCH_CALL = _invocation_re(DUCKDB_CLI_FETCH)
+
+
+def _installs_duckdb_cli(step) -> bool:
+    """This step FETCHES the DuckDB CLI, rather than mentioning it.
+
+    An invocation of `curl` on a logical line that also names the release asset
+    -- so a comment, an echoed string, or prose about the pin is none of it.
+    Read on `_logical_lines` for the same reason every other reading in this
+    file is: the two questions asked of this predicate are "would the load have
+    a duckdb to run" and "is this step the one the rehearsal cannot execute",
+    and a comment answers neither.
+    """
+    return any(
+        CLI_FETCH_CALL.search(line) and DUCKDB_CLI_MARK in line for line in _logical_lines(step)
+    )
 
 
 def _workflow_reader():
@@ -996,9 +1021,7 @@ def check_release_wiring(root: Path) -> list[str]:
     # step before it, the load exits 2 with "duckdb is not on PATH" -- on a tag,
     # and nowhere else, which is the shape this whole mode exists to refuse.
     installers = [
-        step
-        for step in steps
-        if step.job == publish.job and any(DUCKDB_CLI_MARK in line for line in step.commands)
+        step for step in steps if step.job == publish.job and _installs_duckdb_cli(step)
     ]
     for step in load_reads:
         if not any(inst.lineno < step.lineno for inst in installers):
@@ -1148,9 +1171,9 @@ def check_release_rehearsal(root: Path, artifact: Path) -> list[str]:
     # rehearsal that covered it. One kind of step is skipped: any step whose
     # `run:` lines mention `duckdb_cli-`, meant as the DuckDB CLI install, which
     # is a `curl` and a `sudo mv` that no contributor's machine can run. That is
-    # a match by mention -- a comment naming the marker exempts a step too, and
-    # --release-wiring's presence rung reads the same way -- so the exemption is
-    # wider than the one step it is for.
+    # matched by INVOCATION -- a `curl` fetching `duckdb_cli-...`, on a logical
+    # line -- so a step that merely names the marker in a comment is enumerated
+    # like any other and has to be run or explained.
     unexercised = [
         step
         for step in steps
@@ -1158,7 +1181,7 @@ def check_release_rehearsal(root: Path, artifact: Path) -> list[str]:
         and step.lineno < publish.lineno
         and step.commands
         and step not in runnable
-        and not any(DUCKDB_CLI_MARK in line for line in step.commands)
+        and not _installs_duckdb_cli(step)
     ]
     if unexercised:
         raise Refused(
@@ -2010,6 +2033,21 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
             "the duckdb CLI install deleted from the release job",
             {RELEASE_WORKFLOW: cut(install_step, load_step)},
             EXIT_UNWIRED, f"fetching `{DUCKDB_CLI_MARK}...`")
+        # ...and the same step LEFT IN PLACE with its fetch replaced by a
+        # comment that names the asset. Everything the rung above reads is
+        # still true -- the step exists, it is unguarded, it is above the load,
+        # and its `run:` contains `duckdb_cli-` -- and there is no duckdb on
+        # the runner. Measured green before this rung matched invocations, with
+        # the tag exiting 2 at the load and publishing nothing.
+        wiring_case(
+            "the duckdb CLI fetch replaced by a comment naming the asset",
+            {RELEASE_WORKFLOW: sub(
+                "          curl -fsSL -o duckdb.zip "
+                "https://github.com/duckdb/duckdb/releases/download/v1.5.3/"
+                "duckdb_cli-linux-amd64.zip\n",
+                "          # the duckdb_cli-linux-amd64.zip pin is shared with ci.yml\n"
+                '          echo "installing the duckdb CLI"\n')},
+            EXIT_UNWIRED, f"fetching `{DUCKDB_CLI_MARK}...`")
 
         # ── THE REHEARSAL: the same steps, RUN. Every case above reads the
         #    workflow; these execute it, against a tree assembled by the job's
@@ -2066,6 +2104,22 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
                 "      - name: Something a tag alone would run\n"
                 "        shell: bash\n"
                 "        run: ./tools/publish-notes.sh\n" + publish_step)},
+            EXIT_REHEARSAL, "neither executes nor knowingly exempts")
+        # The exemption, from the other side. One kind of step is knowingly not
+        # executed here -- the CLI install, a `curl` and a `sudo mv` no
+        # contributor's machine can run -- and while that exemption matched a
+        # MENTION, any step could claim it by naming the asset in a comment.
+        # This one would exit 3 on a tag and was exempted, unrun, before the
+        # exemption asked for an invocation.
+        rehearsal_case(
+            "a step exempting itself by naming the CLI asset in a comment",
+            {RELEASE_WORKFLOW: sub(
+                publish_step,
+                "      - name: Something a tag alone would run\n"
+                "        shell: bash\n"
+                "        run: |\n"
+                "          # same pin as the duckdb_cli- install above\n"
+                "          exit 3\n" + publish_step)},
             EXIT_REHEARSAL, "neither executes nor knowingly exempts")
         rehearsal_case(
             "the assembly writing somewhere the stamp steps do not read",
