@@ -147,9 +147,13 @@ jobs:
       # rather than scanned.
       #
       # This reads the body AS OF THE EVENT THAT STARTED THIS RUN. A body edited
-      # afterwards is covered by .github/workflows/pr-text-hygiene.yml, which
+      # afterwards is read by .github/workflows/pr-text-hygiene.yml, which
       # triggers on `edited` and runs this one step; that trigger is not here
-      # because it would re-run every job in this file on every typo fix.
+      # because it would re-run every job in this file on every typo fix. That
+      # the other workflow exists, triggers on `edited` and runs this same
+      # `--text` mode is a case in check-history-hygiene-selftest.sh, which the
+      # step above runs — the sentence was true and unchecked for as long as it
+      # had been written.
       - name: private references in the pull request title and body
         if: github.event_name == 'pull_request'
         env:
@@ -168,11 +172,14 @@ jobs:
     # That split is the whole point. A check that runs on a tag and nowhere else
     # is exercised a handful of times a year, always at the moment it is least
     # welcome to be wrong. These two stand a loopback HTTP server in front of
-    # throwaway assets and prove — on every pull request targeting main, with no
-    # network beyond localhost and no toolchain — that a wrong checksum, an
-    # unresolvable url and a lost platform block each still turn it red, and
-    # that a self-test saying so can still tell a broken check from a working
-    # one.
+    # throwaway assets and prove — with no network beyond localhost and no
+    # toolchain — that a wrong checksum, an unresolvable url and a lost platform
+    # block each still turn it red, and that a self-test saying so can still
+    # tell a broken check from a working one.
+    #
+    # WHEN, precisely: on a pull request whose diff touches the check or either
+    # harness, and on any diff that changes the routing itself. Not on every
+    # pull request; the sentence below is the one that is true.
     #
     # Every step here is a proof rather than a check, so every step is routed:
     # a diff that leaves `scripts/check-formula-asset.sh` and its two harnesses
@@ -501,6 +508,11 @@ jobs:
         # Unguarded and in a required context on purpose. A routed step is
         # skipped on a diff that does not touch the gate, and a skipped required
         # check satisfies branch protection.
+        #
+        # `release_wiring` in .github/gate-self-tests.tsv is an `always` row, so
+        # the audit requires this step to be here and to carry no guard. Until
+        # that row existed, deleting this step and the rehearsal below left every
+        # check in this repository green.
         run: scripts/check_extension_stamp.py --release-wiring
 
       - run: rustup show
@@ -541,7 +553,9 @@ jobs:
       # assembler writes, DuckDB derives the init symbol it dlsyms from that
       # name, and every tag would have exited 2 there and published nothing.
       # A routed step would skip on any diff that does not touch the gate,
-      # which is most of the diffs that could break the release path.
+      # which is most of the diffs that could break the release path. The
+      # `release_rehearsal` row in .github/gate-self-tests.tsv is what requires
+      # this step to be present and unguarded.
       - name: The release job's own stamp commands still run against real asset names
         run: scripts/check_extension_stamp.py --release-rehearsal --artifact target/release/finetype.duckdb_extension
 
