@@ -170,6 +170,13 @@ class Gate:
     commands: tuple[str, ...]
     paths: tuple[str, ...]
     lineno: int
+    # `routed` (the default) or `always`. An ALWAYS row is not routing at all:
+    # it registers a command that must run on every diff, and the audit's job
+    # for it is the opposite of its job for a routed one -- the step must carry
+    # NO guard. It exists because deleting such a step is invisible otherwise.
+    # Two of them ran the release-path checks in `doc-surface`, and deleting
+    # both left the audit, every self-test and the comment checker green.
+    when: str = "routed"
 
 
 def load_manifest(root: Path) -> list[Gate]:
@@ -187,10 +194,17 @@ def load_manifest(root: Path) -> list[Gate]:
         # Padded before the count is checked, so a malformed row is REFUSED by the
         # line below rather than crashing the reader on an unpack. A traceback and
         # a refusal are not the same signal and only one of them names the line.
-        gate_id, commands_field, paths_field = (fields + ["", ""])[:3]
-        if len(fields) != 3:
+        gate_id, commands_field, paths_field, when_field = (fields + ["", "", ""])[:4]
+        if len(fields) not in (3, 4):
             raise Fatal(
-                f"{MANIFEST_REL}:{lineno}: expected 3 tab-separated columns, found {len(fields)}"
+                f"{MANIFEST_REL}:{lineno}: expected 3 or 4 tab-separated columns, "
+                f"found {len(fields)}"
+            )
+        when = when_field or "routed"
+        if when not in ("routed", "always"):
+            raise Fatal(
+                f"{MANIFEST_REL}:{lineno}: column 4 is `{when}`; it is `routed` (the default, "
+                "and what an omitted column means) or `always`"
             )
 
         if not ID_RE.match(gate_id):
@@ -208,11 +222,21 @@ def load_manifest(root: Path) -> list[Gate]:
         paths = tuple(p.strip() for p in paths_field.split(",") if p.strip())
         if not commands:
             raise Fatal(f"{MANIFEST_REL}:{lineno}: {gate_id!r} names no self-test command")
-        if not paths:
+        if when == "always":
+            # An always-on row routes nothing, so a path list on one would be a
+            # statement nothing reads -- and a reader who saw paths there would
+            # reasonably believe the command was routed by them.
+            if paths != ("-",):
+                raise Fatal(
+                    f"{MANIFEST_REL}:{lineno}: {gate_id!r} is `always`, so it routes nothing "
+                    "and watches nothing; write `-` in the paths column"
+                )
+            paths = ()
+        elif not paths:
             raise Fatal(f"{MANIFEST_REL}:{lineno}: {gate_id!r} watches no path")
 
         first_seen[gate_id] = lineno
-        gates.append(Gate(gate_id, commands, paths, lineno))
+        gates.append(Gate(gate_id, commands, paths, lineno, when))
 
     if not gates:
         raise Fatal(f"{MANIFEST_REL}: no rows -- an empty manifest routes nothing and says so")
@@ -554,12 +578,45 @@ def audit(root: Path) -> list[str]:
             if not hits:
                 problems.append(
                     f"{MANIFEST_REL}:{gate.lineno}: `{gate.id}` registers `{command}`, which no "
-                    f"step in {WORKFLOW_REL} runs -- a self-test nothing invokes"
+                    f"step in {WORKFLOW_REL} runs -- "
+                    + (
+                        "a check nothing invokes. An always-on row is the only thing that "
+                        "requires it to be there, so deleting the step is otherwise silent"
+                        if gate.when == "always"
+                        else "a self-test nothing invokes"
+                    )
                 )
                 continue
             for hit in hits:
                 owner = jobs[hit.job]
                 planner = plan_steps.get(hit.job)
+
+                # An always-on row asks the opposite question of a routed one:
+                # not "is it guarded by exactly this" but "is it guarded at
+                # all". A guard here skips the check on the diffs that do not
+                # touch it, which for a check that reads OTHER files is most of
+                # the diffs that can break it.
+                if gate.when == "always":
+                    if hit.condition:
+                        problems.append(
+                            f"{WORKFLOW_REL}:{hit.lineno}: `{command}` is registered as "
+                            f"always-on and carries `if: {hit.condition}`. Routing it means "
+                            "skipping it on every diff that does not touch it, which is where "
+                            "it is needed"
+                        )
+                    if hit.continue_on_error:
+                        problems.append(
+                            f"{WORKFLOW_REL}:{hit.lineno}: the always-on `{command}` carries "
+                            f"`continue-on-error: {hit.continue_on_error}`, so it can fail and "
+                            "leave the job green"
+                        )
+                    if owner.condition:
+                        problems.append(
+                            f"{WORKFLOW_REL}:{owner.lineno}: job `{hit.job}` carries the "
+                            f"always-on `{command}` under `if: {owner.condition}`. A skipped "
+                            "job is a green job"
+                        )
+                    continue
 
                 # The job has to do its own routing. Depending on another job's
                 # outputs is what let a skipped required check satisfy branch
@@ -698,7 +755,7 @@ class Plan:
 def route(root: Path, base: str) -> Plan:
     """Which gates this diff invalidates. Every uncertainty selects all of them."""
     gates = load_manifest(root)
-    every = {g.id for g in gates}
+    every = {g.id for g in gates if g.when == "routed"}
 
     resolved = resolve_base(root, base)
     if resolved is None:
@@ -713,7 +770,7 @@ def route(root: Path, base: str) -> Plan:
         return Plan(gates, every, changed, f"the routing itself changed: {', '.join(triggered)}")
 
     changed_set = set(changed)
-    selected = {g.id for g in gates if changed_set.intersection(g.paths)}
+    selected = {g.id for g in gates if g.paths and changed_set.intersection(g.paths)}
     return Plan(gates, selected, changed, "")
 
 
@@ -724,15 +781,22 @@ def emit(plan: Plan) -> None:
     else:
         print(f"{len(plan.changed)} changed path(s) against the base")
     for gate in plan.gates:
-        state = "RUN " if gate.id in plan.selected else "skip"
+        if gate.when == "always":
+            state = "ALWAYS"
+        else:
+            state = "RUN " if gate.id in plan.selected else "skip"
         print(f"  {state}  {gate.id:<24} {', '.join(gate.commands)}")
 
     destination = os.environ.get("GITHUB_OUTPUT")
     if not destination:
         return
+    # No boolean for an always-on row. Its command must run unguarded, so an
+    # output for it could only ever be read by a guard the audit refuses.
     with open(destination, "a", encoding="utf-8") as handle:
         handle.write(f"any={'true' if plan.selected else 'false'}\n")
         for gate in plan.gates:
+            if gate.when == "always":
+                continue
             handle.write(f"{gate.id}={'true' if gate.id in plan.selected else 'false'}\n")
 
 
@@ -743,6 +807,7 @@ SCRATCH_MANIFEST = """\
 alpha\tscripts/alpha_gate.py --self-test\tscripts/alpha_gate.py
 beta\tscripts/beta-gate-selftest.sh\tscripts/beta_gate.sh, scripts/beta-gate-selftest.sh
 gate_routing\t.github/scripts/gate-self-tests.py --self-test\t.github/scripts/gate-self-tests.py, .github/gate-self-tests.tsv
+delta\tscripts/delta_gate.py --verify\t-\talways
 """
 
 SCRATCH_WORKFLOW = """\
@@ -792,6 +857,14 @@ jobs:
       - name: the router proves itself
         if: steps.route.outputs.gate_routing == 'true'
         run: .github/scripts/gate-self-tests.py --self-test
+
+  delta:
+    name: Delta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: a check that must run on every diff
+        run: scripts/delta_gate.py --verify
 """
 
 
@@ -809,6 +882,9 @@ def _scratch_tree(root: Path) -> None:
     _write(root, "scripts/alpha_gate.py", 'import sys\nif "--self-test" in sys.argv:\n    pass\n')
     _write(root, "scripts/beta_gate.sh", "#!/usr/bin/env bash\nexit 0\n")
     _write(root, "scripts/beta-gate-selftest.sh", "#!/usr/bin/env bash\nexit 0\n")
+    # No `--self-test` inside it on purpose: this stands for a check that runs
+    # unguarded, registered by an `always` row, not for a gate's own proof.
+    _write(root, "scripts/delta_gate.py", "import sys\nsys.exit(0)\n")
     _write(root, "docs/unrelated.md", "prose\n")
 
 
@@ -945,7 +1021,10 @@ def self_test() -> int:
         finally:
             del os.environ["GITHUB_OUTPUT"]
         rec.check("an empty plan writes any=false", "any=false\n" in written, written)
-        rec.check("...and a line per gate", written.count("=") == 4, written)
+        rec.check("...and a line per ROUTED gate", written.count("=") == 4, written)
+        # An always-on row publishes nothing, because the only thing that could
+        # read its boolean is a guard the audit refuses.
+        rec.check("...and none for the always-on row", "delta=" not in written, written)
 
     # ── the manifest reader refuses what it cannot read ──────────────────────
     # Each case pins the MESSAGE, not just the refusal. Six rows can each be
@@ -967,7 +1046,22 @@ def self_test() -> int:
         (
             "a two-column row is fatal",
             "alpha\tx --self-test\n",
-            "expected 3 tab-separated columns, found 2",
+            "expected 3 or 4 tab-separated columns, found 2",
+        ),
+        (
+            "a fifth column is fatal",
+            "alpha\tx --self-test\tscripts/alpha_gate.py\talways\tand more\n",
+            "expected 3 or 4 tab-separated columns, found 5",
+        ),
+        (
+            "an unknown `when` is fatal",
+            "alpha\tx --self-test\tscripts/alpha_gate.py\tsometimes\n",
+            "column 4 is `sometimes`",
+        ),
+        (
+            "an always-on row that claims to watch paths is fatal",
+            "alpha\tx --self-test\tscripts/alpha_gate.py\talways\n",
+            "routes nothing and watches nothing",
         ),
         (
             "a row with no command is fatal",
@@ -990,7 +1084,11 @@ def self_test() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         _scratch_tree(root)
-        rec.check("the scratch manifest itself parses", len(load_manifest(root)) == 3)
+        rec.check("the scratch manifest itself parses", len(load_manifest(root)) == 4)
+        rec.check(
+            "...and the always-on row watches nothing",
+            [g.paths for g in load_manifest(root) if g.when == "always"] == [()],
+        )
 
     # ── the audit ────────────────────────────────────────────────────────────
     print("\naudit")
@@ -1207,6 +1305,34 @@ def self_test() -> int:
             "a block-sequence `needs:` is refused rather than guessed",
             rewrite("    name: Alpha\n", "    name: Alpha\n    needs:\n      - beta\n"),
             "writes `needs:` as a block sequence",
+        ),
+        (
+            "an always-on check no step runs reddens",
+            rewrite("        run: scripts/delta_gate.py --verify\n", "        run: true\n"),
+            "always-on row is the only thing that requires it to be there",
+        ),
+        (
+            "an always-on check given a routing guard reddens",
+            rewrite(
+                "      - name: a check that must run on every diff\n",
+                "      - name: a check that must run on every diff\n"
+                "        if: steps.route.outputs.delta == 'true'\n",
+            ),
+            "Routing it means skipping it on every diff that does not touch it",
+        ),
+        (
+            "`continue-on-error` on an always-on check reddens",
+            rewrite(
+                "      - name: a check that must run on every diff\n",
+                "      - name: a check that must run on every diff\n"
+                "        continue-on-error: true\n",
+            ),
+            "can fail and leave the job green",
+        ),
+        (
+            "a job-level `if:` on the job holding an always-on check reddens",
+            rewrite("  delta:\n    name: Delta\n", "  delta:\n    name: Delta\n    if: false\n"),
+            "under `if: false`. A skipped job is a green job",
         ),
         (
             "a gate script no row watches reddens",

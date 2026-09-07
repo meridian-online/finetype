@@ -30,7 +30,8 @@
 # proofs. `--self-test` carries a named case per shape and that case list, not a
 # count in prose, is the enumeration.
 #
-# FORMAT: three TAB-separated columns. Blank lines and `#` lines are ignored.
+# FORMAT: three TAB-separated columns, or four. Blank lines and `#` lines are
+# ignored.
 #
 #   1  id        [a-z][a-z0-9_]*, unique. It becomes an output of the routing
 #                STEP and is read as `steps.<step>.outputs.<id>`, where a hyphen
@@ -40,7 +41,21 @@
 #                row's id. Drift in either direction reddens the audit, so the
 #                manifest cannot describe a workflow that has moved on.
 #   3  paths     comma-separated, repo-relative, each an existing file. A diff
-#                touching any of them runs column 2.
+#                touching any of them runs column 2. On an `always` row this is
+#                a single `-`, because such a row routes nothing.
+#   4  when      optional. `routed` (the default, and what an omitted column
+#                means) or `always`.
+#
+# WHAT AN `always` ROW IS FOR, and it is not routing. Some checks read files
+# OTHER than their own, so the diffs likeliest to break them never touch them:
+# `--release-wiring` reads release.yml and MainDistributionPipeline.yml as
+# structure, and `--release-rehearsal` executes the release job's `run:` steps.
+# Both run unguarded in `doc-surface` for that reason. Nothing required them to
+# be there: deleting both steps left this manifest, the audit, every self-test
+# and the comment checker at exit 0, because a step nothing registers is a step
+# nothing misses. An `always` row registers the command and the audit then
+# requires a step to run it with NO `if:` and no `continue-on-error` -- the
+# opposite of what it requires of a routed row, and for the same reason.
 #
 # ALWAYS-ON, and deliberately so: this manifest, the router, and the workflow
 # itself. A change to any of the three re-runs every gate's self-test, because a
@@ -84,4 +99,6 @@ encoder_record_diff	scripts/encoder_dtype_record_diff.py self-test, scripts/enco
 map_fidelity_results	eval/static-embedding-map-fidelity/check_results.py --self-test	eval/static-embedding-map-fidelity/check_results.py, eval/static-embedding-map-fidelity/map_fidelity.py
 gate_routing	.github/scripts/gate-self-tests.py --self-test	.github/scripts/gate-self-tests.py, .github/gate-self-tests.tsv
 extension_stamp	scripts/check_extension_stamp.py --self-test --artifact target/release/finetype.duckdb_extension	scripts/check_extension_stamp.py, Makefile, .gitignore, .gitmodules, .github/workflows/release.yml, .github/workflows/MainDistributionPipeline.yml, .github/scripts/gate-self-tests.py, .github/scripts/assemble-release-assets.sh
+release_wiring	scripts/check_extension_stamp.py --release-wiring	-	always
+release_rehearsal	scripts/check_extension_stamp.py --release-rehearsal --artifact target/release/finetype.duckdb_extension	-	always
 
