@@ -80,7 +80,7 @@
 #
 # id	commands	paths
 public_hygiene	./scripts/check-public-hygiene-selftest.sh	scripts/check-public-hygiene.sh, scripts/check-public-hygiene-selftest.sh, scripts/public-hygiene-rules.txt, scripts/public-hygiene-allowlist.txt, scripts/public-hygiene-accepted-tree.txt, scripts/public-hygiene-innocent-strings.txt
-history_hygiene	./scripts/check-history-hygiene-selftest.sh	scripts/check-history-hygiene.sh, scripts/check-history-hygiene-selftest.sh, scripts/public-hygiene-rules.txt, scripts/public-hygiene-accepted-history.txt
+history_hygiene	./scripts/check-history-hygiene-selftest.sh	scripts/check-history-hygiene.sh, scripts/check-history-hygiene-selftest.sh, scripts/public-hygiene-rules.txt, scripts/public-hygiene-accepted-history.txt, .github/workflows/pr-text-hygiene.yml
 formula_asset	./scripts/check-formula-asset-selftest.sh, ./scripts/check-formula-asset-mutations.sh	scripts/check-formula-asset.sh, scripts/check-formula-asset-selftest.sh, scripts/check-formula-asset-mutations.sh
 schema_catalogue	python3 scripts/check_schema_catalogue.py --self-test	scripts/check_schema_catalogue.py
 model_coverage	python3 scripts/check_model_coverage.py --self-test	scripts/check_model_coverage.py

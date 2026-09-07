@@ -479,6 +479,35 @@ else
 	printf '%s\n' "$out" | sed 's/^/        /'
 fi
 
+# ---------------------------------------------------------------------------
+# The surface this gate's CI step cannot see: a pull request body EDITED after
+# the run that scanned it. ci.yml reads the title and body as of the event that
+# started its run and says, in a comment, that a later edit is covered by
+# .github/workflows/pr-text-hygiene.yml. That sentence was true and nothing
+# checked it: delete that workflow, or its `edited` trigger, and the comment
+# still reads as coverage while the surface is unscanned.
+#
+# Read as text because a workflow trigger is a declaration, and refused rather
+# than guessed at when the shape is not the one this knows.
+# ---------------------------------------------------------------------------
+echo "the edited-body surface:"
+
+PR_WORKFLOW="$(cd "$HERE/.." && pwd)/.github/workflows/pr-text-hygiene.yml"
+if [[ ! -f "$PR_WORKFLOW" ]]; then
+	bad "ci.yml credits pr-text-hygiene.yml with the edited-body surface and there is no such file"
+else
+	types_lines="$(grep -cE '^[^#]*types: \[' "$PR_WORKFLOW" || true)"
+	if [[ "$types_lines" != "1" ]]; then
+		bad "expected exactly one \`types: [...]\` line in pr-text-hygiene.yml, found $types_lines"
+	elif ! grep -E '^[^#]*types: \[' "$PR_WORKFLOW" | grep -q 'edited'; then
+		bad "pr-text-hygiene.yml does not trigger on \`edited\`, so an edited body is scanned by nothing"
+	elif ! grep -qE '^[^#]*\./scripts/check-history-hygiene\.sh --text' "$PR_WORKFLOW"; then
+		bad "pr-text-hygiene.yml runs something other than this gate's --text mode on the edited body"
+	else
+		ok "an edited pull request body is re-scanned: pr-text-hygiene.yml triggers on edited and runs --text"
+	fi
+fi
+
 echo
 if [[ $failures -eq 0 ]]; then
 	echo "check-history-hygiene-selftest: all assertions passed."
