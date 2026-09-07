@@ -229,6 +229,19 @@ class Job:
     condition: str = ""
     needs: tuple[str, ...] = ()
     outputs: dict[str, str] = field(default_factory=dict)
+    # A job that CALLS a reusable workflow carries no steps of its own. The
+    # release workflows are built out of those, so the second consumer of this
+    # reader identifies a job by what it calls rather than by its name.
+    uses: str = ""
+    # `continue-on-error:` at JOB level, which is a different defect from the
+    # step-level key below: the job reddens, and every job whose `needs:` names
+    # it runs anyway. scripts/check_extension_stamp.py reads it because the
+    # release job has three dependants that publish.
+    continue_on_error: str = ""
+    # Job-level `env:`. Read so a consumer that re-runs a step's `run:` text
+    # outside Actions can supply the variables the step expands, rather than
+    # writing its own copy of a value the workflow already states.
+    env: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -242,9 +255,25 @@ class Step:
     # `continue-on-error: true` turns a red proof into a green job. It is read
     # here because a key this reader ignores is a key the audit cannot refuse.
     continue_on_error: str = ""
+    # `uses:` and `shell:` are read for the same reason, by the second consumer
+    # of this reader. scripts/check_extension_stamp.py asks where the release
+    # workflow's stamp steps sit RELATIVE to the step that publishes, which
+    # needs the publishing action's identity, and asks which shell they run
+    # under, because `shell: bash` is what sets pipefail on a runner whose
+    # default does not.
+    uses: str = ""
+    shell: str = ""
 
 
-def _read_value(key: str, inline: str, lines: list[str], index: int, key_indent: int) -> tuple[list[str], int]:
+def _read_value(
+    key: str,
+    inline: str,
+    lines: list[str],
+    index: int,
+    key_indent: int,
+    rel: str = WORKFLOW_REL,
+) -> tuple[list[str], int]:
+
     """Read one mapping value, block scalar or not. Returns (lines, next index)."""
     if inline in BLOCK_SCALARS:
         out: list[str] = []
@@ -263,7 +292,8 @@ def _read_value(key: str, inline: str, lines: list[str], index: int, key_indent:
             out.pop()
         return out, j
     if inline.startswith(("|", ">")):
-        raise Fatal(f"{WORKFLOW_REL}:{index + 1}: cannot read the block scalar `{key}: {inline}`")
+        raise Fatal(f"{rel}:{index + 1}: cannot read the block scalar `{key}: {inline}`")
+
     return ([inline] if inline else []), index + 1
 
 
@@ -274,17 +304,24 @@ _STEP_START = "      - "
 _STEP_KEY_RE = re.compile(r"^        ([A-Za-z0-9_-]+):[ ]?(.*)$")
 
 
-def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
-    """Read the jobs, their guards and their `run:` commands out of the workflow.
+def scan_workflow(root: Path, rel: str = WORKFLOW_REL) -> tuple[dict[str, Job], list[Step]]:
+    """Read the jobs, their guards and their `run:` commands out of a workflow.
 
     Line-structured rather than YAML-parsed, because the standard library has no
-    YAML reader and this file is the only consumer. Every shape it cannot read
-    exactly is REFUSED: a routing decision made from a half-read workflow is the
-    failure mode, not a missing dependency.
+    YAML reader. Every shape it cannot read exactly is REFUSED: a routing
+    decision made from a half-read workflow is the failure mode, not a missing
+    dependency.
+
+    `rel` names which workflow, and defaults to the one this file routes.
+    scripts/check_extension_stamp.py passes the release workflows instead and
+    asks a different question of the same reading -- one reader, so a workflow
+    shape this cannot parse is refused rather than answered differently by two
+    parsers that have drifted.
     """
-    path = root / WORKFLOW_REL
+    path = root / rel
     if not path.is_file():
-        raise Fatal(f"{WORKFLOW_REL}: not found under {root}")
+        raise Fatal(f"{rel}: not found under {root}")
+
     lines = path.read_text(encoding="utf-8").splitlines()
 
     jobs: dict[str, Job] = {}
@@ -331,7 +368,7 @@ def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
             remainder = line[len(_STEP_START) :]
             key, _, inline = remainder.partition(":")
             key, inline = key.strip(), inline.strip()
-            values, i = _read_value(key, inline, lines, i, 8)
+            values, i = _read_value(key, inline, lines, i, 8, rel)
             _apply_step_key(step, key, values)
             continue
 
@@ -339,7 +376,7 @@ def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
             step_key = _STEP_KEY_RE.match(line)
             if step_key:
                 key, inline = step_key.group(1), step_key.group(2).strip()
-                values, i = _read_value(key, inline, lines, i, 8)
+                values, i = _read_value(key, inline, lines, i, 8, rel)
                 _apply_step_key(step, key, values)
                 continue
 
@@ -353,22 +390,19 @@ def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
                 continue
             in_steps = False
             if key == "if":
-                values, i = _read_value(key, inline, lines, i, 4)
+                values, i = _read_value(key, inline, lines, i, 4, rel)
                 job.condition = " ".join(values)
                 continue
-            if key == "needs":
-                if not inline:
-                    raise Fatal(
-                        f"{WORKFLOW_REL}:{i + 1}: job `{job.id}` writes `needs:` as a block "
-                        "sequence. Write it inline -- this reader refuses a shape it would "
-                        "have to guess at, because guessing here skips a self-test silently."
-                    )
-                job.needs = tuple(
-                    n.strip() for n in inline.strip("[]").split(",") if n.strip()
-                )
+            if key == "uses":
+                job.uses = inline
                 i += 1
                 continue
-            if key == "outputs":
+            if key == "continue-on-error":
+                job.continue_on_error = inline
+                i += 1
+                continue
+            if key in ("outputs", "env"):
+                target = job.outputs if key == "outputs" else job.env
                 j = i + 1
                 while j < len(lines):
                     nxt = lines[j]
@@ -377,15 +411,31 @@ def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
                         continue
                     if len(nxt) - len(nxt.lstrip()) <= 4:
                         break
+                    if nxt.lstrip().startswith("#"):
+                        j += 1
+                        continue
                     out_match = _JOB_OUTPUT_RE.match(nxt)
                     if not out_match:
                         raise Fatal(
-                            f"{WORKFLOW_REL}:{j + 1}: cannot read this line as an output of "
-                            f"job `{job.id}`"
+                            f"{rel}:{j + 1}: cannot read this line as an entry of "
+                            f"`{key}:` in job `{job.id}`"
                         )
-                    job.outputs[out_match.group(1)] = out_match.group(2).strip()
+                    target[out_match.group(1)] = out_match.group(2).strip()
                     j += 1
                 i = j
+                continue
+            if key == "needs":
+                if not inline:
+
+                    raise Fatal(
+                        f"{rel}:{i + 1}: job `{job.id}` writes `needs:` as a block "
+                        "sequence. Write it inline -- this reader refuses a shape it would "
+                        "have to guess at, because guessing here skips a self-test silently."
+                    )
+                job.needs = tuple(
+                    n.strip() for n in inline.strip("[]").split(",") if n.strip()
+                )
+                i += 1
                 continue
             i += 1
             continue
@@ -394,7 +444,7 @@ def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
 
     close_step()
     if not jobs:
-        raise Fatal(f"{WORKFLOW_REL}: no jobs found -- the reader is looking at the wrong shape")
+        raise Fatal(f"{rel}: no jobs found -- the reader is looking at the wrong shape")
     return jobs, steps
 
 
@@ -409,6 +459,10 @@ def _apply_step_key(step: Step, key: str, values: list[str]) -> None:
         step.commands = tuple(v for v in values if v)
     elif key == "continue-on-error":
         step.continue_on_error = " ".join(values)
+    elif key == "uses":
+        step.uses = " ".join(values)
+    elif key == "shell":
+        step.shell = " ".join(values)
 
 
 # ── discovery ───────────────────────────────────────────────────────────────
@@ -1018,6 +1072,21 @@ def self_test() -> int:
     def missing_watched_path(root: Path) -> None:
         (root / "scripts/beta_gate.sh").unlink()
 
+    def no_jobs_at_all(root: Path) -> None:
+        """A workflow the reader finds no jobs in.
+
+        `scan_workflow` is line-structured, so the way it fails on a shape it
+        cannot read is by finding NOTHING -- no jobs, no steps, no guards -- and
+        every rule below it then has nothing to object to. The audit would
+        report clean and `--release-wiring`, which asks this same reader whether
+        the release path still refuses a wrong stamp, would report that it does.
+        The refusal at the end of `scan_workflow` is the only thing standing
+        between "the reader could not read this" and "there is nothing wrong
+        here", and until this case existed it could be deleted with every check
+        in this repository green.
+        """
+        _write(root, WORKFLOW_REL, "name: scratch\non:\n  pull_request:\njobs:\n")
+
     def unrouted_root_trigger(root: Path) -> None:
         text = (root / MANIFEST_REL).read_text(encoding="utf-8")
         _write(root, MANIFEST_REL, text.replace(", .github/gate-self-tests.tsv", ""))
@@ -1158,6 +1227,11 @@ def self_test() -> int:
             "the manifest not watching itself reddens",
             unrouted_root_trigger,
             f"`{MANIFEST_REL}` re-routes every gate when it changes and no row watches it",
+        ),
+        (
+            "a workflow the reader finds no jobs in is REFUSED, not audited clean",
+            no_jobs_at_all,
+            "no jobs found -- the reader is looking at the wrong shape",
         ),
     ]
 

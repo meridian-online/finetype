@@ -464,7 +464,41 @@ jobs:
         # In-job by design, and it audits before it plans; see the identical step
         # in the `gate-routing-self-test` job for why.
         run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+
+      - name: The extension's version file is generated, not committed
+        # Both halves of the defect that stamped one version onto every release
+        # for months. The build writes configure/ on the configure step, and a
+        # tracked copy arrives with every checkout — after which the rule that
+        # would rewrite it, which has no prerequisites, is never run. First here
+        # in the job because it costs milliseconds and nothing below it can be
+        # trusted while it is false.
+        run: scripts/check_extension_stamp.py --untracked-version-file
+
+      - name: ...and the build rewrites it even when one is already on disk
+        # Untracking fixes CI, where every checkout is fresh, and nothing else.
+        # Asked of make with `make -n`, so what is read is make's rebuild
+        # decision on the real Makefile rather than a string in it. Needs the
+        # extension-ci-tools submodule this job already checks out, for the
+        # include; no toolchain.
+        run: scripts/check_extension_stamp.py --regenerates-version-file
+
+      - name: The release path still invokes the stamp gate where it has to
+        # Every other stamp step in this job proves the GATE detects. This one
+        # proves the gate is still CALLED — unguarded, and before the bytes are
+        # published — at the three places a wrong stamp escapes: the two steps
+        # in release.yml and the stamp job in MainDistributionPipeline.yml.
+        # Those are workflow YAML, so nothing in this repository read them: one
+        # `continue-on-error: true` on the release step turned the refusal into
+        # a warning with every check here, including that gate's own
+        # `--self-test`, still at exit 0.
+        #
+        # Unguarded and in a required context on purpose. A routed step is
+        # skipped on a diff that does not touch the gate, and a skipped required
+        # check satisfies branch protection.
+        run: scripts/check_extension_stamp.py --release-wiring
+
       - run: rustup show
+
       - uses: Swatinem/rust-cache@v2
       - name: Install duckdb CLI
         # Both gates below read the catalog / run the examples through this CLI.
@@ -478,6 +512,47 @@ jobs:
         # Just the cdylib + the metadata stamp — not the CLI, eval binaries or
         # trainer. `make build-release` would build all of them.
         run: make build-extension
+
+      - name: The extension's run-time version and its own trailer are one version
+        # ONE artefact, ONE load, two independent readings: `ft_version()` is
+        # compiled in from Cargo.toml, and `duckdb_extensions().extension_version`
+        # is DuckDB's own reading of the metadata trailer the build stamped.
+        # Asserting each against a literal instead would pass while the artefact
+        # disagreed with itself, which is the shape a consumer actually hits —
+        # it reads the trailer before loading and the function after.
+        #
+        # The LOAD is also the only thing here that establishes identity: any
+        # stamped shared library satisfies a trailer read, and only running one
+        # proves it is this extension.
+        run: scripts/check_extension_stamp.py --artifact target/release/finetype.duckdb_extension --load
+
+      # UNGUARDED, like --release-wiring above and for a stronger reason. This
+      # runs the `release` job's own assemble and stamp commands — its `run:`
+      # text, read out of release.yml, with GITHUB_REF_NAME supplied — against
+      # a directory of real assembled asset names. release.yml runs only on a
+      # pushed tag, so until this step existed nothing had ever executed those
+      # lines: the step that loads an asset named it under the name the
+      # assembler writes, DuckDB derives the init symbol it dlsyms from that
+      # name, and every tag would have exited 2 there and published nothing.
+      # A routed step would skip on any diff that does not touch the gate,
+      # which is most of the diffs that could break the release path.
+      - name: The release job's own stamp commands still run against real asset names
+        run: scripts/check_extension_stamp.py --release-rehearsal --artifact target/release/finetype.duckdb_extension
+
+      - name: ...and the stamp gate detects a trailer that is not the release
+        # Fixtures are copies of the artefact above, re-stamped with the real
+        # extension-ci-tools stamper. Every trailer field but the version — the
+        # platform, the ABI type, the DuckDB floor — is read off that artefact,
+        # so a literal for any of those three would be a constant of the
+        # machine that wrote it and the proof would then only pass on that
+        # machine. It is also what makes the run-time mismatch case an artefact
+        # that genuinely disagrees with itself rather than a mutated comparison.
+        # One fixture is stamped for a platform this runner is NOT, on purpose,
+        # and does not load: that is the case proving an unloadable artefact is
+        # refused by name rather than skipped.
+
+        if: steps.route.outputs.extension_stamp == 'true'
+        run: scripts/check_extension_stamp.py --self-test --artifact target/release/finetype.duckdb_extension
 
       - name: The spike still compiles, off the default build
         # crates/finetype-duckdb/src/spike.rs is a trivial VTab kept as living

@@ -44,3 +44,53 @@ jobs:
       # plus linux_arm64_musl, windows_arm64, and windows_amd64_mingw which the
       # project does not ship.
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
+
+  # The version each of those five binaries actually carries, read off its own
+  # bytes after the build that produced it.
+  #
+  # WHY HERE AND NOT ONLY IN release.yml. The build contract derives the stamp
+  # from git — the tag at HEAD, or that commit's abbreviated sha when there is
+  # none — and for months it derived nothing at all, because a committed
+  # configure/extension_version.txt arrived with every checkout and the rule
+  # that would rewrite it has no prerequisites. release.yml can only refuse that
+  # on a tag, a few days a year, at the moment it is least welcome to be wrong.
+  # This job asks the same question of every pull request and every push, where
+  # the expected answer is the abbreviated commit. `0.6.23` abbreviates no
+  # commit, so the defect fails here on any diff at all.
+  #
+  # WHAT IT DOES NOT COVER: the community-extensions rebuild. duckdb/community-
+  # extensions runs this same reusable workflow in its own repository, where no
+  # job of ours can run. What travels there is the build contract in the
+  # Makefile, which this job is the standing evidence for.
+  stamp:
+    name: Each binary carries the version of the ref it was built from
+    needs: duckdb-stable-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      # No merge-multiple: all five artifacts hold a file called
+      # finetype.duckdb_extension, so flattening would leave one. Each stays in
+      # artifacts/<artifact-name>/ and the glob below reads them back out.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: finetype-v1.5.3-extension-*
+          path: artifacts
+
+      - name: Read the stamp off each binary
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(artifacts/*/finetype.duckdb_extension)
+          if [ "${#files[@]}" -ne 5 ]; then
+            echo "::error::expected 5 extension binaries, found ${#files[@]}" >&2
+            exit 1
+          fi
+          args=()
+          for f in "${files[@]}"; do args+=(--artifact "$f"); done
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            scripts/check_extension_stamp.py "${args[@]}" --tag "${GITHUB_REF_NAME}"
+          else
+            scripts/check_extension_stamp.py "${args[@]}" --expect-commit "${GITHUB_SHA}"
+          fi

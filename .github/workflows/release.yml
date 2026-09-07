@@ -253,6 +253,87 @@ jobs:
             --tag "${GITHUB_REF_NAME}" \
             --extension-duckdb-version "${EXTENSION_DUCKDB_VERSION}"
 
+      # ── The stamp, read off the bytes that are about to be published ──────
+      #
+      # THIS IS THE LAST POINT AT WHICH A WRONG VERSION CAN BE STOPPED. The
+      # `build-extension` job above is a bare `uses:` of a reusable workflow and
+      # cannot carry a step, so the artefacts are checked here, after they are
+      # downloaded and named and before `Create release` attaches them.
+      #
+      # The stamp is the only version an extension carries in a form a machine
+      # can read before loading it — DuckDB surfaces it as
+      # `duckdb_extensions().extension_version`, and a packager reads it
+      # straight out of the last 512 bytes. Read here off the artefact's own
+      # bytes, never from the file the build wrote into configure/: those two
+      # disagreeing is the whole defect this guards.
+      #
+      # A pull-request build is checked too, against the abbreviated commit
+      # rather than a tag, by the `stamp` job in MainDistributionPipeline.yml —
+      # so the autodetection is observed on every build and not only on the few
+      # days a year a tag is cut.
+      - name: The extension binaries carry this tag, read off their own bytes
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(release-assets/finetype-"${GITHUB_REF_NAME}"-*.duckdb_extension)
+          if [ "${#files[@]}" -ne 5 ]; then
+            echo "::error::expected 5 extension binaries in release-assets, found ${#files[@]}" >&2
+            exit 1
+          fi
+          args=()
+          for f in "${files[@]}"; do args+=(--artifact "$f"); done
+          scripts/check_extension_stamp.py "${args[@]}" --tag "${GITHUB_REF_NAME}"
+
+      # Setup for the step below, and a step of its own rather than four lines
+      # at the top of it. The stamp step's `run:` is then the gate call and
+      # nothing else, which is what lets
+      # `scripts/check_extension_stamp.py --release-rehearsal` execute that
+      # `run:` on a pull request, comment lines dropped and continuations joined — this workflow runs only on a pushed
+      # tag, so nothing else ever executes it. A `curl | sudo mv` cannot be run
+      # on a contributor's machine, so leaving it inside the stamp step would
+      # have meant rehearsing an edited copy of the step, which is a rehearsal
+      # of something else.
+      #
+      # The cost of the split is that the install can now go missing on its own,
+      # leaving the load below to exit 2 with "duckdb is not on PATH" on a tag.
+      # --release-wiring refuses that: it requires a step fetching duckdb_cli-*
+      # above every `--load` step in this job.
+      #
+      # Same pin as ci.yml's `Install duckdb CLI` step.
+      - name: Install duckdb CLI
+        shell: bash
+        run: |
+          curl -fsSL -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
+          unzip -o duckdb.zip
+          sudo mv duckdb /usr/local/bin/duckdb
+          duckdb --version
+
+      # A correct trailer is not evidence the artefact is this extension: any
+      # stamped shared library passes the reading above. This loads the one
+      # binary a linux_amd64 runner can load and makes it answer for itself —
+      # `ft_version()` (compiled in from Cargo.toml) against its own trailer
+      # (written by the build contract from the tag), off one file in one
+      # session. It is also what refuses a tag cut against a tree whose
+      # Cargo.toml version says something else.
+      #
+      # The other four platforms are NOT load-verified here and cannot be on
+      # this runner; the byte reading above is all they get.
+      #
+      # THE FILE NAME HERE IS THE ONE ASSEMBLED ABOVE, and that is the whole
+      # reason --release-rehearsal exists. DuckDB derives the init symbol it
+      # dlsyms from the file name, stemming at the first dot, so this asset's
+      # name yields `finetype-v0_init_c_api` and the LOAD used to die of it —
+      # exit 2, on every tag, before `Create release`. check_extension_stamp.py
+      # now presents whatever it is given to DuckDB as `finetype.duckdb_extension`
+      # so no caller can hit that rule; the rehearsal is what proves this
+      # particular caller does not.
+      - name: ...and the one this runner can load agrees with itself and the tag
+        shell: bash
+        run: |
+          scripts/check_extension_stamp.py \
+            --artifact "release-assets/finetype-${GITHUB_REF_NAME}-x86_64-unknown-linux-gnu.duckdb_extension" \
+            --load --tag "${GITHUB_REF_NAME}"
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
