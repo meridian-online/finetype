@@ -5,6 +5,21 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.59] - 2026-09-07
+
+### Fixed
+
+- **A built extension's metadata trailer carries the version of the tag it
+  was built from, and a release whose stamp disagrees with its tag is refused
+  before anything is published.** `configure/extension_version.txt` had been
+  tracked in git at `0.6.23`, and the rule that writes it has no prerequisites,
+  so every extension since it was committed carried that stamp whatever the
+  tag said. The file is untracked and regenerated on every configure; the
+  release job reads each binary's trailer off its own bytes against the tag,
+  loads the one binary the runner can load and requires its run-time version,
+  its trailer and the tag to be one value; and the release job's own stamp
+  commands are rehearsed on every pull request against real asset names.
+
 ## [0.6.58] - 2026-08-30
 
 ### Fixed
