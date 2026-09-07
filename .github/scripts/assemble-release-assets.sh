@@ -51,6 +51,10 @@
 #      from the release in silence
 #   4  the taxonomy catalogue or the model manifest did not reach the output
 #      directory, so the release would carry the extension and no type source
+#   5  an assembled asset has no `.sha256` beside it, or a `.sha256` names an
+#      asset that is not there. Read off the output directory rather than a
+#      list: what a downloader can verify is what got assembled, and the CLI
+#      sidecars in particular are produced by a job this script never sees.
 set -euo pipefail
 
 # arch:target pairs -- the five platforms MainDistributionPipeline.yml builds,
@@ -176,6 +180,42 @@ assemble() {
 		cp "$src" "$dest"
 		sha256_of "$dest"
 	done
+
+	# EVERY ASSET PUBLISHES WITH ITS CHECKSUM, AND EVERY CHECKSUM WITH ITS
+	# ASSET. Read off the directory that is about to be uploaded, so the
+	# question is what a downloader can verify rather than what some list here
+	# says should be there.
+	#
+	# The extension sidecars are written above by this script and cannot go
+	# missing without the copy above failing. The CLI archive sidecars cannot:
+	# they are produced by the `build` job's own "Generate SHA256" step and
+	# arrive through its upload globs, none of which this script can see. Drop
+	# `finetype-*.sha256` from that upload and every rung above still passes --
+	# the catalogue is complete, all five platforms are present, the assembly
+	# exits 0 -- and the release publishes five archives a downloader has
+	# nothing to check. The pair is the property; a count is not, because the
+	# extension sidecars alone satisfy any count the CLI ones would have.
+	local asset name unpaired="" orphaned=""
+	for asset in "$output_dir"/*; do
+		[ -f "$asset" ] || continue
+		name="$(basename "$asset")"
+		case "$name" in
+		*.sha256)
+			[ -f "${asset%.sha256}" ] || orphaned="${orphaned} ${name}"
+			;;
+		*)
+			[ -f "${asset}.sha256" ] || unpaired="${unpaired} ${name}"
+			;;
+		esac
+	done
+	if [ -n "$unpaired" ]; then
+		echo "::error::assembled asset with no .sha256 beside it:${unpaired} -- the release would publish it with nothing a downloader can verify it against; check the producing job's upload paths and its checksum step" >&2
+		return 5
+	fi
+	if [ -n "$orphaned" ]; then
+		echo "::error::.sha256 naming an asset that did not arrive:${orphaned} -- the release would publish a checksum for a file it does not carry; check the producing job's upload paths" >&2
+		return 5
+	fi
 
 	return 0
 }
@@ -488,6 +528,48 @@ self_test() {
 		failed=$((failed + 1))
 	else
 		echo "  ok   the catalogue artifact arrived under a name the flatten does not match: assembly refuses with exit 4 rather than reading it where it was not copied"
+	fi
+
+	# ── Mutation: a CLI archive arrives with no `.sha256` beside it, the shape
+	#    the `build` job's upload produces when `finetype-*.sha256` stops
+	#    matching its path list. Every rung above passes on this tree: the
+	#    catalogue is whole, all five extension binaries are present, nothing
+	#    collides. What ships is an archive with nothing to verify it against.
+	#
+	#    ONE PLATFORM'S SIDECAR, not all five: removing all of them proves the
+	#    rung fires and not that it reads the pair, and a rung that required
+	#    only "some sidecar exists" would pass with four gone. ──
+	mkdir -p "$tmp/nosidecar"
+	build_fixture_here "$tmp/nosidecar"
+	rm -f "$tmp/nosidecar/artifacts/finetype-x86_64-apple-darwin/finetype-vSELFTEST-x86_64-apple-darwin.tar.gz.sha256"
+	rc="$(run_assembly "$tmp/nosidecar")"
+	if [ "$rc" != "5" ]; then
+		echo "  MISS a CLI archive arrives with no checksum beside it: exit ${rc}, expected 5"
+		failed=$((failed + 1))
+	elif ! grep -q "finetype-vSELFTEST-x86_64-apple-darwin.tar.gz -- " "$tmp/nosidecar/assembly.log"; then
+		echo "  WRONG a CLI archive arrives with no checksum beside it: refused with exit 5 without naming the unpaired archive — $(cat "$tmp/nosidecar/assembly.log")"
+		failed=$((failed + 1))
+	else
+		echo "  ok   a CLI archive arrives with no checksum beside it: assembly refuses with exit 5 and names the archive"
+	fi
+
+	# ── Mutation: the mirror image — the checksum arrives and the archive does
+	#    not, which is what dropping `finetype-*.tar.gz` from the same upload
+	#    list produces. The release would carry a `.sha256` for a file it does
+	#    not publish, and `fail_on_unmatched_files` never fires because the
+	#    `release-assets/*.sha256` entry still matches plenty. ──
+	mkdir -p "$tmp/noarchive"
+	build_fixture_here "$tmp/noarchive"
+	rm -f "$tmp/noarchive/artifacts/finetype-aarch64-unknown-linux-gnu/finetype-vSELFTEST-aarch64-unknown-linux-gnu.tar.gz"
+	rc="$(run_assembly "$tmp/noarchive")"
+	if [ "$rc" != "5" ]; then
+		echo "  MISS a checksum arrives for an archive that did not: exit ${rc}, expected 5"
+		failed=$((failed + 1))
+	elif ! grep -q "finetype-vSELFTEST-aarch64-unknown-linux-gnu.tar.gz.sha256" "$tmp/noarchive/assembly.log"; then
+		echo "  WRONG a checksum arrives for an archive that did not: refused with exit 5 without naming the orphaned checksum — $(cat "$tmp/noarchive/assembly.log")"
+		failed=$((failed + 1))
+	else
+		echo "  ok   a checksum arrives for an archive that did not: assembly refuses with exit 5 and names the checksum"
 	fi
 
 	if [ "$failed" -ne 0 ]; then
