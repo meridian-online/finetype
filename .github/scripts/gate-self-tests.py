@@ -548,6 +548,23 @@ def plan_steps_by_job(steps: list[Step]) -> dict[str, Step]:
     return found
 
 
+def _job_may_not_fail(owner: Job, job_id: str, command: str) -> list[str]:
+    """A job carrying a check may not be `continue-on-error` at JOB level.
+
+    Different from the step-level key and worse: the step reddens, the job
+    reddens, and the workflow reports success anyway. Every check in the job is
+    then advisory at once, including any that branch protection requires.
+    """
+    if not owner.continue_on_error:
+        return []
+    return [
+        f"{WORKFLOW_REL}:{owner.lineno}: job `{job_id}` carries "
+        f"`continue-on-error: {owner.continue_on_error}` and holds `{command}`. The job "
+        "reddens and the workflow reports success, so every check in it -- this one "
+        "included -- can fail on every pull request without blocking anything"
+    ]
+
+
 def audit(root: Path) -> list[str]:
     """Everything that must be true for a guard in the workflow to mean anything."""
     gates = load_manifest(root)
@@ -616,6 +633,7 @@ def audit(root: Path) -> list[str]:
                             f"always-on `{command}` under `if: {owner.condition}`. A skipped "
                             "job is a green job"
                         )
+                    problems += _job_may_not_fail(owner, hit.job, command)
                     continue
 
                 # The job has to do its own routing. Depending on another job's
@@ -664,6 +682,15 @@ def audit(root: Path) -> list[str]:
                         "be unconditional; a job-level condition cannot read `steps` and can "
                         "only skip the proof"
                     )
+
+                # ...and the JOB-level key, which is not the step-level one and
+                # was read by nothing until a review found it. The step reddens,
+                # the job reddens, and the WORKFLOW reports success -- so every
+                # proof in that job can go red on every pull request while the
+                # check branch protection reads stays green. It was the exact
+                # outcome the always-on rows were added to prevent, reachable by
+                # a key one line above the steps they protect.
+                problems += _job_may_not_fail(owner, hit.job, command)
 
                 # A proof allowed to fail is not a proof. This is the same shape as
                 # a missing guard reached from the other side: the step runs, goes
@@ -1263,6 +1290,22 @@ def self_test() -> int:
                 "        id: route\n", "        id: route\n        continue-on-error: true\n",
             ), 1),
             "the routing step in job `alpha` carries `continue-on-error: true`",
+        ),
+        (
+            "a job-level `continue-on-error` on a job holding a proof reddens",
+            rewrite(
+                "  alpha:\n    name: Alpha\n",
+                "  alpha:\n    name: Alpha\n    continue-on-error: true\n",
+            ),
+            "job `alpha` carries `continue-on-error: true` and holds",
+        ),
+        (
+            "...and on a job holding an always-on check",
+            rewrite(
+                "  delta:\n    name: Delta\n",
+                "  delta:\n    name: Delta\n    continue-on-error: true\n",
+            ),
+            "job `delta` carries `continue-on-error: true` and holds",
         ),
         (
             "a job-level `if:` on a job holding a proof reddens",

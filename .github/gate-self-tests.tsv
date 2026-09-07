@@ -25,10 +25,17 @@
 # ones that leave a job GREEN: a guard written `== 'false'`, which inverts the
 # routing and reads like routing; a guard naming a step that does not exist or
 # sitting above the step that sets it; an `if:` on a job holding a proof; a
-# `continue-on-error` letting a red proof pass; and worst, an `if:` on the routing
-# STEP, which empties every output in the job and skips the audit along with the
-# proofs. `--self-test` carries a named case per shape and that case list, not a
-# count in prose, is the enumeration.
+# `continue-on-error` on a proof or on its routing step; and worst, an `if:` on
+# the routing STEP, which empties every output in the job and skips the audit
+# along with the proofs. `--self-test` carries a named case per shape and that
+# case list, not a count in prose, is the enumeration.
+#
+# THE JOB-LEVEL `continue-on-error` IS ITS OWN SHAPE and this sentence claimed it
+# for a year without covering it. The step-level key leaves the JOB green; the
+# job-level key leaves the WORKFLOW green -- the job reddens and the run reports
+# success -- so every proof in it, and every always-on check beside them, can
+# fail on every pull request without blocking a merge. It is refused for routed
+# rows and always-on rows alike, with a case for each.
 #
 # FORMAT: three TAB-separated columns, or four. Blank lines and `#` lines are
 # ignored.
