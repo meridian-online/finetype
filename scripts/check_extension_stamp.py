@@ -753,6 +753,7 @@ MODES = (
     "--self-test",
 )
 CI_WORKFLOW = ".github/workflows/ci.yml"
+MANIFEST_REL = ".github/gate-self-tests.tsv"
 
 
 def _logical_lines(step) -> list[str]:
@@ -800,6 +801,19 @@ def _invocation_re(script: str) -> re.Pattern[str]:
 GATE_CALL = _invocation_re(GATE_INVOCATION)
 ASSEMBLER_CALL = _invocation_re(ASSEMBLER)
 CLI_FETCH_CALL = _invocation_re(DUCKDB_CLI_FETCH)
+
+
+# `steps.<id>.outputs.<gate> == 'true'` and nothing else. The audit in
+# .github/scripts/gate-self-tests.py compares this expression whole for the same
+# reason: `== 'false'`, `!= 'true'` and an added `&&` each read like routing and
+# disable it.
+ROUTING_GUARD = re.compile(r"steps\.[A-Za-z0-9_-]+\.outputs\.([a-z][a-z0-9_]*) == 'true'")
+
+
+def _is_routing_guard(condition: str, routed_ids: set[str]) -> bool:
+    """This `if:` routes the step, rather than switching it off."""
+    match = ROUTING_GUARD.fullmatch(condition.strip())
+    return bool(match) and match.group(1) in routed_ids
 
 
 def _installs_duckdb_cli(step) -> bool:
@@ -1107,8 +1121,21 @@ def check_release_wiring(root: Path) -> list[str]:
         _, ci_steps = reader.scan_workflow(root, CI_WORKFLOW)
     except Exception as exc:  # noqa: BLE001 -- Fatal is the reader's, not ours
         raise Refused(EXIT_CANNOT_RUN, f"{CI_WORKFLOW} could not be read: {exc}") from None
+    try:
+        routed_ids = {gate.id for gate in reader.load_manifest(root)}
+    except Exception as exc:  # noqa: BLE001
+        raise Refused(EXIT_CANNOT_RUN, f"the routing manifest could not be read: {exc}") from None
     workflow_steps += ci_steps
     for step in workflow_steps:
+        # A STEP THAT CANNOT RUN DOES NOT INVOKE ANYTHING. Reading presence and
+        # not effect is the shape this whole mode exists to refuse, and it was
+        # here: `if: false` on a step naming a mode satisfied the rung below.
+        # A ROUTING guard is different -- the step runs on the diffs that change
+        # what it checks, which is the arrangement .github/gate-self-tests.tsv
+        # exists to make -- so a guard is accepted when it is exactly a routing
+        # comparison naming a gate that manifest registers, and not otherwise.
+        if step.condition and not _is_routing_guard(step.condition, routed_ids):
+            continue
         for line in _calls(step, GATE_CALL):
             invoked.update(mode for mode in MODES if mode in line.split())
     for mode in MODES:
@@ -1902,6 +1929,11 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
             # ci.yml too: the mode reads all three, because the rung asking
             # whether every mode is invoked cannot answer from the two
             # workflows that only ever run on a tag.
+            # The manifest too: the mode asks whether a guarded step is ROUTED,
+            # which is a question only the manifest answers.
+            (root / MANIFEST_REL).write_text(
+                (ROOT / MANIFEST_REL).read_text(encoding="utf-8"), encoding="utf-8"
+            )
             for rel in (RELEASE_WORKFLOW, DISTRIBUTION_WORKFLOW, CI_WORKFLOW):
                 text = (ROOT / rel).read_text(encoding="utf-8")
                 if rel in edits:
@@ -2098,6 +2130,17 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
         # every other sense -- named, in the right job -- and `true` is what a
         # step left as a placeholder looks like. Nothing else in this
         # repository reads ci.yml for the checks it is supposed to be running.
+        # ...and the same step still there, behind a condition that never
+        # holds. Presence is what the rung read; this is the difference between
+        # a step that exists and a step that runs.
+        wiring_case(
+            "a mode of this gate switched off with `if: false`",
+            {CI_WORKFLOW: sub(
+                "        run: scripts/check_extension_stamp.py --regenerates-version-file\n",
+                "        if: false\n"
+                "        run: scripts/check_extension_stamp.py --regenerates-version-file\n")},
+            EXIT_UNWIRED,
+            "--regenerates-version-file` is a mode this gate offers and no step")
         wiring_case(
             "a mode of this gate that ci.yml stopped invoking",
             {CI_WORKFLOW: sub(
