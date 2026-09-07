@@ -290,17 +290,23 @@ jobs:
         run: ./.github/scripts/assemble-release-assets.sh --self-test
 
   release-asset-contract:
-    # The third link. assemble-release-assets.sh guards the artifacts tree and
-    # `if-no-files-found` guards the uploads, and closing those two is what
-    # makes this one dangerous: delete an entry from the release step's
-    # `files:` list and every other check here stays green while the tag
-    # publishes without it. `fail_on_unmatched_files: true` fires on an entry
-    # that is present and matches nothing, never on one that is gone. This job
-    # runs the assembler for real and requires the release step's globs to
-    # match exactly what it wrote, in both directions.
+    # The third link, and now the second as well. assemble-release-assets.sh
+    # guards the artifacts tree, and closing that is what makes the other two
+    # dangerous: delete an entry from the release step's `files:` list and every
+    # other check here stays green while the tag publishes without it.
+    # `fail_on_unmatched_files: true` fires on an entry that is present and
+    # matches nothing, never on one that is gone. `if-no-files-found: error`
+    # fires only when the UNION of an upload's globs comes up empty, so dropping
+    # one of three is silent -- which is how the CLI archives came to be
+    # publishable with no checksum beside them. This job runs the assembler for
+    # real, over a tree filtered through the upload globs release.yml declares,
+    # and requires every one of those globs to be load-bearing.
     name: Release asset contract check
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # 10 rather than 5: the self-test below now runs the assembler once per
+    # declared upload glob per case (~50s on a laptop). The ceiling is here to
+    # catch a hang, not to budget the work.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - name: Which gates this diff changed
