@@ -102,8 +102,8 @@ HOW, AND WHY IT IS NOT A SOURCE SCAN
     release rehearsal use, and is then FILTERED THROUGH THE UPLOAD GLOBS the
     workflow declares: a file no `path:` entry matches is a file the artifact
     does not carry, so deleting a glob deletes those files here exactly as it
-    would on a tag. A fixture that stated its own sidecars would have made F
-    unfalsifiable.
+    would on a tag. A fixture that stated its own sidecars would have made
+    `glob-not-load-bearing` unfalsifiable.
 
     What IS read as text is `release.yml`, which is unavoidable: it is the
     declaration under test. Its jobs, steps, guards and `continue-on-error`
@@ -125,15 +125,10 @@ EVERY RUNG IS PINNED, AND THAT IS ENFORCED HERE RATHER THAN REMEMBERED
     carry an id that is not in it, and `check` reports nothing except through
     `Failure`. `--self-test` then requires every id to be seen firing by a case
     that declares it. A rung added without a case reddens the self-test on the
-    commit that adds it. The round that wrote rungs E through H here shipped
-    four of them with no case, which is the failure this whole file is about
+    commit that adds it. The round that wrote `glob-not-load-bearing`, the
+    `advisory-*` rungs and the `formula-*` rungs here shipped four of them
+    with no case, which is the failure this whole file is about
     arriving one level in -- so the rule is about the SET, not about any rung.
-
-    A pairing rung over the PUBLISHED set was deleted rather than pinned when
-    that sweep found it: `unshipped` requires everything the assembler produces
-    to be carried by a `files:` glob, and the assembler exits 5 on anything it
-    produces without a `.sha256`, so the published set is the produced set and
-    the produced set is paired. It could not fail alone.
 
 EXIT CODES
     0  the release step ships exactly what the assembler assembles, and the
@@ -170,8 +165,8 @@ ROUTER_REL = ".github/scripts/gate-self-tests.py"
 RELEASE_ACTION = "softprops/action-gh-release"
 UPLOAD_ACTION = "actions/upload-artifact"
 # The check the release runs against the formula it has just written, and the
-# step that publishes that formula. H asserts the order, which is the whole of
-# what makes the check worth running.
+# step that publishes that formula. `formula-order` asserts the order, which
+# is the whole of what makes the check worth running.
 FORMULA_CHECK = "check-formula-asset.sh"
 FORMULA_PUSH = "git push"
 FIXTURE_TAG = "vCONTRACT"
@@ -197,6 +192,11 @@ class Unreadable(Exception):
 # the next one has to be about the SET of failures rather than about any of
 # them, and the only set nothing can add to quietly is the one the emitting
 # constructor enforces.
+#
+# RESIDUAL. The register enumerates ids and the sweep requires each id to fire
+# once, so an id emitted from two sites is pinned by whichever site a case
+# reaches and the other can be deleted with the self-test green; nothing here
+# refuses a second site.
 _RUNG_REGISTER: tuple[tuple[str, str], ...] = (
     ("advisory-job", "a job in the release workflow carries `continue-on-error`"),
     ("advisory-step", "a step in the release workflow carries `continue-on-error`"),
@@ -628,10 +628,11 @@ def make_fixture(assembler: Path, root: Path) -> None:
 
     ONE BUILDER. This file used to write its own copy of what
     `actions/download-artifact` leaves behind, which meant the sidecars in it
-    were a statement of this file's beliefs rather than of the workflow's: F
-    could not fail, because the tree carried the files whether or not any
-    upload delivered them. The assembler's fixture is the same one its
-    self-test and `check_extension_stamp.py --release-rehearsal` run against.
+    were a statement of this file's beliefs rather than of the workflow's:
+    `glob-not-load-bearing` could not fail, because the tree carried the files
+    whether or not any upload delivered them. The assembler's fixture is the
+    same one its self-test and `check_extension_stamp.py --release-rehearsal`
+    run against.
     """
     proc = subprocess.run(
         [
@@ -661,8 +662,8 @@ def deliver(
 
     A file no `path:` entry matches is a file the artifact does not carry, so
     it is removed here exactly as it would be absent on a tag. `drop` removes
-    one declared glob first, which is how F asks whether that glob is
-    load-bearing.
+    one declared glob first, which is how `glob-not-load-bearing` asks whether
+    that glob is load-bearing.
 
     Returns failure strings for globs that match nothing ANYWHERE. Per-leg is
     the wrong question: `finetype-*.zip` matches in the windows leg and nothing
@@ -1291,6 +1292,19 @@ def self_test() -> int:
             "            artifacts/*/finetype.duckdb_extension\n",
             "unassembled",
             "which the assembler did not produce",
+        ),
+        # THE SECOND SHAPE the rung's comment claims: a paired, correctly named
+        # duplicate of an assembled file, matched from under its artifact
+        # directory. Every basename here is one the assembler wrote, so a
+        # comparison by basename is green over it and only a comparison by path
+        # reddens; this case is what says which of the two the rung does.
+        (
+            "a `files:` entry carrying a second copy of the catalogue from its artifact directory",
+            "            release-assets/finetype-model.json\n",
+            "            release-assets/finetype-model.json\n"
+            "            artifacts/finetype-taxonomy-catalogue/*\n",
+            "unassembled",
+            "`artifacts/finetype-taxonomy-catalogue/finetype-model.json`, which the assembler did not produce",
         ),
         # ── the rungs this file shipped without a case, found in review ──────
         # A job-level `continue-on-error` is not the step-level one: the job
