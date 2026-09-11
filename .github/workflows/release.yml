@@ -104,6 +104,14 @@ jobs:
           # PARTIAL artifact. If `finetype-*.sha256` stopped matching while
           # `finetype-*.tar.gz` still did, the union is non-empty and this
           # never fires.
+          #
+          # scripts/check_release_asset_contract.py is what reads that half. It
+          # builds the artifacts tree by FILTERING the assembler's own fixture
+          # through these globs and then runs the assembler over the result, so
+          # each entry here is required to be load-bearing: drop one and the
+          # release path has to refuse. Dropping the sidecars is how a tag came
+          # to be able to publish five archives with nothing to verify them
+          # against, and it is a case in that file's self-test.
           if-no-files-found: error
           path: |
             finetype-*.tar.gz
@@ -200,8 +208,13 @@ jobs:
           # cover — it fires only when all four globs below come up empty.
           # assemble-release-assets.sh refuses with exit 4 if any one of these
           # four does not reach the assembled directory, which is the half
-          # that catches a partial upload and the half a pull request can
-          # prove.
+          # that catches a partial upload.
+          #
+          # That the four ARE the exit-4 list is not read off this comment:
+          # check_release_asset_contract.py drops each glob here in turn and
+          # requires the assembler to refuse, so a fifth asset added without a
+          # rung to require it, or a glob that stops delivering, is a failure on
+          # a pull request rather than a discovery on a tag.
           if-no-files-found: error
           path: |
             taxonomy-schemas.json
@@ -383,7 +396,10 @@ jobs:
   # correctly says nothing about the asset being reachable under the name the
   # heredoc composed. The tap has no pull-request CI of its own, so this
   # workflow is where a formula addressing a file that is not there has to stop.
-  # `scripts/check-formula-asset.sh`, below, is what stops it.
+  # `scripts/check-formula-asset.sh`, below, is what stops it — and it only
+  # stops it while it runs BEFORE the push. That ordering, and the step being
+  # unguarded, is a rung in check_release_asset_contract.py; the check's own
+  # credibility is the `formula-asset` job in ci.yml.
   #
   # What that check covers and what it does not: it proves each url resolves and
   # that the asset behind it hashes to the checksum written beside it. It does

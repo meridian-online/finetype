@@ -729,6 +729,34 @@ ASSEMBLER = "assemble-release-assets.sh"
 # needs `duckdb` on PATH, and the runner has none: an install step that goes
 # missing turns the load into "duckdb is not on PATH" on a tag and nowhere else.
 DUCKDB_CLI_MARK = "duckdb_cli-"
+# How it is fetched. The marker alone is a MENTION, and both places that read it
+# were reading mentions: a comment naming `duckdb_cli-` satisfied the rung below
+# that requires an install above the load, and exempted a step from the
+# rehearsal's enumeration. Measured: replacing the install step's `curl` with a
+# comment naming the marker and an `echo` left every check in this repository
+# green while a tag would exit 2 at the load, and a step whose entire `run:` was
+# `# same pin as the duckdb_cli- install above` / `exit 3` was never run by
+# anything. Same reason `_invocation_re` exists for the gate itself.
+DUCKDB_CLI_FETCH = "curl"
+
+# Every mode this gate offers. `main` builds the parser from this, and
+# check_release_wiring requires each one to be invoked by a step in one of the
+# workflows below -- a mode CI never runs is a check that rots unheard, and
+# reading it back off the parser's own declaration is what keeps the two from
+# being separate lists that drift.
+MODES = (
+    "--load",
+    "--untracked-version-file",
+    "--regenerates-version-file",
+    "--release-wiring",
+    "--release-rehearsal",
+    "--self-test",
+)
+CI_WORKFLOW = ".github/workflows/ci.yml"
+MANIFEST_REL = ".github/gate-self-tests.tsv"
+# This file, as the routing manifest spells it. A guard on a step of this gate
+# has to name a row that watches this path, or it routes by something else.
+SELF_REL = "scripts/check_extension_stamp.py"
 
 
 def _logical_lines(step) -> list[str]:
@@ -775,6 +803,46 @@ def _invocation_re(script: str) -> re.Pattern[str]:
 
 GATE_CALL = _invocation_re(GATE_INVOCATION)
 ASSEMBLER_CALL = _invocation_re(ASSEMBLER)
+CLI_FETCH_CALL = _invocation_re(DUCKDB_CLI_FETCH)
+
+
+# `steps.<id>.outputs.<gate> == 'true'` and nothing else. The audit in
+# .github/scripts/gate-self-tests.py compares this expression whole for the same
+# reason: `== 'false'`, `!= 'true'` and an added `&&` each read like routing and
+# disable it.
+ROUTING_GUARD = re.compile(r"steps\.[A-Za-z0-9_-]+\.outputs\.([a-z][a-z0-9_]*) == 'true'")
+
+
+def _is_routing_guard(condition: str, gates: list) -> bool:
+    """This `if:` routes the step BY THIS GATE, rather than switching it off.
+
+    Any registered id was enough until a review pointed at what that admits:
+    `steps.route.outputs.map_fidelity_results == 'true'` on a step of this gate
+    is a well-formed routing guard for a row that watches the fidelity
+    evaluation, so the mode would run only on diffs touching a directory it has
+    nothing to do with, and this rung would call it invoked. The row has to
+    watch THIS file, which is the only thing that makes "routed" mean "runs when
+    what it checks changes".
+    """
+    match = ROUTING_GUARD.fullmatch(condition.strip())
+    if not match:
+        return False
+    return any(gate.id == match.group(1) and SELF_REL in gate.paths for gate in gates)
+
+
+def _installs_duckdb_cli(step) -> bool:
+    """This step FETCHES the DuckDB CLI, rather than mentioning it.
+
+    An invocation of `curl` on a logical line that also names the release asset
+    -- so a comment, an echoed string, or prose about the pin is none of it.
+    Read on `_logical_lines` for the same reason every other reading in this
+    file is: the two questions asked of this predicate are "would the load have
+    a duckdb to run" and "is this step the one the rehearsal cannot execute",
+    and a comment answers neither.
+    """
+    return any(
+        CLI_FETCH_CALL.search(line) and DUCKDB_CLI_MARK in line for line in _logical_lines(step)
+    )
 
 
 def _workflow_reader():
@@ -996,9 +1064,7 @@ def check_release_wiring(root: Path) -> list[str]:
     # step before it, the load exits 2 with "duckdb is not on PATH" -- on a tag,
     # and nowhere else, which is the shape this whole mode exists to refuse.
     installers = [
-        step
-        for step in steps
-        if step.job == publish.job and any(DUCKDB_CLI_MARK in line for line in step.commands)
+        step for step in steps if step.job == publish.job and _installs_duckdb_cli(step)
     ]
     for step in load_reads:
         if not any(inst.lineno < step.lineno for inst in installers):
@@ -1053,6 +1119,46 @@ def check_release_wiring(root: Path) -> list[str]:
                 step,
                 f"{DISTRIBUTION_WORKFLOW}:{step.lineno} ({step.name or 'the stamp step'})",
                 problems,
+            )
+
+    # ── Every mode this gate offers is run by something ──────────────────────
+    #
+    # A mode nobody invokes is a check that cannot fail, and it reads in a diff
+    # exactly like one that runs. The list is the parser's own: `main` builds
+    # the flags from MODES, so a mode that exists is a mode this rung asks
+    # about. Across all three workflows rather than ci.yml alone, because two
+    # of them are only ever run on a tag and one of those is where the byte
+    # reading lives.
+    invoked: set[str] = set()
+    workflow_steps = list(steps) + list(dist_steps)
+    try:
+        _, ci_steps = reader.scan_workflow(root, CI_WORKFLOW)
+    except Exception as exc:  # noqa: BLE001 -- Fatal is the reader's, not ours
+        raise Refused(EXIT_CANNOT_RUN, f"{CI_WORKFLOW} could not be read: {exc}") from None
+    try:
+        gates = reader.load_manifest(root)
+    except Exception as exc:  # noqa: BLE001
+        raise Refused(EXIT_CANNOT_RUN, f"the routing manifest could not be read: {exc}") from None
+    workflow_steps += ci_steps
+    for step in workflow_steps:
+        # A STEP THAT CANNOT RUN DOES NOT INVOKE ANYTHING. Reading presence and
+        # not effect is the shape this whole mode exists to refuse, and it was
+        # here: `if: false` on a step naming a mode satisfied the rung below.
+        # A ROUTING guard is different -- the step runs on the diffs that change
+        # what it checks, which is the arrangement .github/gate-self-tests.tsv
+        # exists to make -- so a guard is accepted when it is exactly a routing
+        # comparison naming a gate that manifest registers, and not otherwise.
+        if step.condition and not _is_routing_guard(step.condition, gates):
+            continue
+        for line in _calls(step, GATE_CALL):
+            invoked.update(mode for mode in MODES if mode in line.split())
+    for mode in MODES:
+        if mode not in invoked:
+            problems.append(
+                f"`{GATE_INVOCATION} {mode}` is a mode this gate offers and no step in "
+                f"{CI_WORKFLOW}, {RELEASE_WORKFLOW} or {DISTRIBUTION_WORKFLOW} invokes. A "
+                "check nothing runs cannot fail, and reads in a diff exactly like one that "
+                "does"
             )
 
     if problems:
@@ -1148,9 +1254,9 @@ def check_release_rehearsal(root: Path, artifact: Path) -> list[str]:
     # rehearsal that covered it. One kind of step is skipped: any step whose
     # `run:` lines mention `duckdb_cli-`, meant as the DuckDB CLI install, which
     # is a `curl` and a `sudo mv` that no contributor's machine can run. That is
-    # a match by mention -- a comment naming the marker exempts a step too, and
-    # --release-wiring's presence rung reads the same way -- so the exemption is
-    # wider than the one step it is for.
+    # matched by INVOCATION -- a `curl` fetching `duckdb_cli-...`, on a logical
+    # line -- so a step that merely names the marker in a comment is enumerated
+    # like any other and has to be run or explained.
     unexercised = [
         step
         for step in steps
@@ -1158,7 +1264,7 @@ def check_release_rehearsal(root: Path, artifact: Path) -> list[str]:
         and step.lineno < publish.lineno
         and step.commands
         and step not in runnable
-        and not any(DUCKDB_CLI_MARK in line for line in step.commands)
+        and not _installs_duckdb_cli(step)
     ]
     if unexercised:
         raise Refused(
@@ -1834,7 +1940,15 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
 
             root = tmp_path / f"wiring-{next(counter)}"
             (root / ".github" / "workflows").mkdir(parents=True)
-            for rel in (RELEASE_WORKFLOW, DISTRIBUTION_WORKFLOW):
+            # ci.yml too: the mode reads all three, because the rung asking
+            # whether every mode is invoked cannot answer from the two
+            # workflows that only ever run on a tag.
+            # The manifest too: the mode asks whether a guarded step is ROUTED,
+            # which is a question only the manifest answers.
+            (root / MANIFEST_REL).write_text(
+                (ROOT / MANIFEST_REL).read_text(encoding="utf-8"), encoding="utf-8"
+            )
+            for rel in (RELEASE_WORKFLOW, DISTRIBUTION_WORKFLOW, CI_WORKFLOW):
                 text = (ROOT / rel).read_text(encoding="utf-8")
                 if rel in edits:
                     try:
@@ -2010,6 +2124,56 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
             "the duckdb CLI install deleted from the release job",
             {RELEASE_WORKFLOW: cut(install_step, load_step)},
             EXIT_UNWIRED, f"fetching `{DUCKDB_CLI_MARK}...`")
+        # ...and the same step LEFT IN PLACE with its fetch replaced by a
+        # comment that names the asset. Everything the rung above reads is
+        # still true -- the step exists, it is unguarded, it is above the load,
+        # and its `run:` contains `duckdb_cli-` -- and there is no duckdb on
+        # the runner. Measured green before this rung matched invocations, with
+        # the tag exiting 2 at the load and publishing nothing.
+        wiring_case(
+            "the duckdb CLI fetch replaced by a comment naming the asset",
+            {RELEASE_WORKFLOW: sub(
+                "          curl -fsSL -o duckdb.zip "
+                "https://github.com/duckdb/duckdb/releases/download/v1.5.3/"
+                "duckdb_cli-linux-amd64.zip\n",
+                "          # the duckdb_cli-linux-amd64.zip pin is shared with ci.yml\n"
+                '          echo "installing the duckdb CLI"\n')},
+            EXIT_UNWIRED, f"fetching `{DUCKDB_CLI_MARK}...`")
+
+        # A mode of this gate that CI stopped running. The step is present in
+        # every other sense -- named, in the right job -- and `true` is what a
+        # step left as a placeholder looks like. Nothing else in this
+        # repository reads ci.yml for the checks it is supposed to be running.
+        # ...and the same step still there, behind a condition that never
+        # holds. Presence is what the rung read; this is the difference between
+        # a step that exists and a step that runs.
+        # A guard that IS routing, for something else. Well-formed, names a
+        # real row, and routes this gate's mode by whether a diff touched the
+        # fidelity evaluation -- so the mode runs on almost no pull request that
+        # could break it.
+        wiring_case(
+            "a mode of this gate routed by another gate's row",
+            {CI_WORKFLOW: sub(
+                "        run: scripts/check_extension_stamp.py --regenerates-version-file\n",
+                "        if: steps.route.outputs.map_fidelity_results == 'true'\n"
+                "        run: scripts/check_extension_stamp.py --regenerates-version-file\n")},
+            EXIT_UNWIRED,
+            "--regenerates-version-file` is a mode this gate offers and no step")
+        wiring_case(
+            "a mode of this gate switched off with `if: false`",
+            {CI_WORKFLOW: sub(
+                "        run: scripts/check_extension_stamp.py --regenerates-version-file\n",
+                "        if: false\n"
+                "        run: scripts/check_extension_stamp.py --regenerates-version-file\n")},
+            EXIT_UNWIRED,
+            "--regenerates-version-file` is a mode this gate offers and no step")
+        wiring_case(
+            "a mode of this gate that ci.yml stopped invoking",
+            {CI_WORKFLOW: sub(
+                "        run: scripts/check_extension_stamp.py --regenerates-version-file\n",
+                "        run: true\n")},
+            EXIT_UNWIRED,
+            "--regenerates-version-file` is a mode this gate offers and no step")
 
         # ── THE REHEARSAL: the same steps, RUN. Every case above reads the
         #    workflow; these execute it, against a tree assembled by the job's
@@ -2067,6 +2231,22 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
                 "        shell: bash\n"
                 "        run: ./tools/publish-notes.sh\n" + publish_step)},
             EXIT_REHEARSAL, "neither executes nor knowingly exempts")
+        # The exemption, from the other side. One kind of step is knowingly not
+        # executed here -- the CLI install, a `curl` and a `sudo mv` no
+        # contributor's machine can run -- and while that exemption matched a
+        # MENTION, any step could claim it by naming the asset in a comment.
+        # This one would exit 3 on a tag and was exempted, unrun, before the
+        # exemption asked for an invocation.
+        rehearsal_case(
+            "a step exempting itself by naming the CLI asset in a comment",
+            {RELEASE_WORKFLOW: sub(
+                publish_step,
+                "      - name: Something a tag alone would run\n"
+                "        shell: bash\n"
+                "        run: |\n"
+                "          # same pin as the duckdb_cli- install above\n"
+                "          exit 3\n" + publish_step)},
+            EXIT_REHEARSAL, "neither executes nor knowingly exempts")
         rehearsal_case(
             "the assembly writing somewhere the stamp steps do not read",
             {RELEASE_WORKFLOW: sub(
@@ -2092,12 +2272,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--artifact", action="append", default=[], type=Path)
     parser.add_argument("--tag")
     parser.add_argument("--expect-commit")
-    parser.add_argument("--load", action="store_true")
-    parser.add_argument("--untracked-version-file", action="store_true")
-    parser.add_argument("--regenerates-version-file", action="store_true")
-    parser.add_argument("--release-wiring", action="store_true")
-    parser.add_argument("--release-rehearsal", action="store_true")
-    parser.add_argument("--self-test", action="store_true")
+    # The modes, added from MODES rather than one by one, because
+    # --release-wiring requires every entry in it to be invoked by a workflow
+    # step. Two lists would let a mode be added to the parser and to nothing
+    # else, which is the check-nobody-runs this file exists to refuse.
+    for mode in MODES:
+        parser.add_argument(mode, action="store_true")
 
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--makefile", type=Path)
