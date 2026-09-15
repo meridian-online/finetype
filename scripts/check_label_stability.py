@@ -99,10 +99,6 @@ UNDECIDED = "undecided"
 # and carries the taxonomy label as `x-finetype-label`.
 LABEL_KEY = "x-finetype-label"
 
-# Batch mode exists so the model and the taxonomy load ONCE for every window in
-# a run rather than once per window. Measured on this branch: 60 windows of one
-# pool in 9 seconds batched, against about 1.5 seconds each spawned singly.
-BATCH_FLAGS = ("--files", "--out-dir")
 
 
 class Fatal(Exception):
@@ -341,9 +337,14 @@ def profile_windows(
             [
                 str(binary),
                 "profile",
-                BATCH_FLAGS[0],
+                # Batch mode exists so the model and the taxonomy load ONCE for
+                # every window in a run rather than once per window. Measured on
+                # this branch: 60 windows of one pool in 9 seconds batched,
+                # against about 1.5 seconds each when spawned singly. It only
+                # wires json-schema and datapackage through the per-file writer.
+                "--files",
                 str(listing),
-                BATCH_FLAGS[1],
+                "--out-dir",
                 str(out_dir),
                 "-o",
                 "json-schema",
@@ -500,12 +501,18 @@ def remeasure(path: Path, baseline: Baseline, measurements: dict[str, Measuremen
     version = subprocess.run(
         [str(binary), "--version"], capture_output=True, text=True, check=True
     ).stdout.strip()
-    commit = subprocess.run(
+    described = subprocess.run(
         ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
         capture_output=True,
         text=True,
-        check=True,
-    ).stdout.strip()
+        check=False,
+    )
+    if described.returncode != 0:
+        raise Fatal(
+            "--remeasure cannot name the build: `git rev-parse` failed here. "
+            "A figure whose build is unnamed is not a measurement."
+        )
+    commit = described.stdout.strip()
 
     replacements = {
         "binary": f"{version} (built from this tree)",
