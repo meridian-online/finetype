@@ -389,6 +389,21 @@ RAGGED_NULLS=$(printf '%s\n' "$RAGGED_JSON" | tr -d ' ' \
     | sed 's/.*"null"://; s/,$//' || echo none)
 assert_eq "short rows are padded, not dropped" "$RAGGED_NULLS" "2"
 
+# ── A 100-value SAMPLE of `naics_description.csv` that widened even though the
+# whole file does not: a candidate sniff confirmed itself by reading the row
+# its own `SkipRows` lands on, and on this exact window that row is the file's
+# own last line, which happens to split into three under `;`. This is
+# `tests/fixtures/label_stability/naics_description_window2.csv` — window 2 of
+# seed `20260828`, drawn the way `scripts/check_label_stability.py` draws it
+# (see `tests/fixtures/label_stability/BASELINE.md`), persisted here so the
+# defect it exposed stays under CI rather than only under an occasional draw.
+NAICS_W2="$REPO_ROOT/tests/fixtures/label_stability/naics_description_window2.csv"
+NAICS_W2_ERR=$("$FINETYPE" profile -f "$NAICS_W2" -o json 2>&1 >/dev/null) || true
+assert_contains "a 100-value sample that used to widen profiles as one column" \
+    "$NAICS_W2_ERR" 'Found 1 columns: ["description"]'
+assert_contains "and keeps all 100 of its rows, not the one a skipped read would leave" \
+    "$NAICS_W2_ERR" 'Read 100 rows'
+
 
 # ── Error Handling ────────────────────────────────────────────────────────────
 

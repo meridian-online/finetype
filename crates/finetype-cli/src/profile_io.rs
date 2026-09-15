@@ -145,10 +145,23 @@ const EMPTY_SENTINEL: &str = "(empty)";
 /// Run `sniff_csv` once and parse its verdict, or `None` if duckdb refused the
 /// file or emitted something we cannot read. A refusal is not an error here:
 /// the caller ranks whatever verdicts it got and falls back when it has none.
-fn sniff_csv(input_literal: &str, delimiter: Option<char>, null_padding: bool) -> Option<CsvSniff> {
+///
+/// `pin_first_row` passes `skip=0` to `sniff_csv` itself, so duckdb's own
+/// sniffer is not free to trade a wider column count for a `SkipRows` that
+/// makes some later row look more consistent — it reports the dialect and
+/// column count the file's actual first row supports.
+fn sniff_csv(
+    input_literal: &str,
+    delimiter: Option<char>,
+    null_padding: bool,
+    pin_first_row: bool,
+) -> Option<CsvSniff> {
     let mut opts = String::from("all_varchar=true");
     if null_padding {
         opts.push_str(", null_padding=true");
+    }
+    if pin_first_row {
+        opts.push_str(", skip=0");
     }
     if let Some(delim) = delimiter {
         opts.push_str(", sep=");
@@ -195,13 +208,19 @@ fn with_option(call: &str, option: &str) -> String {
     format!("{}, {option})", &call[..call.len() - 1])
 }
 
-/// How many fields the file's first row splits into under `sniff`'s own
+/// How many fields the row at `sniff.skip` splits into under `sniff`'s own
 /// dialect, or `None` when the dialect is not one the csv crate can express
-/// (a multi-byte delimiter) or the file cannot be read.
+/// (a multi-byte delimiter), the file cannot be read, or no row of actual
+/// data follows the one `sniff.skip` lands on.
 ///
 /// This is the arbiter between two sniffs that disagree: a CSV's first row
 /// names its columns, so a sniff claiming more columns than that row has
-/// fields has invented the difference.
+/// fields has invented the difference. Requiring a row to follow the one
+/// being confirmed is what keeps a sniff from confirming itself against the
+/// file's own last row: a `SkipRows` that lands there is not naming a header
+/// for anything, and duckdb's sniffer will propose exactly that skip when no
+/// real delimiter agrees across the whole file but the lone row left over
+/// happens to split consistently under one.
 fn header_field_count(file: &std::path::Path, sniff: &CsvSniff) -> Option<usize> {
     let delim = single_byte(&sniff.delim)?;
     let mut builder = csv::ReaderBuilder::new();
@@ -220,7 +239,9 @@ fn header_field_count(file: &std::path::Path, sniff: &CsvSniff) -> Option<usize>
     for _ in 0..sniff.skip {
         records.next()?.ok()?;
     }
-    Some(records.next()?.ok()?.len())
+    let header = records.next()?.ok()?;
+    records.next()?.ok()?;
+    Some(header.len())
 }
 
 /// The single byte a dialect character stands for, or `None` for duckdb's
@@ -234,20 +255,32 @@ fn single_byte(s: &str) -> Option<u8> {
 
 /// Pick the column list to read with. Ranks the sniffs widest-first and takes
 /// the first one the header row confirms; ties keep the strict sniff, which is
-/// listed first and which `sort_by_key` is stable for.
-fn choose_sniff<'a>(
+/// listed first and which `sort_by_key` is stable for. A sniff whose `skip`
+/// leaves no data row behind it never confirms — see `header_field_count` —
+/// so it is passed over here for the other candidate exactly as any other
+/// unconfirmed sniff would be.
+///
+/// When nothing confirms, the fallback is not an unconfirmed guess: it
+/// re-sniffs with `SkipRows` pinned to zero, the dialect and column count the
+/// file's row that is actually first supports, with no skip search free to
+/// trade that for a wider count. Only when duckdb cannot even do that does
+/// this fall back to whichever raw candidate exists.
+fn choose_sniff(
     file: &std::path::Path,
-    strict: Option<&'a CsvSniff>,
-    padded: Option<&'a CsvSniff>,
-) -> Option<&'a CsvSniff> {
+    input_literal: &str,
+    delimiter: Option<char>,
+    strict: Option<&CsvSniff>,
+    padded: Option<&CsvSniff>,
+) -> Option<CsvSniff> {
     let mut ranked: Vec<&CsvSniff> = strict.into_iter().chain(padded).collect();
     ranked.sort_by_key(|c| std::cmp::Reverse(c.ncols));
     ranked
         .iter()
         .copied()
         .find(|c| header_field_count(file, c) == Some(c.ncols))
-        .or(strict)
-        .or(padded)
+        .cloned()
+        .or_else(|| sniff_csv(input_literal, delimiter, false, true))
+        .or_else(|| strict.or(padded).cloned())
 }
 
 /// Read CSV (or Parquet) input into (headers, columns, row_count) by shelling
@@ -311,20 +344,35 @@ pub(crate) fn read_csv_input(
     // row arbitrates: a CSV's first row names its columns, so a sniff claiming
     // more columns than that row has fields has invented the difference. Widest
     // header-confirmed sniff wins; a tie keeps the strict one.
+    //
+    // A sniff's own `SkipRows` can invent that agreement rather than find it:
+    // failing to find one delimiter that splits every row consistently,
+    // duckdb's sniffer will sometimes propose skipping ahead until only one
+    // row is left, which trivially "agrees" with itself under whatever
+    // delimiter it contains. `header_field_count` refuses to confirm a sniff
+    // against a row nothing follows, so that candidate is passed over for the
+    // other one, and if neither confirms `choose_sniff` re-sniffs with
+    // `SkipRows` pinned to zero rather than trust either guess.
     let (source, csv_call) = if is_parquet {
         (
             format!("SELECT COLUMNS(*)::VARCHAR FROM read_parquet({input_literal})"),
             None,
         )
     } else {
-        let strict = sniff_csv(&input_literal, delimiter, false);
-        let padded = sniff_csv(&input_literal, delimiter, true);
-        let call = match choose_sniff(file, strict.as_ref(), padded.as_ref()) {
+        let strict = sniff_csv(&input_literal, delimiter, false, false);
+        let padded = sniff_csv(&input_literal, delimiter, true, false);
+        let call = match choose_sniff(
+            file,
+            &input_literal,
+            delimiter,
+            strict.as_ref(),
+            padded.as_ref(),
+        ) {
             Some(chosen) => {
                 // The padded sniff's own prompt already carries the option; the
                 // strict sniff's does not, and the read needs it either way.
                 if chosen.call.contains("null_padding=") {
-                    chosen.call.clone()
+                    chosen.call
                 } else {
                     with_option(&chosen.call, "null_padding=true")
                 }
