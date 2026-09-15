@@ -1,7 +1,7 @@
 ---
 measured: 2026-09-16
 binary: finetype 0.6.59 (built from this tree)
-build: 9859116b
+build: 472f2faf
 read_path: post-#124 sniff-first read, crates/finetype-cli/src/profile_io.rs
 draws: 60
 window: 100
@@ -21,7 +21,7 @@ The **agreement** is the modal label's share of the windows that read. The **win
 | `gleif_corpus` | 0.783 | 60/60 | `representation.text.plain_text` | unstable |
 | `edgar_gleif_corpus` | 0.700 | 60/60 | `representation.text.plain_text` | unstable |
 | `naics_corpus` | 0.983 | 60/60 | `unknown` | undecided |
-| `naics_description` | 1.000 | 59/60 | `unknown` | undecided |
+| `naics_description` | 1.000 | 60/60 | `unknown` | undecided |
 
 **Two different failures, and the second is why agreement alone is not the test.** Four columns return the right label most of the time and a wrong one on the rest — a draw. The two `naics` columns are perfectly stable and perfectly wrong: every window returns `unknown`, so an agreement check scores them healthy. The test therefore asserts both that the modal label is what the baseline records **and** that a column marked `undecided` is the only place `unknown` is allowed.
 
@@ -40,13 +40,13 @@ It is registered in `.github/gate-self-tests.tsv` as `label_stability` and runs 
 
 Every figure in the table then reproduced digit for digit on the x86_64 Linux runner under duckdb v1.5.3, against a measurement taken on arm64 macOS under v1.5.5. Both the seeded draw and the inference are reproducible across those two platforms; that is measured, not assumed, and it is why the seed is in the frontmatter.
 
-## One window in sixty still widens, and that is the recorded figure below
+## The one-window-in-sixty widening is fixed, and this card is why
 
-**`naics_description` reads as three semicolon-delimited columns on one of its sixty windows** — window 2 of seed 20260828, measured on duckdb v1.5.5. The whole file reads as one column, which is what `tests/smoke.sh` asserts and what #124 fixed; a 100-value *sample* of it does not always. #124 narrowed this defect rather than closing it.
+**This section recorded a defect and said it was not fixed here. It is fixed on this branch now.**
 
-The mechanism is `choose_sniff` in `crates/finetype-cli/src/profile_io.rs`: it ranks the strict and padded sniffs widest-first and takes the first one whose header row confirms its column count, where "header row" means the row after that sniff's own `SkipRows`. On this window the strict sniff reports `;`, three columns and `SkipRows` of 100 — past every row of a 101-line file — and the row it then lands on does split into three under `;`, so a sniff that skipped the file confirms itself. The arbitration cannot be fooled by a sniff that reads the file's actual first row, and that is the shape of a fix.
+`naics_description` used to read as three semicolon-delimited columns on one of its sixty windows — window 2 of seed 20260828, measured on duckdb v1.5.5. #124 fixed the whole file; this narrower defect survived it because `choose_sniff`, arbitrating between the strict and padded sniffs, confirmed a candidate against whichever row its own `SkipRows` landed on without requiring a row to follow it. On this window the strict sniff reported `;`, three columns and `SkipRows` of 100 on a 101-line file — landing on the file's own last row, which happens to split into three under `;` — and that lone row, nothing behind it, confirmed the sniff that skipped to it.
 
-**The count is recorded and not asserted, and what is known about it is this.** It reproduced exactly on two platforms: duckdb v1.5.5 on arm64 macOS and duckdb v1.5.3 on the x86_64 Linux runner, same window, same count, alongside all six agreement figures. So there is no evidence it drifts — and no measurement of any other duckdb version either. It is a property of a dependency this repository does not pin, nothing here has bounded how it behaves across versions, and a gate that reddens on a dependency's patch release gets switched off; this repository already carries defused guards. What the gate does refuse is a pool where *no* window read: a measurement that did not happen is never a pass.
+The fix is in `header_field_count` and `choose_sniff` in `crates/finetype-cli/src/profile_io.rs`: a sniff no longer confirms against a row with no row after it, and when neither candidate confirms, the fallback re-sniffs with `SkipRows` pinned to zero — the file's row that is actually first, read as it stands — rather than trust an unconfirmed guess. The window is persisted at `tests/fixtures/naics_description_window2.csv` (outside `label_stability/`, whose every CSV this gate requires a baseline row for) and asserted by name in `tests/smoke.sh`, section 10, so the defect stays under CI rather than only under an occasional draw.
 
 ## The delimiter pin this file used to require is gone, and #124 is why
 
@@ -54,6 +54,6 @@ The mechanism is `choose_sniff` in `crates/finetype-cli/src/profile_io.rs`: it r
 #124, which took `naics_description.csv` from this branch as its own regression fixture 16 hours
 after the pin was written.
 
-The defect was that `profile` read the two NAICS fixtures as eight columns unless `--delimiter ','` was given, because DuckDB's `null_padding=true` lets the sniffer widen a schema rather than only padding short ragged rows, and prose containing semicolons triggers it — first at line 63 of `naics_description.csv`. #124 sniffs the shape first and then reads with the column list the sniff pinned, so no pin is needed and none should be added back. The section above records what that left: whole files are fixed, one sampled window in sixty is not.
+The defect was that `profile` read the two NAICS fixtures as eight columns unless `--delimiter ','` was given, because DuckDB's `null_padding=true` lets the sniffer widen a schema rather than only padding short ragged rows, and prose containing semicolons triggers it — first at line 63 of `naics_description.csv`. #124 sniffs the shape first and then reads with the column list the sniff pinned, so no pin is needed and none should be added back. The section above records what #124 left, and what closed it.
 
-`tests/smoke.sh` now asserts the fixed behaviour on this fixture by name — *"single-column prose CSV profiles as one column"*, expecting `Found 1 columns: ["description"]` — and that assertion runs in CI. **If a future reader reaches for `--delimiter ','` here, that smoke assertion is the thing to read first**, and the window count in the table above is the thing to read second.
+`tests/smoke.sh` now asserts the fixed behaviour on this fixture by name — *"single-column prose CSV profiles as one column"*, expecting `Found 1 columns: ["description"]` — and that assertion runs in CI. **If a future reader reaches for `--delimiter ','` here, that smoke assertion is the thing to read first**, and the section above is the thing to read second.
