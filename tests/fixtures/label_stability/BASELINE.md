@@ -38,13 +38,15 @@ It is registered in `.github/gate-self-tests.tsv` as `label_stability` and runs 
 
 **The figures above were re-derived by that gate on the build the frontmatter names**, replacing the `finetype 0.6.57` measurement that predated #124's sniff-first read. Every modal label survived the change of read path; four of the six agreement figures moved, and `naics_corpus` left 1.000.
 
+Every figure in the table then reproduced digit for digit on the x86_64 Linux runner under duckdb v1.5.3, against a measurement taken on arm64 macOS under v1.5.5. Both the seeded draw and the inference are reproducible across those two platforms; that is measured, not assumed, and it is why the seed is in the frontmatter.
+
 ## One window in sixty still widens, and that is the recorded figure below
 
 **`naics_description` reads as three semicolon-delimited columns on one of its sixty windows** — window 2 of seed 20260828, measured on duckdb v1.5.5. The whole file reads as one column, which is what `tests/smoke.sh` asserts and what #124 fixed; a 100-value *sample* of it does not always. #124 narrowed this defect rather than closing it.
 
 The mechanism is `choose_sniff` in `crates/finetype-cli/src/profile_io.rs`: it ranks the strict and padded sniffs widest-first and takes the first one whose header row confirms its column count, where "header row" means the row after that sniff's own `SkipRows`. On this window the strict sniff reports `;`, three columns and `SkipRows` of 100 — past every row of a 101-line file — and the row it then lands on does split into three under `;`, so a sniff that skipped the file confirms itself. The arbitration cannot be fooled by a sniff that reads the file's actual first row, and that is the shape of a fix.
 
-**The count is recorded and not asserted, and the reason is the dependency.** This repository's CI installs duckdb v1.5.3 and a developer's machine may hold any later one, so the number moves with a patch release of something this repository does not pin. A gate that reddens on that gets switched off, and this repository already carries defused guards. What the gate does refuse is a pool where *no* window read: a measurement that did not happen is never a pass.
+**The count is recorded and not asserted, and what is known about it is this.** It reproduced exactly on two platforms: duckdb v1.5.5 on arm64 macOS and duckdb v1.5.3 on the x86_64 Linux runner, same window, same count, alongside all six agreement figures. So there is no evidence it drifts — and no measurement of any other duckdb version either. It is a property of a dependency this repository does not pin, nothing here has bounded how it behaves across versions, and a gate that reddens on a dependency's patch release gets switched off; this repository already carries defused guards. What the gate does refuse is a pool where *no* window read: a measurement that did not happen is never a pass.
 
 ## The delimiter pin this file used to require is gone, and #124 is why
 

@@ -610,6 +610,50 @@ def _case(name: str, args: list[str], expect_exit: int, expect_text: list[str], 
     return True
 
 
+def _case_windows_are_independent(fixtures: Path, baseline: Baseline) -> bool:
+    """The windows are distinct draws, and the same seed draws the same ones.
+
+    THE ALTITUDE THIS CASE SITS AT, and why the cases below cannot reach it. A
+    `draw_windows` that returned one window sixty times would leave every rule
+    in this gate green: the modal label would still be the recorded one, and the
+    gate would report an agreement of 1.000 on a column it had sampled once.
+    The whole claim — that the suite tells a real label fix from a lucky draw —
+    rests on the draws being independent, and independence is a property of the
+    sampler rather than of any label it produces. So it is asserted here,
+    directly, against the sampler.
+    """
+    name = "gleif_corpus"
+    _, values = read_pool(fixtures / f"{name}.csv")
+    drawn = draw_windows(values, baseline.draws, baseline.window, baseline.seed, name)
+    problems: list[str] = []
+    if len(drawn) != baseline.draws:
+        problems.append(f"drew {len(drawn)} windows, expected {baseline.draws}")
+    if any(len(window) != baseline.window for window in drawn):
+        problems.append("a window is not the recorded width")
+    distinct = {tuple(window) for window in drawn}
+    if len(distinct) != len(drawn):
+        problems.append(
+            f"{len(drawn) - len(distinct)} of {len(drawn)} windows repeat another; "
+            "these are not independent draws"
+        )
+    if any(len(set(window)) != baseline.window for window in drawn):
+        problems.append("a window repeats a value, so it is not a sample without replacement")
+    again = draw_windows(values, baseline.draws, baseline.window, baseline.seed, name)
+    if [list(w) for w in again] != [list(w) for w in drawn]:
+        problems.append("the same seed drew different windows, so no run can be reproduced")
+    other = draw_windows(values, baseline.draws, baseline.window, baseline.seed + "x", name)
+    if [list(w) for w in other] == [list(w) for w in drawn]:
+        problems.append("a different seed drew identical windows, so the seed does nothing")
+
+    if problems:
+        print("  FAIL  the windows drawn are independent and seeded")
+        for problem in problems:
+            print(f"        {problem}")
+        return False
+    print("  ok    the windows drawn are independent and seeded")
+    return True
+
+
 def self_test(binary: Path) -> int:
     print(SELFTEST_DOC)
     real_fixtures = ROOT / FIXTURE_DIR_REL
@@ -630,6 +674,8 @@ def self_test(binary: Path) -> int:
         baseline = load_baseline(real_baseline)
         recorded = {row.fixture: row for row in baseline.rows}
         stable_label = recorded[stable].label
+
+        passed &= _case_windows_are_independent(real_fixtures, baseline)
 
         # ── control ─────────────────────────────────────────────────────────
         passed &= _case(
