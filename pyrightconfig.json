@@ -37,6 +37,7 @@
     "scripts/check_taxonomy_content.py",
     "scripts/check_sample_patterns.py",
     "scripts/check_schema_catalogue.py",
+    "scripts/check_label_stability.py",
     "scripts/check_model_coverage.py",
     "scripts/check_release_asset_contract.py",
     "scripts/check_extension_stamp.py",

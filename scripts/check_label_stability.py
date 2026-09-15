@@ -446,7 +446,7 @@ def verdict(baseline: Baseline, measurements: dict[str, Measurement]) -> list[st
                 f"{row.fixture}: `{UNKNOWN}` is the modal label of a pool the baseline "
                 f"marks `{row.status}`. `{UNKNOWN}` is written by the demotion guard, "
                 f"never by the model, so this pool has lost its label rather than "
-                f"changed it. Only a `{UNDECIDED}` pool may be modally `{UNKNOWN}`."
+                f"changed it. Only an `{UNDECIDED}` pool may be modally `{UNKNOWN}`."
             )
     return violations
 
@@ -550,6 +550,26 @@ without it, a gate that failed unconditionally would clear every other case.
 """
 
 
+def _mutate(source: Path, target: Path, pattern: str, replacement: str) -> None:
+    """Rewrite one line of a copied file, REFUSING a pattern that matched nothing.
+
+    A mutation that silently failed to apply leaves the gate looking at an
+    unmutated tree, and a gate that then passes is indistinguishable from a gate
+    that cannot detect. This self-test lost a case to exactly that: the table
+    grew a column, the substitution stopped matching, and the case reported the
+    gate had not detected a label it had never been shown. The refusal is the
+    fix, because the harness now cannot report on a mutation it did not make.
+    """
+    text = source.read_text(encoding="utf-8")
+    mutated, count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
+    if count != 1:
+        raise Fatal(
+            f"self-test: the mutation {pattern!r} matched {count} lines of {source}, not 1. "
+            "The file's shape has moved and this case is not testing what it says."
+        )
+    target.write_text(mutated, encoding="utf-8")
+
+
 def _run_gate(args: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(Path(__file__).resolve()), *args],
@@ -616,15 +636,11 @@ def self_test(binary: Path) -> int:
         # ── R1: the recorded label is what the gate compares against ─────────
         moved = scratch / "moved-baseline.md"
         wrong_label = "representation.text.entity_name"
-        moved.write_text(
-            re.sub(
-                rf"(^\|\s*`{stable}`\s*\|\s*[0-9]\.[0-9]{{3}}\s*\|\s*)`[^`]+`",
-                rf"\g<1>`{wrong_label}`",
-                real_baseline.read_text(encoding="utf-8"),
-                count=1,
-                flags=re.MULTILINE,
-            ),
-            encoding="utf-8",
+        _mutate(
+            real_baseline,
+            moved,
+            rf"(^\|\s*`{stable}`\s*\|[^|]*\|[^|]*\|\s*)`[^`]+`",
+            rf"\g<1>`{wrong_label}`",
         )
         passed &= _case(
             "a moved modal label is refused, naming the pool and both labels",
@@ -636,15 +652,11 @@ def self_test(binary: Path) -> int:
 
         # ── R2: `unknown` on a pool the baseline does not mark undecided ─────
         demoted = scratch / "demoted-baseline.md"
-        demoted.write_text(
-            re.sub(
-                rf"(^\|\s*`{undecided}`\s*\|.*\|\s*)undecided(\s*\|)$",
-                r"\g<1>unstable\g<2>",
-                real_baseline.read_text(encoding="utf-8"),
-                count=1,
-                flags=re.MULTILINE,
-            ),
-            encoding="utf-8",
+        _mutate(
+            real_baseline,
+            demoted,
+            rf"(^\|\s*`{undecided}`\s*\|.*\|\s*)undecided(\s*\|)$",
+            r"\g<1>unstable\g<2>",
         )
         passed &= _case(
             "`unknown` modal on a pool marked `unstable` is refused, naming the pool",
