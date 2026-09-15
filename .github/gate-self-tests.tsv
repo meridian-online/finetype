@@ -109,3 +109,4 @@ extension_stamp	scripts/check_extension_stamp.py --self-test --artifact target/r
 release_wiring	scripts/check_extension_stamp.py --release-wiring	-	always
 release_rehearsal	scripts/check_extension_stamp.py --release-rehearsal --artifact target/release/finetype.duckdb_extension	-	always
 
+label_stability	python3 scripts/check_label_stability.py --self-test	scripts/check_label_stability.py, tests/fixtures/label_stability/BASELINE.md, tests/fixtures/label_stability/gleif_corpus.csv, tests/fixtures/label_stability/naics_corpus.csv

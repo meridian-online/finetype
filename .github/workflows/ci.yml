@@ -980,3 +980,56 @@ jobs:
       - name: Download model from HuggingFace
         run: .github/scripts/download-model.sh
       - run: ./tests/smoke.sh
+
+  label-stability:
+    # THE JOB THAT TELLS A LABEL FIX FROM A LUCKY DRAW.
+    #
+    # A free-text column does not type the same way twice. Every label fix in
+    # this repository was verified by running `profile` once and reading the
+    # answer, so a fix and a lucky draw looked identical at review. This job
+    # profiles each pool in `tests/fixtures/label_stability/` over sixty
+    # independent 100-value windows and requires the MODAL label to be the one
+    # `tests/fixtures/label_stability/BASELINE.md` records, and `unknown` to be
+    # modal only where that file marks a pool `undecided`.
+    #
+    # IT NEEDS THE RELEASE BINARY, not `cargo test`. The windows are read
+    # through the shipping CSV read path — `profile` shells out to the duckdb
+    # CLI for ingestion — so what is measured is the build a user installs
+    # rather than a library call that skips the reader. That is also why duckdb
+    # is installed here, exactly as the `smoke` job installs it.
+    #
+    # NOT a required status check. Adding it to the required set is a
+    # branch-protection edit, which is repository configuration rather than
+    # anything a workflow file can do.
+    name: Label stability baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Install duckdb CLI
+        # A hard runtime dependency (choice 0100): `profile` shells out to it to
+        # read a CSV, so every window this job draws goes through it.
+        run: |
+          curl -fsSL -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
+          unzip -o duckdb.zip
+          sudo mv duckdb /usr/local/bin/duckdb
+          duckdb --version
+      - name: Download model from HuggingFace
+        run: .github/scripts/download-model.sh
+      - run: cargo build --release -p finetype-cli
+      - name: Which gates this diff changed
+        id: route
+        # In-job by design, and it audits before it plans; see the identical step
+        # in the `gate-routing-self-test` job for why.
+        run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      # The gate's own proof runs FIRST when it runs at all, for the reason the
+      # `public-hygiene` job states: a gate that is only known to pass is not
+      # known to detect, so "it still detects" has to be established before "the
+      # tree is clean" means anything.
+      - name: The label-stability gate detects a moved label and a pool gone unknown
+        if: steps.route.outputs.label_stability == 'true'
+        run: python3 scripts/check_label_stability.py --self-test
+      - name: Every pool's modal label is the one the baseline records
+        run: python3 scripts/check_label_stability.py
