@@ -147,9 +147,13 @@ jobs:
       # rather than scanned.
       #
       # This reads the body AS OF THE EVENT THAT STARTED THIS RUN. A body edited
-      # afterwards is covered by .github/workflows/pr-text-hygiene.yml, which
+      # afterwards is read by .github/workflows/pr-text-hygiene.yml, which
       # triggers on `edited` and runs this one step; that trigger is not here
-      # because it would re-run every job in this file on every typo fix.
+      # because it would re-run every job in this file on every typo fix. That
+      # the other workflow exists, triggers on `edited` and runs this same
+      # `--text` mode is a case in check-history-hygiene-selftest.sh, which the
+      # step above runs — the sentence was true and unchecked for as long as it
+      # had been written.
       - name: private references in the pull request title and body
         if: github.event_name == 'pull_request'
         env:
@@ -168,11 +172,14 @@ jobs:
     # That split is the whole point. A check that runs on a tag and nowhere else
     # is exercised a handful of times a year, always at the moment it is least
     # welcome to be wrong. These two stand a loopback HTTP server in front of
-    # throwaway assets and prove — on every pull request targeting main, with no
-    # network beyond localhost and no toolchain — that a wrong checksum, an
-    # unresolvable url and a lost platform block each still turn it red, and
-    # that a self-test saying so can still tell a broken check from a working
-    # one.
+    # throwaway assets and prove — with no network beyond localhost and no
+    # toolchain — that a wrong checksum, an unresolvable url and a lost platform
+    # block each still turn it red, and that a self-test saying so can still
+    # tell a broken check from a working one.
+    #
+    # WHEN, precisely: on a pull request whose diff touches the check or either
+    # harness, and on any diff that changes the routing itself. Not on every
+    # pull request; the sentence below is the one that is true.
     #
     # Every step here is a proof rather than a check, so every step is routed:
     # a diff that leaves `scripts/check-formula-asset.sh` and its two harnesses
@@ -206,6 +213,120 @@ jobs:
         # the moment the reconciliation is taken out.
         if: steps.route.outputs.formula_asset == 'true'
         run: ./scripts/check-formula-asset-mutations.sh
+
+  schema-catalogue:
+    # Same shape as `formula-asset` above, and for the same reason: the check
+    # this proves (scripts/check_schema_catalogue.py) reads a release asset
+    # that release.yml generates from labels/definitions_*.yaml, and there is
+    # no release on a branch — so the check itself runs only on a tag, and its
+    # credibility runs here on any pull request whose diff touches
+    # scripts/check_schema_catalogue.py, which is the path
+    # .github/gate-self-tests.tsv's row for this gate watches. A pull request
+    # touching neither that script nor the routing skips this proof.
+    # `--self-test` mutates
+    # synthetic catalogues in-process (an emptied array, entries that keep
+    # their label but lose every checkable keyword, entries that keep a
+    # keyword but lose their label) and requires the check to redden on each,
+    # then re-runs them through the script as a subprocess and requires the
+    # exit code this job reads to be 1 rather than only the verdict to be
+    # right.
+    name: Taxonomy schema catalogue check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Which gates this diff changed
+        id: route
+        # In-job by design, and it audits before it plans; see the identical step
+        # in the `gate-routing-self-test` job for why.
+        run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: The check reddens on an emptied catalogue and on entries missing a label or a checkable keyword
+        if: steps.route.outputs.schema_catalogue == 'true'
+        run: python3 scripts/check_schema_catalogue.py --self-test
+
+  model-coverage:
+    # Same shape again: scripts/check_model_coverage.py reads the catalogue
+    # release.yml generates alongside the model's label_map.json it downloaded
+    # for that same tag, and both only exist together in a release job. The
+    # self-test proves the two failure directions AC6 names, against synthetic
+    # three-label inputs: a catalogue emptied to `[]` measures 0.0, and a label
+    # map carrying labels the catalogue does not mention measures a fraction
+    # the gate's MIN_COVERAGE threshold refuses. It then re-runs both through
+    # the script as a subprocess and requires exit 1, because measuring the
+    # right fraction and acting on it are two different things and only the
+    # second is what this job reads.
+    name: Model coverage check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Which gates this diff changed
+        id: route
+        # In-job by design, and it audits before it plans; see the identical step
+        # in the `gate-routing-self-test` job for why.
+        run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: The check reddens on a label map carrying labels the catalogue does not mention
+        if: steps.route.outputs.model_coverage == 'true'
+        run: python3 scripts/check_model_coverage.py --self-test
+
+  release-asset-assembly:
+    # Same shape again: release.yml's `release` job is the only real caller of
+    # .github/scripts/assemble-release-assets.sh, and it only runs on a pushed
+    # tag. Its `--self-test` builds a synthetic `artifacts/` tree standing in
+    # for what `actions/download-artifact` (no merge-multiple) produces, and
+    # requires the script itself to: assemble all 24 expected files with each
+    # extension binary traced back to its own platform (no cross-platform
+    # collision), refuse with exit 1 when one platform's extension artifact is
+    # missing rather than silently shipping four, refuse with exit 3 when an
+    # artifact arrives for a platform its arch-to-target mapping does not name
+    # rather than dropping it, and write every sidecar in a form
+    # `shasum -a 256 -c` verifies from the directory a downloader unpacked
+    # into.
+    name: Release asset assembly check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Which gates this diff changed
+        id: route
+        # In-job by design, and it audits before it plans; see the identical step
+        # in the `gate-routing-self-test` job for why.
+        run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: The script reddens on a missing platform and assembles collision-free otherwise
+        if: steps.route.outputs.release_asset_assembly == 'true'
+        run: ./.github/scripts/assemble-release-assets.sh --self-test
+
+  release-asset-contract:
+    # The third link, and now the second as well. assemble-release-assets.sh
+    # guards the artifacts tree, and closing that is what makes the other two
+    # dangerous: delete an entry from the release step's `files:` list and every
+    # other check here stays green while the tag publishes without it.
+    # `fail_on_unmatched_files: true` fires on an entry that is present and
+    # matches nothing, never on one that is gone. `if-no-files-found: error`
+    # fires only when the UNION of an upload's globs comes up empty, so dropping
+    # one of three is silent -- which is how the CLI archives came to be
+    # publishable with no checksum beside them. This job runs the assembler for
+    # real, over a tree filtered through the upload globs release.yml declares,
+    # and requires every one of those globs to be load-bearing.
+    name: Release asset contract check
+    runs-on: ubuntu-latest
+    # 10 rather than 5: the self-test below now runs the assembler once per
+    # declared upload glob per case (~50s on a laptop). The ceiling is here to
+    # catch a hang, not to budget the work.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Which gates this diff changed
+        id: route
+        # In-job by design, and it audits before it plans; see the identical step
+        # in the `gate-routing-self-test` job for why.
+        run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: The release step ships exactly what the assembler assembles
+        if: steps.route.outputs.release_asset_contract == 'true'
+        run: python3 scripts/check_release_asset_contract.py
+      - name: ...and the contract check reddens when the release step drops an asset
+        if: steps.route.outputs.release_asset_contract == 'true'
+        run: python3 scripts/check_release_asset_contract.py --self-test
 
   download-model-test:
     name: download-model.sh tests
@@ -356,7 +477,46 @@ jobs:
         # In-job by design, and it audits before it plans; see the identical step
         # in the `gate-routing-self-test` job for why.
         run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+
+      - name: The extension's version file is generated, not committed
+        # Both halves of the defect that stamped one version onto every release
+        # for months. The build writes configure/ on the configure step, and a
+        # tracked copy arrives with every checkout — after which the rule that
+        # would rewrite it, which has no prerequisites, is never run. First here
+        # in the job because it costs milliseconds and nothing below it can be
+        # trusted while it is false.
+        run: scripts/check_extension_stamp.py --untracked-version-file
+
+      - name: ...and the build rewrites it even when one is already on disk
+        # Untracking fixes CI, where every checkout is fresh, and nothing else.
+        # Asked of make with `make -n`, so what is read is make's rebuild
+        # decision on the real Makefile rather than a string in it. Needs the
+        # extension-ci-tools submodule this job already checks out, for the
+        # include; no toolchain.
+        run: scripts/check_extension_stamp.py --regenerates-version-file
+
+      - name: The release path still invokes the stamp gate where it has to
+        # Every other stamp step in this job proves the GATE detects. This one
+        # proves the gate is still CALLED — unguarded, and before the bytes are
+        # published — at the three places a wrong stamp escapes: the two steps
+        # in release.yml and the stamp job in MainDistributionPipeline.yml.
+        # Those are workflow YAML, so nothing in this repository read them: one
+        # `continue-on-error: true` on the release step turned the refusal into
+        # a warning with every check here, including that gate's own
+        # `--self-test`, still at exit 0.
+        #
+        # Unguarded and in a required context on purpose. A routed step is
+        # skipped on a diff that does not touch the gate, and a skipped required
+        # check satisfies branch protection.
+        #
+        # `release_wiring` in .github/gate-self-tests.tsv is an `always` row, so
+        # the audit requires this step to be here and to carry no guard. Until
+        # that row existed, deleting this step and the rehearsal below left every
+        # check in this repository green.
+        run: scripts/check_extension_stamp.py --release-wiring
+
       - run: rustup show
+
       - uses: Swatinem/rust-cache@v2
       - name: Install duckdb CLI
         # Both gates below read the catalog / run the examples through this CLI.
@@ -370,6 +530,49 @@ jobs:
         # Just the cdylib + the metadata stamp — not the CLI, eval binaries or
         # trainer. `make build-release` would build all of them.
         run: make build-extension
+
+      - name: The extension's run-time version and its own trailer are one version
+        # ONE artefact, ONE load, two independent readings: `ft_version()` is
+        # compiled in from Cargo.toml, and `duckdb_extensions().extension_version`
+        # is DuckDB's own reading of the metadata trailer the build stamped.
+        # Asserting each against a literal instead would pass while the artefact
+        # disagreed with itself, which is the shape a consumer actually hits —
+        # it reads the trailer before loading and the function after.
+        #
+        # The LOAD is also the only thing here that establishes identity: any
+        # stamped shared library satisfies a trailer read, and only running one
+        # proves it is this extension.
+        run: scripts/check_extension_stamp.py --artifact target/release/finetype.duckdb_extension --load
+
+      # UNGUARDED, like --release-wiring above and for a stronger reason. This
+      # runs the `release` job's own assemble and stamp commands — its `run:`
+      # text, read out of release.yml, with GITHUB_REF_NAME supplied — against
+      # a directory of real assembled asset names. release.yml runs only on a
+      # pushed tag, so until this step existed nothing had ever executed those
+      # lines: the step that loads an asset named it under the name the
+      # assembler writes, DuckDB derives the init symbol it dlsyms from that
+      # name, and every tag would have exited 2 there and published nothing.
+      # A routed step would skip on any diff that does not touch the gate,
+      # which is most of the diffs that could break the release path. The
+      # `release_rehearsal` row in .github/gate-self-tests.tsv is what requires
+      # this step to be present and unguarded.
+      - name: The release job's own stamp commands still run against real asset names
+        run: scripts/check_extension_stamp.py --release-rehearsal --artifact target/release/finetype.duckdb_extension
+
+      - name: ...and the stamp gate detects a trailer that is not the release
+        # Fixtures are copies of the artefact above, re-stamped with the real
+        # extension-ci-tools stamper. Every trailer field but the version — the
+        # platform, the ABI type, the DuckDB floor — is read off that artefact,
+        # so a literal for any of those three would be a constant of the
+        # machine that wrote it and the proof would then only pass on that
+        # machine. It is also what makes the run-time mismatch case an artefact
+        # that genuinely disagrees with itself rather than a mutated comparison.
+        # One fixture is stamped for a platform this runner is NOT, on purpose,
+        # and does not load: that is the case proving an unloadable artefact is
+        # refused by name rather than skipped.
+
+        if: steps.route.outputs.extension_stamp == 'true'
+        run: scripts/check_extension_stamp.py --self-test --artifact target/release/finetype.duckdb_extension
 
       - name: The spike still compiles, off the default build
         # crates/finetype-duckdb/src/spike.rs is a trivial VTab kept as living

@@ -170,6 +170,13 @@ class Gate:
     commands: tuple[str, ...]
     paths: tuple[str, ...]
     lineno: int
+    # `routed` (the default) or `always`. An ALWAYS row is not routing at all:
+    # it registers a command that must run on every diff, and the audit's job
+    # for it is the opposite of its job for a routed one -- the step must carry
+    # NO guard. It exists because deleting such a step is invisible otherwise.
+    # Two of them ran the release-path checks in `doc-surface`, and deleting
+    # both left the audit, every self-test and the comment checker green.
+    when: str = "routed"
 
 
 def load_manifest(root: Path) -> list[Gate]:
@@ -187,10 +194,17 @@ def load_manifest(root: Path) -> list[Gate]:
         # Padded before the count is checked, so a malformed row is REFUSED by the
         # line below rather than crashing the reader on an unpack. A traceback and
         # a refusal are not the same signal and only one of them names the line.
-        gate_id, commands_field, paths_field = (fields + ["", ""])[:3]
-        if len(fields) != 3:
+        gate_id, commands_field, paths_field, when_field = (fields + ["", "", ""])[:4]
+        if len(fields) not in (3, 4):
             raise Fatal(
-                f"{MANIFEST_REL}:{lineno}: expected 3 tab-separated columns, found {len(fields)}"
+                f"{MANIFEST_REL}:{lineno}: expected 3 or 4 tab-separated columns, "
+                f"found {len(fields)}"
+            )
+        when = when_field or "routed"
+        if when not in ("routed", "always"):
+            raise Fatal(
+                f"{MANIFEST_REL}:{lineno}: column 4 is `{when}`; it is `routed` (the default, "
+                "and what an omitted column means) or `always`"
             )
 
         if not ID_RE.match(gate_id):
@@ -208,11 +222,21 @@ def load_manifest(root: Path) -> list[Gate]:
         paths = tuple(p.strip() for p in paths_field.split(",") if p.strip())
         if not commands:
             raise Fatal(f"{MANIFEST_REL}:{lineno}: {gate_id!r} names no self-test command")
-        if not paths:
+        if when == "always":
+            # An always-on row routes nothing, so a path list on one would be a
+            # statement nothing reads -- and a reader who saw paths there would
+            # reasonably believe the command was routed by them.
+            if paths != ("-",):
+                raise Fatal(
+                    f"{MANIFEST_REL}:{lineno}: {gate_id!r} is `always`, so it routes nothing "
+                    "and watches nothing; write `-` in the paths column"
+                )
+            paths = ()
+        elif not paths:
             raise Fatal(f"{MANIFEST_REL}:{lineno}: {gate_id!r} watches no path")
 
         first_seen[gate_id] = lineno
-        gates.append(Gate(gate_id, commands, paths, lineno))
+        gates.append(Gate(gate_id, commands, paths, lineno, when))
 
     if not gates:
         raise Fatal(f"{MANIFEST_REL}: no rows -- an empty manifest routes nothing and says so")
@@ -229,6 +253,19 @@ class Job:
     condition: str = ""
     needs: tuple[str, ...] = ()
     outputs: dict[str, str] = field(default_factory=dict)
+    # A job that CALLS a reusable workflow carries no steps of its own. The
+    # release workflows are built out of those, so the second consumer of this
+    # reader identifies a job by what it calls rather than by its name.
+    uses: str = ""
+    # `continue-on-error:` at JOB level, which is a different defect from the
+    # step-level key below: the job reddens, and every job whose `needs:` names
+    # it runs anyway. scripts/check_extension_stamp.py reads it because the
+    # release job has three dependants that publish.
+    continue_on_error: str = ""
+    # Job-level `env:`. Read so a consumer that re-runs a step's `run:` text
+    # outside Actions can supply the variables the step expands, rather than
+    # writing its own copy of a value the workflow already states.
+    env: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -242,9 +279,25 @@ class Step:
     # `continue-on-error: true` turns a red proof into a green job. It is read
     # here because a key this reader ignores is a key the audit cannot refuse.
     continue_on_error: str = ""
+    # `uses:` and `shell:` are read for the same reason, by the second consumer
+    # of this reader. scripts/check_extension_stamp.py asks where the release
+    # workflow's stamp steps sit RELATIVE to the step that publishes, which
+    # needs the publishing action's identity, and asks which shell they run
+    # under, because `shell: bash` is what sets pipefail on a runner whose
+    # default does not.
+    uses: str = ""
+    shell: str = ""
 
 
-def _read_value(key: str, inline: str, lines: list[str], index: int, key_indent: int) -> tuple[list[str], int]:
+def _read_value(
+    key: str,
+    inline: str,
+    lines: list[str],
+    index: int,
+    key_indent: int,
+    rel: str = WORKFLOW_REL,
+) -> tuple[list[str], int]:
+
     """Read one mapping value, block scalar or not. Returns (lines, next index)."""
     if inline in BLOCK_SCALARS:
         out: list[str] = []
@@ -263,7 +316,8 @@ def _read_value(key: str, inline: str, lines: list[str], index: int, key_indent:
             out.pop()
         return out, j
     if inline.startswith(("|", ">")):
-        raise Fatal(f"{WORKFLOW_REL}:{index + 1}: cannot read the block scalar `{key}: {inline}`")
+        raise Fatal(f"{rel}:{index + 1}: cannot read the block scalar `{key}: {inline}`")
+
     return ([inline] if inline else []), index + 1
 
 
@@ -274,17 +328,24 @@ _STEP_START = "      - "
 _STEP_KEY_RE = re.compile(r"^        ([A-Za-z0-9_-]+):[ ]?(.*)$")
 
 
-def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
-    """Read the jobs, their guards and their `run:` commands out of the workflow.
+def scan_workflow(root: Path, rel: str = WORKFLOW_REL) -> tuple[dict[str, Job], list[Step]]:
+    """Read the jobs, their guards and their `run:` commands out of a workflow.
 
     Line-structured rather than YAML-parsed, because the standard library has no
-    YAML reader and this file is the only consumer. Every shape it cannot read
-    exactly is REFUSED: a routing decision made from a half-read workflow is the
-    failure mode, not a missing dependency.
+    YAML reader. Every shape it cannot read exactly is REFUSED: a routing
+    decision made from a half-read workflow is the failure mode, not a missing
+    dependency.
+
+    `rel` names which workflow, and defaults to the one this file routes.
+    scripts/check_extension_stamp.py passes the release workflows instead and
+    asks a different question of the same reading -- one reader, so a workflow
+    shape this cannot parse is refused rather than answered differently by two
+    parsers that have drifted.
     """
-    path = root / WORKFLOW_REL
+    path = root / rel
     if not path.is_file():
-        raise Fatal(f"{WORKFLOW_REL}: not found under {root}")
+        raise Fatal(f"{rel}: not found under {root}")
+
     lines = path.read_text(encoding="utf-8").splitlines()
 
     jobs: dict[str, Job] = {}
@@ -331,7 +392,7 @@ def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
             remainder = line[len(_STEP_START) :]
             key, _, inline = remainder.partition(":")
             key, inline = key.strip(), inline.strip()
-            values, i = _read_value(key, inline, lines, i, 8)
+            values, i = _read_value(key, inline, lines, i, 8, rel)
             _apply_step_key(step, key, values)
             continue
 
@@ -339,7 +400,7 @@ def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
             step_key = _STEP_KEY_RE.match(line)
             if step_key:
                 key, inline = step_key.group(1), step_key.group(2).strip()
-                values, i = _read_value(key, inline, lines, i, 8)
+                values, i = _read_value(key, inline, lines, i, 8, rel)
                 _apply_step_key(step, key, values)
                 continue
 
@@ -353,22 +414,19 @@ def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
                 continue
             in_steps = False
             if key == "if":
-                values, i = _read_value(key, inline, lines, i, 4)
+                values, i = _read_value(key, inline, lines, i, 4, rel)
                 job.condition = " ".join(values)
                 continue
-            if key == "needs":
-                if not inline:
-                    raise Fatal(
-                        f"{WORKFLOW_REL}:{i + 1}: job `{job.id}` writes `needs:` as a block "
-                        "sequence. Write it inline -- this reader refuses a shape it would "
-                        "have to guess at, because guessing here skips a self-test silently."
-                    )
-                job.needs = tuple(
-                    n.strip() for n in inline.strip("[]").split(",") if n.strip()
-                )
+            if key == "uses":
+                job.uses = inline
                 i += 1
                 continue
-            if key == "outputs":
+            if key == "continue-on-error":
+                job.continue_on_error = inline
+                i += 1
+                continue
+            if key in ("outputs", "env"):
+                target = job.outputs if key == "outputs" else job.env
                 j = i + 1
                 while j < len(lines):
                     nxt = lines[j]
@@ -377,15 +435,31 @@ def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
                         continue
                     if len(nxt) - len(nxt.lstrip()) <= 4:
                         break
+                    if nxt.lstrip().startswith("#"):
+                        j += 1
+                        continue
                     out_match = _JOB_OUTPUT_RE.match(nxt)
                     if not out_match:
                         raise Fatal(
-                            f"{WORKFLOW_REL}:{j + 1}: cannot read this line as an output of "
-                            f"job `{job.id}`"
+                            f"{rel}:{j + 1}: cannot read this line as an entry of "
+                            f"`{key}:` in job `{job.id}`"
                         )
-                    job.outputs[out_match.group(1)] = out_match.group(2).strip()
+                    target[out_match.group(1)] = out_match.group(2).strip()
                     j += 1
                 i = j
+                continue
+            if key == "needs":
+                if not inline:
+
+                    raise Fatal(
+                        f"{rel}:{i + 1}: job `{job.id}` writes `needs:` as a block "
+                        "sequence. Write it inline -- this reader refuses a shape it would "
+                        "have to guess at, because guessing here skips a self-test silently."
+                    )
+                job.needs = tuple(
+                    n.strip() for n in inline.strip("[]").split(",") if n.strip()
+                )
+                i += 1
                 continue
             i += 1
             continue
@@ -394,7 +468,7 @@ def scan_workflow(root: Path) -> tuple[dict[str, Job], list[Step]]:
 
     close_step()
     if not jobs:
-        raise Fatal(f"{WORKFLOW_REL}: no jobs found -- the reader is looking at the wrong shape")
+        raise Fatal(f"{rel}: no jobs found -- the reader is looking at the wrong shape")
     return jobs, steps
 
 
@@ -409,6 +483,10 @@ def _apply_step_key(step: Step, key: str, values: list[str]) -> None:
         step.commands = tuple(v for v in values if v)
     elif key == "continue-on-error":
         step.continue_on_error = " ".join(values)
+    elif key == "uses":
+        step.uses = " ".join(values)
+    elif key == "shell":
+        step.shell = " ".join(values)
 
 
 # ── discovery ───────────────────────────────────────────────────────────────
@@ -470,6 +548,23 @@ def plan_steps_by_job(steps: list[Step]) -> dict[str, Step]:
     return found
 
 
+def _job_may_not_fail(owner: Job, job_id: str, command: str) -> list[str]:
+    """A job carrying a check may not be `continue-on-error` at JOB level.
+
+    Different from the step-level key and worse: the step reddens, the job
+    reddens, and the workflow reports success anyway. Every check in the job is
+    then advisory at once, including any that branch protection requires.
+    """
+    if not owner.continue_on_error:
+        return []
+    return [
+        f"{WORKFLOW_REL}:{owner.lineno}: job `{job_id}` carries "
+        f"`continue-on-error: {owner.continue_on_error}` and holds `{command}`. The job "
+        "reddens and the workflow reports success, so every check in it -- this one "
+        "included -- can fail on every pull request without blocking anything"
+    ]
+
+
 def audit(root: Path) -> list[str]:
     """Everything that must be true for a guard in the workflow to mean anything."""
     gates = load_manifest(root)
@@ -500,12 +595,46 @@ def audit(root: Path) -> list[str]:
             if not hits:
                 problems.append(
                     f"{MANIFEST_REL}:{gate.lineno}: `{gate.id}` registers `{command}`, which no "
-                    f"step in {WORKFLOW_REL} runs -- a self-test nothing invokes"
+                    f"step in {WORKFLOW_REL} runs -- "
+                    + (
+                        "a check nothing invokes. An always-on row is the only thing that "
+                        "requires it to be there, so deleting the step is otherwise silent"
+                        if gate.when == "always"
+                        else "a self-test nothing invokes"
+                    )
                 )
                 continue
             for hit in hits:
                 owner = jobs[hit.job]
                 planner = plan_steps.get(hit.job)
+
+                # An always-on row asks the opposite question of a routed one:
+                # not "is it guarded by exactly this" but "is it guarded at
+                # all". A guard here skips the check on the diffs that do not
+                # touch it, which for a check that reads OTHER files is most of
+                # the diffs that can break it.
+                if gate.when == "always":
+                    if hit.condition:
+                        problems.append(
+                            f"{WORKFLOW_REL}:{hit.lineno}: `{command}` is registered as "
+                            f"always-on and carries `if: {hit.condition}`. Routing it means "
+                            "skipping it on every diff that does not touch it, which is where "
+                            "it is needed"
+                        )
+                    if hit.continue_on_error:
+                        problems.append(
+                            f"{WORKFLOW_REL}:{hit.lineno}: the always-on `{command}` carries "
+                            f"`continue-on-error: {hit.continue_on_error}`, so it can fail and "
+                            "leave the job green"
+                        )
+                    if owner.condition:
+                        problems.append(
+                            f"{WORKFLOW_REL}:{owner.lineno}: job `{hit.job}` carries the "
+                            f"always-on `{command}` under `if: {owner.condition}`. A skipped "
+                            "job is a green job"
+                        )
+                    problems += _job_may_not_fail(owner, hit.job, command)
+                    continue
 
                 # The job has to do its own routing. Depending on another job's
                 # outputs is what let a skipped required check satisfy branch
@@ -553,6 +682,15 @@ def audit(root: Path) -> list[str]:
                         "be unconditional; a job-level condition cannot read `steps` and can "
                         "only skip the proof"
                     )
+
+                # ...and the JOB-level key, which is not the step-level one and
+                # was read by nothing until a review found it. The step reddens,
+                # the job reddens, and the WORKFLOW reports success -- so every
+                # proof in that job can go red on every pull request while the
+                # check branch protection reads stays green. It was the exact
+                # outcome the always-on rows were added to prevent, reachable by
+                # a key one line above the steps they protect.
+                problems += _job_may_not_fail(owner, hit.job, command)
 
                 # A proof allowed to fail is not a proof. This is the same shape as
                 # a missing guard reached from the other side: the step runs, goes
@@ -644,7 +782,7 @@ class Plan:
 def route(root: Path, base: str) -> Plan:
     """Which gates this diff invalidates. Every uncertainty selects all of them."""
     gates = load_manifest(root)
-    every = {g.id for g in gates}
+    every = {g.id for g in gates if g.when == "routed"}
 
     resolved = resolve_base(root, base)
     if resolved is None:
@@ -659,7 +797,7 @@ def route(root: Path, base: str) -> Plan:
         return Plan(gates, every, changed, f"the routing itself changed: {', '.join(triggered)}")
 
     changed_set = set(changed)
-    selected = {g.id for g in gates if changed_set.intersection(g.paths)}
+    selected = {g.id for g in gates if g.paths and changed_set.intersection(g.paths)}
     return Plan(gates, selected, changed, "")
 
 
@@ -670,15 +808,22 @@ def emit(plan: Plan) -> None:
     else:
         print(f"{len(plan.changed)} changed path(s) against the base")
     for gate in plan.gates:
-        state = "RUN " if gate.id in plan.selected else "skip"
+        if gate.when == "always":
+            state = "ALWAYS"
+        else:
+            state = "RUN " if gate.id in plan.selected else "skip"
         print(f"  {state}  {gate.id:<24} {', '.join(gate.commands)}")
 
     destination = os.environ.get("GITHUB_OUTPUT")
     if not destination:
         return
+    # No boolean for an always-on row. Its command must run unguarded, so an
+    # output for it could only ever be read by a guard the audit refuses.
     with open(destination, "a", encoding="utf-8") as handle:
         handle.write(f"any={'true' if plan.selected else 'false'}\n")
         for gate in plan.gates:
+            if gate.when == "always":
+                continue
             handle.write(f"{gate.id}={'true' if gate.id in plan.selected else 'false'}\n")
 
 
@@ -689,6 +834,7 @@ SCRATCH_MANIFEST = """\
 alpha\tscripts/alpha_gate.py --self-test\tscripts/alpha_gate.py
 beta\tscripts/beta-gate-selftest.sh\tscripts/beta_gate.sh, scripts/beta-gate-selftest.sh
 gate_routing\t.github/scripts/gate-self-tests.py --self-test\t.github/scripts/gate-self-tests.py, .github/gate-self-tests.tsv
+delta\tscripts/delta_gate.py --verify\t-\talways
 """
 
 SCRATCH_WORKFLOW = """\
@@ -738,6 +884,14 @@ jobs:
       - name: the router proves itself
         if: steps.route.outputs.gate_routing == 'true'
         run: .github/scripts/gate-self-tests.py --self-test
+
+  delta:
+    name: Delta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: a check that must run on every diff
+        run: scripts/delta_gate.py --verify
 """
 
 
@@ -755,6 +909,9 @@ def _scratch_tree(root: Path) -> None:
     _write(root, "scripts/alpha_gate.py", 'import sys\nif "--self-test" in sys.argv:\n    pass\n')
     _write(root, "scripts/beta_gate.sh", "#!/usr/bin/env bash\nexit 0\n")
     _write(root, "scripts/beta-gate-selftest.sh", "#!/usr/bin/env bash\nexit 0\n")
+    # No `--self-test` inside it on purpose: this stands for a check that runs
+    # unguarded, registered by an `always` row, not for a gate's own proof.
+    _write(root, "scripts/delta_gate.py", "import sys\nsys.exit(0)\n")
     _write(root, "docs/unrelated.md", "prose\n")
 
 
@@ -891,7 +1048,10 @@ def self_test() -> int:
         finally:
             del os.environ["GITHUB_OUTPUT"]
         rec.check("an empty plan writes any=false", "any=false\n" in written, written)
-        rec.check("...and a line per gate", written.count("=") == 4, written)
+        rec.check("...and a line per ROUTED gate", written.count("=") == 4, written)
+        # An always-on row publishes nothing, because the only thing that could
+        # read its boolean is a guard the audit refuses.
+        rec.check("...and none for the always-on row", "delta=" not in written, written)
 
     # ── the manifest reader refuses what it cannot read ──────────────────────
     # Each case pins the MESSAGE, not just the refusal. Six rows can each be
@@ -913,7 +1073,22 @@ def self_test() -> int:
         (
             "a two-column row is fatal",
             "alpha\tx --self-test\n",
-            "expected 3 tab-separated columns, found 2",
+            "expected 3 or 4 tab-separated columns, found 2",
+        ),
+        (
+            "a fifth column is fatal",
+            "alpha\tx --self-test\tscripts/alpha_gate.py\talways\tand more\n",
+            "expected 3 or 4 tab-separated columns, found 5",
+        ),
+        (
+            "an unknown `when` is fatal",
+            "alpha\tx --self-test\tscripts/alpha_gate.py\tsometimes\n",
+            "column 4 is `sometimes`",
+        ),
+        (
+            "an always-on row that claims to watch paths is fatal",
+            "alpha\tx --self-test\tscripts/alpha_gate.py\talways\n",
+            "routes nothing and watches nothing",
         ),
         (
             "a row with no command is fatal",
@@ -936,7 +1111,11 @@ def self_test() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         _scratch_tree(root)
-        rec.check("the scratch manifest itself parses", len(load_manifest(root)) == 3)
+        rec.check("the scratch manifest itself parses", len(load_manifest(root)) == 4)
+        rec.check(
+            "...and the always-on row watches nothing",
+            [g.paths for g in load_manifest(root) if g.when == "always"] == [()],
+        )
 
     # ── the audit ────────────────────────────────────────────────────────────
     print("\naudit")
@@ -1018,6 +1197,21 @@ def self_test() -> int:
     def missing_watched_path(root: Path) -> None:
         (root / "scripts/beta_gate.sh").unlink()
 
+    def no_jobs_at_all(root: Path) -> None:
+        """A workflow the reader finds no jobs in.
+
+        `scan_workflow` is line-structured, so the way it fails on a shape it
+        cannot read is by finding NOTHING -- no jobs, no steps, no guards -- and
+        every rule below it then has nothing to object to. The audit would
+        report clean and `--release-wiring`, which asks this same reader whether
+        the release path still refuses a wrong stamp, would report that it does.
+        The refusal at the end of `scan_workflow` is the only thing standing
+        between "the reader could not read this" and "there is nothing wrong
+        here", and until this case existed it could be deleted with every check
+        in this repository green.
+        """
+        _write(root, WORKFLOW_REL, "name: scratch\non:\n  pull_request:\njobs:\n")
+
     def unrouted_root_trigger(root: Path) -> None:
         text = (root / MANIFEST_REL).read_text(encoding="utf-8")
         _write(root, MANIFEST_REL, text.replace(", .github/gate-self-tests.tsv", ""))
@@ -1098,6 +1292,22 @@ def self_test() -> int:
             "the routing step in job `alpha` carries `continue-on-error: true`",
         ),
         (
+            "a job-level `continue-on-error` on a job holding a proof reddens",
+            rewrite(
+                "  alpha:\n    name: Alpha\n",
+                "  alpha:\n    name: Alpha\n    continue-on-error: true\n",
+            ),
+            "job `alpha` carries `continue-on-error: true` and holds",
+        ),
+        (
+            "...and on a job holding an always-on check",
+            rewrite(
+                "  delta:\n    name: Delta\n",
+                "  delta:\n    name: Delta\n    continue-on-error: true\n",
+            ),
+            "job `delta` carries `continue-on-error: true` and holds",
+        ),
+        (
             "a job-level `if:` on a job holding a proof reddens",
             rewrite(
                 "  alpha:\n    name: Alpha\n",
@@ -1140,6 +1350,34 @@ def self_test() -> int:
             "writes `needs:` as a block sequence",
         ),
         (
+            "an always-on check no step runs reddens",
+            rewrite("        run: scripts/delta_gate.py --verify\n", "        run: true\n"),
+            "always-on row is the only thing that requires it to be there",
+        ),
+        (
+            "an always-on check given a routing guard reddens",
+            rewrite(
+                "      - name: a check that must run on every diff\n",
+                "      - name: a check that must run on every diff\n"
+                "        if: steps.route.outputs.delta == 'true'\n",
+            ),
+            "Routing it means skipping it on every diff that does not touch it",
+        ),
+        (
+            "`continue-on-error` on an always-on check reddens",
+            rewrite(
+                "      - name: a check that must run on every diff\n",
+                "      - name: a check that must run on every diff\n"
+                "        continue-on-error: true\n",
+            ),
+            "can fail and leave the job green",
+        ),
+        (
+            "a job-level `if:` on the job holding an always-on check reddens",
+            rewrite("  delta:\n    name: Delta\n", "  delta:\n    name: Delta\n    if: false\n"),
+            "under `if: false`. A skipped job is a green job",
+        ),
+        (
             "a gate script no row watches reddens",
             unwatched_gate,
             "`scripts/gamma_gate.py` carries a gate self-test and no row watches it",
@@ -1158,6 +1396,11 @@ def self_test() -> int:
             "the manifest not watching itself reddens",
             unrouted_root_trigger,
             f"`{MANIFEST_REL}` re-routes every gate when it changes and no row watches it",
+        ),
+        (
+            "a workflow the reader finds no jobs in is REFUSED, not audited clean",
+            no_jobs_at_all,
+            "no jobs found -- the reader is looking at the wrong shape",
         ),
     ]
 

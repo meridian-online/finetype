@@ -97,32 +97,281 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: finetype-${{ matrix.target }}
+          # Default is `warn`. What this buys, exactly: the action evaluates
+          # `filesToUpload.length === 0` over the UNION of the globs below, so
+          # `error` turns "not one of these three matched" from a warning and
+          # a skipped upload into a failed job. What it does NOT buy: a
+          # PARTIAL artifact. If `finetype-*.sha256` stopped matching while
+          # `finetype-*.tar.gz` still did, the union is non-empty and this
+          # never fires.
+          #
+          # scripts/check_release_asset_contract.py is what reads that half. It
+          # builds the artifacts tree by FILTERING the assembler's own fixture
+          # through these globs and then runs the assembler over the result, so
+          # each entry here is required to be load-bearing: drop one and the
+          # release path has to refuse. Dropping the sidecars is how a tag came
+          # to be able to publish five archives with nothing to verify them
+          # against, and it is a case in that file's self-test.
+          if-no-files-found: error
           path: |
             finetype-*.tar.gz
             finetype-*.zip
             finetype-*.sha256
 
-  release:
-    name: Create Release
-    needs: build
+  # Builds finetype.duckdb_extension for the same five platforms
+  # MainDistributionPipeline.yml builds, using the identical reusable-workflow
+  # call (same @ref, ci_tools_version, extra_toolchains, exclude_archs — see
+  # weekly-duckdb-compat.yml's comment on why the version is a literal rather
+  # than an expression here). A SEPARATE call rather than reusing
+  # MainDistributionPipeline.yml's run for this tag: that workflow triggers on
+  # the same push and produces its own, independent run. Calling the reusable
+  # workflow again here, inside this run, is what lets the `release` job below
+  # download its output without racing or polling a sibling run for completion.
+  #
+  # EXTENSION_DUCKDB_VERSION below must equal the `duckdb_version` given here
+  # verbatim: the reusable workflow bakes it into the artifact NAME
+  # (`finetype-<duckdb_version>-extension-<arch>`), and the `release` job
+  # reads that name back apart to find each platform's binary.
+  build-extension:
+    name: Build DuckDB extension
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.3
+    with:
+      duckdb_version: v1.5.3
+      ci_tools_version: v1.5.3
+      extension_name: finetype
+      extra_toolchains: 'rust;python3'
+      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
+
+  # Generates the taxonomy schema catalogue from labels/definitions_*.yaml AT
+  # THIS TAG — never committed, never hand-made (AC2) — and proves it against
+  # the two properties its one consumer relies on before it ever reaches a
+  # release: brightfield_engine::semantic::parse_schema_catalogue's shape
+  # (AC3, scripts/check_schema_catalogue.py) and catalogue_coverage against
+  # the model this same tag was built with (AC4, scripts/check_model_coverage.py).
+  # Both checks read the GENERATED FILE, not `finetype taxonomy`'s exit code —
+  # see each script's module doc for why that distinction is the point.
+  #
+  # Runs once on ubuntu-latest rather than once per platform: the catalogue is
+  # plain JSON with no platform-specific content, so building it five times
+  # would prove nothing five times over.
+  taxonomy-catalogue:
+    name: Generate + prove the taxonomy schema catalogue
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      - name: Download artifacts
+      - run: rustup show # installs toolchain from rust-toolchain.toml
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: taxonomy-catalogue
+
+      - name: Download model from HuggingFace
+        shell: bash
+        run: .github/scripts/download-model.sh
+
+      - name: Build finetype-cli
+        run: cargo build --release -p finetype-cli
+
+      - name: Generate the taxonomy schema catalogue
+        run: ./target/release/finetype taxonomy --output json-schema > taxonomy-schemas.json
+
+      - name: AC3 — the catalogue is shaped the way brightfield reads it
+        run: python3 scripts/check_schema_catalogue.py taxonomy-schemas.json
+
+      - name: AC4 — the catalogue still describes most of the shipped model's labels
+        run: |
+          python3 scripts/check_model_coverage.py \
+            --catalogue taxonomy-schemas.json \
+            --label-map "models/${FINETYPE_CI_MODEL}/label_map.json" \
+            --threshold 0.95 \
+            --write-manifest finetype-model.json \
+            --tag "${GITHUB_REF_NAME}" \
+            --model "${FINETYPE_CI_MODEL}"
+
+      - name: Generate SHA256 for the catalogue and the model manifest
+        shell: bash
+        run: |
+          for f in taxonomy-schemas.json finetype-model.json; do
+            if command -v shasum &>/dev/null; then
+              shasum -a 256 "$f" > "${f}.sha256"
+            else
+              sha256sum "$f" > "${f}.sha256"
+            fi
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: finetype-taxonomy-catalogue
+          # See the `build` job's upload for what `error` does and does not
+          # cover — it fires only when all four globs below come up empty.
+          # assemble-release-assets.sh refuses with exit 4 if any one of these
+          # four does not reach the assembled directory, which is the half
+          # that catches a partial upload.
+          #
+          # That the four ARE the exit-4 list is not read off this comment:
+          # check_release_asset_contract.py drops each glob here in turn and
+          # requires the assembler to refuse, so a fifth asset added without a
+          # rung to require it, or a glob that stops delivering, is a failure on
+          # a pull request rather than a discovery on a tag.
+          if-no-files-found: error
+          path: |
+            taxonomy-schemas.json
+            taxonomy-schemas.json.sha256
+            finetype-model.json
+            finetype-model.json.sha256
+
+  release:
+    name: Create Release
+    needs: [build, build-extension, taxonomy-catalogue]
+    runs-on: ubuntu-latest
+    env:
+      # Must equal build-extension's `duckdb_version` input above verbatim —
+      # see that job's comment.
+      EXTENSION_DUCKDB_VERSION: v1.5.3
+    steps:
+      - uses: actions/checkout@v5
+
+      # NO merge-multiple here, and no `pattern:` either: every one of the
+      # five build-extension artifacts uploads a file with the IDENTICAL name
+      # (`finetype.duckdb_extension` — the reusable workflow's own naming, not
+      # ours). `merge-multiple: true` flattens every downloaded artifact into
+      # one directory, so five identically-named files would collide and
+      # silently leave four platforms missing from the release. Downloading
+      # with no `path`-flattening keeps each artifact in its own
+      # `artifacts/<artifact-name>/` directory instead, and the assembly step
+      # below reads them back out by that directory name.
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          merge-multiple: true
+
+      # AC1's renaming logic (CLI tarballs and the taxonomy catalogue
+      # flattened as-is; the five identically-named extension binaries
+      # renamed into the finetype-<TAG>-<target> family and checksummed) lives
+      # in .github/scripts/assemble-release-assets.sh, not inline here — this
+      # step can only run on a pushed tag, so its own `--self-test` carries the
+      # collision and missing-platform failure modes instead, on any pull
+      # request whose diff touches that script or this file. Both paths are in
+      # .github/gate-self-tests.tsv's `release_asset_assembly` row, which is
+      # what selects the proof; a diff touching neither, and not the routing,
+      # skips it.
+      - name: Assemble release assets
+        shell: bash
+        run: |
+          .github/scripts/assemble-release-assets.sh \
+            --artifacts-dir artifacts \
+            --output-dir release-assets \
+            --tag "${GITHUB_REF_NAME}" \
+            --extension-duckdb-version "${EXTENSION_DUCKDB_VERSION}"
+
+      # ── The stamp, read off the bytes that are about to be published ──────
+      #
+      # THIS IS THE LAST POINT AT WHICH A WRONG VERSION CAN BE STOPPED. The
+      # `build-extension` job above is a bare `uses:` of a reusable workflow and
+      # cannot carry a step, so the artefacts are checked here, after they are
+      # downloaded and named and before `Create release` attaches them.
+      #
+      # The stamp is the only version an extension carries in a form a machine
+      # can read before loading it — DuckDB surfaces it as
+      # `duckdb_extensions().extension_version`, and a packager reads it
+      # straight out of the last 512 bytes. Read here off the artefact's own
+      # bytes, never from the file the build wrote into configure/: those two
+      # disagreeing is the whole defect this guards.
+      #
+      # A pull-request build is checked too, against the abbreviated commit
+      # rather than a tag, by the `stamp` job in MainDistributionPipeline.yml —
+      # so the autodetection is observed on every build and not only on the few
+      # days a year a tag is cut.
+      - name: The extension binaries carry this tag, read off their own bytes
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(release-assets/finetype-"${GITHUB_REF_NAME}"-*.duckdb_extension)
+          if [ "${#files[@]}" -ne 5 ]; then
+            echo "::error::expected 5 extension binaries in release-assets, found ${#files[@]}" >&2
+            exit 1
+          fi
+          args=()
+          for f in "${files[@]}"; do args+=(--artifact "$f"); done
+          scripts/check_extension_stamp.py "${args[@]}" --tag "${GITHUB_REF_NAME}"
+
+      # Setup for the step below, and a step of its own rather than four lines
+      # at the top of it. The stamp step's `run:` is then the gate call and
+      # nothing else, which is what lets
+      # `scripts/check_extension_stamp.py --release-rehearsal` execute that
+      # `run:` on a pull request, comment lines dropped and continuations joined — this workflow runs only on a pushed
+      # tag, so nothing else ever executes it. A `curl | sudo mv` cannot be run
+      # on a contributor's machine, so leaving it inside the stamp step would
+      # have meant rehearsing an edited copy of the step, which is a rehearsal
+      # of something else.
+      #
+      # The cost of the split is that the install can now go missing on its own,
+      # leaving the load below to exit 2 with "duckdb is not on PATH" on a tag.
+      # --release-wiring refuses that: it requires a step fetching duckdb_cli-*
+      # above every `--load` step in this job.
+      #
+      # Same pin as ci.yml's `Install duckdb CLI` step.
+      - name: Install duckdb CLI
+        shell: bash
+        run: |
+          curl -fsSL -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
+          unzip -o duckdb.zip
+          sudo mv duckdb /usr/local/bin/duckdb
+          duckdb --version
+
+      # A correct trailer is not evidence the artefact is this extension: any
+      # stamped shared library passes the reading above. This loads the one
+      # binary a linux_amd64 runner can load and makes it answer for itself —
+      # `ft_version()` (compiled in from Cargo.toml) against its own trailer
+      # (written by the build contract from the tag), off one file in one
+      # session. It is also what refuses a tag cut against a tree whose
+      # Cargo.toml version says something else.
+      #
+      # The other four platforms are NOT load-verified here and cannot be on
+      # this runner; the byte reading above is all they get.
+      #
+      # THE FILE NAME HERE IS THE ONE ASSEMBLED ABOVE, and that is the whole
+      # reason --release-rehearsal exists. DuckDB derives the init symbol it
+      # dlsyms from the file name, stemming at the first dot, so this asset's
+      # name yields `finetype-v0_init_c_api` and the LOAD used to die of it —
+      # exit 2, on every tag, before `Create release`. check_extension_stamp.py
+      # now presents whatever it is given to DuckDB as `finetype.duckdb_extension`
+      # so no caller can hit that rule; the rehearsal is what proves this
+      # particular caller does not.
+      - name: ...and the one this runner can load agrees with itself and the tag
+        shell: bash
+        run: |
+          scripts/check_extension_stamp.py \
+            --artifact "release-assets/finetype-${GITHUB_REF_NAME}-x86_64-unknown-linux-gnu.duckdb_extension" \
+            --load --tag "${GITHUB_REF_NAME}"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          # Default is false: an entry below that matched nothing would be
+          # skipped with a warning and the release published without it. Every
+          # entry matches in a normal run — the `.zip` from the windows leg,
+          # the five `.duckdb_extension` files and their sidecars from the
+          # assembly step above, which has already refused if any is absent —
+          # so an unmatched glob here means something upstream changed, and
+          # that is worth a red release rather than a quiet one.
+          #
+          # It does nothing about an entry that is DELETED from the list,
+          # which is the way this list actually loses an asset.
+          # scripts/check_release_asset_contract.py is what covers that: it
+          # runs the assembler and requires these globs to match everything it
+          # wrote, and requires every glob here to match something.
+          fail_on_unmatched_files: true
           files: |
-            artifacts/finetype-*.tar.gz
-            artifacts/finetype-*.zip
-            artifacts/finetype-*.sha256
+            release-assets/finetype-*.tar.gz
+            release-assets/finetype-*.zip
+            release-assets/finetype-*.duckdb_extension
+            release-assets/*.sha256
+            release-assets/taxonomy-schemas.json
+            release-assets/finetype-model.json
 
   publish-crates:
     name: Publish to crates.io
@@ -147,7 +396,10 @@ jobs:
   # correctly says nothing about the asset being reachable under the name the
   # heredoc composed. The tap has no pull-request CI of its own, so this
   # workflow is where a formula addressing a file that is not there has to stop.
-  # `scripts/check-formula-asset.sh`, below, is what stops it.
+  # `scripts/check-formula-asset.sh`, below, is what stops it — and it only
+  # stops it while it runs BEFORE the push. That ordering, and the step being
+  # unguarded, is a rung in check_release_asset_contract.py; the check's own
+  # credibility is the `formula-asset` job in ci.yml.
   #
   # What that check covers and what it does not: it proves each url resolves and
   # that the asset behind it hashes to the checksum written beside it. It does
