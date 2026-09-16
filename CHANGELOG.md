@@ -24,12 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   no marker; their fixed headers have no place for one, and that gap is stated
   in `docs/DEVELOPMENT.md`.
 
-  Every departure from the file's shape stops the run before any profiling and
-  names the JSON path to the offence: an unknown key at any level, a missing
-  `label`, a label the taxonomy does not carry, a label whose Frictionless type
-  the Data Package v2 profile does not admit, a declared column the file does
-  not have, a declared stem no input matches. An input with no entry is
-  profiled by inference, which is the ordinary batch case. A nominated `list`
+  An unknown key at any level, a missing `label`, a label the taxonomy does
+  not carry, a label whose Frictionless type the Data Package v2 profile does
+  not admit, and a declared stem no input matches all stop the run before any
+  profiling and name the JSON path to the offence. A declared column the file
+  does not have is checked per file, once that file is read, so in a
+  `--files` batch it does not undo files already profiled and written earlier
+  in the run. An input with no entry is profiled by inference, which is the
+  ordinary batch case. A nominated `list`
   is refused where an inferred one still emits: an inferred answer is about
   data the caller cannot change mid-run, a nomination is a declaration made
   before any work starts.

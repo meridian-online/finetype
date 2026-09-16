@@ -29,10 +29,12 @@
 //! **Every departure from that shape is refused, by design.** A nomination
 //! that is silently dropped becomes an inference, and the descriptor then ships
 //! a guess under a heading that says somebody declared it — which is the exact
-//! confusion the marker exists to prevent. So an unknown key, a missing
-//! `label`, a label the taxonomy does not carry, a declared column the file
-//! does not have and a declared stem no input matches are all errors that stop
-//! the run before any profiling happens.
+//! confusion the marker exists to prevent. An unknown key, a missing `label`,
+//! a label the taxonomy does not carry and a declared stem no input matches
+//! are all errors that stop the run before any profiling happens. A declared
+//! column the file does not have is refused too, but per file, once that file
+//! is read — in a `--files` batch, files read earlier in the run are already
+//! profiled and written by the time a later file fails this one.
 
 use anyhow::{bail, Result};
 use serde_json::Value;

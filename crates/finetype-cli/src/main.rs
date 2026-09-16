@@ -350,11 +350,13 @@ enum Commands {
         /// `json`, and `decl` in the `plain` CONF column. It publishes no
         /// confidence, because nothing was inferred.
         ///
-        /// Everything wrong with the file stops the run before any profiling:
-        /// an unknown key, a missing `label`, a label the taxonomy does not
+        /// An unknown key, a missing `label`, a label the taxonomy does not
         /// carry, a label whose Frictionless type the Data Package v2 profile
-        /// does not admit, a declared column the file does not have, and a
-        /// declared stem no input matches. A nomination that is silently
+        /// does not admit, and a declared stem no input matches all stop the
+        /// run before any profiling. A declared column the file does not have
+        /// is checked per file, once that file is read — in a `--files` batch,
+        /// files read earlier are already profiled and written to disk by the
+        /// time a later file fails this check. A nomination that is silently
         /// dropped is an inference wearing a declaration's marker.
         #[arg(long, value_name = "FILE")]
         nominations: Option<PathBuf>,
