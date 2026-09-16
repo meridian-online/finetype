@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.60] - 2026-09-16
+
 ### Added
 
 - **`finetype profile --nominations <FILE>` declares what a column IS, and one
@@ -45,6 +47,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `frictionless_for` behind the same `embedded-taxonomy` feature, because two
   independent emitters of the Data Package spec read it and answering it inside
   either one would leave the other guessing.
+
+- **A label-stability gate measures whether a free-text column types the same
+  way twice.** Six pools of real values from free-text columns in published
+  open data sit under `tests/fixtures/label_stability/`, with the figures they
+  return recorded in `BASELINE.md` beside them. `scripts/check_label_stability.py`
+  draws seeded windows from each pool (the baseline's frontmatter records the
+  draw count, window size and seed), profiles them in one `profile --files`
+  batch through the shipping CSV read path, and refuses the tree when a pool's
+  modal label leaves the one the baseline records, or when `unknown` — written
+  by a demotion guard, not by the model — is the modal label of a pool not
+  marked `undecided`. The agreement figure and the count of windows that read
+  as one column are recorded, not asserted; `--remeasure` rewrites both and
+  refuses to touch a modal label. CI runs it as the `Label stability baseline`
+  job.
 
 ### Changed
 
@@ -86,6 +102,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   The model path is unchanged. `finetype profile`'s labels and its
   checksum-driven demotions are produced by a different validator and move
   exactly as before.
+
+- **The release workflow's asset contract is enumerated by a check rather than
+  claimed in a comment.** `scripts/check_release_asset_contract.py` reads the
+  upload declarations in `release.yml` and refuses when a published asset lacks
+  its `.sha256` or a `.sha256` lacks its asset, when a glob in an upload's
+  `path:` list can be dropped without the release path refusing, when a job or
+  step carries `continue-on-error`, when the tap formula's asset check does not
+  run before the push that publishes the formula, or when the artifacts the
+  assembler expects differ from the ones the build matrix uploads. Before this,
+  a tag could publish the CLI archives with no checksum beside them, green end
+  to end. `.github/scripts/assemble-release-assets.sh` reads its own output
+  directory and refuses an asset without its `.sha256` sidecar or a sidecar
+  without its asset.
+- Rustdoc sentences in `finetype-core`'s `checksum.rs` that overstated what
+  the code and its test guarantee — how many call sites share the arithmetic,
+  and what the label-table test reddens on — are deleted.
+
+### Fixed
+
+- **A CSV sniff can no longer confirm itself against the file's last row.**
+  `header_field_count` confirmed a candidate sniff against whatever row its
+  own skip count landed on, without checking that a row followed it, so a
+  candidate whose skip reached the last line of a file was confirmed by that
+  line alone, and a single-column prose file could read as several
+  semicolon-delimited columns. The confirming row must now have a data row
+  after it, and when no candidate confirms, the file is re-sniffed with the
+  skip pinned to zero and read from its actual first row. Regression fixture:
+  `tests/fixtures/naics_description_window2.csv`.
+- The `lei` column of the eval corpus's `finance_coverage.csv` held values
+  that fail ISO 17442 check-digit verification. Its values are replaced with
+  LEIs drawn from the `gleif_entities.csv` registry slice, a test in
+  `finetype-core` asserts the column validates, and
+  `eval/datasets/gold_external/README.md` plus `eval/datasets/sources.yaml`
+  record the GLEIF slice's provenance, licence and the intentional checksum
+  failures it keeps as shape-versus-substance fixtures.
+- `docs/DEVELOPMENT.md` and `docs/LOCALE_GUIDE.md` create the tables their
+  SQL examples query, in the examples a reader sees;
+  `scripts/check_sql_examples.py` no longer supplies those tables from a
+  fixture, so a `CREATE TABLE` deleted from either doc reddens the gate the
+  way the example would fail for the reader.
+- `finetype profile --help`, `docs/DEVELOPMENT.md` and the `nominations`
+  module doc now say which nominations-file checks run once before any
+  profiling and which one runs per file once that file is read, and what each
+  refusal names; the earlier wording claimed one rule for all of them.
 
 ## [0.6.59] - 2026-09-07
 
