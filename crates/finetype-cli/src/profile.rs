@@ -1188,7 +1188,10 @@ identity.person.email:
         let row = plain_row(&profile("representation.text.plain_text", true));
         assert!(row.contains("representation.text.plain_text"), "{row}");
         assert!(row.contains("decl"), "{row}");
-        assert!(!row.contains('%'), "a declared type printed a percentage: {row}");
+        assert!(
+            !row.contains('%'),
+            "a declared type printed a percentage: {row}"
+        );
         for absent in [" ⚑ low", " ~ medium", " ⊘ vetoed:", " ⚠ low-pass"] {
             assert!(!row.contains(absent), "row carried `{absent}`: {row}");
         }

@@ -736,7 +736,9 @@ representation.numeric.integer_number:
     #[test]
     fn a_nominated_field_publishes_its_taxonomy_bounds_and_no_confidence() {
         let taxonomy = test_taxonomy();
-        let values: Vec<String> = (0..4).map(|i| format!("row {i} of registry prose")).collect();
+        let values: Vec<String> = (0..4)
+            .map(|i| format!("row {i} of registry prose"))
+            .collect();
         let cols = vec![DatapackageColumn {
             name: "corpus",
             label: "representation.text.plain_text",
