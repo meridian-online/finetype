@@ -418,6 +418,212 @@ assert_contains "no subcommand shows usage" "$OUT" "Usage"
 OUT=$("$FINETYPE" nonexistent 2>&1) || true
 assert_contains "invalid subcommand shows error" "$OUT" "error"
 
+# ── Nominations ──────────────────────────────────────────────────────────────
+#
+# A nomination declares what a column IS. Everything below runs the release
+# binary end to end, because the flag reaching the binary and the descriptor it
+# writes are exactly the parts a unit test over the emitter cannot see.
+
+section "12. Nominations"
+
+NOM_CSV="$REPO_ROOT/tests/fixtures/nominated_corpus.csv"
+NOM_FILE="$REPO_ROOT/tests/fixtures/nominated_corpus.nominations.finetype.json"
+NOMDIR=$(mktemp -d /tmp/finetype-smoke-nominations-XXXXXX)
+
+# The fixture carries 160 data rows on purpose. A file short enough for a
+# hundred-row sniff to widen would make its column count a property of the read
+# path rather than of the file, and every assertion below would then be about
+# the sniff.
+NOM_ROWS=$(( $(wc -l < "$NOM_CSV") - 1 ))
+if [ "$NOM_ROWS" -gt 100 ]; then
+    pass "the nominations fixture is clear of the sniff window ($NOM_ROWS rows)"
+else
+    fail "the nominations fixture is clear of the sniff window" "only $NOM_ROWS rows"
+fi
+
+HELP_OUTPUT=$("$FINETYPE" profile --help 2>&1)
+# `nominations <FILE>` rather than `--nominations`: assert_contains passes its
+# needle to `grep -qF` without a `--` terminator, so a needle beginning with a
+# dash is read as an option and the assertion fails for a reason that has
+# nothing to do with the binary.
+assert_contains "profile --help lists the nominations flag" "$HELP_OUTPUT" "nominations <FILE>"
+
+# One field of the emitted descriptor, as sorted JSON.
+dp_field() {  # <descriptor> <field name>
+    printf '%s' "$1" | python3 -c '
+import json, sys
+fields = json.load(sys.stdin)["resources"][0]["schema"]["fields"]
+for f in fields:
+    if f["name"] == sys.argv[1]:
+        print(json.dumps(f, sort_keys=True))
+        break
+else:
+    print("{}")
+' "$2"
+}
+
+NOM_DP=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOM_FILE" -o datapackage 2>/dev/null)
+
+# The four things a nominated field publishes, and the one it must not.
+NOM_CORPUS=$(dp_field "$NOM_DP" corpus)
+GOT=$(printf '%s' "$NOM_CORPUS" | python3 -c '
+import json, sys
+f = json.load(sys.stdin)
+print("type=%s label=%s nominated=%s constraints=%s confidence=%s" % (
+    f.get("type"),
+    f.get("x-finetype-label"),
+    f.get("x-finetype-nominated"),
+    json.dumps(f.get("constraints"), sort_keys=True),
+    "present" if "x-finetype-confidence" in f else "absent",
+))')
+assert_eq "a nominated field publishes its label, its bounds and no confidence" \
+    "$GOT" \
+    'type=string label=representation.text.plain_text nominated=True constraints={"maxLength": 65536, "minLength": 1} confidence=absent'
+
+# An undeclared column in the same run is inferred, and still publishes one.
+GOT=$(dp_field "$NOM_DP" record_id | python3 -c '
+import json, sys
+f = json.load(sys.stdin)
+print("nominated=%s confidence=%s" % (
+    f.get("x-finetype-nominated", False),
+    "present" if "x-finetype-confidence" in f else "absent"))')
+assert_eq "an undeclared column in the same run is still inferred" "$GOT" "nominated=False confidence=present"
+
+# The declared type survives to `plain` and `json` too.
+NOM_PLAIN=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOM_FILE" -o plain 2>/dev/null)
+CORPUS_ROW=$(printf '%s\n' "$NOM_PLAIN" | grep '^  corpus ' || true)
+assert_contains "plain marks the nominated row CONF as decl" "$CORPUS_ROW" "decl"
+assert_contains "plain gives the nominated row its declared label" "$CORPUS_ROW" "representation.text.plain_text"
+
+NOM_JSON=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOM_FILE" -o json 2>/dev/null)
+GOT=$(printf '%s' "$NOM_JSON" | python3 -c '
+import json, sys
+cols = {c["column"]: c for c in json.load(sys.stdin)["columns"]}
+c = cols["corpus"]
+dropped = [k for k in ("confidence", "quality_band", "runner_up", "validation_pass_rate",
+                       "validation_vetoed", "vetoed_type", "validation_advisory_low") if k in c]
+print("type=%s nominated=%s leaked=%s" % (c["type"], c.get("nominated"), ",".join(dropped) or "none"))')
+assert_eq "json marks the nominated column and drops the classifier answer" "$GOT" \
+    "type=representation.text.plain_text nominated=True leaked=none"
+
+# `-o json-schema` carries the marker beside the label.
+NOM_JS=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOM_FILE" -o json-schema 2>/dev/null)
+GOT=$(printf '%s' "$NOM_JS" | python3 -c '
+import json, sys
+props = json.load(sys.stdin)["properties"]
+print("label=%s nominated=%s other=%s" % (
+    props["corpus"]["x-finetype-label"],
+    props["corpus"].get("x-finetype-nominated"),
+    props["record_id"].get("x-finetype-nominated", False)))')
+assert_eq "json-schema marks the nominated property and only that one" "$GOT" \
+    "label=representation.text.plain_text nominated=True other=False"
+
+# Nominating one column changes that column's field object and nothing else.
+# `$.created` comes off `Utc::now()`, so two runs a second apart differ there
+# with no nomination involved.
+BASE_DP=$("$FINETYPE" profile -f "$NOM_CSV" -o datapackage 2>/dev/null)
+printf '%s' "$NOM_DP" > "$NOMDIR/with.json"
+printf '%s' "$BASE_DP" > "$NOMDIR/without.json"
+GOT=$(python3 - "$NOMDIR/with.json" "$NOMDIR/without.json" <<'PYEOF'
+import json, sys
+
+def load(p):
+    d = json.load(open(p))
+    d.pop("created", None)
+    return d
+
+a, b = load(sys.argv[1]), load(sys.argv[2])
+nominated = {"corpus"}
+
+def strip(d):
+    d = json.loads(json.dumps(d))
+    d["resources"][0]["schema"]["fields"] = [
+        f for f in d["resources"][0]["schema"]["fields"] if f["name"] not in nominated
+    ]
+    return d
+
+outside = "same" if strip(a) == strip(b) else "differs"
+
+def field(d, name):
+    return next(f for f in d["resources"][0]["schema"]["fields"] if f["name"] == name)
+
+inside = "differs" if field(a, "corpus") != field(b, "corpus") else "same"
+print("outside=%s inside=%s" % (outside, inside))
+PYEOF
+)
+assert_eq "nominating a column changes its own field object and nothing else" "$GOT" \
+    "outside=same inside=differs"
+
+# ── Refusals. Every one of these stops the run; a nomination that is silently
+#    dropped is an inference wearing a declaration's marker.
+
+# A label the taxonomy does not carry.
+cat > "$NOMDIR/unknown-label.json" <<'JSONEOF'
+{"resources": {"nominated_corpus": {"corpus": {"label": "representation.text.plain_txet"}}}}
+JSONEOF
+OUT=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOMDIR/unknown-label.json" -o datapackage 2>&1) && \
+    fail "an unknown nominated label is refused" "the run exited 0" || \
+    pass "an unknown nominated label is refused"
+assert_contains "the refusal names the unknown label" "$OUT" "representation.text.plain_txet"
+assert_contains "the refusal names the column" "$OUT" "corpus"
+
+# The one label of 251 whose Frictionless type the v2 profile does not admit.
+cat > "$NOMDIR/list-type.json" <<'JSONEOF'
+{"resources": {"nominated_corpus": {"corpus": {"label": "container.array.comma_separated"}}}}
+JSONEOF
+OUT=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOMDIR/list-type.json" -o datapackage 2>&1) && \
+    fail "a nominated type the v2 profile does not admit is refused" "the run exited 0" || \
+    pass "a nominated type the v2 profile does not admit is refused"
+assert_contains "the refusal names the type the profile rejects" "$OUT" "list"
+
+# …while an INFERRED list still emits. The asymmetry is deliberate: an inferred
+# answer is about data the caller cannot change mid-run, a nomination is a
+# declaration made before any work starts.
+OUT=$("$FINETYPE" profile -f "$NOM_CSV" -o datapackage 2>&1) && \
+    pass "the same file with no nomination still profiles" || \
+    fail "the same file with no nomination still profiles" "$OUT"
+
+# An unknown key, at the level a typo actually lands on.
+cat > "$NOMDIR/typo.json" <<'JSONEOF'
+{"resources": {"nominated_corpus": {"corpus": {"lable": "representation.text.plain_text"}}}}
+JSONEOF
+OUT=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOMDIR/typo.json" -o datapackage 2>&1) && \
+    fail "an unknown key in a nomination is refused" "the run exited 0" || \
+    pass "an unknown key in a nomination is refused"
+assert_contains "the refusal names the offending key" "$OUT" "lable"
+assert_contains "the refusal names the JSON path to it" "$OUT" '$.resources["nominated_corpus"]["corpus"]'
+
+# A column object with no `label`.
+cat > "$NOMDIR/no-label.json" <<'JSONEOF'
+{"resources": {"nominated_corpus": {"corpus": {"why": "I forgot the label"}}}}
+JSONEOF
+OUT=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOMDIR/no-label.json" -o datapackage 2>&1) && \
+    fail "a nomination with no label is refused" "the run exited 0" || \
+    pass "a nomination with no label is refused"
+assert_contains "the refusal names the missing key" "$OUT" "label"
+
+# A declared column the file does not have — the renamed-column case.
+cat > "$NOMDIR/absent-column.json" <<'JSONEOF'
+{"resources": {"nominated_corpus": {"korpus": {"label": "representation.text.plain_text"}}}}
+JSONEOF
+OUT=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOMDIR/absent-column.json" -o datapackage 2>&1) && \
+    fail "a nomination naming an absent column is refused" "the run exited 0" || \
+    pass "a nomination naming an absent column is refused"
+assert_contains "the refusal names the absent column" "$OUT" "korpus"
+assert_contains "the refusal names the stem" "$OUT" "nominated_corpus"
+assert_contains "the refusal names the file" "$OUT" "nominated_corpus.csv"
+
+# A declared stem no input matches.
+cat > "$NOMDIR/absent-stem.json" <<'JSONEOF'
+{"resources": {"no_such_file": {"corpus": {"label": "representation.text.plain_text"}}}}
+JSONEOF
+OUT=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOMDIR/absent-stem.json" -o datapackage 2>&1) && \
+    fail "a nomination naming an absent stem is refused" "the run exited 0" || \
+    pass "a nomination naming an absent stem is refused"
+assert_contains "the refusal names the absent stem" "$OUT" "no_such_file"
+
+rm -rf "$NOMDIR"
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════════
