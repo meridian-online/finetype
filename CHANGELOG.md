@@ -5,6 +5,43 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`finetype profile --nominations <FILE>` declares what a column IS, and one
+  function in `finetype-core` decides what any label publishes.** Until now the
+  only lever over a column's type was a hand-edit applied after FineType had
+  finished, and nothing checked what it asserted. A nominations file names, per
+  resource stem and column, the taxonomy label that column is declared to be,
+  and that label is taken as given: the classifier still runs, its answer for
+  that column is discarded, and the validation-as-veto does not run against it.
+  A nominated column carries its taxonomy bounds, is marked
+  `x-finetype-nominated` in the `datapackage` and `json-schema` outputs,
+  `"nominated": true` in `json` and `decl` in the `plain` CONF column, and
+  publishes no confidence — nothing was inferred, so a number there would be a
+  claim about a guess nobody made. `-o csv`, `-o markdown` and `-o arrow` carry
+  no marker; their fixed headers have no place for one, and that gap is stated
+  in `docs/DEVELOPMENT.md`.
+
+  Every departure from the file's shape stops the run before any profiling and
+  names the JSON path to the offence: an unknown key at any level, a missing
+  `label`, a label the taxonomy does not carry, a label whose Frictionless type
+  the Data Package v2 profile does not admit, a declared column the file does
+  not have, a declared stem no input matches. An input with no entry is
+  profiled by inference, which is the ordinary batch case. A nominated `list`
+  is refused where an inferred one still emits: an inferred answer is about
+  data the caller cannot change mid-run, a nomination is a declaration made
+  before any work starts.
+
+  `Taxonomy::publication_for` is the new seam. Given a label it answers the
+  declared type, its format, the constraint keywords legal beside that type and
+  the keywords true of the column the type has no place for — the whole of what
+  a Data Package field carries from the taxonomy. It sits beside
+  `frictionless_for` behind the same `embedded-taxonomy` feature, because two
+  independent emitters of the Data Package spec read it and answering it inside
+  either one would leave the other guessing.
+
 ## [0.6.59] - 2026-09-07
 
 ### Fixed
