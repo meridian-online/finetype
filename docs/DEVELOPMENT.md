@@ -195,6 +195,14 @@ The model is column-oriented (5-branch: char + embed + stats + header + validati
 ```sql
 LOAD './target/release/finetype.duckdb_extension';
 
+-- The demo table every example below queries: a 3-row table with age, email, and
+-- phone columns. Paste the whole block — none of the examples creates it.
+CREATE TABLE people (age INTEGER, email VARCHAR, phone VARCHAR);
+INSERT INTO people VALUES
+  (34, 'jane.doe@company.co.uk', '+44 20 7946 0958'),
+  (41, 'sam.patel@example.com',  '+1 202 555 0100'),
+  (29, 'not-an-email',           'not-a-phone');
+
 -- Single-value probe (no column context — weak):
 SELECT ft_infer('jane.doe@company.co.uk');   -- identity.person.email
 
@@ -236,6 +244,15 @@ SELECT * FROM ft_profile('people');
 Schema **generation** stays in the CLI (`finetype taxonomy`); the extension only **consumes** a JSON Schema. The one `schema` argument auto-detects inline JSON (`trim(schema) LIKE '{%'`), a `getvariable()` variable, or a file path — DuckDB short-circuits the `CASE` so the inline path never hits `read_text`.
 
 ```sql
+LOAD './target/release/finetype.duckdb_extension';
+
+-- Recreate the demo table for this section (each code fence runs independently)
+CREATE TABLE people (age INTEGER, email VARCHAR, phone VARCHAR);
+INSERT INTO people VALUES
+  (34, 'jane.doe@company.co.uk', '+44 20 7946 0958'),
+  (41, 'sam.patel@example.com',  '+1 202 555 0100'),
+  (29, 'not-an-email',           'not-a-phone');
+
 -- 1. profile: see what each column is (CLI: finetype profile)
 SELECT * FROM ft_profile('people');
 
