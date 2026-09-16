@@ -13,11 +13,16 @@
 //! - `ft_profile(col)` / `ft_profile(col, header)` — aggregate: column-level
 //!   classification → `STRUCT(type, confidence, duckdb_type)`. Also a table macro
 //!   `ft_profile(tbl)`: one row per column of `tbl`.
+//! - `ft_detail(col)` / `ft_detail(col, header)` — aggregate over the profile
+//!   reservoir: why the column typed as it did → a JSON string with `type`,
+//!   `confidence`, `duckdb_type`, `samples`, `votes`, and `disambiguation` when a
+//!   rule fired. It shares `ft_profile`'s state and sampling, so over the same
+//!   rows it explains the verdict `ft_profile` gives. Neither aggregate supports
+//!   an aggregate-level `ORDER BY` — `ft_profile(col ORDER BY col)` and
+//!   `ft_detail(col ORDER BY col)` read out of bounds inside DuckDB.
 //! - `ft_validate(tbl, schema)` — table macro: one row per column, with reject counts
 //! - `ft_validate_text(value, schema)` — Per-cell validation →
 //!   `STRUCT(valid, constraint, message)`
-//! - `ft_detail(value)` / `ft_detail(list(values))` / `ft_detail(list(values), header)`
-//!   — Classify with detail → a JSON string with type, confidence, DuckDB type
 //! - `ft_cast(value)` — Normalize a value for safe TRY_CAST (dates → ISO, booleans → true/false)
 //! - `ft_unpack(json)` — Recursively classify JSON fields, returns annotated JSON
 //! - `ft_version()` — Returns the extension version
@@ -229,98 +234,6 @@ impl VScalar for FineTypeVersion {
             vec![],
             LogicalTypeHandle::from(LogicalTypeId::Varchar),
         )]
-    }
-}
-
-/// `ft_detail(value VARCHAR) → VARCHAR` — Detailed semantic type classification.
-/// `ft_detail(list(values) LIST<VARCHAR>) → VARCHAR` — Explicit column detail.
-/// `ft_detail(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR` — Column detail with header.
-///
-/// Returns a JSON object with classification details. In both scalar and list modes,
-/// the output includes:
-/// - `type`: semantic type label
-/// - `confidence`: classification confidence (0.0 to 1.0)
-/// - `duckdb_type`: recommended DuckDB CAST target type
-/// - `samples`: number of values in the sample
-/// - `disambiguation`: name of disambiguation rule applied (if any)
-/// - `votes`: top vote distribution (label → fraction)
-///
-/// In scalar mode, the DuckDB processing chunk (~2048 rows) is used as the
-/// column sample. The `list()` overload gives explicit control over the sample.
-struct FineTypeDetail;
-
-impl VScalar for FineTypeDetail {
-    type State = ();
-
-    unsafe fn invoke(
-        _state: &Self::State,
-        input: &mut DataChunkHandle,
-        output: &mut dyn WritableVector,
-    ) -> Result<(), Box<dyn Error>> {
-        // Dispatch based on input type: VARCHAR vs LIST<VARCHAR>
-        if column_fn::is_list_input(input) {
-            return column_fn::invoke_column_detail(input, output);
-        }
-
-        // Scalar path: column classification over the chunk
-        let len = input.len();
-        let mut output_vec = output.flat_vector();
-
-        let mut non_null_indices: Vec<usize> = Vec::with_capacity(len);
-        let mut texts: Vec<String> = Vec::with_capacity(len);
-
-        for i in 0..len {
-            if let Some(text) = read_varchar(input, 0, i) {
-                if !text.is_empty() {
-                    non_null_indices.push(i);
-                    texts.push(text);
-                } else {
-                    let cstr = CString::new(
-                        r#"{"type":"unknown","confidence":0.0,"duckdb_type":"VARCHAR","samples":0}"#,
-                    )?;
-                    output_vec.insert(i, cstr);
-                }
-            } else {
-                output_vec.set_null(i);
-            }
-        }
-
-        if !texts.is_empty() {
-            let col_result = column_fn::classify_column(&texts)?;
-            let json = column_fn::format_column_result_json(&col_result);
-            let cstr = CString::new(json)?;
-            for idx in &non_null_indices {
-                output_vec.insert(*idx, cstr.clone());
-            }
-        }
-
-        Ok(())
-    }
-
-    fn signatures() -> Vec<ScalarFunctionSignature> {
-        let varchar = LogicalTypeHandle::from(LogicalTypeId::Varchar);
-        let list_varchar = LogicalTypeHandle::list(&varchar);
-
-        vec![
-            // ft_detail(value VARCHAR) → VARCHAR
-            ScalarFunctionSignature::exact(
-                vec![LogicalTypeHandle::from(LogicalTypeId::Varchar)],
-                LogicalTypeHandle::from(LogicalTypeId::Varchar),
-            ),
-            // ft_detail(list(values) LIST<VARCHAR>) → VARCHAR
-            ScalarFunctionSignature::exact(
-                vec![list_varchar],
-                LogicalTypeHandle::from(LogicalTypeId::Varchar),
-            ),
-            // ft_detail(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR
-            ScalarFunctionSignature::exact(
-                vec![
-                    LogicalTypeHandle::list(&LogicalTypeHandle::from(LogicalTypeId::Varchar)),
-                    LogicalTypeHandle::from(LogicalTypeId::Varchar),
-                ],
-                LogicalTypeHandle::from(LogicalTypeId::Varchar),
-            ),
-        ]
     }
 }
 
@@ -719,11 +632,14 @@ pub unsafe fn init_extension(
     let connection = duckdb::Connection::open_from_raw(db.cast())?;
     extension_entrypoint(connection)?;
 
-    // The aggregate goes in last, on a raw connection of its own. Registration
+    // The aggregates go in last, on a raw connection of their own. Registration
     // is against the database's catalog, so it outlives this connection.
     let mut raw: duckdb::ffi::duckdb_connection = std::ptr::null_mut();
     if duckdb::ffi::duckdb_connect(db, &mut raw) != 0 || raw.is_null() {
-        return Err("could not open a connection to register the ft_profile aggregate".into());
+        return Err(
+            "could not open a connection to register the ft_profile and ft_detail aggregates"
+                .into(),
+        );
     }
     let registered = profile_agg::register(raw);
     duckdb::ffi::duckdb_disconnect(&mut raw);
@@ -778,16 +694,15 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
     // The whole registered surface: the un-prefixed `finetype*` scalars this
     // list used to sit under are removed, and CHANGELOG.md carries the
     // migration. ft_infer is the single-value probe; ft_validate_text returns a
-    // STRUCT. ft_profile is not here: it is an aggregate plus a table macro,
-    // and an aggregate cannot take a name a scalar already holds.
+    // STRUCT. ft_profile and ft_detail are not here: they are aggregates
+    // (ft_profile also a table macro), and an aggregate cannot take a name a
+    // scalar already holds.
     con.register_scalar_function::<FineTypeVersion>("ft_version")
         .expect("Failed to register ft_version");
     con.register_scalar_function::<FineTypeInfer>("ft_infer")
         .expect("Failed to register ft_infer");
     con.register_scalar_function::<FineTypeValidateText>("ft_validate_text")
         .expect("Failed to register ft_validate_text");
-    con.register_scalar_function::<FineTypeDetail>("ft_detail")
-        .expect("Failed to register ft_detail");
     con.register_scalar_function::<FineTypeCast>("ft_cast")
         .expect("Failed to register ft_cast");
     con.register_scalar_function::<FineTypeUnpack>("ft_unpack")
