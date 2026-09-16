@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: `ft_detail` is a DuckDB aggregate over `ft_profile`'s sample, so it explains the verdict `ft_profile` gave.** `ft_detail(x)` had the call shape of a per-value scalar and pooled the DuckDB chunk. `SELECT ft_detail(email) FROM people` returned one row per input row, each carrying the chunk's answer, and `LIMIT 1` reported `"samples": 1` because the limit shrank the chunk. It also sampled differently from `ft_profile`, a strided pick from the chunk against a seeded reservoir over the column, so asked straight after `ft_profile` about the same column it could explain a verdict `ft_profile` had not given. `ft_detail(col)` and `ft_detail(col, header)` are now aggregates on `ft_profile`'s own state: one row per column, or per group under `GROUP BY`, and over the same rows in one statement its `type` is `ft_profile`'s. The return is the same JSON string with the same keys. `FILTER` and `DISTINCT` work; an aggregate-level `ORDER BY` inside the call does not, exactly as for `ft_profile`.
+
+  The `list()` forms retire the way `ft_profile`'s did:
+
+  | Removed call | Replacement | What changes |
+  |---|---|---|
+  | `ft_profile(list(col))` | `ft_profile(col)` | Retired in 0.6.56; listed here so every `list()` form is in one table. |
+  | `ft_profile(list(col), h)` | `ft_profile(col, h)` | Retired in 0.6.56. |
+  | `ft_detail(list(col))` | `ft_detail(col)` | The `list()` wrapper goes; the aggregate reads the column, and `GROUP BY` gives the per-group form. Left as it was, the call fails with `Binder Error: aggregate function calls cannot be nested`. |
+  | `ft_detail(list(col), h)` | `ft_detail(col, h)` | As above, with the header hint as the second argument. |
+  | `ft_detail(value)` beside ungrouped columns, or in a `WHERE` | `ft_detail(value)` per group in a CTE, filtered or joined outside it; or `ft_infer(value)` to test each value | An aggregate cannot sit in a `WHERE` or beside a column it does not group. |
+
+  The 0.6.57 migration table's `finetype_detail(…)` → `ft_detail(…)` row now lands on this aggregate rather than on the scalar it described.
+
+### Removed
+
+- **The `ft_detail(VARCHAR)`, `ft_detail(LIST<VARCHAR>)` and `ft_detail(LIST<VARCHAR>, VARCHAR)` scalars.** An aggregate cannot be registered at a name a scalar already holds, so all three retired to free the name for the aggregate above. The extension's registered surface is now 5 scalars, 2 aggregates and 2 table macros.
+
 ## [0.6.60] - 2026-09-16
 
 ### Added

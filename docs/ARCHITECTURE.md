@@ -100,7 +100,7 @@ Pure Rust, no Python runtime, no external C++ dependencies. Integrates cleanly w
 | `finetype-model` | Flat CharCNN + Sense→Sharpen inference, feature extraction, column-mode disambiguation, Model2Vec | `candle-core`, `candle-nn` |
 | `finetype-cli` | Binary: CLI commands (infer, profile, load, check, generate, taxonomy, schema, train, mcp) | `clap`, `csv` |
 | `finetype-mcp` | MCP server library (rmcp, 6 tools, taxonomy resources) | `rmcp`, `tokio` |
-| `finetype-duckdb` | DuckDB extension: 6 scalar functions + 1 aggregate + 2 table macros with embedded model | `duckdb`, `libduckdb-sys` |
+| `finetype-duckdb` | DuckDB extension: 5 scalar functions + 2 aggregates + 2 table macros with embedded model | `duckdb`, `libduckdb-sys` |
 | `finetype-eval` | Evaluation binaries (profile, actionability, GitTables, SOTAB) | `csv`, `duckdb`, `arrow` |
 | `finetype-train` | Pure Rust ML training (Sense, Entity, CharCNN, sibling-context attention, data pipeline) | `candle-core`, `candle-nn`, `duckdb` |
 | `finetype-build-tools` | Build utilities (DuckDB extension metadata) | — |
@@ -220,7 +220,7 @@ table macro DuckDB routes to when the call sits in `FROM`.
 
 This table is the whole surface. The un-prefixed `finetype*` scalars that
 shipped alongside it from 0.6.23 are removed; `CHANGELOG.md` carries the
-migration, and two of the six do not map by renaming.
+migration, and two of the six do not map by renaming. The `ft_detail` scalar and its `list()` forms are removed too: `ft_detail` is an aggregate on `ft_profile`'s state, and the same changelog carries that migration.
 
 | Function | Kind | Returns | Purpose |
 |---|---|---|---|
@@ -229,12 +229,12 @@ migration, and two of the six do not map by renaming.
 | `ft_profile(tbl)` | table macro | TABLE | One row per column of `tbl` — the everyday form |
 | `ft_validate(tbl, schema)` | table macro | TABLE | One row per column: totals, rejects, a sample message |
 | `ft_validate_text(value, schema)` | scalar | STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR) | Per-cell validation naming the failed constraint |
-| `ft_detail(col)` / `ft_detail(list, header?)` | scalar | VARCHAR | Full detail as a JSON string |
+| `ft_detail(col, header?)` | aggregate | VARCHAR | Why the column typed as it did, as a JSON string, from `ft_profile`'s own sample |
 | `ft_cast(value)` | scalar | VARCHAR | Normalize value for TRY_CAST |
 | `ft_unpack(json)` | scalar | VARCHAR | Recursively classify JSON fields |
 | `ft_version()` | scalar | VARCHAR | Version string |
 
-Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification (~2048-row chunks).
+Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. The two aggregates share one state per group, a seeded reservoir of up to 100 values, so `ft_detail` explains the verdict `ft_profile` gives over the same rows.
 
 ## MCP Server
 

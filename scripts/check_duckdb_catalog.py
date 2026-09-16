@@ -313,13 +313,13 @@ UNDOCUMENTED = {
 COUNT_CLAIMS: list[tuple[str, str, dict[str, str]]] = [
     (
         "docs/ARCHITECTURE.md",
-        r"DuckDB extension: (?P<s>\d+) scalar functions \+ (?P<a>\d+) aggregate"
+        r"DuckDB extension: (?P<s>\d+) scalar functions \+ (?P<a>\d+) aggregates?"
         r" \+ (?P<m>\d+) table macros",
         {"s": "scalars", "a": "aggregates", "m": "table_macros"},
     ),
     (
         "README.md",
-        r"(?P<s>\d+) scalar functions, (?P<a>\d+) aggregate and (?P<m>\d+) table macros",
+        r"(?P<s>\d+) scalar functions, (?P<a>\d+) aggregates? and (?P<m>\d+) table macros",
         {"s": "scalars", "a": "aggregates", "m": "table_macros"},
     ),
 ]
@@ -586,6 +586,9 @@ def self_test(root: Path, catalog: dict) -> int:
     aggregates = len(catalog["aggregates"])
     macros = len(catalog["table_macros"])
     profile_returns = catalog["aggregates"]["ft_profile"]["return_type"]
+    # The prose says "1 aggregate" or "2 aggregates"; the mutations below have to
+    # find the sentence the docs actually carry.
+    aggregate_word = "aggregate" if aggregates == 1 else "aggregates"
 
     cases: list[tuple[str, Callable[[Path], None], str]] = [
         (
@@ -616,20 +619,20 @@ def self_test(root: Path, catalog: dict) -> int:
             "the scalar count drifts",
             _sub(
                 "docs/ARCHITECTURE.md",
-                f"DuckDB extension: {scalars} scalar functions + {aggregates} aggregate"
+                f"DuckDB extension: {scalars} scalar functions + {aggregates} {aggregate_word}"
                 f" + {macros} table macros",
-                f"DuckDB extension: 5 scalar functions + {aggregates} aggregate"
+                f"DuckDB extension: {scalars + 1} scalar functions + {aggregates} {aggregate_word}"
                 f" + {macros} table macros",
             ),
-            f"documented 5 scalars, the loaded extension registers {scalars}",
+            f"documented {scalars + 1} scalars, the loaded extension registers {scalars}",
         ),
         (
             "the aggregate count drifts",
             _sub(
                 "docs/ARCHITECTURE.md",
-                f"DuckDB extension: {scalars} scalar functions + {aggregates} aggregate"
+                f"DuckDB extension: {scalars} scalar functions + {aggregates} {aggregate_word}"
                 f" + {macros} table macros",
-                f"DuckDB extension: {scalars} scalar functions + 4 aggregate"
+                f"DuckDB extension: {scalars} scalar functions + 4 aggregates"
                 f" + {macros} table macros",
             ),
             f"documented 4 aggregates, the loaded extension registers {aggregates}",
@@ -638,8 +641,8 @@ def self_test(root: Path, catalog: dict) -> int:
             "the table-macro count drifts",
             _sub(
                 "README.md",
-                f"{scalars} scalar functions, {aggregates} aggregate and {macros} table macros",
-                f"{scalars} scalar functions, {aggregates} aggregate and 9 table macros",
+                f"{scalars} scalar functions, {aggregates} {aggregate_word} and {macros} table macros",
+                f"{scalars} scalar functions, {aggregates} {aggregate_word} and 9 table macros",
             ),
             f"documented 9 table_macros, the loaded extension registers {macros}",
         ),

@@ -158,14 +158,16 @@ The extension exposes a `profile → schema → validate` flow that mirrors the 
 
 **Breaking change: the un-prefixed scalars are gone.** `finetype`, `finetype_detail`, `finetype_cast`, `finetype_unpack`, `finetype_validate` and `finetype_version` were deprecated in 0.6.23 and are no longer registered, so a call to one now raises `Catalog Error`. Two of the six do not map by renaming — `finetype` was column-level and maps to `ft_profile`, not to the single-value `ft_infer`, and `finetype_validate` maps to `ft_validate_text`, which returns a `STRUCT` where the old scalar returned a `VARCHAR`. The migration table is in [CHANGELOG.md](../CHANGELOG.md).
 
+**Breaking change: `ft_detail` is an aggregate, and its scalar and `list()` forms are gone.** `ft_detail(value)`, `ft_detail(list(col))` and `ft_detail(list(col), header)` are no longer registered. `ft_detail(col)` and `ft_detail(col, header)` are aggregates on `ft_profile`'s own state, so they return one row per column or per group, from the sample `ft_profile` classified, with the same JSON keys. `ft_detail(list(col))` becomes `ft_detail(col)`; left unchanged it fails with `Binder Error: aggregate function calls cannot be nested`. The migration table is in [CHANGELOG.md](../CHANGELOG.md).
+
 | Verb | Scope | DuckDB kind | Mirrors CLI |
 |------|-------|-------------|-------------|
 | `ft_infer(value)` | one value | scalar | — (weak probe) |
 | `ft_profile(table)` | whole table | SQL table macro | `profile` |
-| `ft_profile(col)` / `ft_profile(col, header)` | a column | aggregate | `profile` |
+| `ft_profile(col)` / `ft_profile(col, header)`, and `ft_detail(col)` / `ft_detail(col, header)` mirroring it | a column | aggregate | `profile` |
 | `ft_validate_text(value, schema)` | one value / column | scalar → STRUCT | per-cell |
 | `ft_validate(table, schema)` | a table | SQL table macro | `validate` |
-| `ft_detail` / `ft_cast` / `ft_unpack` / `ft_version` | one value | scalar | utilities |
+| `ft_cast` / `ft_unpack` / `ft_version` | one value | scalar | utilities |
 
 The two table verbs are symmetric — both take a table name: `ft_profile('t')` and `ft_validate('t', schema)`. Each is a SQL table macro registered at `LOAD`, so it reaches the catalog via `query_table(name)` past the `BindInfo` wall that blocks Rust table functions on this pin (choice 0064).
 
@@ -182,9 +184,11 @@ The surface is organised by *what you hand it*, not by how it is implemented:
 
 `ft_profile` is **one name covering both column forms and the table form**, which DuckDB routes by call position: a call in `FROM` binds the table macro, a call in a projection binds the aggregate.
 
+`ft_detail(col)` answers the question asked straight after it: why the column typed as it did. It is a second aggregate on `ft_profile`'s state, reservoir and seed, so over the same rows in one statement its `type` is `ft_profile`'s and its `samples`, `votes` and `disambiguation` describe that verdict. It returns a JSON string, one row per column or per group. The per-value *why* is `ft_validate_text`'s, which names the constraint a value fails.
+
 The header hint is the second argument. It feeds the model's header branch, which is why the table macro passes each column's own name: profiling a column called `email` is a different question from profiling the same values with no name attached.
 
-**An aggregate-level `ORDER BY` is not supported.** `ft_profile(col ORDER BY col)` reads out of bounds inside DuckDB. The fault is in the C API's shared update path, not in this aggregate: the sorted path makes the state vector constant, and `CAPIAggregateUpdate` flattens the input vectors without flattening the state — its `combine` and `finalize` siblings both do. It is reported upstream and deferred. Order the statement instead.
+**An aggregate-level `ORDER BY` is not supported.** `ft_profile(col ORDER BY col)` and `ft_detail(col ORDER BY col)` read out of bounds inside DuckDB. The fault is in the C API's shared update path, not in either aggregate: the sorted path makes the state vector constant, and `CAPIAggregateUpdate` flattens the input vectors without flattening the state — its `combine` and `finalize` siblings both do. It is reported upstream and deferred. Order the statement instead.
 
 `ft_profile` reached this shape by giving up a scalar. It was `ft_profile(list(col))`, a scalar over an assembled `LIST`, because duckdb-rs exposes no aggregate-UDF registration API. DuckDB's C API does, and the extension already talks to it directly — but an aggregate cannot be registered at a name a scalar already holds, so the `list()` forms retired to free the name. `ft_profile(list(col))` becomes `ft_profile(col)`, and `ft_profile(list(col), h)` becomes `ft_profile(col, h)`.
 

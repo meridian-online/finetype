@@ -31,7 +31,7 @@ identity.person.email
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing. 99.9% actionability across 120 tested types.
 - **Locale-aware** — validates 65 locales for postal codes, 46 for phone numbers, 27 for month/day names
 - **MCP server** — `finetype mcp` exposes type inference to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/)
-- **DuckDB extension** — 6 scalar functions, 1 aggregate and 2 table macros, a `profile → schema → validate` surface in SQL: `ft_profile()` types a column or every column of a table, `ft_validate()` checks a table against a JSON Schema, plus `ft_infer()` / `ft_detail()` / `ft_cast()` / `ft_unpack()` scalars. The full table, gated against the loaded extension's catalog, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#duckdb-extension)
+- **DuckDB extension** — 5 scalar functions, 2 aggregates and 2 table macros, a `profile → schema → validate` surface in SQL: `ft_profile()` types a column or every column of a table, `ft_detail()` explains why a column typed as it did, `ft_validate()` checks a table against a JSON Schema, plus `ft_infer()` / `ft_cast()` / `ft_unpack()` scalars. The full table, gated against the loaded extension's catalog, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#duckdb-extension)
 - **Schema-driven validation** — `finetype validate data.csv schema.json --db out.db --table orders` materialises typed DuckDB tables (per-column transforms applied) plus a `finetype_reject_errors` sidecar in a single pass
 - **Pure Rust** — no Python runtime or dependencies
 
@@ -168,6 +168,17 @@ SELECT ft_profile(value) FROM my_table;
 -- ft_profile(value, 'value'). GROUP BY, FILTER and DISTINCT all work; an
 -- aggregate-level ORDER BY inside the call does not — see docs/DEVELOPMENT.md.
 
+-- Ask WHY it typed the column that way. ft_detail is the same aggregate with the
+-- full answer, drawn from the same sample, so over the same rows it explains the
+-- verdict ft_profile gave: `samples` is how many values reached the model,
+-- `votes` what they looked like, and `disambiguation` names the rule, when one
+-- fired, that settled the type. One row per column, or per group under GROUP BY.
+SELECT ft_detail(value) FROM my_table;
+-- → {"type": "datetime.date.mdy_slash", "confidence": 0.833, "duckdb_type": "DATE", "samples": 4, "disambiguation": "date_slash_disambiguation", "votes": {"datetime.date.mdy_slash": 0.833}}
+-- ft_detail(value, 'value') takes the same header hint, and ft_detail shares
+-- ft_profile's ORDER BY caveat. LIMIT on the statement does not change
+-- `samples`: the aggregate has read the column before the limit applies.
+
 -- Validate a table against a JSON Schema (inline literal, variable, or file path)
 SELECT * FROM ft_validate('my_table', 'schema.json');
 
@@ -175,23 +186,6 @@ SELECT * FROM ft_validate('my_table', 'schema.json');
 -- than ft_profile — reach for it to check one value, not to type a column.
 SELECT ft_infer('192.168.1.1');
 -- → 'technology.internet.ip_v4'
-
--- Full detail as JSON. Note this reads the COLUMN, not the one value in front
--- of it: the DuckDB processing chunk is the pooling boundary, so every row of a
--- chunk returns the SAME answer. It takes a STRIDED sample of up to 100 values
--- (ColumnConfig.sample_size) — evenly spaced, not the first 100 — and `samples`
--- reports how many it used. ft_detail(list(...)) samples the same way, so the
--- two agree.
---
--- ft_profile samples differently again, because an aggregate sees the rows one
--- chunk at a time and cannot stride over a column it has not read yet: it keeps
--- a reservoir of up to 100 values (PROFILE_SAMPLE_CAP), so a value late in the
--- scan is as likely to reach the model as one at the front. The two can
--- therefore disagree on a column whose values are not homogeneous.
-SELECT ft_detail(value) FROM my_table;   -- 4-row date column
--- → {"type": "datetime.date.mdy_slash", "confidence": 0.833, "duckdb_type": "DATE", "samples": 4, "disambiguation": "date_slash_disambiguation", "votes": {"datetime.date.mdy_slash": 0.833}}
--- Every row returns that identical object. Note `SELECT … LIMIT 1` reports
--- "samples": 1, because the limit shrinks the chunk — not because it read one value.
 
 -- Normalize values for safe TRY_CAST (dates → ISO, booleans → true/false)
 SELECT ft_cast(value) FROM my_table;
@@ -216,11 +210,16 @@ SELECT ft_unpack(json_col) FROM my_table;
 > really were probing one literal. And `finetype_validate` is **not** `ft_validate`, which
 > is a table macro; its counterpart is **`ft_validate_text`**, which returns
 > `STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR)` where the old scalar
-> returned a `VARCHAR`. `finetype_detail`, `finetype_cast`, `finetype_unpack` and
-> `finetype_version` are the safe find-and-replace in the set.
+> returned a `VARCHAR`. `finetype_cast`, `finetype_unpack` and `finetype_version` are
+> the safe find-and-replace in the set. `finetype_detail` renames to `ft_detail`, which
+> has since become an aggregate, as the next note says.
 >
 > The migration table, with the call shapes on both sides, is in
 > [CHANGELOG.md](CHANGELOG.md).
+
+> **Breaking: `ft_detail` is an aggregate, and its scalar is retired.** The scalar `ft_detail(value)` and the `ft_detail(list(col))` and `ft_detail(list(col), header)` forms are no longer registered. The scalar pooled the DuckDB chunk, so it returned one row per input row and sampled differently from `ft_profile`, which meant it could explain a verdict `ft_profile` never gave. `ft_detail(col)` and `ft_detail(col, header)` now return one row per column, or per group, from `ft_profile`'s own sample, with the same JSON keys as before.
+>
+> `ft_detail(list(col))` becomes `ft_detail(col)`, and `ft_detail(list(col), h)` becomes `ft_detail(col, h)`; left as it was, the call fails with `Binder Error: aggregate function calls cannot be nested`. A query that used the scalar row by row, in a `WHERE` or beside columns it does not group, computes `ft_detail` per group in a CTE and filters on that result, or uses `ft_infer` where it meant to test each value.
 
 On first use, the extension downloads model weights from HuggingFace and caches them locally. Set `FINETYPE_MODEL_DIR` to use a local model path instead.
 
