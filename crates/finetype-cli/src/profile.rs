@@ -1310,6 +1310,38 @@ identity.person.email:
     }
 
     #[test]
+    fn a_nomination_beats_the_classifiers_answer() {
+        // The nominated label and the predicted label are DIFFERENT strings on
+        // purpose. A test where they agree cannot tell `decide_label` taking
+        // the nomination from `decide_label` taking the prediction, and would
+        // pass just as well against code that ignores the nomination entirely.
+        let taxonomy = taxonomy();
+        let safe: HashSet<String> = HashSet::new();
+        let values: Vec<String> = vec!["ada@example.com".into(), "grace@example.org".into()];
+        let out = decide_label(
+            Some("representation.text.plain_text"),
+            "identity.person.email",
+            &values,
+            Some(&taxonomy),
+            &safe,
+            true,
+        );
+        assert_eq!(out.label, "representation.text.plain_text");
+        assert!(out.nominated);
+        // …and the classifier's answer really was the other one, so the
+        // assertion above is about the choice and not about the fixture.
+        let inferred = decide_label(
+            None,
+            "identity.person.email",
+            &values,
+            Some(&taxonomy),
+            &safe,
+            true,
+        );
+        assert_eq!(inferred.label, "identity.person.email");
+    }
+
+    #[test]
     fn inference_still_decides_a_column_nobody_nominated() {
         let taxonomy = taxonomy();
         let safe: HashSet<String> = HashSet::new();

@@ -463,6 +463,7 @@ else:
 }
 
 NOM_DP=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOM_FILE" -o datapackage 2>/dev/null)
+BASE_JSON=$("$FINETYPE" profile -f "$NOM_CSV" -o json 2>/dev/null)
 
 # The four things a nominated field publishes, and the one it must not.
 NOM_CORPUS=$(dp_field "$NOM_DP" corpus)
@@ -488,6 +489,46 @@ print("nominated=%s confidence=%s" % (
     f.get("x-finetype-nominated", False),
     "present" if "x-finetype-confidence" in f else "absent"))')
 assert_eq "an undeclared column in the same run is still inferred" "$GOT" "nominated=False confidence=present"
+
+# THE ASSERTION THAT CAN TELL A DECLARATION FROM A GUESS.
+#
+# Inference types this fixture's `corpus` column as `representation.text.plain_text`
+# on its own — it is prose, and that is the right answer. So the assertion above,
+# which is the acceptance criterion as written, would pass just as well against a
+# build that ignored the nomination and published the guess. It pins what a
+# nominated field CARRIES; it cannot pin that the nomination was USED.
+#
+# `record_id` is where that becomes decidable: inference types it as an
+# identifier, so declaring it as text asks for a label inference does not give.
+# The premise is measured in the same breath rather than assumed.
+cat > "$NOMDIR/override.json" <<'JSONEOF'
+{"resources": {"nominated_corpus": {"record_id": {"label": "representation.text.plain_text"}}}}
+JSONEOF
+INFERRED_ID=$(printf '%s' "$BASE_JSON" | python3 -c '
+import json, sys
+cols = {c["column"]: c for c in json.load(sys.stdin)["columns"]}
+print(cols["record_id"]["type"])')
+if [ "$INFERRED_ID" != "representation.text.plain_text" ]; then
+    pass "the premise holds — inference calls record_id '$INFERRED_ID', not text"
+else
+    fail "the premise holds — inference does not already call record_id text" \
+        "inference gave 'representation.text.plain_text', so the next assertion proves nothing"
+fi
+OVERRIDE_JSON=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOMDIR/override.json" -o json 2>/dev/null)
+GOT=$(printf '%s' "$OVERRIDE_JSON" | python3 -c '
+import json, sys
+cols = {c["column"]: c for c in json.load(sys.stdin)["columns"]}
+print("%s nominated=%s" % (cols["record_id"]["type"], cols["record_id"].get("nominated")))')
+assert_eq "the declared label is published, not the one inference would give" "$GOT" \
+    "representation.text.plain_text nominated=True"
+
+OVERRIDE_DP=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOMDIR/override.json" -o datapackage 2>/dev/null)
+GOT=$(dp_field "$OVERRIDE_DP" record_id | python3 -c '
+import json, sys
+f = json.load(sys.stdin)
+print("%s bounds=%s" % (f.get("x-finetype-label"), json.dumps(f.get("constraints"), sort_keys=True)))')
+assert_eq "the descriptor carries the declared label and its bounds" "$GOT" \
+    'representation.text.plain_text bounds={"maxLength": 65536, "minLength": 1}'
 
 # The declared type survives to `plain` and `json` too.
 NOM_PLAIN=$("$FINETYPE" profile -f "$NOM_CSV" --nominations "$NOM_FILE" -o plain 2>/dev/null)
