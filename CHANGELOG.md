@@ -5,6 +5,49 @@ All notable changes to FineType will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **BREAKING — `finetype validate` verifies check digits, not only shape. Data
+  that passed yesterday can fail today, and the exit code moves with it.** The
+  taxonomy declares a `checksum:` directive on nineteen leaves across seventeen
+  schemes — `lei`, `isin`, `cusip`, `sedol`, `figi`, `iban`, `aba`, `luhn`,
+  `isbn`, `issn`, `gs1`, `npi`, `dea`, `abn`, `orcid`, `cas`, `iso6346` — and
+  until now the `validate` verb read none of them. A 20-character alphanumeric
+  string that is not an LEI, and a 13-digit number that is not an ISBN, both
+  validated clean. Any column whose schema carries `x-finetype-label` naming one
+  of those leaves is now check-digit verified, and a shape-valid value whose
+  check digit does not verify becomes a reject row.
+
+  **What a consumer does when a green `finetype validate` job goes red.** The
+  new reject rows carry `constraint_failed = 'checksum'` in the
+  `finetype_reject_errors` sidecar, distinct from `'pattern'` and from every
+  other token, with `constraint_value` naming the scheme that refused them —
+  so the first step is to read them:
+
+  ```sql
+  SELECT column_name, constraint_value AS scheme, count(*)
+  FROM finetype_reject_errors
+  WHERE constraint_failed = 'checksum'
+  GROUP BY 1, 2 ORDER BY 3 DESC;
+  ```
+
+  Those rows are values that have the identifier's shape and are not that
+  identifier. Three things they are usually telling you, in the order worth
+  checking: the column is genuinely mistyped and its `x-finetype-label` should
+  name a different leaf — removing or correcting the label turns the check off,
+  because the label is the whole switch; or the identifiers are real and
+  damaged upstream (truncated, re-keyed, padded), which is the case this change
+  exists to surface; or a small number of rows are placeholders, and the reject
+  sidecar is where they now show up instead of passing silently. There is no
+  flag to restore the old behaviour: a validation that confirms shape and
+  reports it as validation is the defect being fixed.
+
+  The model path is unchanged. `finetype profile`'s labels and its
+  checksum-driven demotions are produced by a different validator and move
+  exactly as before.
+
 ## [0.6.59] - 2026-09-07
 
 ### Fixed

@@ -1851,10 +1851,13 @@ impl ColumnClassifier {
     /// `checksum_substance_guard` (default ON). Generic substance check for the
     /// self-validating identifier types — replaces the per-type
     /// `*_checkdigit_veto` pattern. Any column the model labels with a
-    /// checksum-bearing type (the taxonomy `checksum:` directive — isbn, aba,
-    /// cusip, sedol today) is re-checked against the real check-digit arithmetic
-    /// from the canonical `finetype_core::checksum` module rather than a
-    /// hand-rolled copy.
+    /// checksum-bearing type is re-checked against the real check-digit
+    /// arithmetic from the canonical `finetype_core::checksum` module rather
+    /// than a hand-rolled copy. Which types those are is the taxonomy's
+    /// `checksum:` directive and nothing here — the guard reads the directive
+    /// off whatever leaf the model emitted, so a leaf that gains or loses one
+    /// changes what this guard covers with no edit to this file. Naming a few
+    /// of them here is how this sentence went stale the first time.
     ///
     /// The taxonomy's shape pattern (10 or 13 digits) lets a large financial
     /// integer like `marketCap` 5150000128 look like an ISBN; the checksum is
@@ -1867,13 +1870,23 @@ impl ColumnClassifier {
     /// longTermInvestments/… as `aba_routing`, citation_id/case_number as
     /// `cusip`/`sedol`.
     ///
-    /// The checksum is owned HERE, not in the shared compiled validator. Wiring
-    /// it into the validator looks tidier but regresses: the generic
-    /// `value_sharpen` schema-demotion rules also consult that validator and,
-    /// on a checksum-failing column, demote it to their own fallback
-    /// (`numeric_code`/categorical) — a worse target than the gold-correct
-    /// `integer_number` this guard produces, and they run first. So the
-    /// directive scopes this guard while the validator stays shape-only.
+    /// The checksum stays out of the shared compiled validator, and that is a
+    /// constraint on this file's neighbours rather than a preference. The
+    /// generic `value_sharpen` schema-demotion rules also consult
+    /// `CompiledValidator` and run BEFORE this guard; on a checksum-failing
+    /// column they would demote to their own fallback
+    /// (`numeric_code`/categorical), a worse target than the gold-correct
+    /// `integer_number` this guard produces. So `CompiledValidator` stays
+    /// shape-only and the directive scopes this guard.
+    ///
+    /// `finetype validate` is a different path and does verify the check digit:
+    /// `finetype_core::table_validator` resolves a column's `x-finetype-label`
+    /// to the same directive and rejects a shape-valid value whose check digit
+    /// does not verify, with the `checksum` constraint token. The two paths are
+    /// separated by which validator they use — `validate` through
+    /// `table_validator`, the model through `CompiledValidator` — so making the
+    /// verb substance-checking left this guard's demotions exactly where they
+    /// were.
     fn checksum_substance_guard(
         &self,
         result: &mut ColumnResult,
