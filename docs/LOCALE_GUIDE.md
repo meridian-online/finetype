@@ -87,9 +87,9 @@ Column: order_dates
 
 ### DuckDB Extension
 
-**The extension does not report a locale.** `ft_detail` returns `type`,
-`confidence`, `duckdb_type`, `samples`, `votes` and — only when a disambiguation
-rule fired — `disambiguation`. There is no `locale` key; the CLI's
+**The extension does not report a locale.** `ft_detail`, an aggregate over a
+column, returns `type`, `confidence`, `duckdb_type`, `samples`, `votes` and —
+only when a disambiguation rule fired — `disambiguation`. There is no `locale` key; the CLI's
 `--output json` has one, the extension does not
 (`crates/finetype-duckdb/src/column_fn.rs`, `format_column_result_json`).
 
@@ -114,11 +114,16 @@ INSERT INTO orders VALUES
 SELECT ft_detail(phone_number) FROM customers;
 -- → {"type":"identity.person.phone_number","confidence":0.98,"duckdb_type":"VARCHAR","samples":4,"votes":{"identity.person.phone_number":0.98}}
 
--- Filter on the detected TYPE (the locale is not in this payload)
+-- Keep the rows only if the COLUMN typed as a phone number (the locale is not
+-- in this payload). ft_detail is an aggregate, so it runs once in a CTE and the
+-- outer query filters on its verdict.
+WITH detail AS (
+  SELECT json_extract_string(ft_detail(phone_number), '$.type') AS detected_type
+  FROM customers
+)
 SELECT customer_id, phone_number
-FROM customers
-WHERE json_extract_string(ft_detail(phone_number), '$.type')
-      = 'identity.person.phone_number';
+FROM customers, detail
+WHERE detail.detected_type = 'identity.person.phone_number';
 ```
 
 For a per-value locale, use the CLI — `finetype infer --output json` adds a
@@ -237,7 +242,7 @@ FROM french_dates, col;
 
 Extract phone numbers from a specific region:
 
-In DuckDB, filter on the detected type (the extension reports no locale):
+In DuckDB, filter each row on its detected type (the extension reports no locale). A test of each row is a per-value question, so it takes the per-value verb, `ft_infer`, which reads a value without its column and is weaker for that:
 
 ```sql
 LOAD './target/release/finetype.duckdb_extension';
@@ -249,8 +254,7 @@ INSERT INTO customers VALUES
   (3, '+33 1 42 68 53 00'), (4, '+44 20 7946 0958');
 
 SELECT * FROM customers
-WHERE json_extract_string(ft_detail(phone_number), '$.type')
-      = 'identity.person.phone_number';
+WHERE ft_infer(phone_number) = 'identity.person.phone_number';
 ```
 
 From the CLI, where a `locale` field IS emitted:
@@ -427,7 +431,7 @@ finetype profile customers.csv
 
 **What to do:**
 - This is correct behavior — your data *is* multi-locale
-- Use `ft_detail()` in DuckDB to separate and transform by locale
+- Use `ft_detail(col)` with a `GROUP BY` in DuckDB to check each partition's type; the extension reports no locale, so separating by locale is the CLI's job
 - Or filter/validate by expected region using locale information
 
 ## Advanced: Using Locale in ETL Pipelines
@@ -468,26 +472,26 @@ INSERT INTO orders VALUES
 
 -- DuckDB: are the postal codes in each region's partition actually postal codes?
 -- The extension reports a TYPE, not a locale, so this checks the type per group.
+-- ft_detail is an aggregate: the CTE types each region's partition once, and
+-- the outer query counts on that verdict.
+WITH typed AS (
+  SELECT
+    region,
+    COUNT(*) AS postal_codes,
+    json_extract_string(ft_detail(postal_code), '$.type') AS detected_type
+  FROM orders
+  GROUP BY region
+)
 SELECT
   region,
-  COUNT(*) AS postal_codes,
-  COUNT(CASE
-    WHEN json_extract_string(ft_detail(postal_code), '$.type')
-         = 'geography.address.postal_code'
-    THEN 1
-  END) AS validated
-FROM orders
-GROUP BY region
+  postal_codes,
+  CASE WHEN detected_type = 'geography.address.postal_code'
+       THEN postal_codes ELSE 0 END AS validated
+FROM typed
 ORDER BY validated DESC;
 
--- Example output:
--- region | postal_codes | validated
--- -------|------|----------
--- US     | 5000 | 4998
--- CA     | 1000 | 998
--- DE     | 500  | 495
--- FR     | 300  | 298
--- ...
+-- One row per region. `validated` is all of a partition's rows or none of them,
+-- because the type is decided for the partition, not for each row.
 ```
 
 ## Learning More

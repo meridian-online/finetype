@@ -907,10 +907,13 @@ def self_test(root: Path, extension: Path) -> int:
         ),
         (
             "a shell pipeline is put back into a ```sql fence",
+            # Anchored on the query's head, not on the verb its filter calls:
+            # the filter moved from ft_detail to ft_infer when ft_detail became
+            # an aggregate, and a target naming the verb lost its place.
             _sub("docs/LOCALE_GUIDE.md",
-                 "SELECT * FROM customers\nWHERE json_extract_string",
+                 "SELECT * FROM customers\nWHERE ",
                  "finetype infer -f phones.txt --output json\n\n"
-                 "SELECT * FROM customers\nWHERE json_extract_string"),
+                 "SELECT * FROM customers\nWHERE "),
             "a shell command inside a ```sql fence",
             None,
             None,
