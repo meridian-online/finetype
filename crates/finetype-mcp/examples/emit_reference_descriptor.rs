@@ -56,6 +56,7 @@ fn main() {
             values: &empty,
             confidence: Some(0.9),
             locale: None,
+            nominated: false,
         })
         .collect();
 

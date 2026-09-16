@@ -63,6 +63,11 @@ pub struct TableSchemaColumn<'a> {
     /// (card 0020 honest typing — an analyst sees WHY, not just THAT). `None`
     /// for typed columns or when no reason is available.
     pub unknown_reason: Option<&'a str>,
+    /// Whether `label` was **declared** by the caller rather than inferred,
+    /// surfaced as `x-finetype-nominated` beside `x-finetype-label`. Without
+    /// the marker a reader cannot tell a declaration from a guess, and has to
+    /// treat the two the same way.
+    pub nominated: bool,
 }
 
 /// Emit a table-level JSON Schema document.
@@ -121,6 +126,9 @@ pub fn emit_table_schema(
 
         // Verbosity contract: label + pii.
         prop.insert("x-finetype-label".into(), json!(col.label));
+        if col.nominated {
+            prop.insert("x-finetype-nominated".into(), json!(true));
+        }
         prop.insert("x-finetype-pii".into(), json!(pii));
 
         // x-finetype-enum surfaces by DEFAULT (not gated on --stats): a bounded value
@@ -350,6 +358,7 @@ mod tests {
                 values: &country,
                 null_count: 0,
                 unknown_reason: None,
+                nominated: false,
             },
             TableSchemaColumn {
                 name: "colour",
@@ -357,6 +366,7 @@ mod tests {
                 values: &word,
                 null_count: 0,
                 unknown_reason: None,
+                nominated: false,
             },
             TableSchemaColumn {
                 name: "n",
@@ -364,6 +374,7 @@ mod tests {
                 values: &ints,
                 null_count: 0,
                 unknown_reason: None,
+                nominated: false,
             },
         ];
         let schema = emit_table_schema(&cols, "t", "id", &taxonomy, true, 32);
@@ -416,6 +427,7 @@ mod tests {
             values: &level,
             null_count: 0,
             unknown_reason: None,
+            nominated: false,
         }];
         let schema = emit_table_schema(&cols, "t", "id", &taxonomy, false, 0);
         let props = schema
@@ -455,6 +467,7 @@ mod tests {
                 values: &vals,
                 null_count: 3,
                 unknown_reason: Some(
+                nominated: false,
                     "validation rejected 'npi': only 12% of values matched its format",
                 ),
             },
@@ -464,6 +477,7 @@ mod tests {
                 values: &vals,
                 null_count: 3,
                 unknown_reason: None,
+                nominated: false,
             },
         ];
         let schema = emit_table_schema(&cols, "t", "id", &taxonomy, false, 0);

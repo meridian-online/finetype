@@ -1152,6 +1152,168 @@ pub fn frictionless_for(label: &str) -> Option<Frictionless> {
     taxonomy.get(&key).and_then(|d| d.frictionless.clone())
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WHAT A LABEL PUBLISHES
+//
+// One function answers, for any label, the whole of what a Data Package field
+// carries from the taxonomy: the declared type, its format, and the static
+// constraints routed by whether that declared type has a place for them.
+//
+// It is here, beside `frictionless_for`, because two independent emitters of
+// the Data Package spec read it — `finetype-mcp::datapackage` and dovetail's
+// `dovetail-core::datapackage`. Answering it in either one would give that
+// emitter's callers the answer and leave the other guessing.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Which `pattern` a [`LabelPublication`] carries.
+///
+/// The distinction is not cosmetic. A type's canonical `pattern` is a claim
+/// about the type; the pattern an emitter publishes is a claim about the
+/// column in front of it, and a correct label whose column carries legitimate
+/// variants the canonical pattern rejects must not ship a constraint its own
+/// data violates. A caller holding values reconciles the two itself (see
+/// `Validation::fit_pattern`) and passes the answer here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatternSource<'a> {
+    /// Publish the type's own `validation.pattern`, unreconciled. The answer
+    /// for a caller with no column values in hand.
+    Canonical,
+    /// Publish this pattern, or — on `None` — no `pattern` at all.
+    Observed(Option<&'a str>),
+}
+
+/// Everything the taxonomy says one label publishes in a Data Package field.
+///
+/// `constraints` and `unsupported_constraints` are the same keywords split by
+/// [`crate::frictionless_vocabulary`]: v2's field object is a fifteen-branch
+/// `oneOf`, one branch per type, each with its own `constraints` properties, so
+/// a `pattern` beside `"type": "integer"` is a descriptor
+/// `frictionless==5.19.0` refuses outright. The keywords with no place on the
+/// declared type are still true of the column, so they are handed back rather
+/// than dropped — an emitter publishes them beside the field.
+///
+/// A declared type outside the profile's fifteen — the taxonomy's `list`, which
+/// v2 specifies and neither the vendored profile nor the reference
+/// implementation implements — has no vocabulary to route against, so every
+/// keyword stays in `constraints` and `unsupported_constraints` is empty:
+/// filtering against a vocabulary we do not have would be a guess, and such a
+/// field is refused for its type either way.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LabelPublication {
+    /// The Frictionless v2 field type. `string` when the label is unknown to
+    /// the taxonomy or carries no `frictionless` map — the same fallback both
+    /// emitters already used.
+    pub ftype: String,
+    /// The type-legal `format` variant, when the label declares one.
+    pub format: Option<String>,
+    /// Keywords legal beside `ftype`, ready to be the field's `constraints`.
+    pub constraints: serde_json::Map<String, serde_json::Value>,
+    /// Keywords true of the column that `ftype` has no place for.
+    pub unsupported_constraints: serde_json::Map<String, serde_json::Value>,
+}
+
+impl LabelPublication {
+    /// Whether the declared type is one of the fifteen the vendored v2 profile
+    /// admits. A `false` here is why `unsupported_constraints` is empty.
+    pub fn type_is_in_profile(&self) -> bool {
+        crate::frictionless_vocabulary::is_profile_field_type(&self.ftype)
+    }
+}
+
+impl Taxonomy {
+    /// What `label` publishes, against **this** taxonomy.
+    ///
+    /// The free [`publication_for`] answers the same question against the
+    /// compile-time-embedded taxonomy; this method is for a caller that loaded
+    /// `labels/` at runtime and must be answered from the definitions it is
+    /// actually using.
+    pub fn publication_for(&self, label: &str, pattern: PatternSource<'_>) -> LabelPublication {
+        publication_from_definition(self.get(label), pattern)
+    }
+}
+
+/// The single implementation both entry points delegate to.
+fn publication_from_definition(
+    def: Option<&Definition>,
+    pattern: PatternSource<'_>,
+) -> LabelPublication {
+    use serde_json::{json, Map};
+
+    let fx = def.and_then(|d| d.frictionless.as_ref());
+    let ftype = fx.map(|f| f.ftype.clone()).unwrap_or_else(|| "string".into());
+    let format = fx.and_then(|f| f.format.clone());
+
+    let mut c = Map::new();
+    if let Some(v) = def.and_then(|d| d.validation.as_ref()) {
+        let published_pattern = match pattern {
+            PatternSource::Canonical => v.pattern.as_deref(),
+            PatternSource::Observed(p) => p,
+        };
+        if let Some(p) = published_pattern {
+            c.insert("pattern".into(), json!(p));
+        }
+        if let Some(n) = v.min_length {
+            c.insert("minLength".into(), json!(n));
+        }
+        if let Some(n) = v.max_length {
+            c.insert("maxLength".into(), json!(n));
+        }
+        if let Some(x) = v.minimum {
+            c.insert("minimum".into(), json!(x));
+        }
+        if let Some(x) = v.maximum {
+            c.insert("maximum".into(), json!(x));
+        }
+    }
+
+    let Some(vocabulary) = crate::frictionless_vocabulary::constraint_vocabulary(&ftype) else {
+        return LabelPublication {
+            ftype,
+            format,
+            constraints: c,
+            unsupported_constraints: Map::new(),
+        };
+    };
+
+    let mut constraints = Map::new();
+    let mut unsupported_constraints = Map::new();
+    for (keyword, value) in c {
+        if vocabulary.contains(&keyword.as_str()) {
+            constraints.insert(keyword, value);
+        } else {
+            unsupported_constraints.insert(keyword, value);
+        }
+    }
+    LabelPublication {
+        ftype,
+        format,
+        constraints,
+        unsupported_constraints,
+    }
+}
+
+/// What `label` publishes, against the compile-time-embedded taxonomy — the
+/// seam dovetail consumes alongside [`frictionless_for`], so both Data Package
+/// emitters in the family answer a label the same way without either of them
+/// owning the answer.
+///
+/// A `.LOCALE` suffix on a 4-level label is stripped before lookup, as in
+/// [`frictionless_for`]. An unknown label publishes `"type": "string"` and no
+/// constraints, which is what both emitters already did for one.
+///
+/// The embedded taxonomy is parsed once and cached. Available under the
+/// `embedded-taxonomy` feature.
+#[cfg(feature = "embedded-taxonomy")]
+pub fn publication_for(label: &str) -> LabelPublication {
+    use std::sync::OnceLock;
+    static TAXONOMY: OnceLock<Taxonomy> = OnceLock::new();
+    let taxonomy =
+        TAXONOMY.get_or_init(|| Taxonomy::embedded().expect("embedded taxonomy must parse"));
+    let key: String = label.split('.').take(3).collect::<Vec<_>>().join(".");
+    taxonomy.publication_for(&key, PatternSource::Canonical)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

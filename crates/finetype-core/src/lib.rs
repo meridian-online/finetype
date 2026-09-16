@@ -43,10 +43,10 @@ pub use table_validator::{
     TableValidatorError,
 };
 #[cfg(feature = "embedded-taxonomy")]
-pub use taxonomy::frictionless_for;
+pub use taxonomy::{frictionless_for, publication_for};
 pub use taxonomy::{
-    DdlInfo, Definition, Designation, Frictionless, Label, Taxonomy, TierGraph, TierGraphSummary,
-    Validation, FRICTIONLESS_TYPES,
+    DdlInfo, Definition, Designation, Frictionless, Label, LabelPublication, PatternSource,
+    Taxonomy, TierGraph, TierGraphSummary, Validation, FRICTIONLESS_TYPES,
 };
 pub use tokenizer::Tokenizer;
 pub use validation_veto::{

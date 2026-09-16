@@ -93,6 +93,7 @@ fn emitted_descriptor_validates_against_vendored_profile() {
             values,
             confidence: Some(0.9),
             locale: None,
+            nominated: false,
         })
         .collect();
 
@@ -145,6 +146,7 @@ fn every_field_type_format_round_trips_to_the_map() {
             values,
             confidence: None,
             locale: None,
+            nominated: false,
         })
         .collect();
 
@@ -221,6 +223,7 @@ fn descriptor_over(labels: &[(String, String)], taxonomy: &Taxonomy) -> serde_js
             values: &empty,
             confidence: Some(0.9),
             locale: None,
+            nominated: false,
         })
         .collect();
     emit_datapackage(&cols, &meta(), taxonomy, 32)

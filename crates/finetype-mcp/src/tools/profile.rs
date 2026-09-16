@@ -189,6 +189,7 @@ pub async fn handle(
                     values,
                     null_count,
                     unknown_reason,
+                    nominated: false,
                 }
             })
             .collect();
@@ -267,6 +268,7 @@ pub async fn handle(
                     values,
                     confidence: confidences[i],
                     locale: None,
+                    nominated: false,
                 }
             })
             .collect();

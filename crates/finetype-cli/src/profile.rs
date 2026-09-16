@@ -890,6 +890,7 @@ pub(crate) fn cmd_profile(
                             values,
                             null_count: p.null_count,
                             unknown_reason: unknown_reasons[i].as_deref(),
+                            nominated: false,
                         }
                     })
                     .collect();
@@ -928,6 +929,7 @@ pub(crate) fn cmd_profile(
                             values,
                             confidence: Some(p.confidence),
                             locale: p.detected_locale.as_deref(),
+                            nominated: false,
                         }
                     })
                     .collect();
