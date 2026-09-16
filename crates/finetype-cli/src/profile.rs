@@ -45,6 +45,338 @@ pub(crate) fn low_band_runner_up(
         .cloned()
 }
 
+/// One column's object in the `-o json` output.
+///
+/// A **nominated** column publishes `"nominated": true` and none of
+/// `confidence`, `quality_band`, `runner_up`: each of those describes the
+/// classifier's answer, and for a nominated column that answer was discarded.
+/// It keeps every per-column statistic — `samples_used`, `non_null`, `null`,
+/// `locale` — because those are facts about the data, computed on the same pass
+/// and true whoever chose the label. `broad_type`, `format_string` and
+/// `transform` are read off the nominated label, not off the discarded answer,
+/// because the whole loop looks them up from the final label.
+///
+/// The validation keys are absent for a different reason: they were never
+/// computed. See [`decide_label`].
+fn json_column_object(p: &ColProfile, verbose: bool) -> serde_json::Value {
+    let mut obj = serde_json::Map::new();
+    obj.insert("column".to_string(), json!(p.name));
+    obj.insert("type".to_string(), json!(p.label));
+    if p.nominated {
+        obj.insert("nominated".to_string(), json!(true));
+    } else {
+        obj.insert("confidence".to_string(), json!(p.confidence));
+        obj.insert("quality_band".to_string(), json!(p.quality_band));
+        if let Some(ru) = &p.runner_up {
+            obj.insert("runner_up".to_string(), json!(ru));
+        }
+    }
+    let resolved_broad = resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
+    obj.insert("broad_type".to_string(), json!(resolved_broad));
+    if let Some(fs) = &p.format_string {
+        obj.insert("format_string".to_string(), json!(fs));
+    }
+    if let Some(tr) = &p.transform {
+        obj.insert("transform".to_string(), json!(tr));
+    }
+    obj.insert("is_generic".to_string(), json!(p.is_generic));
+    obj.insert("samples_used".to_string(), json!(p.samples_used));
+    obj.insert("non_null".to_string(), json!(p.non_null_count));
+    obj.insert("null".to_string(), json!(p.null_count));
+    if p.disambiguation_applied {
+        obj.insert("disambiguation_applied".to_string(), json!(true));
+        if let Some(rule) = &p.disambiguation_rule {
+            obj.insert("disambiguation_rule".to_string(), json!(rule));
+        }
+    }
+    if let Some(locale) = &p.detected_locale {
+        obj.insert("locale".to_string(), json!(locale));
+    }
+    // ac-06: validation-as-veto signals. pass_rate is
+    // emitted whenever the predicted type had an applicable
+    // validation; the veto/advisory flags and the original
+    // label surface only when they fired.
+    if let Some(rate) = p.validation_pass_rate {
+        let r = (rate * 10000.0).round() / 10000.0;
+        obj.insert("validation_pass_rate".to_string(), json!(r));
+    }
+    if p.validation_vetoed {
+        obj.insert("validation_vetoed".to_string(), json!(true));
+        if let Some(vt) = &p.vetoed_type {
+            obj.insert("vetoed_type".to_string(), json!(vt));
+        }
+    }
+    if p.validation_advisory_low {
+        obj.insert("validation_advisory_low".to_string(), json!(true));
+    }
+    // x-finetype-unknown-reason: why an `unknown` column stayed
+    // untyped — parity with the json-schema surface (ab75b83) so
+    // the explanation reads identically across CLI json,
+    // json-schema and MCP. None for any typed column.
+    if let Some(reason) = unknown_reason_for(p) {
+        obj.insert("x-finetype-unknown-reason".to_string(), json!(reason));
+    }
+    // Include unique values for categorical columns in verbose mode
+    if verbose {
+        if let Some(ref uv) = p.unique_values {
+            obj.insert("unique_values".to_string(), json!(uv));
+        }
+    }
+    // x-finetype-enum: the observed OPEN bounded domain, for
+    // any non-denylisted column (choice 0102). Descriptive
+    // metadata — distinct from the validation `enum` keyword.
+    if let Some(ref ed) = p.enum_domain {
+        obj.insert(
+            "x-finetype-enum".to_string(),
+            json!({
+                "open": ed.open,
+                "distinct": ed.distinct,
+                "rows": ed.rows,
+                "cohesion": (ed.cohesion * 1000.0).round() / 1000.0,
+                "domain": ed.domain,
+            }),
+        );
+    }
+    if false {
+        // validate removed (AC-10)
+        match &p.quality {
+            Some(q) => {
+                let r = |v: f64| (v * 10000.0).round() / 10000.0;
+                obj.insert(
+                    "quality".to_string(),
+                    json!({
+                        "valid": q.valid_count,
+                        "invalid": q.invalid_count,
+                        "null": q.null_count,
+                        "type_conforming_rate": r(q.score.type_conforming_rate),
+                        "null_rate": r(q.score.null_rate),
+                        "completeness": r(q.score.completeness),
+                        "quality_score": r(q.score.quality_score),
+                    }),
+                );
+                if !q.invalid_samples.is_empty() {
+                    obj.insert("invalid_samples".to_string(), json!(q.invalid_samples));
+                }
+            }
+            None => {
+                obj.insert("quality".to_string(), json!(null));
+            }
+        }
+    }
+    serde_json::Value::Object(obj)
+}
+
+/// One row of the `-o plain` table.
+///
+/// A **nominated** column reads `decl` where an inferred one reads a
+/// percentage, and carries no confidence band: `high`/`medium`/`low` rank how
+/// far to trust a guess, and there is no guess here to rank. The veto
+/// annotations are absent for a different reason — not suppressed at print
+/// time, but never computed, because `decide_label` does not run the veto for a
+/// nominated column. That distinction is deliberate: a print-time suppression
+/// would hide a veto that had in fact fired.
+fn plain_row(p: &ColProfile) -> String {
+    let conf_str = if p.nominated {
+        "decl".to_string()
+    } else if p.non_null_count > 0 {
+        format!("{:.1}%", p.confidence * 100.0)
+    } else {
+        "—".to_string()
+    };
+    let broad = resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
+    let disambig = if p.disambiguation_applied {
+        format!(" [{}]", p.disambiguation_rule.as_deref().unwrap_or("rule"))
+    } else {
+        String::new()
+    };
+    let locale_str = if let Some(locale) = &p.detected_locale {
+        format!(" locale:{}", locale)
+    } else {
+        String::new()
+    };
+    // ac-06: annotate a hard veto (predicted type NULLed) or an
+    // advisory low-pass (sub-threshold but not audited-safe).
+    let veto_str = if p.validation_vetoed {
+        let rate = p.validation_pass_rate.unwrap_or(0.0) * 100.0;
+        format!(
+            " ⊘ vetoed:{} ({:.0}% pass)",
+            p.vetoed_type.as_deref().unwrap_or("?"),
+            rate
+        )
+    } else if p.validation_advisory_low {
+        let rate = p.validation_pass_rate.unwrap_or(0.0) * 100.0;
+        format!(" ⚠ low-pass {:.0}% (advisory)", rate)
+    } else {
+        String::new()
+    };
+    // Honest confidence band: call out medium/low only — `high` is
+    // the default expectation, so an unmarked row reads as trusted.
+    let band_str = if p.nominated {
+        String::new()
+    } else {
+        match p.quality_band {
+            "low" => match &p.runner_up {
+                Some(ru) => format!(" ⚑ low (maybe {ru})"),
+                None => " ⚑ low".to_string(),
+            },
+            "medium" => " ~ medium".to_string(),
+            _ => String::new(),
+        }
+    };
+    format!(
+        "  {:<25} {:<38} {:>8} {:>6}{}{}{}{}",
+        p.name, p.label, broad, conf_str, disambig, locale_str, veto_str, band_str
+    )
+}
+
+/// A column's final label, and every signal that depends on how it was reached.
+struct LabelOutcome {
+    label: String,
+    nominated: bool,
+    validation_pass_rate: Option<f64>,
+    validation_vetoed: bool,
+    validation_advisory_low: bool,
+    vetoed_type: Option<String>,
+    fallback_rule: Option<&'static str>,
+}
+
+/// Decide a column's final label.
+///
+/// **A nomination is taken as given.** With one, the label is the nominated one
+/// and the validation-as-veto does not run: the veto's job is to stop the model
+/// asserting a type the data contradicts, and there is no model assertion here
+/// to stop. A person who declares a column's type has said what it IS; data
+/// that has drifted from it is a `ft_validate` finding against the schema, not
+/// grounds for FineType to publish a different type than the one it was told.
+///
+/// Without one, this is exactly the path it always was: evaluate the veto
+/// against the predicted label, and resolve a hard veto into a residual.
+///
+/// `predicted` is the classifier's answer. It is computed for a nominated
+/// column too — the model is loaded for the file regardless, so skipping one
+/// column's forward pass saves nothing measurable, and the per-column
+/// statistics the `json` output publishes for EVERY column come off the same
+/// pass.
+fn decide_label(
+    nomination: Option<&str>,
+    predicted: &str,
+    values: &[String],
+    taxonomy: Option<&finetype_core::Taxonomy>,
+    veto_safe: &std::collections::HashSet<String>,
+    veto_enabled: bool,
+) -> LabelOutcome {
+    if let Some(label) = nomination {
+        return LabelOutcome {
+            label: label.to_string(),
+            nominated: true,
+            validation_pass_rate: None,
+            validation_vetoed: false,
+            validation_advisory_low: false,
+            vetoed_type: None,
+            fallback_rule: None,
+        };
+    }
+
+    let (validation_pass_rate, validation_vetoed, validation_advisory_low) =
+        col_validation_veto(predicted, values, taxonomy, veto_safe, veto_enabled);
+    let (label, vetoed_type, fallback_rule) =
+        resolve_veto_outcome(validation_vetoed, predicted, values);
+    LabelOutcome {
+        label,
+        nominated: false,
+        validation_pass_rate,
+        validation_vetoed,
+        validation_advisory_low,
+        vetoed_type,
+        fallback_rule,
+    }
+}
+
+struct ColProfile {
+    name: String,
+    label: String,
+    /// Whether `label` was DECLARED by the caller (`--nominations`) rather than
+    /// inferred. A nominated column publishes no confidence, no quality band,
+    /// no runner-up and no veto signal: the classifier still ran, and every one
+    /// of those is a fact about the answer it gave, which was discarded.
+    nominated: bool,
+    confidence: f32,
+    samples_used: usize,
+    non_null_count: usize,
+    null_count: usize,
+    disambiguation_applied: bool,
+    disambiguation_rule: Option<String>,
+    detected_locale: Option<String>,
+    // Taxonomy contract fields
+    broad_type: Option<String>,
+    format_string: Option<String>,
+    transform: Option<String>,
+    is_generic: bool,
+    // Validation quality fields
+    quality: Option<ColProfileQuality>,
+    // Unique values for ENUM/categorical columns
+    unique_values: Option<Vec<String>>,
+    // ac-06 validation-as-veto: fraction of sample values passing
+    // the predicted type's validation (None = no applicable
+    // validation), whether that triggered a HARD veto (label NULLed
+    // to "unknown"), an ADVISORY low-pass flag (sub-threshold but the
+    // type is not audited-safe — surfaced, not NULLed), and the
+    // original predicted label when hard-vetoed.
+    validation_pass_rate: Option<f64>,
+    validation_vetoed: bool,
+    validation_advisory_low: bool,
+    vetoed_type: Option<String>,
+    // x-finetype-enum: the column's OBSERVED open bounded domain
+    // (spec 2026-06-17-enum-domain-emission, choice 0102). Descriptive —
+    // emitted as an extension, NOT the validation-enforced `enum` keyword,
+    // which stays conservative via `unique_values`.
+    enum_domain: Option<EnumDomain>,
+    // Honest confidence signal (spec 2026-06-18-calibrated-confidence-abstention):
+    // a quality band (high/medium/low) over the existing confidence, plus the
+    // runner-up type on the `low` band. Purely additive — the predicted label
+    // and raw confidence are unchanged.
+    quality_band: &'static str,
+    runner_up: Option<String>,
+}
+
+/// Synthesise a human-readable reason an `unknown` column could not be
+/// typed, so an analyst sees WHY a column is untyped, not just THAT it
+/// is (card 0020, honest typing — Pillar 1). `None` for typed columns.
+///
+/// Three causes, in order of specificity: a tighter type was predicted
+/// but its format validation rejected the values (the hard veto); too
+/// few values to judge; or the model found no confident type.
+fn unknown_reason_for(p: &ColProfile) -> Option<String> {
+    if p.label != "unknown" {
+        return None;
+    }
+    if p.validation_vetoed {
+        let rejected = p.vetoed_type.as_deref().unwrap_or("a tighter type");
+        let leaf = rejected.rsplit('.').next().unwrap_or(rejected);
+        return Some(match p.validation_pass_rate {
+            Some(r) => format!(
+                "validation rejected '{}': only {}% of values matched its format",
+                leaf,
+                (r * 100.0).round() as i64
+            ),
+            None => format!("validation rejected '{}'", leaf),
+        });
+    }
+    if p.non_null_count < 3 {
+        return Some("too few non-null values to classify".to_string());
+    }
+    Some("no type matched with sufficient confidence".to_string())
+}
+
+/// Per-column validation + quality data.
+struct ColProfileQuality {
+    valid_count: usize,
+    invalid_count: usize,
+    null_count: usize,
+    score: finetype_core::ColumnQualityScore,
+    invalid_samples: Vec<String>,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_profile(
     file: Option<PathBuf>,
@@ -59,7 +391,9 @@ pub(crate) fn cmd_profile(
     verbose: bool,
     raw_model: bool,
     no_validation_veto: bool,
+    nominations_path: Option<PathBuf>,
 ) -> Result<()> {
+    use finetype_cli::nominations::Nominations;
     use finetype_model::{ColumnClassifier, ColumnConfig};
     use std::io::Write as _;
 
@@ -83,6 +417,34 @@ pub(crate) fn cmd_profile(
     if paths.is_empty() {
         return Err(anyhow::anyhow!("no input paths to profile"));
     }
+
+    // Nominations are read and checked BEFORE the model is loaded. Everything
+    // wrong with the file — a bad key, a missing `label`, a stem no input
+    // matches — is knowable from the file and the input list alone, and a
+    // person who mistyped a label should hear about it now rather than after a
+    // multi-second model load and a full profiling pass.
+    let nominations_origin = nominations_path
+        .as_ref()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+    let nominations: Option<Nominations> = match nominations_path.as_ref() {
+        None => None,
+        Some(path) => {
+            let n = Nominations::load(path)?;
+            let stems: Vec<String> = paths
+                .iter()
+                .map(|p| {
+                    p.file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or_default()
+                        .to_string()
+                })
+                .collect();
+            n.check_stems(&stems, &nominations_origin)?;
+            Some(n)
+        }
+    };
+    let nominations = nominations.as_ref();
     let batch_ext = match output {
         OutputFormat::Json | OutputFormat::JsonSchema | OutputFormat::Datapackage => "json",
         OutputFormat::Csv => "csv",
@@ -154,6 +516,21 @@ pub(crate) fn cmd_profile(
     // 245 types is per-batch work, not per-file (accuracy-identical; the loop
     // body only ever reads `enrichment_taxonomy` immutably after this).
     let mut enrichment_taxonomy = load_taxonomy(&taxonomy_path).ok();
+
+    // A nominated label is checked against the taxonomy the run is actually
+    // using, before any column is classified. Without a taxonomy there is
+    // nothing to check it against, and a nomination whose bounds could not be
+    // looked up would publish a bare label — which is what nominating was for.
+    if let Some(n) = nominations {
+        match enrichment_taxonomy.as_ref() {
+            Some(taxonomy) => n.check_against_taxonomy(taxonomy, &nominations_origin)?,
+            None => anyhow::bail!(
+                "--nominations {} needs the bundled taxonomy at `labels/` to check the labels it \
+                 declares; run from the FineType source tree or ship with embedded taxonomy",
+                nominations_origin
+            ),
+        }
+    }
 
     // ac-06: validation-as-veto. Compile the enrichment taxonomy's validators
     // once for the batch (the per-column veto checks sample values against the
@@ -232,89 +609,17 @@ pub(crate) fn cmd_profile(
             Box::new(std::io::BufWriter::new(std::io::stdout()))
         };
 
+        // The nominations file keys on the input's file stem.
+        let stem = file
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default();
+        if let Some(n) = nominations {
+            n.check_columns(stem, &headers, file, &nominations_origin)?;
+        }
+
         let n_cols = headers.len();
         eprintln!("Read {} rows", row_count);
-
-        // Profile each column
-        struct ColProfile {
-            name: String,
-            label: String,
-            confidence: f32,
-            samples_used: usize,
-            non_null_count: usize,
-            null_count: usize,
-            disambiguation_applied: bool,
-            disambiguation_rule: Option<String>,
-            detected_locale: Option<String>,
-            // Taxonomy contract fields
-            broad_type: Option<String>,
-            format_string: Option<String>,
-            transform: Option<String>,
-            is_generic: bool,
-            // Validation quality fields
-            quality: Option<ColProfileQuality>,
-            // Unique values for ENUM/categorical columns
-            unique_values: Option<Vec<String>>,
-            // ac-06 validation-as-veto: fraction of sample values passing
-            // the predicted type's validation (None = no applicable
-            // validation), whether that triggered a HARD veto (label NULLed
-            // to "unknown"), an ADVISORY low-pass flag (sub-threshold but the
-            // type is not audited-safe — surfaced, not NULLed), and the
-            // original predicted label when hard-vetoed.
-            validation_pass_rate: Option<f64>,
-            validation_vetoed: bool,
-            validation_advisory_low: bool,
-            vetoed_type: Option<String>,
-            // x-finetype-enum: the column's OBSERVED open bounded domain
-            // (spec 2026-06-17-enum-domain-emission, choice 0102). Descriptive —
-            // emitted as an extension, NOT the validation-enforced `enum` keyword,
-            // which stays conservative via `unique_values`.
-            enum_domain: Option<EnumDomain>,
-            // Honest confidence signal (spec 2026-06-18-calibrated-confidence-abstention):
-            // a quality band (high/medium/low) over the existing confidence, plus the
-            // runner-up type on the `low` band. Purely additive — the predicted label
-            // and raw confidence are unchanged.
-            quality_band: &'static str,
-            runner_up: Option<String>,
-        }
-
-        /// Synthesise a human-readable reason an `unknown` column could not be
-        /// typed, so an analyst sees WHY a column is untyped, not just THAT it
-        /// is (card 0020, honest typing — Pillar 1). `None` for typed columns.
-        ///
-        /// Three causes, in order of specificity: a tighter type was predicted
-        /// but its format validation rejected the values (the hard veto); too
-        /// few values to judge; or the model found no confident type.
-        fn unknown_reason_for(p: &ColProfile) -> Option<String> {
-            if p.label != "unknown" {
-                return None;
-            }
-            if p.validation_vetoed {
-                let rejected = p.vetoed_type.as_deref().unwrap_or("a tighter type");
-                let leaf = rejected.rsplit('.').next().unwrap_or(rejected);
-                return Some(match p.validation_pass_rate {
-                    Some(r) => format!(
-                        "validation rejected '{}': only {}% of values matched its format",
-                        leaf,
-                        (r * 100.0).round() as i64
-                    ),
-                    None => format!("validation rejected '{}'", leaf),
-                });
-            }
-            if p.non_null_count < 3 {
-                return Some("too few non-null values to classify".to_string());
-            }
-            Some("no type matched with sufficient confidence".to_string())
-        }
-
-        /// Per-column validation + quality data.
-        struct ColProfileQuality {
-            valid_count: usize,
-            invalid_count: usize,
-            null_count: usize,
-            score: finetype_core::ColumnQualityScore,
-            invalid_samples: Vec<String>,
-        }
 
         // Per-column classification.
         //
@@ -339,9 +644,16 @@ pub(crate) fn cmd_profile(
                 let null_count = row_count - col_values.len();
 
                 if col_values.is_empty() {
+                    // A column with no values still carries its declared type:
+                    // nothing was inferred here, so there is nothing for the
+                    // absence of data to overturn.
+                    let nomination = nominations.and_then(|n| n.get(stem, &name));
                     return Ok(ColProfile {
                         name,
-                        label: "unknown".to_string(),
+                        label: nomination
+                            .map(|d| d.label.clone())
+                            .unwrap_or_else(|| "unknown".to_string()),
+                        nominated: nomination.is_some(),
                         quality_band: "low",
                         runner_up: None,
                         confidence: 0.0,
@@ -378,15 +690,25 @@ pub(crate) fn cmd_profile(
                     column_classifier.classify_column_with_header(col_values, &header_hint)?
                 };
 
-                let (vp_rate, vetoed, advisory_low) = col_validation_veto(
+                let outcome = decide_label(
+                    nominations
+                        .and_then(|n| n.get(stem, &name))
+                        .map(|d| d.label.as_str()),
                     &result.label,
                     col_values,
                     enrichment_taxonomy.as_ref(),
                     &veto_safe,
                     veto_enabled,
                 );
-                let (final_label, vetoed_type, fallback_rule) =
-                    resolve_veto_outcome(vetoed, &result.label, col_values);
+                let LabelOutcome {
+                    label: final_label,
+                    nominated,
+                    validation_pass_rate: vp_rate,
+                    validation_vetoed: vetoed,
+                    validation_advisory_low: advisory_low,
+                    vetoed_type,
+                    fallback_rule,
+                } = outcome;
                 let mut result = result;
                 if let Some(rule) = fallback_rule {
                     result.disambiguation_applied = true;
@@ -419,6 +741,7 @@ pub(crate) fn cmd_profile(
                 Ok(ColProfile {
                     name,
                     label: final_label,
+                    nominated,
                     quality_band,
                     runner_up,
                     confidence: result.confidence,
@@ -467,69 +790,7 @@ pub(crate) fn cmd_profile(
                 println!("  {}", "─".repeat(78));
 
                 for p in &profiles {
-                    let conf_str = if p.non_null_count > 0 {
-                        format!("{:.1}%", p.confidence * 100.0)
-                    } else {
-                        "—".to_string()
-                    };
-                    let broad =
-                        resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
-                    let disambig = if p.disambiguation_applied {
-                        format!(" [{}]", p.disambiguation_rule.as_deref().unwrap_or("rule"))
-                    } else {
-                        String::new()
-                    };
-                    let locale_str = if let Some(locale) = &p.detected_locale {
-                        format!(" locale:{}", locale)
-                    } else {
-                        String::new()
-                    };
-                    // ac-06: annotate a hard veto (predicted type NULLed) or an
-                    // advisory low-pass (sub-threshold but not audited-safe).
-                    let veto_str = if p.validation_vetoed {
-                        let rate = p.validation_pass_rate.unwrap_or(0.0) * 100.0;
-                        format!(
-                            " ⊘ vetoed:{} ({:.0}% pass)",
-                            p.vetoed_type.as_deref().unwrap_or("?"),
-                            rate
-                        )
-                    } else if p.validation_advisory_low {
-                        let rate = p.validation_pass_rate.unwrap_or(0.0) * 100.0;
-                        format!(" ⚠ low-pass {:.0}% (advisory)", rate)
-                    } else {
-                        String::new()
-                    };
-                    let quality_str = if false {
-                        // validate removed (AC-10)
-                        match &p.quality {
-                            Some(q) => format!(" {:>7.1}%", q.score.type_conforming_rate * 100.0),
-                            None => "      —".to_string(),
-                        }
-                    } else {
-                        String::new()
-                    };
-                    // Honest confidence band: call out medium/low only — `high` is
-                    // the default expectation, so an unmarked row reads as trusted.
-                    let band_str = match p.quality_band {
-                        "low" => match &p.runner_up {
-                            Some(ru) => format!(" ⚑ low (maybe {ru})"),
-                            None => " ⚑ low".to_string(),
-                        },
-                        "medium" => " ~ medium".to_string(),
-                        _ => String::new(),
-                    };
-                    println!(
-                        "  {:<25} {:<38} {:>8} {:>6}{}{}{}{}{}",
-                        p.name,
-                        p.label,
-                        broad,
-                        conf_str,
-                        quality_str,
-                        disambig,
-                        locale_str,
-                        veto_str,
-                        band_str
-                    );
+                    println!("{}", plain_row(p));
                     // Show top 3 invalid samples inline (plain output, validate mode)
                     if false {
                         // validate removed (AC-10)
@@ -564,113 +825,7 @@ pub(crate) fn cmd_profile(
             OutputFormat::Json => {
                 let cols: Vec<serde_json::Value> = profiles
                     .iter()
-                    .map(|p| {
-                        let mut obj = serde_json::Map::new();
-                        obj.insert("column".to_string(), json!(p.name));
-                        obj.insert("type".to_string(), json!(p.label));
-                        obj.insert("confidence".to_string(), json!(p.confidence));
-                        obj.insert("quality_band".to_string(), json!(p.quality_band));
-                        if let Some(ru) = &p.runner_up {
-                            obj.insert("runner_up".to_string(), json!(ru));
-                        }
-                        let resolved_broad =
-                            resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
-                        obj.insert("broad_type".to_string(), json!(resolved_broad));
-                        if let Some(fs) = &p.format_string {
-                            obj.insert("format_string".to_string(), json!(fs));
-                        }
-                        if let Some(tr) = &p.transform {
-                            obj.insert("transform".to_string(), json!(tr));
-                        }
-                        obj.insert("is_generic".to_string(), json!(p.is_generic));
-                        obj.insert("samples_used".to_string(), json!(p.samples_used));
-                        obj.insert("non_null".to_string(), json!(p.non_null_count));
-                        obj.insert("null".to_string(), json!(p.null_count));
-                        if p.disambiguation_applied {
-                            obj.insert("disambiguation_applied".to_string(), json!(true));
-                            if let Some(rule) = &p.disambiguation_rule {
-                                obj.insert("disambiguation_rule".to_string(), json!(rule));
-                            }
-                        }
-                        if let Some(locale) = &p.detected_locale {
-                            obj.insert("locale".to_string(), json!(locale));
-                        }
-                        // ac-06: validation-as-veto signals. pass_rate is
-                        // emitted whenever the predicted type had an applicable
-                        // validation; the veto/advisory flags and the original
-                        // label surface only when they fired.
-                        if let Some(rate) = p.validation_pass_rate {
-                            let r = (rate * 10000.0).round() / 10000.0;
-                            obj.insert("validation_pass_rate".to_string(), json!(r));
-                        }
-                        if p.validation_vetoed {
-                            obj.insert("validation_vetoed".to_string(), json!(true));
-                            if let Some(vt) = &p.vetoed_type {
-                                obj.insert("vetoed_type".to_string(), json!(vt));
-                            }
-                        }
-                        if p.validation_advisory_low {
-                            obj.insert("validation_advisory_low".to_string(), json!(true));
-                        }
-                        // x-finetype-unknown-reason: why an `unknown` column stayed
-                        // untyped — parity with the json-schema surface (ab75b83) so
-                        // the explanation reads identically across CLI json,
-                        // json-schema and MCP. None for any typed column.
-                        if let Some(reason) = unknown_reason_for(p) {
-                            obj.insert("x-finetype-unknown-reason".to_string(), json!(reason));
-                        }
-                        // Include unique values for categorical columns in verbose mode
-                        if verbose {
-                            if let Some(ref uv) = p.unique_values {
-                                obj.insert("unique_values".to_string(), json!(uv));
-                            }
-                        }
-                        // x-finetype-enum: the observed OPEN bounded domain, for
-                        // any non-denylisted column (choice 0102). Descriptive
-                        // metadata — distinct from the validation `enum` keyword.
-                        if let Some(ref ed) = p.enum_domain {
-                            obj.insert(
-                                "x-finetype-enum".to_string(),
-                                json!({
-                                    "open": ed.open,
-                                    "distinct": ed.distinct,
-                                    "rows": ed.rows,
-                                    "cohesion": (ed.cohesion * 1000.0).round() / 1000.0,
-                                    "domain": ed.domain,
-                                }),
-                            );
-                        }
-                        if false {
-                            // validate removed (AC-10)
-                            match &p.quality {
-                                Some(q) => {
-                                    let r = |v: f64| (v * 10000.0).round() / 10000.0;
-                                    obj.insert(
-                                        "quality".to_string(),
-                                        json!({
-                                            "valid": q.valid_count,
-                                            "invalid": q.invalid_count,
-                                            "null": q.null_count,
-                                            "type_conforming_rate": r(q.score.type_conforming_rate),
-                                            "null_rate": r(q.score.null_rate),
-                                            "completeness": r(q.score.completeness),
-                                            "quality_score": r(q.score.quality_score),
-                                        }),
-                                    );
-                                    if !q.invalid_samples.is_empty() {
-                                        obj.insert(
-                                            "invalid_samples".to_string(),
-                                            json!(q.invalid_samples),
-                                        );
-                                    }
-                                }
-                                None => {
-                                    obj.insert("quality".to_string(), json!(null));
-                                }
-                            }
-                        }
-                        serde_json::Value::Object(obj)
-                    })
+                    .map(|p| json_column_object(p, verbose))
                     .collect();
 
                 // Compute file-level grade when validation is active
@@ -890,7 +1045,7 @@ pub(crate) fn cmd_profile(
                             values,
                             null_count: p.null_count,
                             unknown_reason: unknown_reasons[i].as_deref(),
-                            nominated: false,
+                            nominated: p.nominated,
                         }
                     })
                     .collect();
@@ -929,7 +1084,7 @@ pub(crate) fn cmd_profile(
                             values,
                             confidence: Some(p.confidence),
                             locale: p.detected_locale.as_deref(),
-                            nominated: false,
+                            nominated: p.nominated,
                         }
                     })
                     .collect();

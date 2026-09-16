@@ -1152,7 +1152,6 @@ pub fn frictionless_for(label: &str) -> Option<Frictionless> {
     taxonomy.get(&key).and_then(|d| d.frictionless.clone())
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════════
 // WHAT A LABEL PUBLISHES
 //
@@ -1241,7 +1240,9 @@ fn publication_from_definition(
     use serde_json::{json, Map};
 
     let fx = def.and_then(|d| d.frictionless.as_ref());
-    let ftype = fx.map(|f| f.ftype.clone()).unwrap_or_else(|| "string".into());
+    let ftype = fx
+        .map(|f| f.ftype.clone())
+        .unwrap_or_else(|| "string".into());
     let format = fx.and_then(|f| f.format.clone());
 
     let mut c = Map::new();

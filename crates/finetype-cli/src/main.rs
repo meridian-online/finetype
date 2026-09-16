@@ -332,6 +332,32 @@ enum Commands {
         /// hard veto. This flag turns the whole mechanism off.
         #[arg(long)]
         no_validation_veto: bool,
+
+        /// Declare what columns ARE, instead of letting FineType guess.
+        ///
+        /// Takes a JSON file — conventionally `nominations.finetype.json`,
+        /// though any path works — of the shape
+        /// `{"version": 1, "resources": {"<file stem>": {"<column>":
+        /// {"label": "<taxonomy label>", "why": "<free text>"}}}}`.
+        /// `resources` is required, `version` is optional and defaults to 1,
+        /// `label` is required, and `why` is recorded but never interpreted.
+        ///
+        /// A nominated column is taken as given: its label is used as
+        /// declared, the model's answer for it is discarded, and the
+        /// validation-as-veto does not run against it. It publishes its
+        /// taxonomy bounds and is marked `x-finetype-nominated` in the
+        /// `datapackage` and `json-schema` outputs, `"nominated": true` in
+        /// `json`, and `decl` in the `plain` CONF column. It publishes no
+        /// confidence, because nothing was inferred.
+        ///
+        /// Everything wrong with the file stops the run before any profiling:
+        /// an unknown key, a missing `label`, a label the taxonomy does not
+        /// carry, a label whose Frictionless type the Data Package v2 profile
+        /// does not admit, a declared column the file does not have, and a
+        /// declared stem no input matches. A nomination that is silently
+        /// dropped is an inference wearing a declaration's marker.
+        #[arg(long, value_name = "FILE")]
+        nominations: Option<PathBuf>,
     },
 
     /// Start MCP server for AI agent integration (stdio transport)
@@ -584,6 +610,7 @@ fn main() -> Result<()> {
             verbose,
             raw_model,
             no_validation_veto,
+            nominations,
         } => {
             // ac-04: --stats is gated to -o json-schema. Refuse early with a
             // clap-style error rather than silently dropping the flag.
@@ -618,6 +645,7 @@ fn main() -> Result<()> {
                 verbose,
                 raw_model,
                 no_validation_veto,
+                nominations,
             )
         }
 
