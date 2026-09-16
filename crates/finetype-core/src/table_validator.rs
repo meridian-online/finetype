@@ -95,10 +95,12 @@ pub struct RejectRecord {
     pub constraint_failed: String,
     /// The constraint's value for debugging without a schema round-trip
     /// (pattern regex, length limit as a string, enum list as a
-    /// JSON-array string, type name, required-property name).
+    /// JSON-array string, type name, required-property name, checksum
+    /// scheme name).
     pub constraint_value: Option<String>,
     /// Human-readable description of what failed and why (the
-    /// underlying `jsonschema::ValidationError::Display`).
+    /// underlying `jsonschema::ValidationError::Display`, or for a
+    /// `checksum` reject, the value and the scheme that refused it).
     pub error_message: String,
 }
 
