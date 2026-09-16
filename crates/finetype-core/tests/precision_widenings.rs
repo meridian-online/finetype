@@ -353,7 +353,12 @@ fn pvc_finance_coverage_lei_validates() {
         })
         .collect();
 
-    assert_eq!(leis.len(), 25, "lei column has 25 rows in {}; if this drifts, the fixture has been changed", path.display());
+    assert_eq!(
+        leis.len(),
+        25,
+        "lei column has 25 rows in {}; if this drifts, the fixture has been changed",
+        path.display()
+    );
 
     let tax = load_taxonomy();
     let invalid: Vec<&&str> = leis
