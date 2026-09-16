@@ -343,7 +343,7 @@ enum Verdict {
     Empty,
     /// The classifier returned an error or panicked; the message says which.
     Failed(String),
-    Classified(ColumnResult),
+    Classified(Box<ColumnResult>),
 }
 
 /// Classify one group's reservoir, with its header hint if it captured one.
@@ -376,7 +376,7 @@ unsafe fn classify_state(state: *const ProfileState) -> Verdict {
     }));
 
     match classified {
-        Ok(Ok(result)) => Verdict::Classified(result),
+        Ok(Ok(result)) => Verdict::Classified(Box::new(result)),
         Ok(Err(error)) => Verdict::Failed(error.to_string()),
         Err(_) => Verdict::Failed("the classifier panicked".to_string()),
     }
@@ -387,6 +387,7 @@ unsafe fn classify_state(state: *const ProfileState) -> Verdict {
 fn profile_fields(verdict: Verdict) -> (String, f64, String) {
     match verdict {
         Verdict::Classified(result) => {
+            let result = *result;
             let duckdb_type = type_mapping::to_duckdb_type(&result.label).to_string();
             (result.label, result.confidence as f64, duckdb_type)
         }
@@ -595,7 +596,9 @@ unsafe fn register_aggregate(con: duckdb_connection, aggregate: &Aggregate) -> R
     let name = CString::new(label).map_err(|e| e.to_string())?;
     let set = duckdb_create_aggregate_function_set(name.as_ptr());
     if set.is_null() {
-        return Err(format!("could not create the {label} aggregate function set"));
+        return Err(format!(
+            "could not create the {label} aggregate function set"
+        ));
     }
 
     let mut failure: Option<String> = None;
