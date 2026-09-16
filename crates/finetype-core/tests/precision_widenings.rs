@@ -314,3 +314,62 @@ fn pvc_widening_lei_validates_the_committed_registry_slice() {
         path.display()
     );
 }
+
+/// Widening 3, measured over the internal eval corpus:
+/// `eval/datasets/csv/finance_coverage.csv`, column `lei`.
+///
+/// This test tracks that all values in the eval corpus's `lei` column pass
+/// validation, so a later drift in the fixture reddens here:
+///
+///   - 25 rows have a non-empty lei value;
+///   - All 25 values pass LEI validation (pattern and checksum).
+#[test]
+fn pvc_finance_coverage_lei_validates() {
+    let path = workspace_root().join("eval/datasets/csv/finance_coverage.csv");
+    let csv =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {}", path.display(), e));
+
+    let mut lines = csv.lines();
+    let header = lines.next().expect("the file has a header row");
+
+    // Locate lei column
+    let headers: Vec<&str> = header.split(',').collect();
+    let lei_idx = headers
+        .iter()
+        .position(|&h| h == "lei")
+        .expect(&format!("lei column exists in {}", path.display()));
+
+    // Collect non-empty lei values
+    let leis: Vec<&str> = lines
+        .filter(|l| !l.trim().is_empty())
+        .filter_map(|l| {
+            let fields: Vec<&str> = l.split(',').collect();
+            let lei = fields.get(lei_idx).copied().unwrap_or("").trim();
+            if !lei.is_empty() {
+                Some(lei)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    assert_eq!(leis.len(), 25, "lei column has 25 rows in {}; if this drifts, the fixture has been changed", path.display());
+
+    let tax = load_taxonomy();
+    let invalid: Vec<&&str> = leis
+        .iter()
+        .filter(|v| {
+            !validate_value_for_label(v, "finance.securities.lei", &tax)
+                .expect("the lei leaf exists")
+                .is_valid
+        })
+        .collect();
+    assert!(
+        invalid.is_empty(),
+        "{} of {} rows in {} fail LEI validation, e.g. {:?}",
+        invalid.len(),
+        leis.len(),
+        path.display(),
+        invalid.first()
+    );
+}

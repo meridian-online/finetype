@@ -585,3 +585,16 @@ sources:
   local_path: repo://eval/datasets/gold_external/uk_price_paid_sample.csv
   snapshot: eval/datasets/snapshots/gold-uk-price-paid-2026-06-10.json
   dataset_version: '2026-06-10'
+- source_url: https://www.gleif.org/
+  role: gold
+  licence: CC0-1.0
+  fetched_date: '2026-04-21'
+  attribution: Global Legal Entity Identifier Foundation (GLEIF) entity data snapshot;
+    200-row representative sample of LEI records used as a regression fixture for
+    LEI pattern and checksum validation. Contains intentional checksum failures (two
+    values) to distinguish shape from substance validation.
+  datasets:
+  - gold-gleif-entities
+  local_path: repo://eval/datasets/gold_external/gleif_entities.csv
+  snapshot: eval/datasets/snapshots/gold-gleif-entities-2026-04-21.json
+  dataset_version: '2026-04-21'
