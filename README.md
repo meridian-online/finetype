@@ -95,6 +95,10 @@ finetype taxonomy "datetime.date.*" -o json-schema
 # TRY-wrapped projection) + `finetype_reject_errors` sidecar (engine
 # rejects as error_type='SEMANTIC_TYPE'; cells that passed validation but
 # failed the typed cast as error_type='TRANSFORM_FAILED').
+# Validation is substance-checking, not shape-only: where a column's
+# `x-finetype-label` names a type that carries a check digit (LEI, ISIN,
+# CUSIP, IBAN, ISBN, IMEI, NPI, ...), a value with the right shape and a
+# bad check digit is rejected with constraint_failed='checksum'.
 # Exit codes: 0 no rejects / 1 rejects / 2 error. Requires `duckdb` on PATH.
 finetype profile -f data.csv -o json-schema > schema.json
 finetype validate data.csv schema.json --db out.db --table orders

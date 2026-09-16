@@ -5,20 +5,37 @@
 //! A length/format-only validation "confirms 90% of random input"; the
 //! checksum is what distinguishes "is this type" from "is not this type".
 //!
-//! This module is the canonical home for that arithmetic, shared by the
-//! validator (so the taxonomy's `checksum:` directive makes a type's
-//! validation substance-checking) and by the model's post-sharpen
-//! `checksum_substance_guard`. Previously the ISBN math lived hand-rolled
-//! inside a per-type veto; here it is wired into the validator instead, and
-//! each future algo-exists type (aba, luhn, npi, ean, upc, imei, …) enrols by
-//! adding one entry to [`resolve`] plus a one-line `checksum:` directive in
-//! its YAML — no new bespoke veto.
+//! This module is the canonical home for that arithmetic. Two callers share it:
+//!
+//! * [`crate::table_validator`], the engine behind the `validate` verb. A column
+//!   whose schema carries `x-finetype-label` pointing at a leaf with a
+//!   `checksum:` directive is check-digit verified, and a value that fails is
+//!   rejected with the `checksum` constraint token. That is what makes
+//!   `validate` substance-checking rather than shape-only.
+//! * the model's post-sharpen `checksum_substance_guard`, which reads the same
+//!   directive off the taxonomy to demote a column whose values mostly fail.
+//!
+//! **[`crate::validator::CompiledValidator`] deliberately stays shape-only.**
+//! It is the per-label validator the model's `value_sharpen` demotion rules
+//! consult, and those rules run before the guard: teaching it the check digit
+//! would demote a checksum-failing column to their fallback
+//! (`numeric_code`/categorical) instead of the gold-correct `integer_number`
+//! the guard produces. The two paths are separated by which validator they use,
+//! not by a flag — `validate` goes through `table_validator`, the model through
+//! `CompiledValidator`.
 //!
 //! Each function is a total `fn(&str) -> bool`: `true` when the value carries a
 //! valid check digit for that scheme, `false` otherwise (including malformed
 //! input). They are deliberately lenient about surrounding format — hyphens are
-//! stripped — because the validator's `pattern` already constrains shape; the
-//! checksum adds the substance check on top.
+//! stripped — because the caller's `pattern` has already constrained shape; the
+//! checksum adds the substance check on top. `table_validator` enforces that
+//! order explicitly: it asks for the check digit only after the column's shape
+//! constraints have passed.
+//!
+//! A new algo-exists type enrols by adding one entry to [`resolve`], one entry
+//! to [`CHECKSUM_LABELS`], and a one-line `checksum:` directive in its YAML —
+//! no new bespoke veto. [`checksum_labels_match_taxonomy`] reddens if the table
+//! and the YAML ever disagree.
 
 /// Validate an ISBN-10 or ISBN-13 by its check digit (not just digit count).
 ///
@@ -610,6 +627,69 @@ pub fn resolve(name: &str) -> Option<fn(&str) -> bool> {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// LABEL → SCHEME (the taxonomy's `checksum:` directive, resolvable without a
+// `Taxonomy` instance)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Every taxonomy leaf carrying a scalar `checksum:` directive, paired with the
+/// scheme name that directive names.
+///
+/// This exists because the `validate` verb has to substance-check whether or not
+/// a `labels/` directory is on disk. `Definition.checksum` is the same fact read
+/// off a parsed [`crate::taxonomy::Taxonomy`], and the model's guard reads it
+/// that way — but a released `finetype` binary run in a user's data directory
+/// has no `labels/`, and `finetype-core` publishes to crates.io with the
+/// `embedded-taxonomy` feature off. A check that silently becomes a no-op
+/// wherever the YAML is absent is worse than no check, so the validate path
+/// resolves the directive from this table instead.
+///
+/// `checksum_labels_match_taxonomy` in this module's tests parses the shipped
+/// YAML and asserts this table is exactly what it contains, so the taxonomy
+/// stays authoritative and drift reddens CI rather than going unnoticed.
+///
+/// Sorted by label.
+pub const CHECKSUM_LABELS: &[(&str, &str)] = &[
+    ("finance.banking.aba_routing", "aba"),
+    ("finance.banking.iban", "iban"),
+    ("finance.payment.credit_card_number", "luhn"),
+    ("finance.securities.cusip", "cusip"),
+    ("finance.securities.figi", "figi"),
+    ("finance.securities.isin", "isin"),
+    ("finance.securities.lei", "lei"),
+    ("finance.securities.sedol", "sedol"),
+    ("geography.transportation.iso6346", "iso6346"),
+    ("identity.academic.orcid", "orcid"),
+    ("identity.commerce.ean", "gs1"),
+    ("identity.commerce.isbn", "isbn"),
+    ("identity.commerce.issn", "issn"),
+    ("identity.commerce.upc", "gs1"),
+    ("identity.government.abn", "abn"),
+    ("identity.medical.dea_number", "dea"),
+    ("identity.medical.npi", "npi"),
+    ("representation.scientific.cas_number", "cas"),
+    ("technology.code.imei", "luhn"),
+];
+
+/// The `checksum:` scheme name a taxonomy label declares, or `None` when the
+/// label declares none (which is every label outside [`CHECKSUM_LABELS`]).
+pub fn scheme_for_label(label: &str) -> Option<&'static str> {
+    CHECKSUM_LABELS
+        .iter()
+        .find(|(l, _)| *l == label)
+        .map(|(_, scheme)| *scheme)
+}
+
+/// The check-digit function a taxonomy label's `checksum:` directive names.
+///
+/// Composition of [`scheme_for_label`] and [`resolve`]: `None` when the label
+/// carries no directive. A label that carries a directive naming a scheme
+/// [`resolve`] does not know is a taxonomy typo, and `checksum_every_label_scheme_resolves`
+/// reddens on it rather than letting it read as "no checksum for this type".
+pub fn checker_for_label(label: &str) -> Option<fn(&str) -> bool> {
+    scheme_for_label(label).and_then(resolve)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -928,5 +1008,130 @@ mod tests {
             assert!(resolve(name).is_some(), "{name} should resolve");
         }
         assert!(resolve("not_a_scheme").is_none());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // LABEL → SCHEME TABLE: the taxonomy stays authoritative
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// The seven domain definition files, embedded at compile time so this test
+    /// needs no `labels/` directory at runtime (the same technique the
+    /// `embedded-taxonomy` feature uses, and the reason this is a `#[cfg(test)]`
+    /// include rather than a feature gate: the drift check must run on every
+    /// `cargo test`, including the bare one CI's `test` job runs).
+    const LABEL_YAMLS: &[&str] = &[
+        include_str!("../../../labels/definitions_container.yaml"),
+        include_str!("../../../labels/definitions_datetime.yaml"),
+        include_str!("../../../labels/definitions_finance.yaml"),
+        include_str!("../../../labels/definitions_geography.yaml"),
+        include_str!("../../../labels/definitions_identity.yaml"),
+        include_str!("../../../labels/definitions_representation.yaml"),
+        include_str!("../../../labels/definitions_technology.yaml"),
+    ];
+
+    /// Walk a parsed definitions document collecting `(dotted.label, scheme)`
+    /// for every mapping that carries a scalar `checksum:` key.
+    ///
+    /// Parsed, not grepped, deliberately: `definitions_identity.yaml` mentions
+    /// the token inside a prose `description`, and a line-oriented scan counts
+    /// that occurrence as a twentieth directive. A YAML walk sees a string
+    /// value, not a key, and does not.
+    fn collect_checksum_leaves(
+        doc: &serde_yaml::Value,
+        path: &str,
+        out: &mut Vec<(String, String)>,
+    ) {
+        let serde_yaml::Value::Mapping(map) = doc else {
+            return;
+        };
+        if let Some(serde_yaml::Value::String(scheme)) =
+            map.get(serde_yaml::Value::String("checksum".into()))
+        {
+            out.push((path.to_string(), scheme.clone()));
+        }
+        for (k, v) in map {
+            let Some(key) = k.as_str() else { continue };
+            if key == "checksum" {
+                continue;
+            }
+            let child = if path.is_empty() {
+                key.to_string()
+            } else {
+                format!("{}.{}", path, key)
+            };
+            collect_checksum_leaves(v, &child, out);
+        }
+    }
+
+    fn checksum_leaves_from_yaml() -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        for yaml in LABEL_YAMLS {
+            let doc: serde_yaml::Value =
+                serde_yaml::from_str(yaml).expect("definitions YAML parses");
+            collect_checksum_leaves(&doc, "", &mut out);
+        }
+        out.sort();
+        out
+    }
+
+    #[test]
+    fn checksum_labels_match_taxonomy() {
+        let from_yaml = checksum_leaves_from_yaml();
+        let from_table: Vec<(String, String)> = CHECKSUM_LABELS
+            .iter()
+            .map(|(l, s)| (l.to_string(), s.to_string()))
+            .collect();
+        assert_eq!(
+            from_yaml, from_table,
+            "CHECKSUM_LABELS has drifted from the `checksum:` directives in labels/*.yaml. \
+             Every leaf carrying the directive must appear here, sorted by label, so the \
+             `validate` verb substance-checks it without a labels/ directory at runtime."
+        );
+    }
+
+    #[test]
+    fn checksum_labels_is_sorted_and_unique() {
+        let labels: Vec<&str> = CHECKSUM_LABELS.iter().map(|(l, _)| *l).collect();
+        let mut sorted = labels.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(
+            labels, sorted,
+            "CHECKSUM_LABELS must be sorted by label and carry no duplicate"
+        );
+    }
+
+    #[test]
+    fn checksum_every_label_scheme_resolves() {
+        for (label, scheme) in CHECKSUM_LABELS {
+            assert!(
+                resolve(scheme).is_some(),
+                "label {label} declares checksum scheme {scheme:?}, which `resolve` does not know — \
+                 a typo here reads as \"this type has no checksum\" at the validate path"
+            );
+            assert!(
+                checker_for_label(label).is_some(),
+                "checker_for_label({label}) must resolve"
+            );
+        }
+    }
+
+    #[test]
+    fn checker_for_label_is_none_off_the_table() {
+        assert!(checker_for_label("representation.numeric.integer_number").is_none());
+        assert!(checker_for_label("finance.securities.ticker").is_none());
+        assert!(checker_for_label("not.a.label").is_none());
+    }
+
+    #[test]
+    fn checker_for_label_verifies_the_check_digit() {
+        let lei = checker_for_label("finance.securities.lei").expect("lei has a checksum");
+        // A genuine LEI, and the same string with its last check digit altered.
+        assert!(lei("5493001KJTIIGC8Y1R12"));
+        assert!(!lei("5493001KJTIIGC8Y1R13"));
+
+        let isbn13 = checker_for_label("identity.commerce.isbn").expect("isbn has a checksum");
+        assert!(isbn13("9780306406157"));
+        assert!(!isbn13("9780306406158"));
     }
 }

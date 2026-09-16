@@ -58,6 +58,27 @@ fn vals(xs: &[&str]) -> Vec<String> {
     xs.iter().map(|s| s.to_string()).collect()
 }
 
+/// The SHIPPED taxonomy, loaded from `labels/`, with its validators compiled.
+///
+/// A hand-written fragment is the right tool for a guard whose behaviour is
+/// local to one leaf. It is the wrong tool for asking where a demotion LANDS,
+/// because the landing site is chosen by rules that consult the whole map — a
+/// fragment containing only the leaf under test cannot demote to a label it does
+/// not contain, so a fragment-based test would report the right answer whatever
+/// the code did.
+fn shipped_taxonomy() -> Taxonomy {
+    let labels_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("labels");
+    let mut tax = Taxonomy::from_directory(&labels_dir)
+        .expect("load taxonomy from labels/ — is labels/ present in the workspace?");
+    tax.compile_validators();
+    tax
+}
+
 fn jwt_guard_taxonomy() -> Taxonomy {
     let yaml = r#"
 technology.cryptographic.jwt:

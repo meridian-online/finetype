@@ -1,17 +1,119 @@
 use super::super::*;
-use super::jwt_guard_taxonomy;
+use super::{jwt_guard_taxonomy, shipped_taxonomy, vals};
 
 #[test]
 fn checksum_substance_guard_is_default_on() {
     assert!(!rhh::is_disabled("checksum_substance_guard"));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// WHERE A CHECKSUM DEMOTION LANDS
+//
+// `finetype validate` verifies check digits as of the change that added these
+// tests. The model path deliberately does not go through the same validator:
+// `value_sharpen`'s generic schema-demotion rules consult `CompiledValidator`
+// and run BEFORE `checksum_substance_guard`, so a `CompiledValidator` that knew
+// the check digit would demote these columns to the `numeric_code`/categorical
+// fallback instead of the gold-correct target this guard produces.
+//
+// That is an invariant about two files separated by a crate boundary, and
+// nothing in the type system holds it. These tests do: they run the real
+// composition over the shipped taxonomy and assert the LANDING SITE, so
+// teaching `CompiledValidator` the check digit reddens here rather than showing
+// up as a quiet accuracy drop in the next eval.
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn checksum_failing_bare_numbers_land_on_integer_number() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(shipped_taxonomy());
+    // Ten-digit financial figures: ISBN-10 SHAPE, ISBN-10 check digit fails.
+    // The gold columns this was measured on are marketCap / otherLiab and their
+    // neighbours, emitted as `isbn` by the model.
+    let values = vals(&[
+        "5150000128",
+        "6965100000",
+        "7586000000",
+        "1041000000",
+        "2280000000",
+    ]);
+    let r = cc
+        .compose_from_sense("marketcap", &values, "identity.commerce.isbn", 0.9)
+        .expect("composition produces a result");
+
+    assert_eq!(
+        r.label, "representation.numeric.integer_number",
+        "a checksum-failing bare-number column is a number, and the guard's \
+         target is the gold-correct one"
+    );
+    assert_ne!(
+        r.label, "representation.identifier.numeric_code",
+        "numeric_code is value_sharpen's fallback — reaching it means the shared \
+         compiled validator learned the check digit and demoted first"
+    );
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("checksum_substance_guard:identity.commerce.isbn"),
+        "and it must be THIS guard that moved it, not a rule that happens to \
+         agree on the label"
+    );
+}
+
+#[test]
+fn checksum_failing_alphanumerics_land_on_alphanumeric_id() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(shipped_taxonomy());
+    // CUSIP shape (`^[A-Z0-9]{8}[0-9]$`), CUSIP check digit fails.
+    let values = vals(&[
+        "AAAAAAAA1",
+        "BBBBBBBB1",
+        "CCCCCCCC1",
+        "DDDDDDDD1",
+        "EEEEEEEE1",
+    ]);
+    let r = cc
+        .compose_from_sense("citation_id", &values, "finance.securities.cusip", 0.9)
+        .expect("composition produces a result");
+
+    assert_eq!(
+        r.label, "representation.identifier.alphanumeric_id",
+        "gold confirms citation_id/case_number as alphanumeric_id, not categorical"
+    );
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("checksum_substance_guard:finance.securities.cusip")
+    );
+}
+
+#[test]
+fn genuine_identifiers_are_not_demoted_at_all() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(shipped_taxonomy());
+    // Real LEIs — the leaf the demo's edge discovery depends on.
+    let values = vals(&[
+        "529900T8BM49AURSDO55",
+        "213800WSGIIZCXF1P572",
+        "549300MLUDYVRQOOXS22",
+        "HWUPKR0MPOU8FGXBT394",
+        "001GPB6A9XPE8XJICC14",
+    ]);
+    let r = cc
+        .compose_from_sense("lei", &values, "finance.securities.lei", 0.9)
+        .expect("composition produces a result");
+    assert_eq!(
+        r.label, "finance.securities.lei",
+        "values that carry their check digit are that type and stay it"
+    );
+}
+
 #[test]
 fn isbn_checksum_distinguishes_genuine_from_lookalikes() {
-    // The check-digit math now lives in the canonical crate::checksum module
-    // (wired into the validator via `checksum: isbn`); the guard delegates to
-    // it. Genuine ISBNs pass; same-length financial figures the model
-    // mislabels as ISBN fail.
+    // The check-digit math lives in the canonical crate::checksum module; this
+    // guard and `finetype validate` both delegate to it. Genuine ISBNs pass;
+    // same-length financial figures the model mislabels as ISBN fail.
     use finetype_core::checksum::isbn;
     for v in [
         "0306406152",
