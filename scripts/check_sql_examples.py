@@ -92,10 +92,15 @@ SNAPSHOT_FILES = {
 # zero times in README.md. The gate was green and a reader pasting the first
 # example got `Catalog Error: Table with name my_table does not exist!`.
 #
+# docs/DEVELOPMENT.md and docs/LOCALE_GUIDE.md carried the same defect: readers
+# would get `Catalog Error` on examples the gate said were runnable. Both now
+# create their tables visibly (choice 0???, commit ???).
+#
 # For a document listed here the run below IS the reader's path, not a proxy for
 # it. The gate refuses to hand one a fixture, so the way to make a red run green
-# is to fix the document.
-SELF_CONTAINED = {"README.md"}
+# is to fix the document. If a document's CREATE TABLE is deleted, the gate fails
+# on the reader's example (the documented statement), not silently.
+SELF_CONTAINED = {"README.md", "docs/DEVELOPMENT.md", "docs/LOCALE_GUIDE.md"}
 
 # One fixture per document that is NOT self-contained: the tables its examples
 # name, with enough rows for a column-level classifier to have something to work
@@ -103,32 +108,13 @@ SELF_CONTAINED = {"README.md"}
 # nothing here asserts what the model calls them.
 #
 # Each surviving entry is a document that does not create the tables its examples
-# query. Audited 2026-08-06, and `only the README` was false: of the three
-# documents that had a fixture, ZERO created any of their five tables. README.md
-# now creates its one; these two still create none of their four. That is a
-# defect in those documents of the same kind, not a property of this gate.
-FIXTURES: dict[str, str] = {
-    "docs/DEVELOPMENT.md": """
-CREATE TABLE people (age INTEGER, email VARCHAR, phone VARCHAR);
-INSERT INTO people VALUES
-  (34, 'jane.doe@company.co.uk', '+44 20 7946 0958'),
-  (41, 'sam.patel@example.com',  '+1 202 555 0100'),
-  (29, 'not-an-email',           'not-a-phone');
-""",
-    "docs/LOCALE_GUIDE.md": """
-CREATE TABLE customers (customer_id INTEGER, phone_number VARCHAR);
-INSERT INTO customers VALUES
-  (1, '+1 202 555 0100'), (2, '+49 30 12345678'),
-  (3, '+33 1 42 68 53 00'), (4, '+44 20 7946 0958');
-CREATE TABLE french_dates (month_col VARCHAR);
-INSERT INTO french_dates VALUES
-  ('janvier'), ('février'), ('mars'), ('avril'), ('mai'), ('juin');
-CREATE TABLE orders (region VARCHAR, postal_code VARCHAR);
-INSERT INTO orders VALUES
-  ('EN_US', '90210'), ('EN_US', '10001'),
-  ('EN_CA', 'M5V 3A8'), ('EN_GB', 'SW1A 1AA');
-""",
-}
+# query. README.md creates `my_table` visibly; any other entry here is a defect
+# in that document. docs/DEVELOPMENT.md and docs/LOCALE_GUIDE.md have been made
+# self-contained: they now create their own tables visibly for the reader. Their
+# FIXTURES entries are deleted, and the gate now rejects the pattern they were
+# covering: the air-gap where a fixture supplies a table that a document names
+# but never creates (choice 0???, commit ???).
+FIXTURES: dict[str, str] = {}
 
 # Files a document's examples open by path. Written into the run directory.
 FILE_ASSETS: dict[str, dict[str, str]] = {

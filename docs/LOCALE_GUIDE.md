@@ -94,6 +94,23 @@ rule fired — `disambiguation`. There is no `locale` key; the CLI's
 (`crates/finetype-duckdb/src/column_fn.rs`, `format_column_result_json`).
 
 ```sql
+LOAD './target/release/finetype.duckdb_extension';
+
+-- Demo tables used in this section: customer phone numbers, French date names,
+-- and a multi-region order table. Paste the whole block — none of the examples
+-- below create these tables.
+CREATE TABLE customers (customer_id INTEGER, phone_number VARCHAR);
+INSERT INTO customers VALUES
+  (1, '+1 202 555 0100'), (2, '+49 30 12345678'),
+  (3, '+33 1 42 68 53 00'), (4, '+44 20 7946 0958');
+CREATE TABLE french_dates (month_col VARCHAR);
+INSERT INTO french_dates VALUES
+  ('janvier'), ('février'), ('mars'), ('avril'), ('mai'), ('juin');
+CREATE TABLE orders (region VARCHAR, postal_code VARCHAR);
+INSERT INTO orders VALUES
+  ('EN_US', '90210'), ('EN_US', '10001'),
+  ('EN_CA', 'M5V 3A8'), ('EN_GB', 'SW1A 1AA');
+
 SELECT ft_detail(phone_number) FROM customers;
 -- → {"type":"identity.person.phone_number","confidence":0.98,"duckdb_type":"VARCHAR","samples":4,"votes":{"identity.person.phone_number":0.98}}
 
@@ -183,6 +200,13 @@ datetime.component.month_name.EN
 Useful for datasets with non-English date text:
 
 ```sql
+LOAD './target/release/finetype.duckdb_extension';
+
+-- Recreate the demo tables for this section (each code fence runs independently)
+CREATE TABLE french_dates (month_col VARCHAR);
+INSERT INTO french_dates VALUES
+  ('janvier'), ('février'), ('mars'), ('avril'), ('mai'), ('juin');
+
 -- French dataset. ft_profile is an aggregate, so it reads the whole column and
 -- answers once — one row, not one per input row.
 SELECT ft_profile(month_col).type FROM french_dates;
@@ -216,6 +240,14 @@ Extract phone numbers from a specific region:
 In DuckDB, filter on the detected type (the extension reports no locale):
 
 ```sql
+LOAD './target/release/finetype.duckdb_extension';
+
+-- Recreate the demo tables for this section (each code fence runs independently)
+CREATE TABLE customers (customer_id INTEGER, phone_number VARCHAR);
+INSERT INTO customers VALUES
+  (1, '+1 202 555 0100'), (2, '+49 30 12345678'),
+  (3, '+33 1 42 68 53 00'), (4, '+44 20 7946 0958');
+
 SELECT * FROM customers
 WHERE json_extract_string(ft_detail(phone_number), '$.type')
       = 'identity.person.phone_number';
@@ -426,6 +458,14 @@ echo "Normalized to locale: $phone_locale"
 ### Example: Validate Multi-Region Dataset
 
 ```sql
+LOAD './target/release/finetype.duckdb_extension';
+
+-- Recreate the demo tables for this section (each code fence runs independently)
+CREATE TABLE orders (region VARCHAR, postal_code VARCHAR);
+INSERT INTO orders VALUES
+  ('EN_US', '90210'), ('EN_US', '10001'),
+  ('EN_CA', 'M5V 3A8'), ('EN_GB', 'SW1A 1AA');
+
 -- DuckDB: are the postal codes in each region's partition actually postal codes?
 -- The extension reports a TYPE, not a locale, so this checks the type per group.
 SELECT
