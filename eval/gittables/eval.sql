@@ -179,59 +179,47 @@ FROM sampled_values;
 .print ''
 .print '--- Running FineType classification ---'
 
+-- One row per column. ft_detail is an aggregate over the column's sampled
+-- values, so its label, confidence and vote come from one classification.
 CREATE OR REPLACE TABLE classified AS
-SELECT
-    table_file,
-    col_idx,
-    gt_label,
-    ontology,
-    col_value,
-    -- ft_detail's scalar path samples the DuckDB chunk, so this label is the
-    -- chunk's consensus rather than a per-value answer.
-    json_extract_string(ft_detail(col_value), '$.type') AS ft_label,
-    ft_detail(col_value) AS ft_detail
-FROM sampled_values;
-
-SELECT 'Classification complete' AS step,
-       count(*) AS classified_values
-FROM classified;
-
--- ═══════════════════════════════════════════════════════════════════════════════
--- 5. AGGREGATE: Per-column majority vote
--- ═══════════════════════════════════════════════════════════════════════════════
-
-.print ''
-.print '--- Per-column majority vote ---'
-
-CREATE OR REPLACE TABLE column_predictions AS
-WITH vote_counts AS (
+WITH detailed AS (
     SELECT
         table_file,
         col_idx,
         gt_label,
         ontology,
-        ft_label,
-        count(*) AS votes,
-        count(*) OVER (PARTITION BY table_file, col_idx) AS total_votes
-    FROM classified
-    GROUP BY table_file, col_idx, gt_label, ontology, ft_label
-),
-ranked AS (
-    SELECT *,
-           row_number() OVER (PARTITION BY table_file, col_idx ORDER BY votes DESC) AS rk
-    FROM vote_counts
+        count(*) AS sampled,
+        ft_detail(col_value) AS ft_detail
+    FROM sampled_values
+    GROUP BY table_file, col_idx, gt_label, ontology
 )
+SELECT *, json_extract_string(ft_detail, '$.type') AS ft_label
+FROM detailed;
+
+SELECT 'Classification complete' AS step,
+       count(*) AS classified_columns,
+       sum(sampled) AS classified_values
+FROM classified;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 5. Per-column prediction
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+.print ''
+.print '--- Per-column prediction ---'
+
+-- The column's label is ft_detail's, so there is no vote to take here.
+-- vote_pct keeps its name for the report below and is ft_detail's confidence
+-- for the column, as a percentage.
+CREATE OR REPLACE TABLE column_predictions AS
 SELECT
     table_file,
     col_idx,
     gt_label,
     ontology,
     ft_label AS predicted_label,
-    votes,
-    total_votes,
-    ROUND(votes * 100.0 / total_votes, 1) AS vote_pct
-FROM ranked
-WHERE rk = 1;
+    ROUND(100.0 * CAST(json_extract_string(ft_detail, '$.confidence') AS DOUBLE), 1) AS vote_pct
+FROM classified;
 
 SELECT count(*) AS columns_with_predictions FROM column_predictions;
 
@@ -385,13 +373,14 @@ ORDER BY columns DESC;
 
 SELECT
     gt_label,
-    count(*) AS values,
+    count(*) AS columns,
+    sum(sampled) AS values,
     ROUND(avg(CAST(json_extract_string(ft_detail, '$.confidence') AS DOUBLE)), 4) AS avg_confidence,
     ROUND(min(CAST(json_extract_string(ft_detail, '$.confidence') AS DOUBLE)), 4) AS min_confidence,
     ROUND(max(CAST(json_extract_string(ft_detail, '$.confidence') AS DOUBLE)), 4) AS max_confidence
 FROM classified
 GROUP BY gt_label
-HAVING count(*) >= 20
+HAVING sum(sampled) >= 20
 ORDER BY avg_confidence DESC
 LIMIT 25;
 

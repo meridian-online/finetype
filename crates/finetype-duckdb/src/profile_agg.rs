@@ -1,9 +1,19 @@
-//! `ft_profile` as a true DuckDB aggregate, registered through the raw C API.
+//! `ft_profile` and `ft_detail` as true DuckDB aggregates, registered through
+//! the raw C API.
 //!
 //! `SELECT ft_profile(email) FROM people` is the call a reader reaches for
 //! first. It is an aggregate: DuckDB pools the column's values into one state
 //! per group and hands the pooled sample to the classifier once, which is
 //! exactly the shape the column-oriented model wants.
+//!
+//! `SELECT ft_detail(email) FROM people` is the question asked straight after
+//! it: why that type, and what else it could have been. It is the same
+//! aggregate with a different finalize — same state, same reservoir, same
+//! seeded sampling, same header capture — so the explanation it returns is of
+//! the verdict `ft_profile` gave over the same rows, not of a different sample.
+//! Its finalize writes the full classification as a JSON string (`type`,
+//! `confidence`, `duckdb_type`, `samples`, `votes`, and `disambiguation` when a
+//! rule fired) where `ft_profile`'s writes three fields of it.
 //!
 //! duckdb-rs exposes `vscalar` and `vtab` only, so the registration goes
 //! through `libduckdb_sys` directly — the same raw-FFI route the crate already
@@ -44,8 +54,9 @@
 //!
 //! ## Unsupported: an aggregate-level `ORDER BY`
 //!
-//! `ft_profile(col ORDER BY col)` reads out of bounds inside DuckDB and can
-//! crash the process or return a silently wrong answer. The sorted-aggregate
+//! `ft_profile(col ORDER BY col)` and `ft_detail(col ORDER BY col)` read out of
+//! bounds inside DuckDB and can crash the process or return a silently wrong
+//! answer. The sorted-aggregate
 //! path makes the state vector constant and the C API flattens only the inputs,
 //! so the callback receives a one-element state buffer with a multi-row count.
 //! It is upstream (duckdb/duckdb#21537, deferred), it is not specific to this
@@ -53,9 +64,10 @@
 //! both arrive from DuckDB and look valid. The `ft_profile(tbl)` table macro
 //! never emits one.
 
-use crate::column_fn::PROFILE_SAMPLE_CAP;
+use crate::column_fn::{format_column_result_json, PROFILE_SAMPLE_CAP};
 use crate::{get_column_classifier, type_mapping};
 
+use finetype_model::ColumnResult;
 use libduckdb_sys::*;
 use std::ffi::CString;
 use std::panic::AssertUnwindSafe;
@@ -72,6 +84,9 @@ const RNG_SEED: u64 = 0x9E37_79B9_7F4A_7C15;
 /// The answer for a group with nothing classifiable in it.
 const UNKNOWN_LABEL: &str = "unknown";
 const UNKNOWN_DUCKDB_TYPE: &str = "VARCHAR";
+/// `ft_detail`'s answer for the same group.
+const UNKNOWN_DETAIL_JSON: &str =
+    r#"{"type":"unknown","confidence":0.0,"duckdb_type":"VARCHAR","samples":0}"#;
 
 /// Per-group aggregate state.
 ///
@@ -321,24 +336,27 @@ unsafe extern "C" fn profile_combine(
     }
 }
 
-/// Classify one group. Returns the STRUCT's three fields.
+/// What classifying one group came to. Both finalizes read this, so
+/// `ft_profile` and `ft_detail` over the same rows are one classification.
+enum Verdict {
+    /// Nothing classifiable reached the group.
+    Empty,
+    /// The classifier returned an error or panicked; the message says which.
+    Failed(String),
+    Classified(Box<ColumnResult>),
+}
+
+/// Classify one group's reservoir, with its header hint if it captured one.
 ///
 /// # Safety
 /// `state` must point at an initialised `ProfileState`, or be null.
-unsafe fn classify_state(state: *const ProfileState) -> (String, f64, String) {
-    let unknown = || {
-        (
-            UNKNOWN_LABEL.to_string(),
-            0.0,
-            UNKNOWN_DUCKDB_TYPE.to_string(),
-        )
-    };
+unsafe fn classify_state(state: *const ProfileState) -> Verdict {
     if state.is_null() || (*state).inited != PROFILE_MAGIC || (*state).sample.is_null() {
-        return unknown();
+        return Verdict::Empty;
     }
     let sample: &Vec<String> = &*(*state).sample;
     if sample.is_empty() {
-        return unknown();
+        return Verdict::Empty;
     }
     let header = if (*state).header.is_null() {
         None
@@ -358,11 +376,56 @@ unsafe fn classify_state(state: *const ProfileState) -> (String, f64, String) {
     }));
 
     match classified {
-        Ok(Ok(result)) => {
+        Ok(Ok(result)) => Verdict::Classified(Box::new(result)),
+        Ok(Err(error)) => Verdict::Failed(error.to_string()),
+        Err(_) => Verdict::Failed("the classifier panicked".to_string()),
+    }
+}
+
+/// `ft_profile`'s three fields. A group that could not be classified is
+/// `unknown`, not an error.
+fn profile_fields(verdict: Verdict) -> (String, f64, String) {
+    match verdict {
+        Verdict::Classified(result) => {
+            let result = *result;
             let duckdb_type = type_mapping::to_duckdb_type(&result.label).to_string();
             (result.label, result.confidence as f64, duckdb_type)
         }
-        _ => unknown(),
+        Verdict::Empty | Verdict::Failed(_) => (
+            UNKNOWN_LABEL.to_string(),
+            0.0,
+            UNKNOWN_DUCKDB_TYPE.to_string(),
+        ),
+    }
+}
+
+/// `ft_detail`'s JSON string. A failure keeps the `unknown` shape and adds an
+/// `error` key naming why, so the explanation call explains its own failure.
+fn detail_json(verdict: Verdict) -> String {
+    match verdict {
+        Verdict::Classified(result) => format_column_result_json(&result),
+        Verdict::Empty => UNKNOWN_DETAIL_JSON.to_string(),
+        Verdict::Failed(message) => format!(
+            r#"{{"type":"unknown","confidence":0.0,"duckdb_type":"VARCHAR","samples":0,"error":{}}}"#,
+            serde_json::Value::String(message)
+        ),
+    }
+}
+
+unsafe extern "C" fn detail_finalize(
+    _info: duckdb_function_info,
+    source: *mut duckdb_aggregate_state,
+    result: duckdb_vector,
+    count: idx_t,
+    offset: idx_t,
+) {
+    for i in 0..count as usize {
+        let row = offset as usize + i;
+        let json = detail_json(classify_state(*source.add(i) as *const ProfileState));
+        let json = CString::new(json).unwrap_or_else(|_| {
+            CString::new(UNKNOWN_DETAIL_JSON).expect("a literal without an interior NUL")
+        });
+        duckdb_vector_assign_string_element(result, row as idx_t, json.as_ptr());
     }
 }
 
@@ -381,7 +444,7 @@ unsafe extern "C" fn profile_finalize(
     for i in 0..count as usize {
         let row = offset as usize + i;
         let (label, confidence, duckdb_type) =
-            classify_state(*source.add(i) as *const ProfileState);
+            profile_fields(classify_state(*source.add(i) as *const ProfileState));
         // An interior NUL cannot come out of the taxonomy, but a raw callback
         // is the wrong place to find out: fall back rather than unwrap.
         let label = CString::new(label).unwrap_or_else(|_| c_unknown_label());
@@ -450,9 +513,50 @@ unsafe fn profile_return_type() -> duckdb_logical_type {
     struct_type
 }
 
-/// Build one arity of the aggregate. Every parameter is VARCHAR: the value
+/// `VARCHAR` — `ft_detail`'s JSON string.
+unsafe fn detail_return_type() -> duckdb_logical_type {
+    duckdb_create_logical_type(DUCKDB_TYPE_DUCKDB_TYPE_VARCHAR)
+}
+
+/// A finalize callback, as the C API takes it.
+type Finalize = unsafe extern "C" fn(
+    duckdb_function_info,
+    *mut duckdb_aggregate_state,
+    duckdb_vector,
+    idx_t,
+    idx_t,
+);
+
+/// One of the aggregates over the shared state: its name, what it returns and
+/// the finalize that writes it. The state, `update`, `combine` and the
+/// destructor are common, which is what makes `ft_detail` explain the verdict
+/// `ft_profile` gave rather than one drawn from a different sample.
+struct Aggregate {
+    name: &'static str,
+    return_type: unsafe fn() -> duckdb_logical_type,
+    finalize: Finalize,
+}
+
+const AGGREGATES: [Aggregate; 2] = [
+    Aggregate {
+        name: "ft_profile",
+        return_type: profile_return_type,
+        finalize: profile_finalize,
+    },
+    Aggregate {
+        name: "ft_detail",
+        return_type: detail_return_type,
+        finalize: detail_finalize,
+    },
+];
+
+/// Build one arity of an aggregate. Every parameter is VARCHAR: the value
 /// column, and for the two-argument form the header hint.
-unsafe fn build_profile_aggregate(name: &CString, arity: usize) -> duckdb_aggregate_function {
+unsafe fn build_aggregate(
+    aggregate: &Aggregate,
+    name: &CString,
+    arity: usize,
+) -> duckdb_aggregate_function {
     let function = duckdb_create_aggregate_function();
     duckdb_aggregate_function_set_name(function, name.as_ptr());
     for _ in 0..arity {
@@ -460,7 +564,7 @@ unsafe fn build_profile_aggregate(name: &CString, arity: usize) -> duckdb_aggreg
         duckdb_aggregate_function_add_parameter(function, parameter);
         duckdb_destroy_logical_type(&mut parameter);
     }
-    let mut return_type = profile_return_type();
+    let mut return_type = (aggregate.return_type)();
     duckdb_aggregate_function_set_return_type(function, return_type);
     duckdb_destroy_logical_type(&mut return_type);
 
@@ -470,7 +574,7 @@ unsafe fn build_profile_aggregate(name: &CString, arity: usize) -> duckdb_aggreg
         Some(profile_init),
         Some(profile_update),
         Some(profile_combine),
-        Some(profile_finalize),
+        Some(aggregate.finalize),
     );
     duckdb_aggregate_function_set_destructor(function, Some(profile_destroy));
 
@@ -483,26 +587,28 @@ unsafe fn build_profile_aggregate(name: &CString, arity: usize) -> duckdb_aggreg
     function
 }
 
-/// Register `ft_profile(VARCHAR)` and `ft_profile(VARCHAR, VARCHAR)`.
+/// Register one aggregate at both arities, as one function set.
 ///
 /// # Safety
-/// `con` must be a live connection, and the extension API table must already be
-/// initialised.
-pub unsafe fn register(con: duckdb_connection) -> Result<(), String> {
-    let name = CString::new("ft_profile").map_err(|e| e.to_string())?;
+/// As for `register`.
+unsafe fn register_aggregate(con: duckdb_connection, aggregate: &Aggregate) -> Result<(), String> {
+    let label = aggregate.name;
+    let name = CString::new(label).map_err(|e| e.to_string())?;
     let set = duckdb_create_aggregate_function_set(name.as_ptr());
     if set.is_null() {
-        return Err("could not create the ft_profile aggregate function set".to_string());
+        return Err(format!(
+            "could not create the {label} aggregate function set"
+        ));
     }
 
     let mut failure: Option<String> = None;
     for arity in [1usize, 2usize] {
-        let mut function = build_profile_aggregate(&name, arity);
+        let mut function = build_aggregate(aggregate, &name, arity);
         let added = duckdb_add_aggregate_function_to_set(set, function);
         duckdb_destroy_aggregate_function(&mut function);
         if added != 0 {
             failure = Some(format!(
-                "could not add the {arity}-argument ft_profile to its function set"
+                "could not add the {arity}-argument {label} to its function set"
             ));
             break;
         }
@@ -513,7 +619,7 @@ pub unsafe fn register(con: duckdb_connection) -> Result<(), String> {
         if registered != 0 {
             // The C API swallows the catalog's message, so there is nothing
             // more specific to report than the state.
-            failure = Some("could not register the ft_profile aggregate".to_string());
+            failure = Some(format!("could not register the {label} aggregate"));
         }
     }
 
@@ -524,6 +630,19 @@ pub unsafe fn register(con: duckdb_connection) -> Result<(), String> {
         Some(message) => Err(message),
         None => Ok(()),
     }
+}
+
+/// Register `ft_profile` and `ft_detail`, each at `(VARCHAR)` and
+/// `(VARCHAR, VARCHAR)`.
+///
+/// # Safety
+/// `con` must be a live connection, and the extension API table must already be
+/// initialised.
+pub unsafe fn register(con: duckdb_connection) -> Result<(), String> {
+    for aggregate in &AGGREGATES {
+        register_aggregate(con, aggregate)?;
+    }
+    Ok(())
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

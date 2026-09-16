@@ -35,35 +35,26 @@ LATERAL (
 ) j(key, value)
 WHERE m.annotations_json IS NOT NULL AND m.annotations_json != '';
 
--- Classify values
+-- Classify columns: one row per column. ft_detail is an aggregate over the
+-- column's values, so its label and confidence come from one classification.
 CREATE OR REPLACE TABLE classified AS
-SELECT
-    topic,
-    table_name,
-    col_name,
-    col_value,
-    -- ft_detail's scalar path samples the DuckDB chunk, so this label is the
-    -- chunk's consensus rather than a per-value answer.
-    json_extract_string(ft_detail(col_value), '$.type') AS ft_label
-FROM column_values;
-
--- Per-column majority vote
-CREATE OR REPLACE TABLE column_predictions AS
-WITH vote_counts AS (
+WITH detailed AS (
     SELECT
-        topic, table_name, col_name, ft_label,
-        count(*) AS votes,
-        sum(count(*)) OVER (PARTITION BY topic, table_name, col_name) AS total_votes
-    FROM classified
-    GROUP BY topic, table_name, col_name, ft_label
-),
-ranked AS (
-    SELECT *, row_number() OVER (PARTITION BY topic, table_name, col_name ORDER BY votes DESC) AS rk
-    FROM vote_counts
+        topic, table_name, col_name,
+        count(*) AS values_read,
+        ft_detail(col_value) AS detail_json
+    FROM column_values
+    GROUP BY topic, table_name, col_name
 )
-SELECT topic, table_name, col_name, ft_label AS predicted_label, votes, total_votes,
-       ROUND(votes * 100.0 / total_votes, 1) AS vote_pct
-FROM ranked WHERE rk = 1;
+SELECT *, json_extract_string(detail_json, '$.type') AS ft_label
+FROM detailed;
+
+-- Per-column prediction. vote_pct keeps its name for the reports below and is
+-- ft_detail's confidence for the column, as a percentage.
+CREATE OR REPLACE TABLE column_predictions AS
+SELECT topic, table_name, col_name, ft_label AS predicted_label,
+       ROUND(100.0 * CAST(json_extract_string(detail_json, '$.confidence') AS DOUBLE), 1) AS vote_pct
+FROM classified;
 
 -- Join with ground truth
 CREATE OR REPLACE TABLE eval_results AS
@@ -195,12 +186,14 @@ LIMIT 20;
 .print '  SAMPLE: Misclassified "id" values (non-technology predictions)'
 .print '═══════════════════════════════════════════════════════════════════'
 
+-- The label is the column's; the value is one of that column's values.
 SELECT
     c.ft_label,
-    c.col_value,
+    cv.col_value,
     c.topic,
     c.col_name
 FROM classified c
+JOIN column_values cv ON c.topic = cv.topic AND c.table_name = cv.table_name AND c.col_name = cv.col_name
 JOIN ground_truth gt ON c.topic = gt.topic AND c.table_name = gt.table_name AND c.col_name = gt.col_name
 WHERE gt.gt_label = 'id'
   AND split_part(c.ft_label, '.', 1) != 'technology'
@@ -218,9 +211,10 @@ LIMIT 40;
 
 SELECT
     c.ft_label,
-    c.col_value,
+    cv.col_value,
     c.topic
 FROM classified c
+JOIN column_values cv ON c.topic = cv.topic AND c.table_name = cv.table_name AND c.col_name = cv.col_name
 JOIN ground_truth gt ON c.topic = gt.topic AND c.table_name = gt.table_name AND c.col_name = gt.col_name
 WHERE gt.gt_label = 'url'
   AND split_part(c.ft_label, '.', 1) != 'technology'
@@ -236,11 +230,11 @@ LIMIT 40;
 .print '  ID VALUE PATTERNS: What do ID columns actually contain?'
 .print '═══════════════════════════════════════════════════════════════════'
 
--- Distribution of FineType predictions for individual values in id columns
+-- Distribution of the values in id columns by their column's FineType label
 SELECT
     c.ft_label,
-    count(*) AS values,
-    ROUND(count(*) * 100.0 / sum(count(*)) OVER (), 1) AS pct
+    sum(c.values_read) AS values,
+    ROUND(sum(c.values_read) * 100.0 / sum(sum(c.values_read)) OVER (), 1) AS pct
 FROM classified c
 JOIN ground_truth gt ON c.topic = gt.topic AND c.table_name = gt.table_name AND c.col_name = gt.col_name
 WHERE gt.gt_label = 'id'

@@ -111,47 +111,35 @@ FROM column_values;
 .print ''
 .print '--- Running FineType classification ---'
 
+-- One row per column. ft_detail is an aggregate over the column's values, so
+-- its label, confidence and vote come from one classification.
 CREATE OR REPLACE TABLE classified AS
-SELECT
-    topic,
-    table_name,
-    col_name,
-    col_value,
-    -- ft_detail's scalar path samples the DuckDB chunk, so this label is the
-    -- chunk's consensus rather than a per-value answer.
-    json_extract_string(ft_detail(col_value), '$.type') AS ft_label
-FROM column_values;
-
-SELECT count(*) AS values_classified FROM classified;
-
--- Per-column majority vote
-CREATE OR REPLACE TABLE column_predictions AS
-WITH vote_counts AS (
+WITH detailed AS (
     SELECT
         topic,
         table_name,
         col_name,
-        ft_label,
-        count(*) AS votes,
-        sum(count(*)) OVER (PARTITION BY topic, table_name, col_name) AS total_votes
-    FROM classified
-    GROUP BY topic, table_name, col_name, ft_label
-),
-ranked AS (
-    SELECT *,
-           row_number() OVER (PARTITION BY topic, table_name, col_name ORDER BY votes DESC) AS rk
-    FROM vote_counts
+        count(*) AS values_read,
+        ft_detail(col_value) AS detail_json
+    FROM column_values
+    GROUP BY topic, table_name, col_name
 )
+SELECT *, json_extract_string(detail_json, '$.type') AS ft_label
+FROM detailed;
+
+SELECT count(*) AS columns_classified, sum(values_read) AS values_classified FROM classified;
+
+-- Per-column prediction. The label is ft_detail's, so there is no vote to take
+-- here; vote_pct keeps its name for the reports below and is ft_detail's
+-- confidence for the column, as a percentage.
+CREATE OR REPLACE TABLE column_predictions AS
 SELECT
     topic,
     table_name,
     col_name,
     ft_label AS predicted_label,
-    votes,
-    total_votes,
-    ROUND(votes * 100.0 / total_votes, 1) AS vote_pct
-FROM ranked
-WHERE rk = 1;
+    ROUND(100.0 * CAST(json_extract_string(detail_json, '$.confidence') AS DOUBLE), 1) AS vote_pct
+FROM classified;
 
 SELECT
     count(*) AS total_columns,
@@ -589,7 +577,7 @@ ORDER BY topic;
 
 .print ''
 .print '═══════════════════════════════════════════════════════════════════'
-.print '           ft_profile(col) vs PER-VALUE MAJORITY VOTE      '
+.print '           ft_profile(col) vs ft_detail(col) (section 3)   '
 .print '═══════════════════════════════════════════════════════════════════'
 
 -- 10a. Run column-level classification
@@ -599,7 +587,7 @@ SELECT
     cv.table_name,
     cv.col_name,
     ft_profile(cv.col_value).type AS predicted_label,
-    ft_detail(list(cv.col_value)) AS detail_json
+    ft_detail(cv.col_value) AS detail_json
 FROM column_values cv
 GROUP BY cv.topic, cv.table_name, cv.col_name;
 
@@ -645,11 +633,13 @@ JOIN ground_truth gt ON cp.topic = gt.topic
     AND cp.col_name = gt.col_name
 LEFT JOIN schema_mapping sm ON gt.gt_label = sm.gt_label;
 
--- 10c. Side-by-side headline comparison
+-- 10c. Side-by-side headline comparison. Section 3 is ft_detail(col), the same
+-- aggregate state as ft_profile(col) here, so a difference between the two is
+-- the sample each statement drew, not a different method.
 .print ''
-.print '--- COMPARISON: per-value majority vote vs ft_profile(col) ---'
+.print '--- COMPARISON: ft_detail(col) (section 3) vs ft_profile(col) ---'
 SELECT
-    'per-value majority vote' AS method,
+    'ft_detail(col), section 3' AS method,
     count(*) AS total,
     sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
     ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_pct,
@@ -670,7 +660,7 @@ FROM eval_results_v2 WHERE match_quality IS NOT NULL;
 .print ''
 .print '--- COMPARISON: Format-detectable only (direct + close) ---'
 SELECT
-    'per-value majority vote' AS method,
+    'ft_detail(col), section 3' AS method,
     count(*) AS total,
     sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
     ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_pct,
@@ -687,11 +677,11 @@ SELECT
     ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_pct
 FROM eval_results_v2 WHERE detectability = 'format_detectable';
 
--- 10e. Where ft_profile(col) differs from majority vote
+-- 10e. Where ft_profile(col) differs from section 3's ft_detail(col)
 .print ''
 .print '--- Columns where ft_profile(col) CHANGED the prediction ---'
 SELECT
-    v1.predicted_label AS majority_vote,
+    v1.predicted_label AS section_3_label,
     v2.predicted_label AS column_fn,
     v1.gt_label,
     v1.match_quality,
@@ -710,7 +700,7 @@ LIMIT 30;
 
 -- 10f. Net improvement summary
 .print ''
-.print '--- Net improvement: ft_profile(col) vs per-value majority vote ---'
+.print '--- Net improvement: ft_profile(col) vs ft_detail(col) (section 3) ---'
 WITH diff AS (
     SELECT
         CASE
