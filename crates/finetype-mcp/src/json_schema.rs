@@ -467,9 +467,9 @@ mod tests {
                 values: &vals,
                 null_count: 3,
                 unknown_reason: Some(
-                nominated: false,
                     "validation rejected 'npi': only 12% of values matched its format",
                 ),
+                nominated: false,
             },
             TableSchemaColumn {
                 name: "bare",
@@ -544,5 +544,44 @@ mod tests {
                 dropped
             );
         }
+    }
+    #[test]
+    fn a_nominated_property_is_marked_as_declared_beside_its_label() {
+        // Without the marker a reader sees a label and cannot tell whether a
+        // person declared it or a model guessed it, and has to treat both the
+        // same way — which is the whole of what nominating buys.
+        let taxonomy = Taxonomy::from_directory(labels_path()).expect("load taxonomy");
+        let vals: Vec<String> = vec!["some registry prose".into(), "more of it".into()];
+        let cols = vec![
+            TableSchemaColumn {
+                name: "corpus",
+                label: "representation.text.plain_text",
+                values: &vals,
+                null_count: 0,
+                unknown_reason: None,
+                nominated: true,
+            },
+            TableSchemaColumn {
+                name: "guessed",
+                label: "representation.text.plain_text",
+                values: &vals,
+                null_count: 0,
+                unknown_reason: None,
+                nominated: false,
+            },
+        ];
+        let schema = emit_table_schema(&cols, "t", "t.csv", &taxonomy, false, 32);
+        let props = &schema["properties"];
+
+        assert_eq!(
+            props["corpus"]["x-finetype-label"],
+            "representation.text.plain_text"
+        );
+        assert_eq!(props["corpus"]["x-finetype-nominated"], true);
+        assert!(
+            props["guessed"].get("x-finetype-nominated").is_none(),
+            "an inferred property claimed to be nominated: {}",
+            props["guessed"]
+        );
     }
 }

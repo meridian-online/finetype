@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "resources": {
+    "nominated_corpus": {
+      "corpus": {
+        "label": "representation.text.plain_text",
+        "why": "free-form registry prose; the people who wrote these rows know it is text"
+      },
+      "observed_on": {
+        "label": "datetime.date.iso",
+        "why": "ISO dates, declared so the field's off-type bounds are published rather than guessed"
+      }
+    }
+  }
+}

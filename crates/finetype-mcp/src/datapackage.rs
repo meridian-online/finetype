@@ -359,6 +359,14 @@ mod tests {
         // A string/email with validation + pii, and a bare date/pattern.
         Taxonomy::from_yaml(
             r#"
+representation.text.plain_text:
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+  validation:
+    type: string
+    minLength: 1
+    maxLength: 65536
 identity.person.email:
   broad_type: VARCHAR
   pii: true
@@ -717,5 +725,130 @@ representation.numeric.integer_number:
                 "{label}: the routing must move every keyword, not lose one"
             );
         }
+    }
+    // ── Nomination ───────────────────────────────────────────────────────────
+    //
+    // A nomination reaches this emitter as a LABEL and a flag, and nothing
+    // else. There is no second constraint path for it, which is why the two
+    // tests below can pin what a nominated field publishes by building the
+    // column directly.
+
+    #[test]
+    fn a_nominated_field_publishes_its_taxonomy_bounds_and_no_confidence() {
+        let taxonomy = test_taxonomy();
+        let values: Vec<String> = (0..4).map(|i| format!("row {i} of registry prose")).collect();
+        let cols = vec![DatapackageColumn {
+            name: "corpus",
+            label: "representation.text.plain_text",
+            values: &values,
+            // Deliberately Some: the emitter, not the caller, decides that a
+            // declared type publishes no confidence. A caller that forgets
+            // must not be able to publish one.
+            confidence: Some(0.42),
+            locale: None,
+            nominated: true,
+        }];
+        let descriptor = emit_datapackage(&cols, &meta(), &taxonomy, 32);
+        let field = &descriptor["resources"][0]["schema"]["fields"][0];
+
+        assert_eq!(field["type"], "string");
+        assert_eq!(field["x-finetype-label"], "representation.text.plain_text");
+        assert_eq!(field["x-finetype-nominated"], true);
+        assert_eq!(field["constraints"]["minLength"], 1);
+        assert_eq!(field["constraints"]["maxLength"], 65536);
+        assert!(
+            field.get("x-finetype-confidence").is_none(),
+            "a declared type published a confidence: {field}"
+        );
+    }
+
+    #[test]
+    fn a_nominated_date_routes_its_off_type_constraints_exactly_as_an_inferred_one() {
+        // AC4's pin, taken through the nomination path: `date` has no place for
+        // `pattern`/`minLength`/`maxLength`, so a nominated date must carry no
+        // `constraints` key at all and exactly three off-type keywords. A
+        // second constraint path that bypassed the vocabulary filter would
+        // show up here as a `constraints` object.
+        let taxonomy = test_taxonomy();
+        let values: Vec<String> = vec!["2026-01-01".into(), "2026-02-02".into()];
+        let cols = vec![DatapackageColumn {
+            name: "observed_on",
+            label: "datetime.date.iso",
+            values: &values,
+            confidence: None,
+            locale: None,
+            nominated: true,
+        }];
+        let descriptor = emit_datapackage(&cols, &meta(), &taxonomy, 32);
+        let field = &descriptor["resources"][0]["schema"]["fields"][0];
+
+        assert_eq!(field["type"], "date");
+        assert_eq!(field["x-finetype-nominated"], true);
+        assert!(
+            field.get("constraints").is_none(),
+            "a nominated date carried a constraints object: {field}"
+        );
+        let off = field["x-finetype-unsupported-constraints"]
+            .as_object()
+            .expect("off-type carrier");
+        assert_eq!(off.len(), 3, "off-type keywords: {off:?}");
+        assert_eq!(off["pattern"], r"^\d{4}-\d{2}-\d{2}$");
+        assert_eq!(off["minLength"], 10);
+        assert_eq!(off["maxLength"], 10);
+    }
+
+    #[test]
+    fn nominating_a_column_changes_nothing_outside_its_own_field() {
+        // The same two columns, emitted once with the first nominated and once
+        // without. Everything but that field's own object is byte-identical —
+        // including the resource's bytes/hash/path and the second field.
+        let taxonomy = test_taxonomy();
+        let corpus: Vec<String> = vec!["some prose".into(), "more prose".into()];
+        let dates: Vec<String> = vec!["2026-01-01".into(), "2026-02-02".into()];
+        let build = |nominated: bool| {
+            let cols = vec![
+                DatapackageColumn {
+                    name: "corpus",
+                    label: "representation.text.plain_text",
+                    values: &corpus,
+                    confidence: Some(0.9),
+                    locale: None,
+                    nominated,
+                },
+                DatapackageColumn {
+                    name: "observed_on",
+                    label: "datetime.date.iso",
+                    values: &dates,
+                    confidence: Some(0.9),
+                    locale: None,
+                    nominated: false,
+                },
+            ];
+            emit_datapackage(&cols, &meta(), &taxonomy, 32)
+        };
+        let mut with = build(true);
+        let mut without = build(false);
+        // `created` is `Utc::now()` at emit time, so two runs a microsecond
+        // apart differ there with no nomination involved.
+        assert!(with.get("created").is_some(), "created is emitted");
+        with["created"] = serde_json::Value::Null;
+        without["created"] = serde_json::Value::Null;
+
+        let strip_first_field = |d: &mut Value| {
+            d["resources"][0]["schema"]["fields"][0] = Value::Null;
+        };
+        let mut with_stripped = with.clone();
+        let mut without_stripped = without.clone();
+        strip_first_field(&mut with_stripped);
+        strip_first_field(&mut without_stripped);
+        assert_eq!(
+            with_stripped, without_stripped,
+            "nominating `corpus` changed something outside its own field"
+        );
+        assert_ne!(
+            with["resources"][0]["schema"]["fields"][0],
+            without["resources"][0]["schema"]["fields"][0],
+            "nominating `corpus` changed nothing at all"
+        );
     }
 }

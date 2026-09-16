@@ -1118,3 +1118,211 @@ pub(crate) fn cmd_profile(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod nomination_tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    fn taxonomy() -> finetype_core::Taxonomy {
+        let mut t = finetype_core::Taxonomy::from_yaml(
+            r#"
+representation.text.plain_text:
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+  validation:
+    type: string
+    minLength: 1
+    maxLength: 65536
+identity.person.email:
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+    format: email
+  validation:
+    type: string
+    pattern: '^[^@ ]+@[^@ ]+\.[^@ ]+$'
+    minLength: 5
+    maxLength: 254
+"#,
+        )
+        .expect("test taxonomy parses");
+        t.compile_validators();
+        t
+    }
+
+    fn profile(label: &str, nominated: bool) -> ColProfile {
+        ColProfile {
+            name: "corpus".to_string(),
+            label: label.to_string(),
+            nominated,
+            confidence: 0.4213,
+            samples_used: 7,
+            non_null_count: 7,
+            null_count: 1,
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            detected_locale: None,
+            broad_type: Some("VARCHAR".to_string()),
+            format_string: Some("%s".to_string()),
+            transform: Some("CAST({col} AS VARCHAR)".to_string()),
+            is_generic: false,
+            quality: None,
+            unique_values: None,
+            validation_pass_rate: None,
+            validation_vetoed: false,
+            validation_advisory_low: false,
+            vetoed_type: None,
+            enum_domain: None,
+            // `low` is the band a 0.42 confidence earns. A nominated column
+            // must not print it, and the band is left here deliberately so a
+            // suppression that only works for `high` would fail this test.
+            quality_band: "low",
+            runner_up: Some("identity.person.email".to_string()),
+        }
+    }
+
+    #[test]
+    fn a_nominated_column_reads_decl_and_carries_no_band_or_veto_annotation() {
+        let row = plain_row(&profile("representation.text.plain_text", true));
+        assert!(row.contains("representation.text.plain_text"), "{row}");
+        assert!(row.contains("decl"), "{row}");
+        assert!(!row.contains('%'), "a declared type printed a percentage: {row}");
+        for absent in [" ⚑ low", " ~ medium", " ⊘ vetoed:", " ⚠ low-pass"] {
+            assert!(!row.contains(absent), "row carried `{absent}`: {row}");
+        }
+
+        // The same column inferred still prints both.
+        let row = plain_row(&profile("representation.text.plain_text", false));
+        assert!(row.contains("42.1%"), "{row}");
+        assert!(row.contains(" ⚑ low"), "{row}");
+        assert!(!row.contains("decl"), "{row}");
+    }
+
+    #[test]
+    fn a_nominated_columns_json_object_drops_the_classifiers_answer_and_keeps_the_data() {
+        let obj = json_column_object(&profile("representation.text.plain_text", true), false);
+        let obj = obj.as_object().expect("column object");
+
+        assert_eq!(obj["type"], "representation.text.plain_text");
+        assert_eq!(obj["nominated"], true);
+        for absent in [
+            "confidence",
+            "quality_band",
+            "runner_up",
+            "validation_pass_rate",
+            "validation_vetoed",
+            "vetoed_type",
+            "validation_advisory_low",
+        ] {
+            assert!(
+                !obj.contains_key(absent),
+                "a declared type published `{absent}`: {obj:?}"
+            );
+        }
+        // Facts about the data, true whoever chose the label.
+        assert_eq!(obj["broad_type"], "VARCHAR");
+        assert_eq!(obj["format_string"], "%s");
+        assert_eq!(obj["transform"], "CAST({col} AS VARCHAR)");
+        assert_eq!(obj["samples_used"], 7);
+        assert_eq!(obj["non_null"], 7);
+        assert_eq!(obj["null"], 1);
+
+        // Inferred, the same column publishes the classifier's answer and no
+        // `nominated` key.
+        let obj = json_column_object(&profile("representation.text.plain_text", false), false);
+        let obj = obj.as_object().expect("column object");
+        assert!(!obj.contains_key("nominated"), "{obj:?}");
+        assert_eq!(obj["quality_band"], "low");
+        assert!(obj.contains_key("confidence"), "{obj:?}");
+        assert!(obj.contains_key("runner_up"), "{obj:?}");
+    }
+
+    #[test]
+    fn an_undeclared_column_is_untouched_by_another_columns_nomination() {
+        // AC5's last clause, at the grain the flag actually acts on: the
+        // per-column decision. Two columns, one nominated, and the other's
+        // object is byte-identical to what it is with no nomination anywhere.
+        let inferred = json_column_object(&profile("identity.person.email", false), false);
+        let _ = json_column_object(&profile("representation.text.plain_text", true), false);
+        let again = json_column_object(&profile("identity.person.email", false), false);
+        assert_eq!(inferred, again);
+    }
+
+    #[test]
+    fn the_data_cannot_overturn_a_nomination() {
+        // `identity.person.email` is on the audited-safe allowlist, so a column
+        // of non-emails hard-vetoes it: `resolve_veto_outcome` would replace
+        // the label with a residual picked from the value shape. A nomination
+        // is taken as given, so the veto never runs.
+        let taxonomy = taxonomy();
+        let safe: HashSet<String> = ["identity.person.email".to_string()].into_iter().collect();
+        let values: Vec<String> = (0..10)
+            .map(|i| format!("not an address at all {i}"))
+            .collect();
+
+        // The premise: inferred, this column really is hard-vetoed.
+        let inferred = decide_label(
+            None,
+            "identity.person.email",
+            &values,
+            Some(&taxonomy),
+            &safe,
+            true,
+        );
+        assert!(
+            inferred.validation_vetoed,
+            "the premise failed — this column is not vetoed when inferred, so \
+             the nominated case below proves nothing"
+        );
+        assert_ne!(inferred.label, "identity.person.email");
+
+        // Nominated, the same column and the same values keep the label.
+        let nominated = decide_label(
+            Some("identity.person.email"),
+            "identity.person.email",
+            &values,
+            Some(&taxonomy),
+            &safe,
+            true,
+        );
+        assert_eq!(nominated.label, "identity.person.email");
+        assert!(nominated.nominated);
+        assert!(!nominated.validation_vetoed);
+        assert!(!nominated.validation_advisory_low);
+        assert_eq!(nominated.validation_pass_rate, None);
+        assert_eq!(nominated.vetoed_type, None);
+        assert_eq!(nominated.fallback_rule, None);
+
+        // …and none of that reaches the output.
+        let mut p = profile("identity.person.email", true);
+        p.validation_pass_rate = nominated.validation_pass_rate;
+        p.validation_vetoed = nominated.validation_vetoed;
+        p.validation_advisory_low = nominated.validation_advisory_low;
+        p.vetoed_type = nominated.vetoed_type.clone();
+        assert!(!plain_row(&p).contains(" ⊘ vetoed:"));
+        let obj = json_column_object(&p, false);
+        let obj = obj.as_object().unwrap();
+        for absent in ["validation_vetoed", "vetoed_type", "validation_pass_rate"] {
+            assert!(!obj.contains_key(absent), "{obj:?}");
+        }
+    }
+
+    #[test]
+    fn inference_still_decides_a_column_nobody_nominated() {
+        let taxonomy = taxonomy();
+        let safe: HashSet<String> = HashSet::new();
+        let values: Vec<String> = vec!["ada@example.com".into(), "grace@example.org".into()];
+        let out = decide_label(
+            None,
+            "identity.person.email",
+            &values,
+            Some(&taxonomy),
+            &safe,
+            true,
+        );
+        assert_eq!(out.label, "identity.person.email");
+        assert!(!out.nominated);
+    }
+}
