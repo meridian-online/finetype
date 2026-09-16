@@ -7,4 +7,5 @@
 //! its caller in `main.rs`.
 
 pub mod enum_emission;
+pub mod nominations;
 pub mod transform_projection;

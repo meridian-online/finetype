@@ -339,6 +339,40 @@ The hide mechanism is `#[command(hide = true)]` on the clap variant — no wrapp
 | `finetype train` *(hidden)* | Train CharCNN models (flat/tiered). `--seed N` for deterministic. Auto-snapshots. |
 ```
 
+### Type nominations (`profile --nominations`)
+
+A nomination declares what a column IS, rather than letting FineType guess. It takes a JSON file — conventionally `nominations.finetype.json`, though `--nominations` accepts any path — keyed on the input's file stem and then on column name:
+
+```json
+{
+  "version": 1,
+  "resources": {
+    "naics": {
+      "description": { "label": "representation.text.plain_text", "why": "free-form descriptions" }
+    }
+  }
+}
+```
+
+`resources` is required, `version` is optional and defaults to `1`, `label` is required, and `why` is free text FineType records and never interprets.
+
+**A nomination is taken as given.** The classifier still runs for a nominated column — the model is loaded for the file regardless, and the per-column statistics every output publishes come off the same pass — but its label, confidence, quality band, runner-up and veto result are all discarded. The validation-as-veto does not run against a nominated column: the veto exists to stop the model asserting a type the data contradicts, and there is no model assertion here to stop. Data that has drifted from a declared type is a `finetype validate` finding against the schema, not grounds for FineType to publish a different type than the one it was told.
+
+The nominated label reaches the emitters as a label and nothing else, so it goes through the same `finetype_core::Taxonomy::publication_for` every inferred label goes through and carries the same taxonomy bounds. A nominated column is marked so a reader can tell a declaration from a guess:
+
+```
+| Output | Marker | Confidence |
+|---|---|---|
+| `-o datapackage` | `x-finetype-nominated: true` | `x-finetype-confidence` omitted |
+| `-o json-schema` | `x-finetype-nominated: true` | n/a (never carried one) |
+| `-o json` | `"nominated": true` | `confidence`, `quality_band`, `runner_up` omitted |
+| `-o plain` | CONF cell reads `decl` | no percentage, no band glyph |
+```
+
+**`-o csv`, `-o markdown` and `-o arrow` carry no marker, and that is a known gap.** `-o csv` writes a fixed fourteen-column header whose `confidence` and `quality_band` cells have no place for one without changing the header, which is its own contract change; `markdown` and `arrow` have the same shape problem. A nominated column in those three formats still shows the classifier's discarded confidence. Use `plain`, `json`, `json-schema` or `datapackage` when the distinction matters.
+
+Every departure from the file's shape stops the run before any profiling, naming the JSON path to the offence: an unknown key at any level, a missing `label`, a label the taxonomy does not carry, a label whose Frictionless type the Data Package v2 profile does not admit (`container.array.comma_separated` is the one of 251 that maps to `list`), a declared column the file does not have, and a declared stem no input matches. The reverse is not an error — an input with no entry in the file is profiled by inference, which is the ordinary `--files` batch case. The asymmetry with inference is deliberate: an *inferred* `list` still emits, because that is a mid-run model answer about data the caller cannot change, while a *nominated* `list` is a deliberate declaration made before any work starts and can be refused while the person is still holding the file they can fix.
+
 ## Model-Name Env Vars
 
 Three env vars exist — each is read by exactly one consumer. Do not conflate.

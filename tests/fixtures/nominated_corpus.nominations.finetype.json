@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "resources": {
+    "nominated_corpus": {
+      "corpus": {
+        "label": "representation.text.plain_text",
+        "why": "free-form registry prose; the people who wrote these rows know it is text"
+      }
+    }
+  }
+}

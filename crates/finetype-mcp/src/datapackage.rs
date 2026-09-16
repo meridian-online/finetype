@@ -19,8 +19,7 @@
 //!   nowhere, so the extensions validate cleanly.
 
 use finetype_core::enum_domain::{detect_enum_domain, label_is_enum_keyword_eligible, EnumConfig};
-use finetype_core::frictionless_vocabulary::constraint_vocabulary;
-use finetype_core::{PatternFit, Taxonomy};
+use finetype_core::{LabelPublication, PatternSource, Taxonomy};
 use serde_json::{json, Map, Value};
 use std::collections::BTreeSet;
 
@@ -39,10 +38,20 @@ pub struct DatapackageColumn<'a> {
     /// constraint and the open `x-finetype-enum-domain`).
     pub values: &'a [String],
     /// Inference confidence (0..1), surfaced as `x-finetype-confidence`.
+    ///
+    /// **Ignored when `nominated`.** A declared type was not inferred, so there
+    /// is no confidence to publish and a number here would read as one. The
+    /// suppression is decided in this emitter rather than in each caller so
+    /// every caller answers it the same way.
     pub confidence: Option<f32>,
     /// Detected locale for locale-specific types, surfaced as
     /// `x-finetype-locale`. `None` / `UNIVERSAL` is omitted.
     pub locale: Option<&'a str>,
+    /// Whether `label` was **declared** by the caller rather than inferred,
+    /// surfaced as `x-finetype-nominated`. A reader that cannot tell a
+    /// declaration from a guess has to treat both the same way, which is what
+    /// the marker exists to prevent.
+    pub nominated: bool,
 }
 
 /// Resource-level metadata for the single Data Resource. Computed by the caller
@@ -196,17 +205,9 @@ pub fn emit_datapackage(
 /// `x-finetype-*` custom properties (ac-03).
 fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold: usize) -> Value {
     let def = taxonomy.get(col.label);
-    let fx = def.and_then(|d| d.frictionless.as_ref());
 
     let mut field = Map::new();
     field.insert("name".into(), json!(col.name));
-
-    // ── ac-02 core: type + format from the authoritative map ──
-    let ftype = fx.map(|f| f.ftype.as_str()).unwrap_or("string");
-    field.insert("type".into(), json!(ftype));
-    if let Some(fmt) = fx.and_then(|f| f.format.as_ref()) {
-        field.insert("format".into(), json!(fmt));
-    }
 
     // The published `pattern` is fitted to the values observed in THIS column,
     // not taken from the type. A correct label whose column carries legitimate
@@ -216,14 +217,22 @@ fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold
         .and_then(|d| d.validation.as_ref())
         .and_then(|v| v.fit_pattern(col.values));
 
-    let FieldConstraints { kept, off_type } = constraints_for(
+    // ── ac-02 core: type, format and the type's own constraints, all from the
+    // one function in `finetype-core` that decides what a label publishes. A
+    // nomination reaches this emitter as a label and nothing else, so it takes
+    // exactly this route and there is no second constraint path to bypass it.
+    let published = taxonomy.publication_for(
         col.label,
-        col.values,
-        def,
-        ftype,
-        enum_threshold,
-        fit.as_ref(),
+        PatternSource::Observed(fit.as_ref().and_then(|f| f.published())),
     );
+    let ftype = published.ftype.as_str();
+    field.insert("type".into(), json!(ftype));
+    if let Some(fmt) = &published.format {
+        field.insert("format".into(), json!(fmt));
+    }
+
+    let FieldConstraints { kept, off_type } =
+        constraints_for(col.label, col.values, published, enum_threshold);
     if !kept.is_empty() {
         field.insert("constraints".into(), Value::Object(kept));
     }
@@ -251,7 +260,12 @@ fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold
             );
         }
     }
-    if let Some(conf) = col.confidence {
+    // A declared type is marked as one, and publishes no confidence: the
+    // classifier's answer for a nominated column is discarded, and a number
+    // here would be a claim about a guess nobody made.
+    if col.nominated {
+        field.insert("x-finetype-nominated".into(), json!(true));
+    } else if let Some(conf) = col.confidence {
         field.insert(
             "x-finetype-confidence".into(),
             json!((conf as f64 * 10000.0).round() / 10000.0),
@@ -291,55 +305,30 @@ struct FieldConstraints {
     off_type: Map<String, Value>,
 }
 
-/// Frictionless `constraints` for a field: `pattern`/`minLength`/`maxLength`/
-/// `minimum`/`maximum` from the type's static validation, plus `enum` ONLY when
-/// the column is a closed categorical (observed, enum-keyword-eligible).
+/// A field's `constraints`, split as [`finetype_core::Taxonomy::publication_for`]
+/// splits them, plus the one keyword that is a fact about THIS column rather
+/// than about its label: the closed-categorical `enum`.
 ///
-/// Every keyword is then routed by the declared type's v2 vocabulary
-/// ([`finetype_core::frictionless_vocabulary`]). The field object in v2 is a
-/// fifteen-branch `oneOf`, one branch per type, each with its own `constraints`
-/// properties — so `pattern` beside `"type": "integer"` is not surplus
-/// information a reader skips, it is a descriptor `frictionless==5.19.0`
-/// refuses outright. Keywords with no place on the declared type move to
-/// `x-finetype-unsupported-constraints`; they are true of the column and the
-/// standard has nowhere to put them.
+/// Everything type-derived — `pattern`/`minLength`/`maxLength`/`minimum`/
+/// `maximum`, and which of them the declared type has a place for — is decided
+/// in `finetype-core`, because dovetail's emitter asks the same question and
+/// must get the same answer. What is left here is the observed `enum`, which
+/// needs the column's values and so cannot be answered from a label alone.
 ///
-/// A declared type outside the profile's fifteen (the taxonomy's `list`, which
-/// v2 specifies and neither the vendored profile nor the reference
-/// implementation implements) has no vocabulary to route against, so its
-/// constraints are left where they are — filtering against a vocabulary we do
-/// not have would be a guess, and the field is refused for its type either way.
-///
-/// `fit` is the reconciliation of the type's canonical `pattern` with this
-/// column's observed values; it decides whether a `pattern` is published, and
-/// which one. `None` means the type carries no pattern.
+/// `enum` is legal beside every one of the profile's fifteen types, so adding
+/// it after the split is the same answer as adding it before.
 fn constraints_for(
     label: &str,
     values: &[String],
-    def: Option<&finetype_core::Definition>,
-    ftype: &str,
+    published: LabelPublication,
     enum_threshold: usize,
-    fit: Option<&PatternFit>,
 ) -> FieldConstraints {
-    let mut c = Map::new();
-
-    if let Some(v) = def.and_then(|d| d.validation.as_ref()) {
-        if let Some(pattern) = fit.and_then(|f| f.published()) {
-            c.insert("pattern".into(), json!(pattern));
-        }
-        if let Some(n) = v.min_length {
-            c.insert("minLength".into(), json!(n));
-        }
-        if let Some(n) = v.max_length {
-            c.insert("maxLength".into(), json!(n));
-        }
-        if let Some(x) = v.minimum {
-            c.insert("minimum".into(), json!(x));
-        }
-        if let Some(x) = v.maximum {
-            c.insert("maximum".into(), json!(x));
-        }
-    }
+    let LabelPublication {
+        ftype,
+        constraints: mut kept,
+        unsupported_constraints: off_type,
+        ..
+    } = published;
 
     // Closed-categorical enum: same eligibility gate as the json-schema emitter,
     // but only on `string` fields — an observed-value enum (raw strings) is only
@@ -354,26 +343,10 @@ fn constraints_for(
         if unique.len() <= enum_threshold {
             let mut vals: Vec<&str> = unique.into_iter().collect();
             vals.sort();
-            c.insert("enum".into(), json!(vals));
+            kept.insert("enum".into(), json!(vals));
         }
     }
 
-    let Some(vocabulary) = constraint_vocabulary(ftype) else {
-        return FieldConstraints {
-            kept: c,
-            off_type: Map::new(),
-        };
-    };
-
-    let mut kept = Map::new();
-    let mut off_type = Map::new();
-    for (keyword, value) in c {
-        if vocabulary.contains(&keyword.as_str()) {
-            kept.insert(keyword, value);
-        } else {
-            off_type.insert(keyword, value);
-        }
-    }
     FieldConstraints { kept, off_type }
 }
 
@@ -386,6 +359,14 @@ mod tests {
         // A string/email with validation + pii, and a bare date/pattern.
         Taxonomy::from_yaml(
             r#"
+representation.text.plain_text:
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+  validation:
+    type: string
+    minLength: 1
+    maxLength: 65536
 identity.person.email:
   broad_type: VARCHAR
   pii: true
@@ -441,6 +422,7 @@ representation.numeric.integer_number:
             values: &owned,
             confidence: Some(0.9),
             locale: None,
+            nominated: false,
         }];
         let dp = emit_datapackage(&cols, &meta(), &test_taxonomy(), 32);
         dp["resources"][0]["schema"]["fields"][0].clone()
@@ -469,6 +451,7 @@ representation.numeric.integer_number:
                 values: &[],
                 confidence: Some(0.875), // exactly representable → stable rounding
                 locale: None,
+                nominated: false,
             },
             DatapackageColumn {
                 name: "d",
@@ -476,6 +459,7 @@ representation.numeric.integer_number:
                 values: &[],
                 confidence: Some(0.5),
                 locale: Some("UNIVERSAL"), // sentinel → omitted
+                nominated: false,
             },
             DatapackageColumn {
                 name: "mystery",
@@ -483,6 +467,7 @@ representation.numeric.integer_number:
                 values: &[],
                 confidence: None,
                 locale: None,
+                nominated: false,
             },
         ];
         let dp = emit_datapackage(&cols, &meta(), &tax, 32);
@@ -546,6 +531,7 @@ representation.numeric.integer_number:
             values: &[],
             confidence: None,
             locale: None,
+            nominated: false,
         }];
         let dp = emit_datapackage(&cols, &m, &tax, 32);
         assert!(dp["resources"][0].get("encoding").is_none());
@@ -618,6 +604,7 @@ representation.numeric.integer_number:
             values: &[],
             confidence: Some(0.9),
             locale: None,
+            nominated: false,
         }];
         let dp = emit_datapackage(&cols, &meta(), &tax, 32);
         let field = &dp["resources"][0]["schema"]["fields"][0];
@@ -738,5 +725,132 @@ representation.numeric.integer_number:
                 "{label}: the routing must move every keyword, not lose one"
             );
         }
+    }
+    // ── Nomination ───────────────────────────────────────────────────────────
+    //
+    // A nomination reaches this emitter as a LABEL and a flag, and nothing
+    // else. There is no second constraint path for it, which is why the two
+    // tests below can pin what a nominated field publishes by building the
+    // column directly.
+
+    #[test]
+    fn a_nominated_field_publishes_its_taxonomy_bounds_and_no_confidence() {
+        let taxonomy = test_taxonomy();
+        let values: Vec<String> = (0..4)
+            .map(|i| format!("row {i} of registry prose"))
+            .collect();
+        let cols = vec![DatapackageColumn {
+            name: "corpus",
+            label: "representation.text.plain_text",
+            values: &values,
+            // Deliberately Some: the emitter, not the caller, decides that a
+            // declared type publishes no confidence. A caller that forgets
+            // must not be able to publish one.
+            confidence: Some(0.42),
+            locale: None,
+            nominated: true,
+        }];
+        let descriptor = emit_datapackage(&cols, &meta(), &taxonomy, 32);
+        let field = &descriptor["resources"][0]["schema"]["fields"][0];
+
+        assert_eq!(field["type"], "string");
+        assert_eq!(field["x-finetype-label"], "representation.text.plain_text");
+        assert_eq!(field["x-finetype-nominated"], true);
+        assert_eq!(field["constraints"]["minLength"], 1);
+        assert_eq!(field["constraints"]["maxLength"], 65536);
+        assert!(
+            field.get("x-finetype-confidence").is_none(),
+            "a declared type published a confidence: {field}"
+        );
+    }
+
+    #[test]
+    fn a_nominated_date_routes_its_off_type_constraints_exactly_as_an_inferred_one() {
+        // AC4's pin, taken through the nomination path: `date` has no place for
+        // `pattern`/`minLength`/`maxLength`, so a nominated date must carry no
+        // `constraints` key at all and exactly three off-type keywords. A
+        // second constraint path that bypassed the vocabulary filter would
+        // show up here as a `constraints` object.
+        let taxonomy = test_taxonomy();
+        let values: Vec<String> = vec!["2026-01-01".into(), "2026-02-02".into()];
+        let cols = vec![DatapackageColumn {
+            name: "observed_on",
+            label: "datetime.date.iso",
+            values: &values,
+            confidence: None,
+            locale: None,
+            nominated: true,
+        }];
+        let descriptor = emit_datapackage(&cols, &meta(), &taxonomy, 32);
+        let field = &descriptor["resources"][0]["schema"]["fields"][0];
+
+        assert_eq!(field["type"], "date");
+        assert_eq!(field["x-finetype-nominated"], true);
+        assert!(
+            field.get("constraints").is_none(),
+            "a nominated date carried a constraints object: {field}"
+        );
+        let off = field["x-finetype-unsupported-constraints"]
+            .as_object()
+            .expect("off-type carrier");
+        assert_eq!(off.len(), 3, "off-type keywords: {off:?}");
+        assert_eq!(off["pattern"], r"^\d{4}-\d{2}-\d{2}$");
+        assert_eq!(off["minLength"], 10);
+        assert_eq!(off["maxLength"], 10);
+    }
+
+    #[test]
+    fn nominating_a_column_changes_nothing_outside_its_own_field() {
+        // The same two columns, emitted once with the first nominated and once
+        // without. Everything but that field's own object is byte-identical —
+        // including the resource's bytes/hash/path and the second field.
+        let taxonomy = test_taxonomy();
+        let corpus: Vec<String> = vec!["some prose".into(), "more prose".into()];
+        let dates: Vec<String> = vec!["2026-01-01".into(), "2026-02-02".into()];
+        let build = |nominated: bool| {
+            let cols = vec![
+                DatapackageColumn {
+                    name: "corpus",
+                    label: "representation.text.plain_text",
+                    values: &corpus,
+                    confidence: Some(0.9),
+                    locale: None,
+                    nominated,
+                },
+                DatapackageColumn {
+                    name: "observed_on",
+                    label: "datetime.date.iso",
+                    values: &dates,
+                    confidence: Some(0.9),
+                    locale: None,
+                    nominated: false,
+                },
+            ];
+            emit_datapackage(&cols, &meta(), &taxonomy, 32)
+        };
+        let mut with = build(true);
+        let mut without = build(false);
+        // `created` is `Utc::now()` at emit time, so two runs a microsecond
+        // apart differ there with no nomination involved.
+        assert!(with.get("created").is_some(), "created is emitted");
+        with["created"] = serde_json::Value::Null;
+        without["created"] = serde_json::Value::Null;
+
+        let strip_first_field = |d: &mut Value| {
+            d["resources"][0]["schema"]["fields"][0] = Value::Null;
+        };
+        let mut with_stripped = with.clone();
+        let mut without_stripped = without.clone();
+        strip_first_field(&mut with_stripped);
+        strip_first_field(&mut without_stripped);
+        assert_eq!(
+            with_stripped, without_stripped,
+            "nominating `corpus` changed something outside its own field"
+        );
+        assert_ne!(
+            with["resources"][0]["schema"]["fields"][0],
+            without["resources"][0]["schema"]["fields"][0],
+            "nominating `corpus` changed nothing at all"
+        );
     }
 }

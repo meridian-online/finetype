@@ -46,15 +46,22 @@ fn meta() -> ResourceMeta {
 /// because each one changes what the descriptor carries: a widened pattern and a
 /// dropped one, each accompanied by an `x-finetype-pattern-fit` extension the
 /// profile has to accept.
-fn fixture_columns() -> Vec<(&'static str, &'static str, Vec<String>)> {
+/// The fourth element is whether the column was NOMINATED. A nominated field
+/// carries `x-finetype-nominated` in place of `x-finetype-confidence`, and the
+/// profile has to accept both — the marker itself cannot break conformance,
+/// since the profile sets `additionalProperties: false` nowhere, so a failure
+/// here means the nomination changed `type` or `constraints`, which is the
+/// thing worth catching.
+fn fixture_columns() -> Vec<(&'static str, &'static str, Vec<String>, bool)> {
     vec![
-        ("email", "identity.person.email", vec![]),
-        ("d", "datetime.date.dmy_slash", vec![]),
-        ("lat", "geography.coordinate.latitude", vec![]),
+        ("email", "identity.person.email", vec![], false),
+        ("d", "datetime.date.dmy_slash", vec![], false),
+        ("lat", "geography.coordinate.latitude", vec![], false),
         (
             "jurisdiction",
             "geography.location.country_code",
             vec!["US".into(), "FR".into(), "US-DE".into(), "CA-ON".into()],
+            false,
         ),
         (
             "registry",
@@ -66,18 +73,30 @@ fn fixture_columns() -> Vec<(&'static str, &'static str, Vec<String>)> {
                 "The Netherlands".into(),
                 "Cote d'Ivoire".into(),
             ],
+            false,
         ),
         (
             "flag",
             "representation.boolean.binary",
             vec!["0".into(), "1".into(), "1".into(), "0".into()],
+            false,
         ),
         (
             "category",
             "representation.discrete.categorical",
             vec!["A".into(), "B".into(), "A".into()],
+            false,
         ),
-        ("mystery", "unknown", vec![]),
+        ("mystery", "unknown", vec![], false),
+        // A NOMINATED column: `representation.text.plain_text` declared rather
+        // than inferred, so the field publishes `minLength`/`maxLength` from
+        // the taxonomy and `x-finetype-nominated` in place of a confidence.
+        (
+            "corpus",
+            "representation.text.plain_text",
+            vec!["some registry prose".into(), "more of it".into()],
+            true,
+        ),
     ]
 }
 
@@ -87,12 +106,13 @@ fn emitted_descriptor_validates_against_vendored_profile() {
     let fixtures = fixture_columns();
     let cols: Vec<DatapackageColumn<'_>> = fixtures
         .iter()
-        .map(|(name, label, values)| DatapackageColumn {
+        .map(|(name, label, values, nominated)| DatapackageColumn {
             name,
             label,
             values,
             confidence: Some(0.9),
             locale: None,
+            nominated: *nominated,
         })
         .collect();
 
@@ -139,12 +159,13 @@ fn every_field_type_format_round_trips_to_the_map() {
     let fixtures = fixture_columns();
     let cols: Vec<DatapackageColumn<'_>> = fixtures
         .iter()
-        .map(|(name, label, values)| DatapackageColumn {
+        .map(|(name, label, values, nominated)| DatapackageColumn {
             name,
             label,
             values,
             confidence: None,
             locale: None,
+            nominated: *nominated,
         })
         .collect();
 
@@ -153,7 +174,7 @@ fn every_field_type_format_round_trips_to_the_map() {
         .as_array()
         .unwrap();
 
-    for ((_, label, _), field) in fixtures.iter().zip(fields) {
+    for ((_, label, _, _), field) in fixtures.iter().zip(fields) {
         let emitted_type = field["type"].as_str().unwrap();
         let emitted_format = field.get("format").and_then(|f| f.as_str());
 
@@ -221,6 +242,7 @@ fn descriptor_over(labels: &[(String, String)], taxonomy: &Taxonomy) -> serde_js
             values: &empty,
             confidence: Some(0.9),
             locale: None,
+            nominated: false,
         })
         .collect();
     emit_datapackage(&cols, &meta(), taxonomy, 32)
@@ -236,7 +258,7 @@ fn no_emitted_field_carries_a_constraint_outside_its_declared_types_vocabulary()
     columns.extend(
         fixture_columns()
             .iter()
-            .map(|(n, l, _)| ((*n).to_string(), (*l).to_string())),
+            .map(|(n, l, _, _)| ((*n).to_string(), (*l).to_string())),
     );
     assert!(
         columns.len() > 200,

@@ -63,6 +63,11 @@ pub struct TableSchemaColumn<'a> {
     /// (card 0020 honest typing — an analyst sees WHY, not just THAT). `None`
     /// for typed columns or when no reason is available.
     pub unknown_reason: Option<&'a str>,
+    /// Whether `label` was **declared** by the caller rather than inferred,
+    /// surfaced as `x-finetype-nominated` beside `x-finetype-label`. Without
+    /// the marker a reader cannot tell a declaration from a guess, and has to
+    /// treat the two the same way.
+    pub nominated: bool,
 }
 
 /// Emit a table-level JSON Schema document.
@@ -121,6 +126,9 @@ pub fn emit_table_schema(
 
         // Verbosity contract: label + pii.
         prop.insert("x-finetype-label".into(), json!(col.label));
+        if col.nominated {
+            prop.insert("x-finetype-nominated".into(), json!(true));
+        }
         prop.insert("x-finetype-pii".into(), json!(pii));
 
         // x-finetype-enum surfaces by DEFAULT (not gated on --stats): a bounded value
@@ -350,6 +358,7 @@ mod tests {
                 values: &country,
                 null_count: 0,
                 unknown_reason: None,
+                nominated: false,
             },
             TableSchemaColumn {
                 name: "colour",
@@ -357,6 +366,7 @@ mod tests {
                 values: &word,
                 null_count: 0,
                 unknown_reason: None,
+                nominated: false,
             },
             TableSchemaColumn {
                 name: "n",
@@ -364,6 +374,7 @@ mod tests {
                 values: &ints,
                 null_count: 0,
                 unknown_reason: None,
+                nominated: false,
             },
         ];
         let schema = emit_table_schema(&cols, "t", "id", &taxonomy, true, 32);
@@ -416,6 +427,7 @@ mod tests {
             values: &level,
             null_count: 0,
             unknown_reason: None,
+            nominated: false,
         }];
         let schema = emit_table_schema(&cols, "t", "id", &taxonomy, false, 0);
         let props = schema
@@ -457,6 +469,7 @@ mod tests {
                 unknown_reason: Some(
                     "validation rejected 'npi': only 12% of values matched its format",
                 ),
+                nominated: false,
             },
             TableSchemaColumn {
                 name: "bare",
@@ -464,6 +477,7 @@ mod tests {
                 values: &vals,
                 null_count: 3,
                 unknown_reason: None,
+                nominated: false,
             },
         ];
         let schema = emit_table_schema(&cols, "t", "id", &taxonomy, false, 0);
@@ -530,5 +544,44 @@ mod tests {
                 dropped
             );
         }
+    }
+    #[test]
+    fn a_nominated_property_is_marked_as_declared_beside_its_label() {
+        // Without the marker a reader sees a label and cannot tell whether a
+        // person declared it or a model guessed it, and has to treat both the
+        // same way — which is the whole of what nominating buys.
+        let taxonomy = Taxonomy::from_directory(labels_path()).expect("load taxonomy");
+        let vals: Vec<String> = vec!["some registry prose".into(), "more of it".into()];
+        let cols = vec![
+            TableSchemaColumn {
+                name: "corpus",
+                label: "representation.text.plain_text",
+                values: &vals,
+                null_count: 0,
+                unknown_reason: None,
+                nominated: true,
+            },
+            TableSchemaColumn {
+                name: "guessed",
+                label: "representation.text.plain_text",
+                values: &vals,
+                null_count: 0,
+                unknown_reason: None,
+                nominated: false,
+            },
+        ];
+        let schema = emit_table_schema(&cols, "t", "t.csv", &taxonomy, false, 32);
+        let props = &schema["properties"];
+
+        assert_eq!(
+            props["corpus"]["x-finetype-label"],
+            "representation.text.plain_text"
+        );
+        assert_eq!(props["corpus"]["x-finetype-nominated"], true);
+        assert!(
+            props["guessed"].get("x-finetype-nominated").is_none(),
+            "an inferred property claimed to be nominated: {}",
+            props["guessed"]
+        );
     }
 }
