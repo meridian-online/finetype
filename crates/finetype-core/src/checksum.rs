@@ -5,8 +5,6 @@
 //! A length/format-only validation "confirms 90% of random input"; the
 //! checksum is what distinguishes "is this type" from "is not this type".
 //!
-//! This module is the canonical home for that arithmetic. Two callers share it:
-//!
 //! * [`crate::table_validator`], the engine behind the `validate` verb. A column
 //!   whose schema carries `x-finetype-label` pointing at a leaf with a
 //!   `checksum:` directive is check-digit verified, and a value that fails is
@@ -31,11 +29,6 @@
 //! checksum adds the substance check on top. `table_validator` enforces that
 //! order explicitly: it asks for the check digit only after the column's shape
 //! constraints have passed.
-//!
-//! A new algo-exists type enrols by adding one entry to [`resolve`], one entry
-//! to [`CHECKSUM_LABELS`], and a one-line `checksum:` directive in its YAML —
-//! no new bespoke veto. [`checksum_labels_match_taxonomy`] reddens if the table
-//! and the YAML ever disagree.
 
 /// Validate an ISBN-10 or ISBN-13 by its check digit (not just digit count).
 ///
@@ -643,10 +636,6 @@ pub fn resolve(name: &str) -> Option<fn(&str) -> bool> {
 /// `embedded-taxonomy` feature off. A check that silently becomes a no-op
 /// wherever the YAML is absent is worse than no check, so the validate path
 /// resolves the directive from this table instead.
-///
-/// `checksum_labels_match_taxonomy` in this module's tests parses the shipped
-/// YAML and asserts this table is exactly what it contains, so the taxonomy
-/// stays authoritative and drift reddens CI rather than going unnoticed.
 ///
 /// Sorted by label.
 pub const CHECKSUM_LABELS: &[(&str, &str)] = &[
