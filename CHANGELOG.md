@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   not carry and a label whose Frictionless type the Data Package v2 profile
   does not admit stop the run in that same pass, naming the column, the stem
   and the label. A declared stem no input matches stops it there too, naming
-  the stem and the file. A declared column the file does not have is checked
+  the stem. A declared column the file does not have is checked
   per file, once that file is read, so in a `--files` batch it does not undo
   files already profiled and written earlier in the run. An input with no
   entry is profiled by inference, which is the ordinary batch case. A
