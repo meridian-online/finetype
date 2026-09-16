@@ -85,7 +85,13 @@ pub struct RejectRecord {
     /// `expected_type` — not set by the validator).
     pub type_confidence: Option<f64>,
     /// Canonical constraint token: one of `pattern` | `min_length` |
-    /// `max_length` | `enum` | `type` | `required` | `other`.
+    /// `max_length` | `enum` | `checksum` | `type` | `required` | `other`.
+    ///
+    /// `checksum` is emitted when the column's `x-finetype-label` names a
+    /// taxonomy leaf carrying a `checksum:` directive and the value's check
+    /// digit does not verify. It is distinct from `pattern` on purpose: the
+    /// value HAS the leaf's shape, which is exactly why shape alone was not
+    /// enough to catch it.
     pub constraint_failed: String,
     /// The constraint's value for debugging without a schema round-trip
     /// (pattern regex, length limit as a string, enum list as a
@@ -181,13 +187,60 @@ struct EnumCheck {
     options_token: String,
 }
 
-/// Split a column schema into a jsonschema validator (with `enum` removed) and
-/// an optional case-folded `EnumCheck`. When the schema carries no `enum`, the
-/// validator is compiled unchanged and the check is `None`.
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHECK-DIGIT SUBSTANCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Per-column check-digit verification, resolved from the column schema's
+/// `x-finetype-label` extension.
+///
+/// `finetype validate` used to confirm shape and call it validation: a
+/// 20-character alphanumeric string that is not an LEI, or a 13-digit number
+/// that is not an ISBN, cleared the gate. The taxonomy has declared the
+/// arithmetic all along — a `checksum:` directive on the leaf — and
+/// `finetype_core::checksum` has held it all along; nothing on this path read
+/// either. This struct is that reading.
+///
+/// `None` for every column whose schema carries no `x-finetype-label`, or whose
+/// label declares no directive, which is the overwhelming majority — the
+/// directive is declared on nineteen leaves.
+struct ChecksumCheck {
+    /// The scheme the leaf's `checksum:` directive names (`lei`, `isbn`, …).
+    /// Reported as the reject's `constraint_value`.
+    scheme: &'static str,
+    /// The check-digit function that scheme resolves to.
+    verify: fn(&str) -> bool,
+}
+
+/// Resolve a column schema's `x-finetype-label` to its check-digit function.
+///
+/// Reads the label from the schema rather than taking a `Taxonomy`, and
+/// resolves through [`crate::checksum::checker_for_label`] rather than through
+/// `Definition.checksum`, because `validate` has to substance-check whether or
+/// not a `labels/` directory exists at runtime — see the note on
+/// `checksum::CHECKSUM_LABELS`.
+fn build_checksum_check(col_schema: &Value) -> Option<ChecksumCheck> {
+    let label = col_schema.get("x-finetype-label")?.as_str()?;
+    let scheme = crate::checksum::scheme_for_label(label)?;
+    let verify = crate::checksum::resolve(scheme)?;
+    Some(ChecksumCheck { scheme, verify })
+}
+
+/// Split a column schema into a jsonschema validator (with `enum` removed), an
+/// optional case-folded `EnumCheck`, and an optional `ChecksumCheck`. When the
+/// schema carries no `enum`, the validator is compiled unchanged and the check
+/// is `None`; likewise for a column with no checksum-bearing label.
 fn build_column_validator(
     col_name: &str,
     col_schema: &Value,
-) -> Result<(jsonschema::Validator, Option<EnumCheck>), TableValidatorError> {
+) -> Result<
+    (
+        jsonschema::Validator,
+        Option<EnumCheck>,
+        Option<ChecksumCheck>,
+    ),
+    TableValidatorError,
+> {
     let mut schema_for_jsonschema = col_schema.clone();
     let enum_check = if let Value::Object(map) = &mut schema_for_jsonschema {
         match map.remove("enum") {
@@ -220,7 +273,7 @@ fn build_column_validator(
             detail: e.to_string(),
         }
     })?;
-    Ok((validator, enum_check))
+    Ok((validator, enum_check, build_checksum_check(col_schema)))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -279,19 +332,33 @@ pub fn validate_table(
     // Sort by column index so iteration order is deterministic and matches
     // the column order in `headers` (ac-03: byte-identical output on repeat
     // calls). `serde_json::Map` iteration is arbitrary otherwise.
-    let mut validators: Vec<(usize, String, jsonschema::Validator, Option<EnumCheck>)> = Vec::new();
+    #[allow(clippy::type_complexity)]
+    let mut validators: Vec<(
+        usize,
+        String,
+        jsonschema::Validator,
+        Option<EnumCheck>,
+        Option<ChecksumCheck>,
+    )> = Vec::new();
     for (col_name, col_schema) in properties {
         if let Some(&col_idx) = header_index.get(col_name.as_str()) {
-            let (validator, enum_check) = build_column_validator(col_name, col_schema)?;
-            validators.push((col_idx, col_name.clone(), validator, enum_check));
+            let (validator, enum_check, checksum_check) =
+                build_column_validator(col_name, col_schema)?;
+            validators.push((
+                col_idx,
+                col_name.clone(),
+                validator,
+                enum_check,
+                checksum_check,
+            ));
         }
         // Columns in schema but not in data are tracked in missing_columns
     }
-    validators.sort_by_key(|(col_idx, _, _, _)| *col_idx);
+    validators.sort_by_key(|(col_idx, _, _, _, _)| *col_idx);
 
     // Per-column counters
     let mut col_stats: HashMap<String, (usize, usize, usize)> = HashMap::new(); // (valid, invalid, null)
-    for (_, name, _, _) in &validators {
+    for (_, name, _, _, _) in &validators {
         col_stats.insert(name.clone(), (0, 0, 0));
     }
 
@@ -303,7 +370,7 @@ pub fn validate_table(
     for (row_idx, row) in rows.iter().enumerate() {
         let mut errors: Vec<CellError> = Vec::new();
 
-        for (col_idx, col_name, validator, enum_check) in &validators {
+        for (col_idx, col_name, validator, enum_check, checksum_check) in &validators {
             let cell = row.get(*col_idx).unwrap_or(&None);
 
             if is_null(cell) {
@@ -373,6 +440,42 @@ pub fn validate_table(
                 }
             }
 
+            // Check digit (the taxonomy's `checksum:` directive). Runs ONLY
+            // when every shape constraint above passed, and the order is the
+            // point rather than an optimisation: a check digit is defined on
+            // values that already have the type's shape. Asking whether a
+            // 7-character string carries a valid 20-character LEI check digit
+            // has one answer for every such string, so a second reject on a
+            // value already rejected for `pattern` would add no information and
+            // would move reject counts for data whose verdict has not changed.
+            // What this stage catches is exactly the class shape cannot: a
+            // value that IS the right shape and is still not that identifier.
+            if cell_rejects.is_empty() {
+                if let Some(check) = checksum_check {
+                    if !(check.verify)(value_str) {
+                        let error_message =
+                            format!("{} fails its {} check digit", json_value, check.scheme);
+                        cell_rejects.push(RejectRecord {
+                            row_index: row_idx,
+                            column_index: *col_idx,
+                            column_name: col_name.clone(),
+                            value: Some(value_str.to_string()),
+                            expected_type: None,
+                            type_confidence: None,
+                            constraint_failed: "checksum".to_string(),
+                            constraint_value: Some(check.scheme.to_string()),
+                            error_message: error_message.clone(),
+                        });
+                        cell_errors.push(CellError {
+                            column: col_name.clone(),
+                            value: Some(value_str.to_string()),
+                            error: error_message,
+                            schema_path: "/x-finetype-label/checksum".to_string(),
+                        });
+                    }
+                }
+            }
+
             if cell_rejects.is_empty() {
                 if let Some(stats) = col_stats.get_mut(col_name) {
                     stats.0 += 1;
@@ -414,7 +517,7 @@ pub fn validate_table(
     // Build column stats
     let columns: Vec<ColumnValidationStats> = validators
         .iter()
-        .map(|(_, name, _, _)| {
+        .map(|(_, name, _, _, _)| {
             let (valid, invalid, null) = col_stats.get(name).copied().unwrap_or((0, 0, 0));
             let total = valid + invalid + null;
             let non_null = valid + invalid;
@@ -779,6 +882,7 @@ mod tests {
         "min_length",
         "max_length",
         "enum",
+        "checksum",
         "type",
         "required",
         "other",
