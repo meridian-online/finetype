@@ -25,9 +25,17 @@ path = "src/bin/checksum_samples.rs"
 name = "validate-samples"
 path = "src/bin/validate_samples.rs"
 
+# The expression oracle scripts/check_registry_expressions.py calls, here for the
+# same reason as the two above: `make build-extension` already builds this
+# package, so the gate needs no build step of its own.
+[[bin]]
+name = "registry-expressions"
+path = "src/bin/registry_expressions.rs"
+
 [dependencies]
 clap = { workspace = true }
 finetype-core = { workspace = true }
+serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 
 [dev-dependencies]
