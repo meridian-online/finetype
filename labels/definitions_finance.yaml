@@ -135,7 +135,7 @@ finance.currency.amount:
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\\-]+', ''), '[^0-9\\.\\-]', '', 'g'), ',', '', 'g'), '\\s+', '', 'g') AS DECIMAL(18,2))"
   transform_ext: null
   decompose:
-    symbol: "REGEXP_EXTRACT({col}, '^([^0-9\\-\\(]+)')"
+    symbol: "REGEXP_EXTRACT({col}, '^([^0-9\\-\\(]+)', 1)"
     numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\\-]+', ''), '[^0-9\\.\\-]', '', 'g'), ',', '', 'g'), '\\s+', '', 'g') AS DECIMAL(18,2))"
   validation:
     type: string
@@ -191,7 +191,7 @@ finance.currency.amount_comma:
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€\\$£¥₹₩₿\\p{Sc}]', '', 'g'), '\\s+', '', 'g'), '\\.', '', 'g'), ',', '.') AS DECIMAL(18,2))"
   transform_ext: null
   decompose:
-    symbol: "REGEXP_EXTRACT({col}, '([€\\$£¥₹₩₿\\p{Sc}])')"
+    symbol: "REGEXP_EXTRACT({col}, '([€\\$£¥₹₩₿\\p{Sc}])', 1)"
     numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€\\$£¥₹₩₿\\p{Sc}]', '', 'g'), '\\s+', '', 'g'), '\\.', '', 'g'), ',', '.') AS DECIMAL(18,2))"
   validation:
     type: string
@@ -324,9 +324,9 @@ finance.payment.credit_card_number:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    issuer_identification_number: "REGEXP_EXTRACT({col}, '^([0-9]{6})')"
+    issuer_identification_number: "REGEXP_EXTRACT({col}, '^([0-9]{6})', 1)"
     card_type: "CASE WHEN {col} LIKE '4%' THEN 'Visa' WHEN {col} LIKE '5[1-5]%' THEN 'Mastercard' WHEN {col} LIKE '3[47]%' THEN 'Amex' ELSE 'Other' END"
-    last_four: "REGEXP_EXTRACT({col}, '([0-9]{4})$')"
+    last_four: "REGEXP_EXTRACT({col}, '([0-9]{4})$', 1)"
   validation:
     type: string
     pattern: "^[0-9]{13,19}$"
@@ -803,7 +803,7 @@ finance.currency.amount_comma_suffix:
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€$£¥₹₩₿\\p{Sc}]', '', 'g'), '\\s+', '', 'g'), '\\.', '', 'g'), ',', '.') AS DECIMAL(18,2))"
   transform_ext: null
   decompose:
-    symbol: "REGEXP_EXTRACT({col}, '([€$£¥₹₩₿\\p{Sc}]+)\\s*$')"
+    symbol: "REGEXP_EXTRACT({col}, '([€$£¥₹₩₿\\p{Sc}]+)\\s*$', 1)"
     numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€$£¥₹₩₿\\p{Sc}]', '', 'g'), '\\s+', '', 'g'), '\\.', '', 'g'), ',', '.') AS DECIMAL(18,2))"
   validation:
     type: string
@@ -838,7 +838,7 @@ finance.currency.amount_space:
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€$£¥₹₩₿\\p{Sc}]', '', 'g'), '[\\s\\x{00A0}]+', '', 'g'), ',', '.'), '\\.$', '') AS DECIMAL(18,2))"
   transform_ext: null
   decompose:
-    symbol: "REGEXP_EXTRACT({col}, '([€$£¥₹₩₿\\p{Sc}]+)')"
+    symbol: "REGEXP_EXTRACT({col}, '([€$£¥₹₩₿\\p{Sc}]+)', 1)"
     numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€$£¥₹₩₿\\p{Sc}]', '', 'g'), '[\\s\\x{00A0}]+', '', 'g'), ',', '.'), '\\.$', '') AS DECIMAL(18,2))"
   validation:
     type: string
@@ -873,7 +873,7 @@ finance.currency.amount_lakh:
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[₹Rs\\.\\s]', '', 'g'), ',', '') AS DECIMAL(18,2))"
   transform_ext: null
   decompose:
-    symbol: "REGEXP_EXTRACT({col}, '^([₹]|Rs\\.?\\s?)')"
+    symbol: "REGEXP_EXTRACT({col}, '^([₹]|Rs\\.?\\s?)', 1)"
     numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[₹Rs\\.\\s]', '', 'g'), ',', '') AS DECIMAL(18,2))"
   validation:
     type: string
@@ -942,7 +942,7 @@ finance.currency.amount_nodecimal:
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[¥₩\\p{Sc}]', '', 'g'), ',', '') AS INTEGER)"
   transform_ext: null
   decompose:
-    symbol: "REGEXP_EXTRACT({col}, '([¥₩\\p{Sc}])')"
+    symbol: "REGEXP_EXTRACT({col}, '([¥₩\\p{Sc}])', 1)"
     numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[¥₩\\p{Sc}]', '', 'g'), ',', '') AS INTEGER)"
   validation:
     type: string
@@ -976,7 +976,7 @@ finance.currency.amount_code_prefix:
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[A-Z]{3}\\s?', ''), ',', '') AS DECIMAL(18,2))"
   transform_ext: null
   decompose:
-    currency_code: "REGEXP_EXTRACT({col}, '^([A-Z]{3})')"
+    currency_code: "REGEXP_EXTRACT({col}, '^([A-Z]{3})', 1)"
     numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[A-Z]{3}\\s?', ''), ',', '') AS DECIMAL(18,2))"
   validation:
     type: string
@@ -1009,7 +1009,7 @@ finance.currency.amount_crypto:
   transform: "CAST(REGEXP_REPLACE({col}, '\\s*[A-Z]{2,5}$', '') AS DECIMAL(18,8))"
   transform_ext: null
   decompose:
-    ticker: "REGEXP_EXTRACT({col}, '([A-Z]{2,5})$')"
+    ticker: "REGEXP_EXTRACT({col}, '([A-Z]{2,5})$', 1)"
     numeric_value: "CAST(REGEXP_REPLACE({col}, '\\s*[A-Z]{2,5}$', '') AS DECIMAL(18,8))"
   validation:
     type: string
@@ -1043,7 +1043,7 @@ finance.currency.amount_multisym:
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[A-Za-z$₹€£¥₩₿\\p{Sc}\\s]+', ''), '[.,](?=[0-9]{3})', '', 'g'), '[\\s]', '', 'g'), ',', '.') AS DECIMAL(18,2))"
   transform_ext: null
   decompose:
-    symbol: "REGEXP_EXTRACT({col}, '^([A-Za-z$₹€£¥₩₿\\p{Sc}\\s]+)')"
+    symbol: "REGEXP_EXTRACT({col}, '^([A-Za-z$₹€£¥₩₿\\p{Sc}\\s]+)', 1)"
   validation:
     type: string
     pattern: "^(R\\$|HK\\$|NT\\$|S\\$|A\\$|C\\$|NZ\\$|kr|Kč|zł|Ft|lei|Rp|Rs\\.?)\\s?-?[0-9]"

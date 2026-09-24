@@ -163,8 +163,8 @@ representation.numeric.scientific_notation:
   transform: "CAST({col} AS DOUBLE)"
   transform_ext: null
   decompose:
-    mantissa: "CAST(REGEXP_EXTRACT({col}, '^([0-9.+-]+)e') AS DOUBLE)"
-    exponent: "CAST(REGEXP_EXTRACT({col}, 'e([+-]?[0-9]+)$') AS SMALLINT)"
+    mantissa: "CAST(REGEXP_EXTRACT({col}, '^([0-9.+-]+)e', 1) AS DOUBLE)"
+    exponent: "CAST(REGEXP_EXTRACT({col}, 'e([+-]?[0-9]+)$', 1) AS SMALLINT)"
   validation:
     type: string
     pattern: "^-?[0-9]+(\\.[0-9]+)?[eE][+-]?[0-9]+$"
@@ -193,10 +193,10 @@ representation.numeric.percentage:
   frictionless:
     type: number
   format_string: null
-  transform: "CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(\\.[0-9]+)?)') AS DOUBLE)"
+  transform: "CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(\\.[0-9]+)?)', 1) AS DOUBLE)"
   transform_ext: null
   decompose:
-    percent_value: "CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(\\.[0-9]+)?)') AS DOUBLE)"
+    percent_value: "CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(\\.[0-9]+)?)', 1) AS DOUBLE)"
     has_symbol: "CASE WHEN {col} LIKE '%\"%' THEN TRUE ELSE FALSE END"
   validation:
     type: string
@@ -382,9 +382,9 @@ representation.format.color_rgb:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    red: "CAST(REGEXP_EXTRACT({col}, '^(?:rgb)?\\(?([0-9]{1,3})') AS SMALLINT)"
-    green: "CAST(REGEXP_EXTRACT({col}, ',\\s*([0-9]{1,3})') AS SMALLINT)"
-    blue: "CAST(REGEXP_EXTRACT({col}, ',\\s*([0-9]{1,3})\\)?$') AS SMALLINT)"
+    red: "CAST(REGEXP_EXTRACT({col}, '^(?:rgb)?\\(?([0-9]{1,3})', 1) AS SMALLINT)"
+    green: "CAST(REGEXP_EXTRACT({col}, ',\\s*([0-9]{1,3})', 1) AS SMALLINT)"
+    blue: "CAST(REGEXP_EXTRACT({col}, ',\\s*([0-9]{1,3})\\)?$', 1) AS SMALLINT)"
   validation:
     type: string
     pattern: "^(?:rgb)?\\(?([0-9]{1,3}),\\s*([0-9]{1,3}),\\s*([0-9]{1,3})\\)?$"
@@ -424,9 +424,9 @@ representation.format.color_hsl:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    hue: "CAST(REGEXP_EXTRACT({col}, 'hsla?\\(\\s*(\\d+)') AS SMALLINT)"
-    saturation: "CAST(REGEXP_EXTRACT({col}, ',\\s*(\\d+)%') AS SMALLINT)"
-    lightness: "CAST(REGEXP_EXTRACT({col}, ',\\s*\\d+%\\s*,\\s*(\\d+)%|%\\s*,\\s*(\\d+)%') AS SMALLINT)"
+    hue: "CAST(REGEXP_EXTRACT({col}, 'hsla?\\(\\s*(\\d+)', 1) AS SMALLINT)"
+    saturation: "CAST(REGEXP_EXTRACT({col}, ',\\s*(\\d+)%', 1) AS SMALLINT)"
+    lightness: "CAST(REGEXP_EXTRACT({col}, ',\\s*\\d+%\\s*,\\s*(\\d+)%|%\\s*,\\s*(\\d+)%', 1) AS SMALLINT)"
   validation:
     type: string
     pattern: "^hsla?\\(\\s*\\d{1,3}\\s*,\\s*\\d{1,3}%\\s*,\\s*\\d{1,3}%\\s*(,\\s*[\\d.]+\\s*)?\\)$"
@@ -575,9 +575,9 @@ representation.file.mime_type:
   transform: "LOWER(CAST({col} AS VARCHAR))"
   transform_ext: null
   decompose:
-    type: "REGEXP_EXTRACT({col}, '^([^/]+)')"
-    subtype: "REGEXP_EXTRACT({col}, '/([^;]+)')"
-    charset: "REGEXP_EXTRACT({col}, 'charset=([^;]+)')"
+    type: "REGEXP_EXTRACT({col}, '^([^/]+)', 1)"
+    subtype: "REGEXP_EXTRACT({col}, '/([^;]+)', 1)"
+    charset: "REGEXP_EXTRACT({col}, 'charset=([^;]+)', 1)"
   validation:
     type: string
     pattern: "^[a-zA-Z]+/[a-zA-Z0-9.+\\-]+(;.*)?$"
@@ -611,16 +611,16 @@ representation.file.file_size:
   format_string: null
   transform: >
     CASE
-      WHEN UPPER({col}) LIKE '%GB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) * 1024 * 1024 * 1024
-      WHEN UPPER({col}) LIKE '%MB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) * 1024 * 1024
-      WHEN UPPER({col}) LIKE '%KB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) * 1024
-      WHEN UPPER({col}) LIKE '%B%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE)
+      WHEN UPPER({col}) LIKE '%GB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE) * 1024 * 1024 * 1024
+      WHEN UPPER({col}) LIKE '%MB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE) * 1024 * 1024
+      WHEN UPPER({col}) LIKE '%KB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE) * 1024
+      WHEN UPPER({col}) LIKE '%B%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE)
       ELSE CAST({col} AS BIGINT)
     END
   transform_ext: null
   decompose:
-    size: "CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE)"
-    unit: "UPPER(COALESCE(REGEXP_EXTRACT({col}, '([A-Z]+)$'), 'B'))"
+    size: "CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE)"
+    unit: "UPPER(COALESCE(REGEXP_EXTRACT({col}, '([A-Z]+)$', 1), 'B'))"
   validation:
     type: string
     pattern: "^[0-9]+(\\.[0-9]+)?\\s*(B|KB|MB|GB|TB)?$"
@@ -866,9 +866,9 @@ representation.scientific.cas_number:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    part1: "REGEXP_EXTRACT({col}, '^(\\d+)-')"
-    part2: "REGEXP_EXTRACT({col}, '-(\\d{2})-')"
-    check_digit: "REGEXP_EXTRACT({col}, '-(\\d)$')"
+    part1: "REGEXP_EXTRACT({col}, '^(\\d+)-', 1)"
+    part2: "REGEXP_EXTRACT({col}, '-(\\d{2})-', 1)"
+    check_digit: "REGEXP_EXTRACT({col}, '-(\\d)$', 1)"
   validation:
     type: string
     pattern: "^\\d{2,7}-\\d{2}-\\d$"
@@ -907,8 +907,8 @@ representation.scientific.inchi:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    version: "REGEXP_EXTRACT({col}, 'InChI=(1S?)')"
-    formula: "REGEXP_EXTRACT({col}, 'InChI=1S?/([^/]+)')"
+    version: "REGEXP_EXTRACT({col}, 'InChI=(1S?)', 1)"
+    formula: "REGEXP_EXTRACT({col}, 'InChI=1S?/([^/]+)', 1)"
   validation:
     type: string
     pattern: "^InChI=1S?/.+$"
