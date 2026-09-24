@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **The `ft_detail(VARCHAR)`, `ft_detail(LIST<VARCHAR>)` and `ft_detail(LIST<VARCHAR>, VARCHAR)` scalars.** An aggregate cannot be registered at a name a scalar already holds, so all three retired to free the name for the aggregate above. The extension's registered surface is now 5 scalars, 2 aggregates and 2 table macros.
 
+### Fixed
+
+- **Every `transform` and `decompose` expression in the taxonomy now returns what it names on its own type's samples.** `REGEXP_EXTRACT` given no group index returns the whole match, so a part written around a capture group read the text around it: `technology.internet.url`'s `hostname` gave `https://example.com`, `technology.cloud.aws_arn`'s `partition` gave `arn:aws:`, and `identity.government.ssn`'s `group` gave `-05-`. All 120 such calls now pass the index. Running each expression on each sample also found:
+  - transforms that could not cast their own samples: `datetime.timestamp.rfc_2822` (its samples ended `GMT+00:00`, a zone RFC 2822 does not define, and now end `+0000`), `datetime.timestamp.rfc_3339` on a `Z` suffix, `datetime.date.jp_era_long` (a folded block that kept its `\u` escapes as text; it now holds the kanji), `finance.currency.amount_multisym` (a lookahead RE2 rejects), `amount_lakh`, `amount_nodecimal`, `datetime.date.abbreviated_month` and `weekday_abbreviated_month` on day-first samples, `geography.coordinate.coordinates` on a space separator, and `representation.boolean.terms` on `on` and `off`;
+  - parts that failed or returned NULL: `geography.coordinate.dms`, `representation.format.color_rgb` and `color_hsl`, `representation.numeric.scientific_notation`, `technology.development.version`'s `minor` and `patch`, `finance.banking.swift_bic`'s `branch_code` (now `XXX` for an 8-character BIC, as ISO 9362 writes the primary office) and `finance.currency.amount_apostrophe`'s `symbol`;
+  - parts that returned the wrong value: URL `hostname` and `path`, JWT `payload`, Docker `tag` on a digest-only reference, `full_address` `city` and `street_name`, height and weight `unit`, weight in pounds, E.164 `country_code` (`614` for `+61`), `phone_number`'s `country_code`, `area_code` and `digits_only`, ISBN-10 reported as ISBN-13, credit card type for Mastercard and Amex, file extension category with a leading dot, percentage `has_symbol`, and `full_name` on `Last, First` and titled names.
+
+  `technology.development.calver` no longer shows `2024.02` among its samples: a year-month version has no day for its `day` part to return. CI now runs every expression on every sample of its type and fails on a NULL, an error, or a two-argument `REGEXP_EXTRACT` whose pattern captures.
+
 ## [0.6.60] - 2026-09-16
 
 ### Added
