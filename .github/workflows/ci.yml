@@ -640,6 +640,29 @@ jobs:
         if: steps.route.outputs.taxonomy_content == 'true'
         run: scripts/check_taxonomy_content.py --self-test
 
+      - name: Every registry expression returns a value on its own samples
+        # The gate above resolves the names in `transform` and `decompose`;
+        # this RUNS them. Each one, on every sample of its leaf, in the duckdb
+        # CLI installed above with no extension loaded, must return a value
+        # rather than NULL or an error. A two-argument REGEXP_EXTRACT whose
+        # pattern captures is refused outright: DuckDB returns the whole match,
+        # which is how the URL page came to show `https://example.com` as the
+        # hostname. The expressions come from the `registry-expressions` bin
+        # `make build-extension` built above, which reads labels/ with the
+        # product's own parser, so no build step of its own.
+        run: scripts/check_registry_expressions.py
+
+      - name: ...and the registry expression gate detects a failing expression
+        # A clean fixture that must pass, with its `ft_` call skipped and
+        # counted, and one fixture per refusal that must fail: a NULL on the
+        # last sample only, an error on the last sample only, a pattern RE2
+        # rejects, a folded transform whose escape YAML never decodes, an
+        # uncaptured extract in upper case, in lower case nested in a cast,
+        # with a named group, in a transform with a comma inside its pattern,
+        # and a decompose that is a list.
+        if: steps.route.outputs.registry_expressions == 'true'
+        run: scripts/check_registry_expressions.py --self-test
+
       - name: Every published sample satisfies its own leaf's pattern
         # The gate above puts a CHECK-DIGIT leaf's samples through
         # finetype-core; this puts EVERY leaf's samples through its own
