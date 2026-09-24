@@ -482,11 +482,13 @@ fixture.capture.named:
         "fixture.capture.named decompose.host: two-argument REGEXP_EXTRACT",
     ),
     (
+        # The comma sits outside the group, so a splitter that did not skip
+        # the literal would count three arguments and refuse nothing.
         "a capture in a transform, with a comma inside the pattern",
         """
 fixture.capture.transform:
   title: "Capture transform"
-  transform: "REGEXP_EXTRACT({col}, '(a,b)')"
+  transform: "REGEXP_EXTRACT({col}, 'a,(b)')"
   samples:
     - "a,b"
 """,
