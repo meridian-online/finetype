@@ -74,8 +74,8 @@ technology.internet.ip_v4_with_port:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    ip: "REGEXP_EXTRACT({col}, '^([^:]+):')"
-    port: "CAST(REGEXP_EXTRACT({col}, ':([0-9]+)$') AS SMALLINT)"
+    ip: "REGEXP_EXTRACT({col}, '^([^:]+):', 1)"
+    port: "CAST(REGEXP_EXTRACT({col}, ':([0-9]+)$', 1) AS SMALLINT)"
   validation:
     type: string
     pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):[0-9]{1,5}$"
@@ -168,9 +168,9 @@ technology.internet.url:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    scheme: "REGEXP_EXTRACT({col}, '^([^:]+):')"
-    hostname: "REGEXP_EXTRACT({col}, '(?:https?://)?([^/?]+)')"
-    path: "REGEXP_EXTRACT({col}, '(?:https?://[^/]+)?(/.*)$')"
+    scheme: "REGEXP_EXTRACT({col}, '^([^:]+):', 1)"
+    hostname: "REGEXP_EXTRACT({col}, '^(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?//([^/?#:]+)', 1)"
+    path: "REGEXP_EXTRACT({col}, '^(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?//[^/?#]*(/[^?#]*)', 1)"
   validation:
     type: string
     pattern: "^(?:(?:https?|ftp|file):)?//(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?::\\d+)?(?:/[^?#]*)?(?:\\?[^#]*)?(?:#.*)?$"
@@ -495,8 +495,8 @@ technology.code.doi:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    registrant: "REGEXP_EXTRACT({col}, '^10\\.([0-9]+)/')"
-    suffix: "REGEXP_EXTRACT({col}, '^10\\.[0-9]+/(.*)')"
+    registrant: "REGEXP_EXTRACT({col}, '^10\\.([0-9]+)/', 1)"
+    suffix: "REGEXP_EXTRACT({col}, '^10\\.[0-9]+/(.*)', 1)"
   validation:
     type: string
     pattern: "^10\\.[0-9]{4,9}/[^\\s]+$"
@@ -531,8 +531,8 @@ technology.code.locale_code:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    language: "REGEXP_EXTRACT(LOWER({col}), '^([a-z]{2,3})')"
-    country: "REGEXP_EXTRACT(LOWER({col}), '-([a-z]{2})(?:$|-)')"
+    language: "REGEXP_EXTRACT(LOWER({col}), '^([a-z]{2,3})', 1)"
+    country: "REGEXP_EXTRACT(LOWER({col}), '-([a-z]{2})(?:$|-)', 1)"
   validation:
     type: string
     pattern: "^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{2,4})*$"
@@ -568,11 +568,11 @@ technology.development.version:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    major: "CAST(REGEXP_EXTRACT({col}, '^v?([0-9]+)') AS SMALLINT)"
-    minor: "CAST(REGEXP_EXTRACT({col}, '^\\.([0-9]+)') AS SMALLINT)"
-    patch: "CAST(REGEXP_EXTRACT({col}, '^\\.([0-9]+)(?:-|\\+|$)') AS SMALLINT)"
-    prerelease: "REGEXP_EXTRACT({col}, '-([a-zA-Z0-9.]+)(?:\\+|$)')"
-    metadata: "REGEXP_EXTRACT({col}, '\\+([a-zA-Z0-9.]+)$')"
+    major: "CAST(REGEXP_EXTRACT({col}, '^v?([0-9]+)', 1) AS SMALLINT)"
+    minor: "CAST(REGEXP_EXTRACT({col}, '^v?[0-9]+\\.([0-9]+)', 1) AS SMALLINT)"
+    patch: "CAST(REGEXP_EXTRACT({col}, '^v?[0-9]+\\.[0-9]+\\.([0-9]+)', 1) AS SMALLINT)"
+    prerelease: "REGEXP_EXTRACT({col}, '-([a-zA-Z0-9.]+)(?:\\+|$)', 1)"
+    metadata: "REGEXP_EXTRACT({col}, '\\+([a-zA-Z0-9.]+)$', 1)"
   validation:
     type: string
     pattern: "^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:-[a-zA-Z0-9.]+)?(?:\\+[a-zA-Z0-9.]+)?$"
@@ -606,9 +606,9 @@ technology.development.calver:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    year: "CAST(REGEXP_EXTRACT({col}, '^([0-9]{4})') AS SMALLINT)"
-    month: "CAST(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.([0-9]{2})') AS SMALLINT)"
-    day: "CAST(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.[0-9]{2}\\.([0-9]{2})') AS SMALLINT)"
+    year: "CAST(REGEXP_EXTRACT({col}, '^([0-9]{4})', 1) AS SMALLINT)"
+    month: "CAST(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.([0-9]{2})', 1) AS SMALLINT)"
+    day: "CAST(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.[0-9]{2}\\.([0-9]{2})', 1) AS SMALLINT)"
   validation:
     type: string
     pattern: "^[0-9]{4}\\.[0-9]{2}(?:\\.[0-9]{2})?(?:\\..*)?$"
@@ -616,7 +616,6 @@ technology.development.calver:
   release_priority: 3
   aliases: null
   samples:
-    - "2024.02"
     - "2024.02.09"
     - "2023.12.31"
     - "2024.01.15.1"
@@ -640,10 +639,10 @@ technology.development.docker_ref:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    registry: "REGEXP_EXTRACT({col}, '^(?:([a-zA-Z0-9.\\-]+(?::\\d+)?)/)')"
-    repository: "REGEXP_EXTRACT({col}, '(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?([a-z0-9._\\-/]+?)(?::|@|$)')"
-    tag: "REGEXP_EXTRACT({col}, ':([a-zA-Z0-9_.\\-]+)')"
-    digest: "REGEXP_EXTRACT({col}, '@(sha256:[a-fA-F0-9]{64})')"
+    registry: "REGEXP_EXTRACT({col}, '^(?:([a-zA-Z0-9.\\-]+(?::\\d+)?)/)', 1)"
+    repository: "REGEXP_EXTRACT({col}, '(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?([a-z0-9._\\-/]+?)(?::|@|$)', 1)"
+    tag: "REGEXP_EXTRACT({col}, '^[^@]*:([a-zA-Z0-9_.\\-]+)(?:@|$)', 1)"
+    digest: "REGEXP_EXTRACT({col}, '@(sha256:[a-fA-F0-9]{64})', 1)"
   validation:
     type: string
     pattern: "^(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?(?:[a-z0-9._\\-/]+)(?::[a-zA-Z0-9_.\\-]+)?(?:@sha256:[a-fA-F0-9]{64})?$"
@@ -785,11 +784,11 @@ technology.cloud.aws_arn:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    partition: "REGEXP_EXTRACT({col}, '^arn:([^:]+):')"
-    service: "REGEXP_EXTRACT({col}, '^arn:[^:]+:([^:]+):')"
-    region: "REGEXP_EXTRACT({col}, '^arn:[^:]+:[^:]+:([^:]*):' )"
-    account_id: "REGEXP_EXTRACT({col}, '^arn:[^:]+:[^:]+:[^:]*:([^:]*):' )"
-    resource: "REGEXP_EXTRACT({col}, '^arn:[^:]+:[^:]+:[^:]*:[^:]*:(.+)$')"
+    partition: "REGEXP_EXTRACT({col}, '^arn:([^:]+):', 1)"
+    service: "REGEXP_EXTRACT({col}, '^arn:[^:]+:([^:]+):', 1)"
+    region: "REGEXP_EXTRACT({col}, '^arn:[^:]+:[^:]+:([^:]*):' , 1)"
+    account_id: "REGEXP_EXTRACT({col}, '^arn:[^:]+:[^:]+:[^:]*:([^:]*):' , 1)"
+    resource: "REGEXP_EXTRACT({col}, '^arn:[^:]+:[^:]+:[^:]*:[^:]*:(.+)$', 1)"
   validation:
     type: string
     pattern: "^arn:(aws|aws-cn|aws-us-gov):[a-zA-Z0-9\\-]+:[a-z0-9\\-]*:\\d{0,12}:.+$"
@@ -821,8 +820,8 @@ technology.cloud.s3_uri:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    bucket: "REGEXP_EXTRACT({col}, '^s3://([^/]+)')"
-    key: "REGEXP_EXTRACT({col}, '^s3://[^/]+/(.*)')"
+    bucket: "REGEXP_EXTRACT({col}, '^s3://([^/]+)', 1)"
+    key: "REGEXP_EXTRACT({col}, '^s3://[^/]+/(.*)', 1)"
   validation:
     type: string
     pattern: "^s3://[a-z0-9][a-z0-9.\\-]{1,61}[a-z0-9](/.*)?$"
@@ -854,9 +853,9 @@ technology.cryptographic.jwt:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    header: "REGEXP_EXTRACT({col}, '^([A-Za-z0-9_-]+)\\.')"
-    payload: "REGEXP_EXTRACT({col}, '^\\.([A-Za-z0-9_-]+)\\.')"
-    signature: "REGEXP_EXTRACT({col}, '\\.([A-Za-z0-9_-]+)$')"
+    header: "REGEXP_EXTRACT({col}, '^([A-Za-z0-9_-]+)\\.', 1)"
+    payload: "REGEXP_EXTRACT({col}, '^[A-Za-z0-9_-]+\\.([A-Za-z0-9_-]+)\\.', 1)"
+    signature: "REGEXP_EXTRACT({col}, '\\.([A-Za-z0-9_-]+)$', 1)"
   validation:
     type: string
     pattern: "^[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}$"
@@ -889,8 +888,8 @@ technology.internet.cidr:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: "CAST({col} AS INET)"
   decompose:
-    network: "REGEXP_EXTRACT({col}, '^([^/]+)/')"
-    prefix_length: "CAST(REGEXP_EXTRACT({col}, '/(\\d+)$') AS TINYINT)"
+    network: "REGEXP_EXTRACT({col}, '^([^/]+)/', 1)"
+    prefix_length: "CAST(REGEXP_EXTRACT({col}, '/(\\d+)$', 1) AS TINYINT)"
   validation:
     type: string
     pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/([0-9]|[12]\\d|3[0-2])$"
@@ -925,8 +924,8 @@ technology.internet.urn:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    nid: "REGEXP_EXTRACT({col}, '^urn:([^:]+):')"
-    nss: "REGEXP_EXTRACT({col}, '^urn:[^:]+:(.+)$')"
+    nid: "REGEXP_EXTRACT({col}, '^urn:([^:]+):', 1)"
+    nss: "REGEXP_EXTRACT({col}, '^urn:[^:]+:(.+)$', 1)"
   validation:
     type: string
     pattern: "^urn:[a-z0-9][a-z0-9\\-]{0,31}:.+$"
@@ -961,7 +960,7 @@ technology.internet.data_uri:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    media_type: "REGEXP_EXTRACT({col}, '^data:([^;,]+)')"
+    media_type: "REGEXP_EXTRACT({col}, '^data:([^;,]+)', 1)"
     is_base64: "CASE WHEN {col} LIKE '%base64,%' THEN true ELSE false END"
   validation:
     type: string
@@ -997,8 +996,8 @@ technology.filesystem.windows_path:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    drive: "REGEXP_EXTRACT({col}, '^([A-Za-z]:)')"
-    filename: "REGEXP_EXTRACT({col}, '([^\\\\]+)$')"
+    drive: "REGEXP_EXTRACT({col}, '^([A-Za-z]:)', 1)"
+    filename: "REGEXP_EXTRACT({col}, '([^\\\\]+)$', 1)"
   validation:
     type: string
     pattern: '^([A-Za-z]:\\|\\\\)[^\r\n]*$'
@@ -1036,8 +1035,8 @@ technology.filesystem.filename:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    stem: "REGEXP_EXTRACT({col}, '^(.*)\\.[^.]+$')"
-    extension: "REGEXP_EXTRACT({col}, '\\.([^.]+)$')"
+    stem: "REGEXP_EXTRACT({col}, '^(.*)\\.[^.]+$', 1)"
+    extension: "REGEXP_EXTRACT({col}, '\\.([^.]+)$', 1)"
   validation:
     type: string
     pattern: '^[^\\/\r\n\t]+\.[A-Za-z0-9]{1,8}$'
@@ -1075,8 +1074,8 @@ technology.internet.message_id:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    local: "REGEXP_EXTRACT({col}, '^<([^@]+)@')"
-    domain: "REGEXP_EXTRACT({col}, '@([^>]+)>$')"
+    local: "REGEXP_EXTRACT({col}, '^<([^@]+)@', 1)"
+    domain: "REGEXP_EXTRACT({col}, '@([^>]+)>$', 1)"
   validation:
     type: string
     pattern: '^<[^<>@\s]+@[^<>@\s]+>$'
@@ -1112,8 +1111,8 @@ technology.code.qualified_name:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    root: "REGEXP_EXTRACT({col}, '^([A-Za-z_][A-Za-z0-9_]*)')"
-    leaf: "REGEXP_EXTRACT({col}, '([A-Za-z0-9_]+)$')"
+    root: "REGEXP_EXTRACT({col}, '^([A-Za-z_][A-Za-z0-9_]*)', 1)"
+    leaf: "REGEXP_EXTRACT({col}, '([A-Za-z0-9_]+)$', 1)"
   validation:
     type: string
     pattern: '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){2,}$'

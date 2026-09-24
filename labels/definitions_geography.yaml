@@ -593,9 +593,9 @@ geography.address.full_address:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    street_number: "REGEXP_EXTRACT({col}, '^([0-9]+)')"
-    street_name: "REGEXP_EXTRACT({col}, '^[0-9]+\\s+(.+?),?\\s+(?:[0-9]{5})?')"
-    city: "REGEXP_EXTRACT({col}, '([A-Z][a-z]+)(?:,|$)')"
+    street_number: "REGEXP_EXTRACT({col}, '^([0-9]+)', 1)"
+    street_name: "REGEXP_EXTRACT({col}, '^[0-9]+\\s+([^,]+)', 1)"
+    city: "REGEXP_EXTRACT({col}, '^[^,]+,\\s*([^,]+)', 1)"
   validation:
     type: string
     minLength: 10
@@ -733,7 +733,7 @@ geography.address.postal_code:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    first_part: "REGEXP_EXTRACT({col}, '^([0-9A-Z]+)')"
+    first_part: "REGEXP_EXTRACT({col}, '^([0-9A-Z]+)', 1)"
   validation:
     type: string
     minLength: 3
@@ -1269,11 +1269,11 @@ geography.coordinate.coordinates:
   frictionless:
     type: geopoint
   format_string: null
-  transform: "STRUCT_PACK(lat := CAST(SPLIT_PART({col}, ',', 1) AS DOUBLE), lon := CAST(SPLIT_PART({col}, ',', 2) AS DOUBLE))"
+  transform: "STRUCT_PACK(lat := CAST(REGEXP_EXTRACT({col}, '^([^, ]+)', 1) AS DOUBLE), lon := CAST(REGEXP_EXTRACT({col}, '[, ]([^, ]+)$', 1) AS DOUBLE))"
   transform_ext: "ST_Point(CAST(SPLIT_PART({col}, ',', 1) AS DOUBLE), CAST(SPLIT_PART({col}, ',', 2) AS DOUBLE))"
   decompose:
-    latitude: "CAST(REGEXP_EXTRACT({col}, '^([^,]+)') AS DOUBLE)"
-    longitude: "CAST(REGEXP_EXTRACT({col}, ',([^,]+)') AS DOUBLE)"
+    latitude: "CAST(REGEXP_EXTRACT({col}, '^([^, ]+)', 1) AS DOUBLE)"
+    longitude: "CAST(REGEXP_EXTRACT({col}, '[, ]([^, ]+)$', 1) AS DOUBLE)"
   validation:
     type: string
     pattern: "^-?[0-9]+(\\.[0-9]+)?[, ]-?[0-9]+(\\.[0-9]+)?$"
@@ -1376,9 +1376,9 @@ geography.coordinate.dms:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    latitude_deg: "CAST(REGEXP_EXTRACT({col}, '^(\\d+)°') AS INTEGER)"
-    latitude_min: "CAST(REGEXP_EXTRACT({col}, '°(\\d+)''') AS INTEGER)"
-    longitude_deg: "CAST(REGEXP_EXTRACT({col}, '\\s+(\\d+)°') AS INTEGER)"
+    latitude_deg: "CAST(REGEXP_EXTRACT({col}, '^(\\d+)°', 1) AS INTEGER)"
+    latitude_min: "CAST(REGEXP_EXTRACT({col}, '°(\\d+)''', 1) AS INTEGER)"
+    longitude_deg: "CAST(REGEXP_EXTRACT({col}, '\\s+(\\d+)°', 1) AS INTEGER)"
   validation:
     type: string
     pattern: "^\\d{1,3}°\\d{1,2}'\\d{1,2}(\\.\\d+)?\"[NS]\\s+\\d{1,3}°\\d{1,2}'\\d{1,2}(\\.\\d+)?\"[EW]$"
@@ -1652,7 +1652,7 @@ geography.contact.calling_code:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    code: "REGEXP_EXTRACT({col}, '\\+?([0-9]+)')"
+    code: "REGEXP_EXTRACT({col}, '\\+?([0-9]+)', 1)"
   validation:
     type: string
     pattern: "^\\+?[0-9]{1,4}$"
