@@ -163,8 +163,8 @@ representation.numeric.scientific_notation:
   transform: "CAST({col} AS DOUBLE)"
   transform_ext: null
   decompose:
-    mantissa: "CAST(REGEXP_EXTRACT({col}, '^([0-9.+-]+)e', 1) AS DOUBLE)"
-    exponent: "CAST(REGEXP_EXTRACT({col}, 'e([+-]?[0-9]+)$', 1) AS SMALLINT)"
+    mantissa: "CAST(REGEXP_EXTRACT({col}, '^([0-9.+-]+)[eE]', 1) AS DOUBLE)"
+    exponent: "CAST(REGEXP_EXTRACT({col}, '[eE]([+-]?[0-9]+)$', 1) AS SMALLINT)"
   validation:
     type: string
     pattern: "^-?[0-9]+(\\.[0-9]+)?[eE][+-]?[0-9]+$"
@@ -197,7 +197,7 @@ representation.numeric.percentage:
   transform_ext: null
   decompose:
     percent_value: "CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(\\.[0-9]+)?)', 1) AS DOUBLE)"
-    has_symbol: "CASE WHEN {col} LIKE '%\"%' THEN TRUE ELSE FALSE END"
+    has_symbol: "contains({col}, '%')"
   validation:
     type: string
     pattern: "^-?[0-9]+(\\.[0-9]+)?%?$"
@@ -382,9 +382,9 @@ representation.format.color_rgb:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    red: "CAST(REGEXP_EXTRACT({col}, '^(?:rgb)?\\(?([0-9]{1,3})', 1) AS SMALLINT)"
+    red: "CAST(REGEXP_EXTRACT({col}, '^(?:rgba?)?\\(?\\s*([0-9]{1,3})', 1) AS SMALLINT)"
     green: "CAST(REGEXP_EXTRACT({col}, ',\\s*([0-9]{1,3})', 1) AS SMALLINT)"
-    blue: "CAST(REGEXP_EXTRACT({col}, ',\\s*([0-9]{1,3})\\)?$', 1) AS SMALLINT)"
+    blue: "CAST(REGEXP_EXTRACT({col}, '^[^,]*,[^,]*,\\s*([0-9]{1,3})', 1) AS SMALLINT)"
   validation:
     type: string
     pattern: "^(?:rgb)?\\(?([0-9]{1,3}),\\s*([0-9]{1,3}),\\s*([0-9]{1,3})\\)?$"
@@ -426,7 +426,7 @@ representation.format.color_hsl:
   decompose:
     hue: "CAST(REGEXP_EXTRACT({col}, 'hsla?\\(\\s*(\\d+)', 1) AS SMALLINT)"
     saturation: "CAST(REGEXP_EXTRACT({col}, ',\\s*(\\d+)%', 1) AS SMALLINT)"
-    lightness: "CAST(REGEXP_EXTRACT({col}, ',\\s*\\d+%\\s*,\\s*(\\d+)%|%\\s*,\\s*(\\d+)%', 1) AS SMALLINT)"
+    lightness: "CAST(REGEXP_EXTRACT({col}, ',\\s*\\d+%\\s*,\\s*(\\d+)%', 1) AS SMALLINT)"
   validation:
     type: string
     pattern: "^hsla?\\(\\s*\\d{1,3}\\s*,\\s*\\d{1,3}%\\s*,\\s*\\d{1,3}%\\s*(,\\s*[\\d.]+\\s*)?\\)$"
@@ -541,7 +541,7 @@ representation.file.extension:
   transform: "LOWER(REGEXP_REPLACE({col}, '^\\.*', ''))"
   transform_ext: null
   decompose:
-    category: "CASE WHEN {col} IN ('txt', 'doc', 'docx', 'pdf', 'rtf') THEN 'document' WHEN {col} IN ('jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg') THEN 'image' WHEN {col} IN ('mp4', 'avi', 'mov', 'mkv', 'webm') THEN 'video' WHEN {col} IN ('mp3', 'wav', 'flac', 'aac', 'm4a') THEN 'audio' WHEN {col} IN ('zip', 'rar', '7z', 'tar', 'gz') THEN 'archive' ELSE 'other' END"
+    category: "CASE WHEN lower(ltrim({col}, '.')) IN ('txt', 'doc', 'docx', 'pdf', 'rtf') THEN 'document' WHEN lower(ltrim({col}, '.')) IN ('jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg') THEN 'image' WHEN lower(ltrim({col}, '.')) IN ('mp4', 'avi', 'mov', 'mkv', 'webm') THEN 'video' WHEN lower(ltrim({col}, '.')) IN ('mp3', 'wav', 'flac', 'aac', 'm4a') THEN 'audio' WHEN lower(ltrim({col}, '.')) IN ('zip', 'rar', '7z', 'tar', 'gz') THEN 'archive' ELSE 'other' END"
   validation:
     type: string
     pattern: "^\\.?[a-zA-Z0-9]{1,10}$"
@@ -620,7 +620,7 @@ representation.file.file_size:
   transform_ext: null
   decompose:
     size: "CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE)"
-    unit: "UPPER(COALESCE(REGEXP_EXTRACT({col}, '([A-Z]+)$', 1), 'B'))"
+    unit: "UPPER(COALESCE(NULLIF(REGEXP_EXTRACT({col}, '([A-Za-z]+)$', 1), ''), 'B'))"
   validation:
     type: string
     pattern: "^[0-9]+(\\.[0-9]+)?\\s*(B|KB|MB|GB|TB)?$"
@@ -1121,7 +1121,7 @@ representation.boolean.terms:
   frictionless:
     type: boolean
   format_string: null
-  transform: "CAST({col} AS BOOLEAN)"
+  transform: "CAST(CASE WHEN lower({col}) IN ('on', 'enabled', 'active') THEN 'true' WHEN lower({col}) IN ('off', 'disabled', 'inactive') THEN 'false' ELSE {col} END AS BOOLEAN)"
   transform_ext: null
   decompose: null
   validation:

@@ -169,8 +169,8 @@ technology.internet.url:
   transform_ext: null
   decompose:
     scheme: "REGEXP_EXTRACT({col}, '^([^:]+):', 1)"
-    hostname: "REGEXP_EXTRACT({col}, '(?:https?://)?([^/?]+)', 1)"
-    path: "REGEXP_EXTRACT({col}, '(?:https?://[^/]+)?(/.*)$', 1)"
+    hostname: "REGEXP_EXTRACT({col}, '^(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?//([^/?#:]+)', 1)"
+    path: "REGEXP_EXTRACT({col}, '^(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?//[^/?#]*(/[^?#]*)', 1)"
   validation:
     type: string
     pattern: "^(?:(?:https?|ftp|file):)?//(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?::\\d+)?(?:/[^?#]*)?(?:\\?[^#]*)?(?:#.*)?$"
@@ -569,8 +569,8 @@ technology.development.version:
   transform_ext: null
   decompose:
     major: "CAST(REGEXP_EXTRACT({col}, '^v?([0-9]+)', 1) AS SMALLINT)"
-    minor: "CAST(REGEXP_EXTRACT({col}, '^\\.([0-9]+)', 1) AS SMALLINT)"
-    patch: "CAST(REGEXP_EXTRACT({col}, '^\\.([0-9]+)(?:-|\\+|$)', 1) AS SMALLINT)"
+    minor: "CAST(REGEXP_EXTRACT({col}, '^v?[0-9]+\\.([0-9]+)', 1) AS SMALLINT)"
+    patch: "CAST(REGEXP_EXTRACT({col}, '^v?[0-9]+\\.[0-9]+\\.([0-9]+)', 1) AS SMALLINT)"
     prerelease: "REGEXP_EXTRACT({col}, '-([a-zA-Z0-9.]+)(?:\\+|$)', 1)"
     metadata: "REGEXP_EXTRACT({col}, '\\+([a-zA-Z0-9.]+)$', 1)"
   validation:
@@ -616,7 +616,6 @@ technology.development.calver:
   release_priority: 3
   aliases: null
   samples:
-    - "2024.02"
     - "2024.02.09"
     - "2023.12.31"
     - "2024.01.15.1"
@@ -642,7 +641,7 @@ technology.development.docker_ref:
   decompose:
     registry: "REGEXP_EXTRACT({col}, '^(?:([a-zA-Z0-9.\\-]+(?::\\d+)?)/)', 1)"
     repository: "REGEXP_EXTRACT({col}, '(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?([a-z0-9._\\-/]+?)(?::|@|$)', 1)"
-    tag: "REGEXP_EXTRACT({col}, ':([a-zA-Z0-9_.\\-]+)', 1)"
+    tag: "REGEXP_EXTRACT({col}, '^[^@]*:([a-zA-Z0-9_.\\-]+)(?:@|$)', 1)"
     digest: "REGEXP_EXTRACT({col}, '@(sha256:[a-fA-F0-9]{64})', 1)"
   validation:
     type: string
@@ -855,7 +854,7 @@ technology.cryptographic.jwt:
   transform_ext: null
   decompose:
     header: "REGEXP_EXTRACT({col}, '^([A-Za-z0-9_-]+)\\.', 1)"
-    payload: "REGEXP_EXTRACT({col}, '^\\.([A-Za-z0-9_-]+)\\.', 1)"
+    payload: "REGEXP_EXTRACT({col}, '^[A-Za-z0-9_-]+\\.([A-Za-z0-9_-]+)\\.', 1)"
     signature: "REGEXP_EXTRACT({col}, '\\.([A-Za-z0-9_-]+)$', 1)"
   validation:
     type: string

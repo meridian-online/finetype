@@ -182,8 +182,8 @@ datetime.timestamp.rfc_2822:
   release_priority: 5
   aliases: []
   samples:
-    - "Tue, 15 Jan 2024 10:30:00 GMT+00:00"
-    - "Sun, 31 Dec 2023 23:59:59 GMT+00:00"
+    - "Tue, 15 Jan 2024 10:30:00 +0000"
+    - "Sun, 31 Dec 2023 23:59:59 +0000"
   icon: clock
   canonical: "https://www.rfc-editor.org/rfc/rfc2822"
   references:
@@ -207,7 +207,7 @@ datetime.timestamp.rfc_3339:
     format: "%Y-%m-%d %H:%M:%S%z"
   format_string: "%Y-%m-%d %H:%M:%S%z"
   format_string_alt: "%Y-%m-%d %H:%M:%SZ"
-  transform: "strptime({col}, '%Y-%m-%d %H:%M:%S%z')"
+  transform: "strptime(regexp_replace({col}, 'Z$', '+00:00'), '%Y-%m-%d %H:%M:%S%z')"
   transform_ext: null
   decompose: null
   validation:
@@ -963,7 +963,7 @@ datetime.date.abbreviated_month:
     type: date
     format: "%b %d, %Y"
   format_string: "%b %d, %Y"
-  transform: "strptime({col}, '%b %d, %Y')::DATE"
+  transform: "strptime({col}, ['%b %d, %Y', '%d %b %Y'])::DATE"
   transform_ext: null
   decompose: null
   validation:
@@ -1040,7 +1040,7 @@ datetime.date.weekday_abbreviated_month:
     type: date
     format: "%A, %b %d, %Y"
   format_string: "%A, %b %d, %Y"
-  transform: "strptime({col}, '%A, %b %d, %Y')::DATE"
+  transform: "strptime({col}, ['%A, %b %d, %Y', '%A, %d %b %Y'])::DATE"
   transform_ext: null
   decompose: null
   validation:
@@ -3305,11 +3305,11 @@ datetime.date.jp_era_long:
   format_string: null
   transform: >
     CASE
-      WHEN {col} LIKE '\u4EE4\u548C%' THEN make_date(2018 + CAST(regexp_extract({col}, '(\d+)\u5E74', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u6708', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u65E5', 1) AS INT))
-      WHEN {col} LIKE '\u5E73\u6210%' THEN make_date(1988 + CAST(regexp_extract({col}, '(\d+)\u5E74', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u6708', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u65E5', 1) AS INT))
-      WHEN {col} LIKE '\u662D\u548C%' THEN make_date(1925 + CAST(regexp_extract({col}, '(\d+)\u5E74', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u6708', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u65E5', 1) AS INT))
-      WHEN {col} LIKE '\u5927\u6B63%' THEN make_date(1911 + CAST(regexp_extract({col}, '(\d+)\u5E74', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u6708', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u65E5', 1) AS INT))
-      WHEN {col} LIKE '\u660E\u6CBB%' THEN make_date(1867 + CAST(regexp_extract({col}, '(\d+)\u5E74', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u6708', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u65E5', 1) AS INT))
+      WHEN {col} LIKE '令和%' THEN make_date(2018 + CAST(regexp_extract({col}, '(\d+)年', 1) AS INT), CAST(regexp_extract({col}, '(\d+)月', 1) AS INT), CAST(regexp_extract({col}, '(\d+)日', 1) AS INT))
+      WHEN {col} LIKE '平成%' THEN make_date(1988 + CAST(regexp_extract({col}, '(\d+)年', 1) AS INT), CAST(regexp_extract({col}, '(\d+)月', 1) AS INT), CAST(regexp_extract({col}, '(\d+)日', 1) AS INT))
+      WHEN {col} LIKE '昭和%' THEN make_date(1925 + CAST(regexp_extract({col}, '(\d+)年', 1) AS INT), CAST(regexp_extract({col}, '(\d+)月', 1) AS INT), CAST(regexp_extract({col}, '(\d+)日', 1) AS INT))
+      WHEN {col} LIKE '大正%' THEN make_date(1911 + CAST(regexp_extract({col}, '(\d+)年', 1) AS INT), CAST(regexp_extract({col}, '(\d+)月', 1) AS INT), CAST(regexp_extract({col}, '(\d+)日', 1) AS INT))
+      WHEN {col} LIKE '明治%' THEN make_date(1867 + CAST(regexp_extract({col}, '(\d+)年', 1) AS INT), CAST(regexp_extract({col}, '(\d+)月', 1) AS INT), CAST(regexp_extract({col}, '(\d+)日', 1) AS INT))
     END
   transform_ext: null
   decompose:
