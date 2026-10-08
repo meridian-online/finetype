@@ -398,7 +398,8 @@ pub(crate) fn is_iso_8601_duration(v: &str) -> bool {
     };
     let has_date = (1..=3).any(|i| c.get(i).is_some());
     let has_time = (5..=7).any(|i| c.get(i).is_some());
-    (has_date || has_time) && (c.get(4).is_none() || has_time)
+    // A `T` with no time component after it is not a duration.
+    has_time || (has_date && c.get(4).is_none())
 }
 
 /// An IANA tz database zone name: one of the database's top-level areas, then a
@@ -438,8 +439,9 @@ pub(crate) fn is_clf_timestamp(v: &str) -> bool {
         return false;
     };
     let n = |i: usize| -> u32 { c.get(i).and_then(|m| m.as_str().parse().ok()).unwrap_or(0) };
-    let bracketed = !c[1].is_empty();
-    bracketed == !c[8].is_empty()
+    let opened = !c[1].is_empty();
+    let closed = !c[8].is_empty();
+    opened == closed
         && (1..=31).contains(&n(2))
         && n(3) <= 23
         && n(4) <= 59
