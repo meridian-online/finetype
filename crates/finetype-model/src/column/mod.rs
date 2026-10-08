@@ -1654,6 +1654,22 @@ impl ColumnClassifier {
             return;
         }
 
+        // A value-shape datetime recovery (value_sharpen Rule 0) read a shape no
+        // other leaf writes, so a hint naming a type outside the recovered leaf's
+        // own category cannot know better. Without this, the `duration` header's
+        // cross-domain hint turned a column of `PT8M10S` into integer_number, which
+        // the values fail outright and the validation veto then demotes. A hint
+        // inside the same category still applies.
+        if result
+            .disambiguation_rule
+            .as_deref()
+            .is_some_and(|rule| SHAPE_RECOVERY_RULES.contains(&rule))
+            && hinted_type.rsplit_once('.').map(|(c, _)| c)
+                != result.label.rsplit_once('.').map(|(c, _)| c)
+        {
+            return;
+        }
+
         // Value-corroboration (spec 2026-06-25-sharpen-stage-audit ac-1). The
         // deprecated regex header_hint table (decision 0042) substring-matches
         // compound headers — "priceEpsCurrentYear"/"CitesPerYear"/"(year)"→year,

@@ -56,7 +56,7 @@ pub(crate) fn value_sharpen(
     // Rule 0: value-shape datetime recoveries. Each shape is one no other leaf
     // writes, so these fire on any label but their own and from a single value up
     // — the one-value column `finetype infer -i` and `ft_infer(v)` hand the model,
-    // which every rule below needs three values to correct.
+    // which no rule below read these shapes from (see datetime_rules.rs).
     for recovery in [
         iso_duration_recovery,
         iana_zone_recovery,

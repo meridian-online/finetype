@@ -1361,6 +1361,7 @@ fn shape_recoveries_fire_on_a_one_value_column() {
     ];
     for (value, from, to, rule) in cases {
         let got = value_sharpen(&vals(&[value]), from, 0.5, None);
+        assert!(SHAPE_RECOVERY_RULES.contains(&rule), "{rule} is listed");
         assert_eq!(
             got,
             Some((to.to_string(), rule.to_string())),
@@ -1548,4 +1549,45 @@ fn shape_recoveries_assert_only_what_the_leaf_validator_accepts() {
             assert!(validator.is_valid(v), "{leaf} must accept {v}");
         }
     }
+}
+
+/// A header hint outside the recovered leaf's category does not undo a
+/// value-shape recovery. Measured on the corpus-honest gate sample: YouTube
+/// `duration` columns of `PT8M10S` went duration -> integer_number through the
+/// `duration` header's cross-domain hint before this guard.
+#[test]
+fn header_hint_does_not_undo_a_shape_recovery() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    let labels_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("labels");
+    let mut tax = Taxonomy::from_directory(&labels_dir).unwrap();
+    tax.compile_validators();
+    cc.set_taxonomy(tax);
+    let sample = vals(&["PT8M10S", "PT8H5M15S", "PT3M9S", "PT5M5S", "PT1M30S"]);
+    let result_with = |rule: &str| ColumnResult {
+        label: "datetime.duration.iso_8601".to_string(),
+        confidence: 0.9,
+        vote_distribution: vec![],
+        disambiguation_applied: true,
+        disambiguation_rule: Some(rule.to_string()),
+        samples_used: sample.len(),
+        detected_locale: None,
+        is_generic: false,
+        column_features: None,
+    };
+
+    let mut recovered = result_with("iso_duration_recovery");
+    cc.apply_header_sharpen(&mut recovered, "duration", &sample);
+    assert_eq!(recovered.label, "datetime.duration.iso_8601");
+
+    // The same label from anywhere else is still open to the hint, so the guard
+    // above is what holds it.
+    let mut other = result_with("multi-branch");
+    cc.apply_header_sharpen(&mut other, "duration", &sample);
+    assert_eq!(other.label, "representation.numeric.integer_number");
 }

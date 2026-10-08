@@ -341,10 +341,14 @@ pub(crate) fn disambiguate_utc_offset_override(values: &[String]) -> Option<(Str
 // ═══════════════════════════════════════════════════════════════════════════════
 //
 // The model reads a one-value column (`finetype infer -i`, `ft_infer(v)`) with no
-// sibling values to correct it, and every value rule above wants three or more
-// values before it fires. So `PT30M` stayed `alphanumeric_id`, `America/New_York`
-// stayed `continent`, a Common Log Format timestamp stayed `plain_text` and
-// `04-03-24` stayed `hm_24h` — four datetime values read outside the domain.
+// sibling values to correct it, and before these rules nothing read these four
+// shapes from one headerless value. Rule 14 reads a duration only on the `sedol`
+// label and from three values; Rule 2 reads a short date only when the label is
+// already one; `datetime_format_refinement` reads neither CLF, a duration nor a
+// two-digit-year date, although `labels/ceded_leaves.txt` cedes all three to
+// Sharpen; and an IANA zone was reached only by a `timezone` header hint. So
+// `PT30M` stayed `alphanumeric_id`, `America/New_York` stayed `continent`, a CLF
+// timestamp stayed `plain_text` and `04-03-24` stayed `hm_24h`.
 //
 // Each recovery below asserts a leaf only on a shape no other taxonomy leaf
 // writes, and each shape sits strictly inside its leaf's own validator, so the
@@ -353,6 +357,16 @@ pub(crate) fn disambiguate_utc_offset_override(values: &[String]) -> Option<(Str
 /// Fraction of the non-empty values a value-shape recovery needs before it asserts
 /// its leaf: the bar `label_validates_sample` holds a leaf's own validator to.
 const SHAPE_RECOVERY_BAR: f64 = 0.9;
+
+/// The `disambiguation_rule` each value-shape recovery writes. A header hint
+/// naming a type outside the recovered leaf's category does not override them
+/// (`apply_header_sharpen`).
+pub(crate) const SHAPE_RECOVERY_RULES: [&str; 4] = [
+    "iso_duration_recovery",
+    "iana_zone_recovery",
+    "clf_timestamp_recovery",
+    "short_date_recovery",
+];
 
 /// True when there is at least one non-empty value and at least 90% of the
 /// non-empty values satisfy `is_shape`. No minimum column size, on purpose: the
