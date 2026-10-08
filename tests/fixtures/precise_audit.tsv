@@ -69,7 +69,7 @@ datetime.time.hm_24h	false	^\d{2}:\d{2}$	true
 datetime.time.hms_12h	false	^\d{2}:\d{2}:\d{2} [AP]M$	true
 datetime.time.hms_24h	false	^\d{1,2}:\d{2}:\d{2}(\.\d{1,6})?$	true
 datetime.time.iso	false	^\d{2}:\d{2}:\d{2}\.\d{1,9}$	true
-datetime.timestamp.clf	false	^\[?\d{2}/[A-Z][a-z]{2}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}\]?$	true
+datetime.timestamp.clf	false	^\[?\d{2}/[A-Z][a-z]{2}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{2}(?::?\d{2})?\]?$	true
 datetime.timestamp.ctime	false	^[A-Z][a-z]{2} [A-Z][a-z]{2} [\s\d]\d \d{2}:\d{2}:\d{2} \d{4}$	true
 datetime.timestamp.dmy_hm	false	^\d{2}/\d{2}/\d{4} \d{2}:\d{2}$	true
 datetime.timestamp.dot_dmy_24h	false	^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}$	true
