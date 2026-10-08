@@ -53,6 +53,21 @@ pub(crate) fn value_sharpen(
     result_confidence: f32,
     taxonomy: Option<&Taxonomy>,
 ) -> Option<(String, String)> {
+    // Rule 0: value-shape datetime recoveries. Each shape is one no other leaf
+    // writes, so these fire on any label but their own and from a single value up
+    // — the one-value column `finetype infer -i` and `ft_infer(v)` hand the model,
+    // which no rule below read these shapes from (see datetime_rules.rs).
+    for recovery in [
+        iso_duration_recovery,
+        iana_zone_recovery,
+        clf_timestamp_recovery,
+        short_date_recovery,
+    ] {
+        if let Some(hit) = recovery(values, result_label) {
+            return Some(hit);
+        }
+    }
+
     // Rule 1: Date slash disambiguation (mdy_slash vs dmy_slash)
     // ADAPTED: fire when result.label is either date type (not both in top-3)
     if result_label == DATE_SLASH_PAIR.0 || result_label == DATE_SLASH_PAIR.1 {

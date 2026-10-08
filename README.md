@@ -285,7 +285,7 @@ transformation contract.
 
 | Metric | Value |
 |--------|-------|
-| Accuracy | 0.81 on the 931-column human-verified gold corpus |
+| Accuracy | 0.850 (881/1,037 columns, 95% CI 0.827–0.870) on the human-or-calibrated-verified gold corpus, `scripts/score_gold_anchor.py` |
 | Actionability | 99.9% (232,321/232,541 values transformed across 120 types) |
 | Model classes | 244 |
 | Profile (model load + classify) | ~150 ms; ~180 MB peak RSS |
