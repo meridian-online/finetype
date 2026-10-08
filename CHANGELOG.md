@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A one-value datetime column reads in its category: ISO 8601 durations, IANA zone names, Common Log Format timestamps and two-digit-year dates.** `finetype infer -i` and `ft_infer(v)` hand the model a single value, and every value rule wanted three before it fired, so `PT30M` read as `representation.identifier.alphanumeric_id`, `America/New_York` as `geography.location.continent`, `04/Mar/2024:05:06:07 +00` as `representation.text.plain_text` and `04-03-24` as `datetime.time.hm_24h`. Four value-shape rules now run first in value Sharpen, each on a shape no other type writes, from one value up and at the 90% bar a type's own validator is held to: `iso_duration_recovery`, `iana_zone_recovery`, `clf_timestamp_recovery` and `short_date_recovery`. A two-digit-year date like `04-03-24` is undecidable between year-, day- and month-first, so it reads the way DuckDB's CSV sniffer reads it — `%y-%m-%d`, then `%d-%m-%y`, then `%m-%d-%y`, the first under which every value parses — which makes the type the one whose cast DuckDB itself applies: `datetime.date.short_ymd` for `04-03-24`.
+- **`datetime.timestamp.clf` accepts every offset form its own transform parses.** The pattern required a four-digit offset (`+0000`), but DuckDB's `strftime` writes this type's `%z` as `+00`, and its `strptime` reads `+00`, `+0000` and `+00:00`. The pattern now admits all three, and the type's `minLength`/`maxLength` move from 26–28 to 24–29.
+
 ## [0.6.61] - 2026-09-24
 
 ### Changed

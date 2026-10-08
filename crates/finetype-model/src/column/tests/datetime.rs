@@ -1321,3 +1321,231 @@ datetime.timestamp.iso_8601_milliseconds:
         "zoneless iso-millis must not be asserted — taxonomy rejects that leaf"
     );
 }
+
+// ── value-shape datetime recoveries: one value up ────────────────────────────
+
+fn vals(v: &[&str]) -> Vec<String> {
+    v.iter().map(|s| s.to_string()).collect()
+}
+
+/// The label each one-value column reached value_sharpen with before these rules,
+/// and the leaf it must leave with — read from `finetype infer -i` on the shipped
+/// model. One value per recovery, so each fires from a single value.
+#[test]
+fn shape_recoveries_fire_on_a_one_value_column() {
+    let cases = [
+        (
+            "PT30M",
+            "representation.identifier.alphanumeric_id",
+            "datetime.duration.iso_8601",
+            "iso_duration_recovery",
+        ),
+        (
+            "America/New_York",
+            "geography.location.continent",
+            "datetime.offset.iana",
+            "iana_zone_recovery",
+        ),
+        (
+            "04/Mar/2024:05:06:07 +00",
+            "representation.text.plain_text",
+            "datetime.timestamp.clf",
+            "clf_timestamp_recovery",
+        ),
+        (
+            "04-03-24",
+            "datetime.time.hm_24h",
+            "datetime.date.short_ymd",
+            "short_date_recovery",
+        ),
+    ];
+    for (value, from, to, rule) in cases {
+        let got = value_sharpen(&vals(&[value]), from, 0.5, None);
+        assert_eq!(
+            got,
+            Some((to.to_string(), rule.to_string())),
+            "{value:?} labelled {from} must read as {to}"
+        );
+    }
+}
+
+#[test]
+fn shape_recoveries_leave_their_own_category_alone() {
+    // A label already in the leaf's own family is not re-asserted, so the
+    // existing day-first/month-first rule keeps the short dates it settles.
+    assert_eq!(
+        iso_duration_recovery(&vals(&["PT30M"]), "datetime.duration.iso_8601"),
+        None
+    );
+    assert_eq!(
+        iana_zone_recovery(&vals(&["Europe/London"]), "datetime.offset.iana"),
+        None
+    );
+    assert_eq!(
+        clf_timestamp_recovery(
+            &vals(&["15/Jan/2024:14:30:00 +0000"]),
+            "datetime.timestamp.clf"
+        ),
+        None
+    );
+    assert_eq!(
+        short_date_recovery(&vals(&["04-03-24"]), "datetime.date.short_mdy"),
+        None
+    );
+}
+
+#[test]
+fn iso_8601_duration_shape_is_the_strict_grammar() {
+    for ok in [
+        "PT30M",
+        "P1DT12H",
+        "P1Y2M3DT4H5M6S",
+        "P2W",
+        "PT0.5S",
+        "-P3D",
+        "P1M",
+    ] {
+        assert!(is_iso_8601_duration(ok), "{ok} is a duration");
+    }
+    for bad in [
+        "P", "PT", "P1DT", "P1", "PD1TH0M0", "PT30", "P1H", "XPT30M", "pt30m",
+    ] {
+        assert!(!is_iso_8601_duration(bad), "{bad} is not a duration");
+    }
+}
+
+#[test]
+fn iana_zone_shape_takes_tz_areas_only() {
+    for ok in [
+        "America/New_York",
+        "Europe/London",
+        "Asia/Tokyo",
+        "America/Argentina/Buenos_Aires",
+        "Etc/UTC",
+        "Antarctica/DumontDUrville",
+    ] {
+        assert!(is_iana_zone_name(ok), "{ok} is a zone name");
+    }
+    for bad in [
+        "Sales/North",
+        "Users/hugh",
+        "America",
+        "America/new_york",
+        "America/New York",
+        "Europe/London/Soho/Street",
+        "Etc/GMT+5",
+    ] {
+        assert!(!is_iana_zone_name(bad), "{bad} is not a zone name");
+    }
+}
+
+#[test]
+fn clf_shape_takes_every_offset_form_duckdb_parses() {
+    for ok in [
+        "04/Mar/2024:05:06:07 +00",
+        "15/Jan/2024:14:30:00 +0000",
+        "31/Dec/2023:23:59:59 -0500",
+        "01/Jun/2024:08:15:30 +05:30",
+        "[10/Oct/2000:13:55:36 -0700]",
+    ] {
+        assert!(is_clf_timestamp(ok), "{ok} is CLF");
+    }
+    for bad in [
+        "04/Mar/2024 05:06:07 +00",
+        "04/Mar/2024:05:06:07",
+        "04/03/2024:05:06:07 +00",
+        "04/Mar/2024:25:06:07 +00",
+        "32/Mar/2024:05:06:07 +00",
+        "[04/Mar/2024:05:06:07 +00",
+        "04/Mar/2024:05:06:07 +000",
+    ] {
+        assert!(!is_clf_timestamp(bad), "{bad} is not CLF");
+    }
+}
+
+/// The reading follows DuckDB's own: each expected leaf here is the format
+/// `sniff_csv` chose for a one-row CSV of that value on DuckDB v1.5.6.
+#[test]
+fn short_date_reading_follows_duckdbs_sniffer_order() {
+    let cases = [
+        ("04-03-24", Some("datetime.date.short_ymd")), // %y-%m-%d
+        ("31-12-31", Some("datetime.date.short_ymd")), // %y-%m-%d
+        ("04-03-99", Some("datetime.date.short_dmy")), // %d-%m-%y
+        ("13-03-99", Some("datetime.date.short_dmy")), // %d-%m-%y
+        ("04-13-24", Some("datetime.date.short_mdy")), // %m-%d-%y
+        ("40-40-40", None),
+        ("04-03-2024", None),
+        ("04:03:24", None),
+    ];
+    for (value, want) in cases {
+        assert_eq!(short_date_reading(&vals(&[value])), want, "{value}");
+    }
+    // A column reads under the first order every value parses in.
+    assert_eq!(
+        short_date_reading(&vals(&["04-03-24", "25-12-99"])),
+        Some("datetime.date.short_dmy")
+    );
+}
+
+#[test]
+fn shape_recoveries_need_ninety_percent_of_the_column() {
+    let nine_of_ten: Vec<&str> = std::iter::repeat_n("PT30M", 9).chain(["ABC123"]).collect();
+    assert!(iso_duration_recovery(&vals(&nine_of_ten), "representation.text.word").is_some());
+    let eight_of_ten: Vec<&str> = std::iter::repeat_n("PT30M", 8)
+        .chain(["ABC123", "XYZ789"])
+        .collect();
+    assert!(iso_duration_recovery(&vals(&eight_of_ten), "representation.text.word").is_none());
+    assert!(iana_zone_recovery(&vals(&["", "  "]), "representation.text.word").is_none());
+}
+
+/// Every value a shape admits passes its leaf's validator in the shipped
+/// taxonomy, so the downstream validation veto never rejects an assertion.
+#[test]
+fn shape_recoveries_assert_only_what_the_leaf_validator_accepts() {
+    let labels_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("labels");
+    let mut tax = Taxonomy::from_directory(&labels_dir).unwrap();
+    tax.compile_validators();
+    let cases: [(&str, &[&str]); 4] = [
+        (
+            "datetime.duration.iso_8601",
+            &[
+                "PT30M",
+                "P1DT12H",
+                "P1Y2M3DT4H5M6S",
+                "P2W",
+                "PT0.5S",
+                "-P3D",
+            ],
+        ),
+        (
+            "datetime.offset.iana",
+            &[
+                "America/New_York",
+                "America/Argentina/Buenos_Aires",
+                "Etc/UTC",
+            ],
+        ),
+        (
+            "datetime.timestamp.clf",
+            &[
+                "04/Mar/2024:05:06:07 +00",
+                "15/Jan/2024:14:30:00 +0000",
+                "01/Jun/2024:08:15:30 +05:30",
+                "[10/Oct/2000:13:55:36 -0700]",
+                "[01/Jun/2024:08:15:30 +05:30]",
+            ],
+        ),
+        ("datetime.date.short_ymd", &["04-03-24", "31-12-31"]),
+    ];
+    for (leaf, values) in cases {
+        let validator = tax.get_validator(leaf).expect(leaf);
+        for v in values {
+            assert!(validator.is_valid(v), "{leaf} must accept {v}");
+        }
+    }
+}

@@ -740,6 +740,16 @@ jobs:
         if: steps.route.outputs.sql_examples == 'true'
         run: scripts/check_sql_examples.py --self-test
 
+      - name: The datetime page's eight examples read alike through ft_infer and the CLI
+        # The datetime domain page prints a loop over eight example values, one
+        # per category of the domain. This runs the extension built above and the
+        # CLI built from the same commit over them, and requires both to read each
+        # value in the category the page lists it under, and to agree. The
+        # extension half is #[ignore]d in the default suite because only this job
+        # builds the extension and installs the duckdb CLI; the CLI half also runs
+        # in the `test` job.
+        run: cargo test --release -p finetype-cli --test datetime_page_examples -- --include-ignored
+
   encoder-dtype:
     # Every step here is a proof rather than a check, and each is routed
     # separately: a diff that changes `scripts/encoder_dtype.py` alone does not
