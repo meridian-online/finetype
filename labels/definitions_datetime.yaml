@@ -2213,9 +2213,9 @@ datetime.timestamp.clf:
   decompose: null
   validation:
     type: string
-    pattern: "^\\[?\\d{2}/[A-Z][a-z]{2}/\\d{4}:\\d{2}:\\d{2}:\\d{2} [+-]\\d{4}\\]?$"
-    minLength: 26
-    maxLength: 28
+    pattern: "^\\[?\\d{2}/[A-Z][a-z]{2}/\\d{4}:\\d{2}:\\d{2}:\\d{2} [+-]\\d{2}(?::?\\d{2})?\\]?$"
+    minLength: 24
+    maxLength: 29
   tier: [TIMESTAMPTZ, timestamp]
   release_priority: 5
   aliases: [apache, nginx_log]
@@ -2230,6 +2230,9 @@ datetime.timestamp.clf:
   notes: >
     New in format coverage expansion. Critical for web log analysis.
     Highly distinctive format — colon between date:time is unique.
+    The offset takes every form DuckDB's `%z` parses — `+00`, `+0000`,
+    `+00:00` — because `+00` is what DuckDB's own `strftime` writes for
+    this format string, and the transform reads all three.
 
 datetime.timestamp.syslog_bsd:
   title: BSD Syslog (RFC 3164)
