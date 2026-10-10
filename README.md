@@ -113,17 +113,21 @@ LOAD finetype;
 ```
 
 > **Version note:** the community channel builds per DuckDB version, so what you get depends on
-> which DuckDB you run — and all of it lags this repo. Measured 2026-07-30 on `osx_arm64`:
+> which DuckDB you run — and all of it lags this repo. Measured 2026-10-11 on `osx_arm64`:
 >
 > | DuckDB | `SELECT ft_version()` |
 > |---|---|
-> | 1.5.5 | `finetype 0.6.36` |
+> | 1.5.6 | `finetype 0.6.57` |
+> | 1.5.5 | `finetype 0.6.57` |
 > | 1.5.4 | `finetype 0.6.36` |
 > | 1.5.3 | `finetype 0.6.23` |
 > | 1.5.2 | no build published — `INSTALL` fails with HTTP 404 |
+> | 1.5.1 | `INSTALL` fails — the file served is the 1.5.0 build, which 1.5.1 refuses to load |
+> | 1.5.0 | no `ft_version()` — the build is `finetype 0.2.0`, which calls it `finetype_version()` |
 >
-> Rows are the 1.5 line. The 1.4 maintenance line has the same gaps — 1.4.4 is served, 1.4.5 is
-> not — so always check what you actually got with `SELECT ft_version();` rather than assuming.
+> Rows are the 1.5 line. The 1.4 maintenance line has the same gaps — 1.4.4 is served; 1.4.0 to
+> 1.4.3 and 1.4.5 are not — so always check what you actually got with `SELECT ft_version();`
+> rather than assuming.
 > To run the latest, build from source with `make build-release` and load it unsigned — see
 > [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#duckdb-extension-build).
 
