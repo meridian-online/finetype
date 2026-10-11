@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Tests for download-model.sh model-name resolution logic.
 #
-# Covers AC-1 of specs/2026-04-20-ci-decouple-default-symlink/spec.yaml:
 #   (a) FINETYPE_CI_MODEL set + non-empty → resolves to env var value
 #   (b) FINETYPE_CI_MODEL="" (empty)      → falls back to models/default
 #   (c) env var unset + models/default missing → exits non-zero with error

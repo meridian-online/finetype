@@ -7,10 +7,6 @@
 #      symlinks as plain text files.
 # If all three yield an empty/whitespace name, the script exits non-zero
 # with a clear error — no malformed URLs reach curl.
-#
-# FINETYPE_CI_MODEL is read ONLY by this script. CLI binary, MCP server,
-# DuckDB extension, and all eval scripts ignore it. See spec
-# specs/2026-04-20-ci-decouple-default-symlink/spec.yaml.
 set -euo pipefail
 
 REPO="https://huggingface.co/meridian-online/finetype-model/resolve/main"

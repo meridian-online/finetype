@@ -43,10 +43,6 @@ Sampling strategy:
   single-letter prefixes over the long-common-name field to cover the
   code space broadly without cherry-picking by medical specialty. Each
   page returns up to 500 rows; we deduplicate by code.
-
-Spec reference:
-  specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3)
-  acceptance_criteria: ac-01
 """
 
 from __future__ import annotations

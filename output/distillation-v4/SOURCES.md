@@ -1,8 +1,6 @@
 # Distillation v4 — Data Sources
 
 Authoritative per-type record of where v17 training data comes from.
-This file is the human-readable companion to the `sourcing_table:` field
-in `specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml` (v1.3).
 
 Policy (decision 0050): public datasets with permissive licenses, OR
 synthetic generators improved in place. No restricted-registry scraping,
@@ -299,13 +297,3 @@ failed and why. Path-swaps for the same type + same target are fast-path
 (this file + progress.md note, no spec bump). Full spec bump only
 required if the swap changes a target row count, evaluation gate, or
 scope boundary.
-
----
-
-## Spec reference
-
-`specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml` (v1.3) —
-see the `sourcing_table:` top-level field for the authoritative
-per-type sourcing decisions. This document MUST stay consistent with
-that field; any mismatch is a spec/implementation drift to be resolved
-before merge.
