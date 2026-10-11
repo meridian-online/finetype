@@ -358,19 +358,19 @@ core → model → mcp → train → cli
 `finetype-cli` depends on `finetype-mcp` + `finetype-train`, so those publish first even
 though their READMEs mark them internal/no-stability. The script walks the crates in that
 order, and `cargo publish` blocks until each crate is in the index before the next one
-resolves its internal dependencies. It publishes with `--no-verify`, because the `build` job
-has already built and tested the release binaries, so the workflow does not compile the
-packaged crates.
+resolves its internal dependencies. It publishes with `--no-verify`, so the workflow does not
+compile the packaged crates.
 
 **Gotcha — `include_str!` of a `labels/` file breaks packaging.**
 `include_str!("../../../labels/…")` escapes the package root, so `cargo package`/`publish`
 fails. Any `labels/` file a crate embeds MUST be reached through an in-crate `data/` symlink
 (e.g. `crates/finetype-core/data/… → ../../../labels/…`); cargo dereferences it at packaging
 while `labels/` stays canonical. Adding a **new** `include_str!` of a `labels/` file without
-the matching `data/` symlink will break the publish the next tag runs (this silently broke
-packaging once already — see memory `company-reference-audit-2026-07`). Verify with `cargo
-package -p finetype-core` before you push the tag; the workflow's `--no-verify` publish does
-not.
+the matching `data/` symlink produces a crate that cannot compile, and the tag's publish does
+not catch it: `--no-verify` skips the build that would fail, so it publishes the broken
+version, which crates.io does not let anyone delete (this silently broke packaging once
+already — see memory `company-reference-audit-2026-07`). Verify with `cargo package -p
+finetype-core` before you push the tag; the workflow's `--no-verify` publish does not.
 
 ### Rollback
 
