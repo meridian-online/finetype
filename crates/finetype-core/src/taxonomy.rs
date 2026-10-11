@@ -1805,14 +1805,23 @@ representation.discrete.categorical:
     }
 
     #[test]
-    fn dgd_ac01_real_imprecise_amount_multisym() {
+    fn dgd_ac01_real_precise_amount_multisym() {
         // From labels/definitions_finance.yaml (finance.currency.amount_multisym).
+        // It ended at its first digit until it gained its end anchor; the
+        // anchored form is precise because every symbol branch is a literal.
         let v = validation_with_pattern(
+            r"^(R\$|HK\$|NT\$|S\$|A\$|C\$|NZ\$|kr|Kč|zł|Ft|lei|Rp|Rs\.?)\s?-?[0-9]+([.,\s][0-9]+)*$",
+        );
+        assert!(
+            v.is_precise(),
+            "anchored multi-symbol amount pattern must be precise"
+        );
+        let unanchored = validation_with_pattern(
             r"^(R\$|HK\$|NT\$|S\$|A\$|C\$|NZ\$|kr|Kč|zł|Ft|lei|Rp|Rs\.?)\s?-?[0-9]",
         );
         assert!(
-            !v.is_precise(),
-            "unanchored multi-symbol amount pattern must NOT be precise"
+            !unanchored.is_precise(),
+            "the same pattern without its end anchor must NOT be precise"
         );
     }
 
