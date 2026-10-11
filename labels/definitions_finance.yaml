@@ -1046,7 +1046,7 @@ finance.currency.amount_multisym:
     symbol: "REGEXP_EXTRACT({col}, '^([^0-9\\s-]+)', 1)"
   validation:
     type: string
-    pattern: "^(R\\$|HK\\$|NT\\$|S\\$|A\\$|C\\$|NZ\\$|kr|Kč|zł|Ft|lei|Rp|Rs\\.?)\\s?-?[0-9]"
+    pattern: "^(R\\$|HK\\$|NT\\$|S\\$|A\\$|C\\$|NZ\\$|kr|Kč|zł|Ft|lei|Rp|Rs\\.?)\\s?-?[0-9]+([.,\\s][0-9]+)*$"
   tier: [VARCHAR, currency]
   release_priority: 4
   aliases: []

@@ -112,3 +112,131 @@ fn dgd_ac01b_emit_precise_audit_tsv() {
         n_precise_false,
     );
 }
+
+/// The registry patterns that are deliberately a prefix of the value they
+/// validate, each with the value it is a prefix of. Every other
+/// `validation.pattern` in `labels/definitions_*.yaml` ends in `$`.
+///
+/// JSON Schema's `pattern` is a search, not a full match, so an unanchored
+/// pattern accepts any value that merely starts well — `R$ 1 apple` passed
+/// `finance.currency.amount_multisym` until it gained its end anchor. These
+/// three are right as they are: the value runs on past anything a pattern could
+/// name, so an end anchor would reject the real family.
+const UNANCHORED_PREFIXES: &[(&str, &str)] = &[
+    (
+        "container.object.yaml",
+        "a YAML mapping, whose `key: value` lines run on past the first key",
+    ),
+    (
+        "geography.format.wkt",
+        "a WKT geometry, whose coordinate list runs on past the opening parenthesis",
+    ),
+    (
+        "technology.internet.user_agent",
+        "a User-Agent header, whose product and comment tokens run on past the leading product",
+    ),
+];
+
+/// True when `pattern` ends in an unescaped `$`: an even run of backslashes
+/// (including none) before it, so a literal `\$` at the end is not an anchor.
+fn ends_anchored(pattern: &str) -> bool {
+    match pattern.strip_suffix('$') {
+        None => false,
+        Some(rest) => (rest.len() - rest.trim_end_matches('\\').len()) % 2 == 0,
+    }
+}
+
+/// `(type_key, pattern)` for every definition whose `validation.pattern` does
+/// not end in an unescaped `$`, sorted by key. A definition with no pattern is
+/// not listed: there is nothing there to run on.
+fn unanchored_patterns(taxonomy: &Taxonomy) -> Vec<(String, String)> {
+    let mut keys: Vec<&String> = taxonomy.labels().iter().collect();
+    keys.sort();
+    keys.into_iter()
+        .filter_map(|key| {
+            let pattern = taxonomy.get(key)?.validation.as_ref()?.pattern.as_deref()?;
+            (!ends_anchored(pattern)).then(|| (key.clone(), pattern.to_string()))
+        })
+        .collect()
+}
+
+#[test]
+fn registry_patterns_end_anchored_unless_a_recorded_prefix() {
+    let root = workspace_root();
+    let taxonomy = Taxonomy::from_directory(root.join("labels"))
+        .expect("load taxonomy from labels/ — is labels/ present in workspace?");
+
+    let found = unanchored_patterns(&taxonomy);
+
+    let unrecorded: Vec<String> = found
+        .iter()
+        .filter(|(key, _)| !UNANCHORED_PREFIXES.iter().any(|(k, _)| k == key))
+        .map(|(key, pattern)| format!("  {key}: {pattern}"))
+        .collect();
+    assert!(
+        unrecorded.is_empty(),
+        "validation.pattern without an end anchor, so it accepts any value that merely starts \
+         well. Anchor it with `$`, or record it in UNANCHORED_PREFIXES with the value it is a \
+         prefix of:\n{}",
+        unrecorded.join("\n")
+    );
+
+    // A recorded exception that has since been anchored or removed is a stale
+    // entry: the list would keep excusing a pattern nothing needs to excuse.
+    let stale: Vec<&str> = UNANCHORED_PREFIXES
+        .iter()
+        .map(|(key, _)| *key)
+        .filter(|key| !found.iter().any(|(k, _)| k == key))
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "UNANCHORED_PREFIXES records {stale:?}, which no longer has an unanchored \
+         validation.pattern — delete the entry"
+    );
+}
+
+#[test]
+fn the_anchor_audit_names_an_unanchored_pattern_it_is_given() {
+    fn definition(key: &str, pattern: &str) -> String {
+        format!(
+            r#"
+{key}:
+  title: "t"
+  description: "d"
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: null
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "{pattern}"
+  tier: [VARCHAR, text]
+  release_priority: 5
+  aliases: []
+  samples:
+    - "x"
+  references: null
+  notes: null
+"#
+        )
+    }
+    let report = |key: &str, pattern: &str| {
+        let tax = Taxonomy::from_yaml(&definition(key, pattern)).expect("test YAML parses");
+        unanchored_patterns(&tax)
+    };
+
+    // A fourth unanchored pattern is reported, with its key and its pattern.
+    assert_eq!(
+        report("text.sample.fourth", "^abc[0-9]"),
+        vec![("text.sample.fourth".to_string(), "^abc[0-9]".to_string())]
+    );
+    // An anchored pattern is not.
+    assert!(report("text.sample.anchored", "^abc[0-9]+$").is_empty());
+    // A literal `\$` at the end is not an anchor, but `\\$` (an escaped
+    // backslash, then the anchor) is.
+    assert_eq!(report("text.sample.escaped", "^abc\\\\$").len(), 1);
+    assert!(report("text.sample.double", "^abc\\\\\\\\$").is_empty());
+}

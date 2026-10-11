@@ -748,3 +748,88 @@ fn ptc_veto_safe_allowlist_contains_every_generator_declared_exception() {
         );
     }
 }
+
+/// Tightening — `finance.currency.amount_multisym` ends at the last digit of
+/// the amount instead of at its first.
+///
+/// The pattern stopped after `[0-9]` with no `$`, and JSON Schema's `pattern`
+/// is a search, not a full match, so `R$ 1 apple` validated as a multi-symbol
+/// amount. The REJECT set is the run-on family: trailing words, a trailing
+/// separator, a trailing space. The ACCEPT set is the type's own samples plus
+/// the shapes the generator and the transform handle: a negative sign, an
+/// ungrouped integer and a one-digit decimal.
+#[test]
+fn ptc_tightening_amount_multisym_rejects_trailing_text() {
+    assert_pattern_boundary(
+        "finance.currency.amount_multisym",
+        &[
+            // the five samples the definition carries
+            "R$ 1.234,56",
+            "HK$ 1,234.56",
+            "kr 1 234,56",
+            "Kč 1 234,56",
+            "zł 1 234,56",
+            // the negative form the generator emits, an ungrouped integer and
+            // a short decimal
+            "R$ -1.234,56",
+            "R$ 1234",
+            "kr 1234,5",
+        ],
+        &[
+            "R$ 1 apple",
+            "R$ 1.234,56 apple",
+            "HK$ 1,234.56 HKD",
+            "R$ 1.234,56 ",
+            "R$ 1.",
+            "R$ 12abc",
+        ],
+    );
+}
+
+/// The definition's own samples and the generator's own output, negative form
+/// included, all pass the anchored validator.
+///
+/// `ptc_tightening_amount_multisym_rejects_trailing_text` pins a literal list;
+/// this one reads the samples from the definition and draws the generator, so
+/// a later edit to either that the pattern no longer covers reddens here.
+#[test]
+fn ptc_amount_multisym_samples_and_generator_output_pass_the_anchored_pattern() {
+    const LABEL: &str = "finance.currency.amount_multisym";
+    let tax = load_taxonomy();
+
+    let samples: Vec<String> = tax
+        .get(LABEL)
+        .expect("amount_multisym is in the taxonomy")
+        .samples
+        .iter()
+        .map(|v| v.as_str().expect("a string sample").to_string())
+        .collect();
+    assert!(!samples.is_empty(), "the definition carries no samples");
+    for sample in &samples {
+        let result = validate_value_for_label(sample, LABEL, &tax).unwrap();
+        assert!(
+            result.is_valid,
+            "the definition's own sample {sample:?} fails its pattern: {:?}",
+            result.errors
+        );
+    }
+
+    let mut generator = finetype_core::Generator::with_seed(load_taxonomy(), 42);
+    let mut negatives = 0usize;
+    for _ in 0..500 {
+        let value = generator.generate_value(LABEL).expect("generator output");
+        if value.contains(" -") {
+            negatives += 1;
+        }
+        let result = validate_value_for_label(&value, LABEL, &tax).unwrap();
+        assert!(
+            result.is_valid,
+            "the generator's own output {value:?} fails the pattern: {:?}",
+            result.errors
+        );
+    }
+    assert!(
+        negatives > 0,
+        "500 draws produced no negative amount — the negative form is not exercised"
+    );
+}

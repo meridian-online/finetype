@@ -436,7 +436,8 @@ impl Generator {
                 let formatted = Self::format_int_with_separator(int_part, '.');
                 let symbols = ["R$", "HK$", "S$", "A$", "NZ$", "C$"];
                 let sym = symbols[self.rng.gen_range(0..symbols.len())];
-                // Pattern: ^(symbol)\s?-? — symbol then minus
+                // Pattern: ^(symbol)\s?-?[0-9]+([.,\s][0-9]+)*$ — symbol, optional
+                // minus, then digit groups to the end of the value
                 let is_negative = self.rng.gen_bool(0.1);
                 if is_negative {
                     Ok(format!("{} -{},{:02}", sym, formatted, cents))
