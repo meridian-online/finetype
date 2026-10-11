@@ -331,15 +331,22 @@ say so explicitly rather than leaving the percentages to stand by default:
 If **no** to either — note it and move on. CLI, Homebrew and install users are current; the
 docs stay as they are until a deliberate refresh.
 
-### crates.io (library crates — separate, deliberate step)
+### crates.io (library crates — published by the release workflow)
 
-The binary release above does **not** publish to crates.io. The five library crates
-(`finetype-core`, `finetype-model`, `finetype-mcp`, `finetype-train`, `finetype-cli`) are a
-distinct publish. Do it when a release changes library-visible behaviour a downstream crate
-consumer should get — e.g. taxonomy/validator changes, which are **embedded into
-`finetype-core`** at build time, so they reach consumers only via a crates.io bump (a
-`labels/*.yaml` change like the 0.6.41 checksum guards qualifies). Skip it for pure
-binary/CI/tooling changes.
+Pushing a `v*` tag publishes the five library crates (`finetype-core`, `finetype-model`,
+`finetype-mcp`, `finetype-train`, `finetype-cli`) to crates.io along with the binaries. The
+`publish-crates` job in `.github/workflows/release.yml` needs only the `release` job and runs
+`.github/scripts/publish-crates.sh`; there is no separate publish step to run afterwards. A
+`v*` tag publishes them whether or not the release changed library-visible behaviour. A
+taxonomy/validator change is **embedded into `finetype-core`** at build time, so the tag's
+publish is how it reaches crate consumers (a `labels/*.yaml` change like the 0.6.41 checksum
+guards is one).
+
+The script is safe to re-run. It skips a crate whose tag version is already on crates.io, so
+re-pushing a tag, or re-running after one crate failed, publishes only what is missing. With
+no `CARGO_REGISTRY_TOKEN` secret it warns and does nothing, leaving the job green and the
+crates unpublished. crates.io permits yanking a version, not deleting it, so a published
+version stays public: settle what the library crates carry before you push the tag.
 
 **Publish order — dependency order; each must be on crates.io before the crate that depends
 on it:**
@@ -349,22 +356,21 @@ core → model → mcp → train → cli
 ```
 
 `finetype-cli` depends on `finetype-mcp` + `finetype-train`, so those publish first even
-though their READMEs mark them internal/no-stability.
-
-```bash
-for c in finetype-core finetype-model finetype-mcp finetype-train finetype-cli; do
-  cargo publish -p "$c" --dry-run   # then drop --dry-run; let the index settle between crates
-done
-```
+though their READMEs mark them internal/no-stability. The script walks the crates in that
+order, and `cargo publish` blocks until each crate is in the index before the next one
+resolves its internal dependencies. It publishes with `--no-verify`, because the `build` job
+has already built and tested the release binaries, so the workflow does not compile the
+packaged crates.
 
 **Gotcha — `include_str!` of a `labels/` file breaks packaging.**
 `include_str!("../../../labels/…")` escapes the package root, so `cargo package`/`publish`
 fails. Any `labels/` file a crate embeds MUST be reached through an in-crate `data/` symlink
 (e.g. `crates/finetype-core/data/… → ../../../labels/…`); cargo dereferences it at packaging
 while `labels/` stays canonical. Adding a **new** `include_str!` of a `labels/` file without
-the matching `data/` symlink will break the next publish (this silently broke packaging once
-already — see memory `company-reference-audit-2026-07`). Verify with `cargo package -p
-finetype-core` before a real publish.
+the matching `data/` symlink will break the publish the next tag runs (this silently broke
+packaging once already — see memory `company-reference-audit-2026-07`). Verify with `cargo
+package -p finetype-core` before you push the tag; the workflow's `--no-verify` publish does
+not.
 
 ### Rollback
 
