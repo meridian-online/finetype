@@ -11,7 +11,7 @@ The Meridian review standard. roborev reads a repo's `REVIEW.md` as its review g
 - **Cross-repo privacy:** a PUBLIC repo's code / commit / PR must not contain private planning terms, the private planning-repo name, private PR numbers, or strategy/instrument terms.
 - **Verified, not asserted:** load-bearing claims are backed by a real run / golden image / passing test — not prose.
 - **Determinism where promised:** byte-identical outputs; no `HashMap` on an order-bearing path.
-- **Dependency hygiene:** each dependency a change adds or alters gets a licence check. Permissive licences pass, and a strong copyleft licence such as GPL or AGPL does not. Where the repo has a `deny.toml`, cargo-deny checks its Rust dependencies; check any other dependency's licence by hand. Flag a weak copyleft licence such as MPL-2.0 where a deny.toml allows it, and a git-tree or pinned dependency, so the merge is decided knowing it.
+- **Dependency hygiene:** check the licence of each dependency a change adds or alters. cargo-deny does it for Rust dependencies where the repo has a `deny.toml`; check the rest by hand. A permissive licence passes. A strong copyleft licence such as GPL or AGPL is a 🔴 must-fix. Any other licence is flagged by name so the merge is decided knowing it: weak copyleft such as MPL-2.0 or LGPL, whether or not a deny.toml allows it, and a source-available, non-commercial or unidentified licence. Flag a git-tree or pinned dependency too.
 
 ## Nit cap
 Report at most 5 nits, then "plus N similar items."
