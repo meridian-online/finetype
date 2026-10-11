@@ -11,7 +11,7 @@ The Meridian review standard. roborev reads a repo's `REVIEW.md` as its review g
 - **Cross-repo privacy:** a PUBLIC repo's code / commit / PR must not contain private planning terms, the private planning-repo name, private PR numbers, or strategy/instrument terms.
 - **Verified, not asserted:** load-bearing claims are backed by a real run / golden image / passing test — not prose.
 - **Determinism where promised:** byte-identical outputs; no `HashMap` on an order-bearing path.
-- **Dependency hygiene:** no new dependency without a licence check, permissive licences only. Where the repo has a `deny.toml`, cargo-deny checks its Rust dependencies; check any other dependency's licence by hand. Flag a git-tree or pinned dependency that the change adds or alters.
+- **Dependency hygiene:** no new dependency without a licence check, permissive licences only. Where the repo has a `deny.toml`, cargo-deny checks its Rust dependencies; check any other dependency's licence by hand. Flag a licence that is not permissive, such as MPL-2.0, even when the deny.toml lets it through, and flag a git-tree or pinned dependency that the change adds or alters.
 
 ## Nit cap
 Report at most 5 nits, then "plus N similar items."
