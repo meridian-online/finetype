@@ -785,8 +785,7 @@ def _sub(path_rel: str, old: str, new: str):
     on exact spacing and lost their target. The gate stayed green; its proof that
     it can fail went red.
 
-    So whitespace is optional wherever JSON punctuation allows it. The mutation
-    is a claim about the document's MEANING; the spacing is not part of it.
+    The mutation is a claim about the document's MEANING; the spacing is not part of it.
     """
 
     pattern = re.compile(
