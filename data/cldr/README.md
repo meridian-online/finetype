@@ -145,16 +145,19 @@ filtered out. This may be revisited when CJK datetime types are added to the tax
 - `data/cldr/cldr_month_names.tsv` — Month names per locale (wide + abbreviated, 706 locales)
 - `data/cldr/cldr_weekday_names.tsv` — Weekday names per locale (wide + abbreviated, 706 locales)
 - `data/cldr/cldr_mapping_report.txt` — Coverage analysis and unmapped pattern report
+- `data/cldr/cldr_numbering_systems.tsv` — Each date-pattern locale's default numbering system (`cldr-numbers-full`, 706 locales). A pattern says where the fields go, not which digits write them: `ar-SA` writes `d/M/y` as `١٥/١/٢٠٢٤` because its default is `arab`. 82 locales default to digits other than `latn`.
 
 ### Refreshing
 
 ```bash
 ./scripts/download_cldr.sh          # Download CLDR v46.0.0
-python3 scripts/extract_cldr_patterns.py  # Re-extract and map
+python3 scripts/extract_cldr_numbering.py  # Default numbering system per locale
 ```
+
+`scripts/extract_cldr_patterns.py`, which wrote the pattern and name tables, was removed with the Python training infrastructure; those tables are kept as extracted.
 
 ## Future Data Sources
 
 | Source | Purpose | Status |
 |--------|---------|--------|
-| [CLDR JSON](https://github.com/unicode-org/cldr-json) `cldr-numbers-full` | Number formatting rules | Downloaded, not yet used |
+| [CLDR JSON](https://github.com/unicode-org/cldr-json) `cldr-numbers-full` | Number formatting rules | Default numbering system extracted; the rest not yet used |
