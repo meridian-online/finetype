@@ -195,7 +195,7 @@ Also change `run_case` so the scratch tree no longer pre-creates `models/` (the 
 - [ ] **Step 2: Run the self-test to see the new cases fail**
 
 Run: `.github/scripts/check-ci-model-drift.sh --self-test`
-Expected: 21 of 25 cases FAIL. The committed script exits 0 with "unset or empty" whenever `FINETYPE_CI_MODEL` is unset, so every case that reads the tree fails: the drift cases that no longer set the variable exit 0 instead of 1, and the aligned cases print the unset message instead of the aligned one. Only `drift_environment`, `ci_model_whitespace`, `aligned_environment_matches` and `ci_model_empty` pass.
+Expected: 22 of 25 cases FAIL. The committed script exits 0 with "unset or empty" whenever `FINETYPE_CI_MODEL` is unset, so every case that reads the tree fails: the drift cases that no longer set the variable exit 0 instead of 1, and the aligned cases print the unset message instead of the aligned one. Only `drift_environment`, `ci_model_whitespace` and `aligned_environment_matches` pass; `ci_model_empty` exits 0 but wants the aligned message the old script never prints.
 
 - [ ] **Step 3: Replace `check_drift` with the five-pin version**
 
