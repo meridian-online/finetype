@@ -2,7 +2,9 @@ name: Weekly README version table
 
 # Re-measures the per-DuckDB-version table in README.md against the community
 # registry, on the platform the table names, and files an issue when a cell is
-# stale or a DuckDB release has no row. A signal, never a gate: no pull-request
+# stale, a DuckDB release has no row, or the run itself fell short (a row that
+# could not be measured, an unavailable release list); the report says which.
+# A signal, never a gate: no pull-request
 # or push trigger, because a registry outage must not redden a pull request its
 # author cannot fix. The README is never edited by this workflow.
 

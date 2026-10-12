@@ -24,8 +24,7 @@ itself falls short, a row whose probe failed or a release list that could
 not be fetched, the other cells are still compared, the report lists what
 could not be measured apart from the stale cells, and the exit is 3 (2 is
 argparse's usage error). The README is never edited: a cell is a measurement
-with a date,
-and the fix is a new measurement a person commits.
+with a date, and the fix is a new measurement a person commits.
 
 It is a signal, not a gate. The workflow that runs it is scheduled and never
 triggered by a pull request.
@@ -321,6 +320,8 @@ def self_test() -> int:
     case("cell_refused", rows[2].outcome == Outcome("refused"))
     case("cell_old_build_reads_its_version", rows[3].outcome == Outcome("version", "0.2.0"))
     case("cell_unreadable", classify_cell("something else entirely").kind == "unreadable")
+    committed = parse_table(README.read_text(encoding="utf-8"))
+    case("committed_readme_rows_all_readable", committed and all(r.outcome.kind != "unreadable" for r in committed), str([(r.duckdb, r.cell) for r in committed if r.outcome.kind == "unreadable"]))
 
     case("probe_version", classify_probe("", "", "finetype 0.6.57\n") == Outcome("version", "0.6.57"))
     case("probe_404", classify_probe("IO Error: Failed to download extension ... HTTP 404", "", "").kind == "not_published")

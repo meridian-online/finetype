@@ -395,7 +395,7 @@ The script is the committed file `scripts/check_readme_version_table.py`, not a 
 - [ ] **Step 2: Run the self-test**
 
 Run: `chmod +x scripts/check_readme_version_table.py && scripts/check_readme_version_table.py --self-test`
-Expected: `Results: 26 passed, 0 failed`. If a case fails, fix the classifier, not the case: each case is the spec's outcome table.
+Expected: `Results: 27 passed, 0 failed`. If a case fails, fix the classifier, not the case: each case is the spec's outcome table.
 
 - [ ] **Step 3: Register the self-test and route it**
 
@@ -437,104 +437,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 - [ ] **Step 1: The workflow**
 
-```yaml
-name: Weekly README version table
-
-# Re-measures the per-DuckDB-version table in README.md against the community
-# registry, on the platform the table names, and files an issue when a cell is
-# stale or a DuckDB release has no row. A signal, never a gate: no pull-request
-# or push trigger, because a registry outage must not redden a pull request its
-# author cannot fix. The README is never edited by this workflow.
-
-on:
-  schedule:
-    - cron: '0 7 * * 1'      # Mondays 07:00 UTC, after the compat build
-  workflow_dispatch:
-
-concurrency:
-  group: weekly-readme-version-table
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
-jobs:
-  measure:
-    # macOS arm64: the table's rows were measured on osx_arm64.
-    runs-on: macos-15
-    timeout-minutes: 30
-    outputs:
-      status: ${{ steps.run.outcome }}
-    steps:
-      - uses: actions/checkout@v5
-      - name: Re-measure every row
-        id: run
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: scripts/check_readme_version_table.py --measure --report "$RUNNER_TEMP/report.md"
-      - name: Keep the report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: readme-version-table-report
-          path: ${{ runner.temp }}/report.md
-          if-no-files-found: ignore
-
-  notify:
-    needs: measure
-    if: failure()
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: readme-version-table-report
-          path: report
-        continue-on-error: true
-      - uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const label = 'readme-version-table';
-            try {
-              await github.rest.issues.getLabel({ owner: context.repo.owner, repo: context.repo.repo, name: label });
-            } catch (e) {
-              await github.rest.issues.createLabel({ owner: context.repo.owner, repo: context.repo.repo, name: label, color: 'fbca04' });
-            }
-            let report = '(no report file: the measurement itself failed; read the run log)';
-            try { report = fs.readFileSync('report/report.md', 'utf8'); } catch (e) {}
-            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            // A stale cell stays stale until a person commits a new measurement,
-            // so the same finding lands on the open issue rather than a new one.
-            const open = await github.rest.issues.listForRepo({
-              owner: context.repo.owner, repo: context.repo.repo, labels: label, state: 'open', per_page: 1,
-            });
-            if (open.data.length > 0) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner, repo: context.repo.repo, issue_number: open.data[0].number,
-                body: ['Re-measured again.', '', '```', report.trim(), '```', '', `Run: ${run}`].join('\n'),
-              });
-              return;
-            }
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `README version table is stale or incomplete (run ${context.runId})`,
-              body: [
-                'The weekly re-measurement of the README DuckDB version table found a cell that no longer matches the community registry, or a DuckDB release with no row.',
-                '',
-                'This is a signal, not a gate. Re-measure, update the table with the new date, and close this.',
-                '',
-                '```', report.trim(), '```',
-                '',
-                `Run: ${run}`,
-              ].join('\n'),
-              labels: [label],
-            });
-```
-
-Check the `upload-artifact`/`download-artifact` major versions match the ones used in `MainDistributionPipeline.yml` (v4 today); use the same.
+The workflow is the committed file `.github/workflows/weekly-readme-version-table.yml`, not a copy here: a Monday 07:00 UTC schedule plus `workflow_dispatch`, a `measure` job on `macos-15` that runs the script and keeps the report as an artifact, and a `notify` job that on any failure comments on the open `readme-version-table` issue or opens one whose body defers to the report. Its action versions match `MainDistributionPipeline.yml`.
 
 - [ ] **Step 2: The 1.5.0 cell**
 
