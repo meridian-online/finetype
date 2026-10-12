@@ -23,8 +23,8 @@
 
 ## Review Focus
 
-1. Piece 3: a Windows checkout writes `models/default` as a text file with CRLF; the script must still read it (existing case kept, now with all five pins planted).
-2. Piece 3: `build.rs` may be reformatted by `cargo fmt` with different spacing around `=`; the constant must still be read (Task A1 case `aligned_build_rs_spacing`).
+1. Piece 3: a Windows checkout writes `models/default` as a text file with CRLF; the script must still read it (`check-ci-model-drift.sh --self-test` cases `drift_plain_text_symlink` and `aligned_plain_text_symlink`).
+2. Piece 3: `build.rs` may be reformatted by `cargo fmt` with different spacing around `=`; the constant must still be read (`check-ci-model-drift.sh --self-test` case `aligned_build_rs_spacing`).
 3. Piece 2: a `generate:` value other than `on_request` must fail the taxonomy load, so the field cannot become a second scale (Task B1 test `generate_policy_rejects_unknown_value`).
 4. Piece 4: a README table row whose cell is prose with no version string and no known failure phrase must be reported as unreadable rather than silently matched (Task C1 case `cell_unreadable`).
 5. Piece 4: a DuckDB release the GitHub API lists as a prerelease must not count as a missing row (Task C1 case `prerelease_is_not_missing`).
