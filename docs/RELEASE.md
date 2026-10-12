@@ -18,14 +18,14 @@ pre-flight) does **not** apply to ingestion. Any CI job that runs `profile`/
 After the v0.6.17 release we decoupled CI from the `models/default` symlink (see `spec 2026-04-20-ci-decouple-default-symlink`). The 3-step flow:
 
 1. **Publish to HuggingFace** — upload the trained model directory to `meridian-online/finetype-model` on HF.
-2. **Bump `FINETYPE_CI_MODEL`** in `.github/workflows/ci.yml` and `.github/workflows/release.yml` (workflow-level `env:` blocks).
+2. **Bump the pins** — `FINETYPE_CI_MODEL` in `.github/workflows/ci.yml` and `.github/workflows/release.yml` (workflow-level `env:` blocks), `DEFAULT_MODEL` in `crates/finetype-cli/build.rs`, and the `models/<new-model>/` line in `.gitignore`.
 3. **Flip `models/default`** — `ln -sfn <new-model> models/default`.
 
-Steps 2 and 3 ship in the same PR: CI fails while `FINETYPE_CI_MODEL` and `models/default` name different models. Step 1 must precede step 2 — CI's download 404s on a model that is not on HuggingFace yet.
+Steps 2 and 3 ship in the same PR: CI fails while any of the five pins names a model other than `models/default`'s. Step 1 must precede step 2 — CI's download 404s on a model that is not on HuggingFace yet.
 
 **Quality gates before any of this.** A candidate clears the promotion-order scoreboard *before* the flip (CLAUDE.md "Promotion order"): gold-anchor → drift proxy → gold + rare-type scoreboard → **representative accuracy (advisory)** → **external-data band (advisory)** → corpus-honest gate (**blocking**). The representative band (`eval/repr/representative_corpus.tsv`, scored `score_gold_anchor.py … --reframe`) is reported alongside gold and flags an advisory drop on the candidate-vs-v19 delta; it never blocks on its own. The external-data band (`scripts/external_band.py` over `eval/datasets/gold_external/`, held labels live-derived from `gold_corpus.tsv`) profiles whole real external tables the model never trained on and reports the same candidate-vs-baseline delta; also advisory, also never blocking. Only gold + the corpus-honest relocation gate block. See specs `2026-06-18-representative-accuracy-gate` and `output/external-band/2026-07-11-first-reading.md`.
 
-The drift check (`.github/scripts/check-ci-model-drift.sh`) fails the `CI model vs symlink drift` job when `FINETYPE_CI_MODEL` and `models/default` name different models. Run it with `--self-test` to exercise it over scratch trees.
+The pin check (`.github/scripts/check-ci-model-drift.sh`) fails the `Model pins agree` job when any of the five places that name the default model disagrees with `models/default`: `FINETYPE_CI_MODEL` in `ci.yml` and in `release.yml`, `DEFAULT_MODEL` in `crates/finetype-cli/build.rs`, and the `models/<name>/` line in `.gitignore`. A promotion edits all five in one pull request. Run it with `--self-test` to exercise it over scratch trees.
 
 ### Step 0: pack the encoders in half precision before uploading
 

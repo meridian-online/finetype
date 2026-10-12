@@ -336,7 +336,7 @@ jobs:
         run: .github/scripts/test-download-model.sh
 
   drift-check:
-    name: CI model vs symlink drift
+    name: Model pins agree
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -345,19 +345,18 @@ jobs:
         # In-job by design, and it audits before it plans; see the identical step
         # in the `gate-routing-self-test` job for why.
         run: .github/scripts/gate-self-tests.py plan --base "${{ github.event.pull_request.base.sha || github.event.before }}"
-      - name: Check for drift between FINETYPE_CI_MODEL and models/default
+      - name: Every model pin names the models/default model
         run: .github/scripts/check-ci-model-drift.sh
 
-      - name: ...and the drift gate detects a planted drift
+      - name: ...and the pin check detects each planted drift
         # The step above is only known to pass. This one runs the same script
-        # over scratch trees it builds: a planted drift in the symlink form and
-        # in the plain-text form git leaves on Windows, a target differing only
-        # by a path component (which a basename comparison would call aligned),
-        # a models/default that resolves to no name, and a whitespace pin —
-        # each held to an exit status AND a message, since a status alone
-        # cannot tell a refusal from a crash. The aligned trees, FINETYPE_CI_MODEL
-        # unset among them, are asserted green in the same run, or the catches
-        # are noise.
+        # over scratch trees it builds: all five pins planted and one broken
+        # per case — the symlink (and the plain-text form git leaves on
+        # Windows), both workflow variables, the build-script constant, the
+        # gitignore line, and the environment — each held to an exit status
+        # AND a message, since a status alone cannot tell a refusal from a
+        # crash. The aligned trees are asserted green in the same run, or the
+        # catches are noise.
         if: steps.route.outputs.ci_model_drift == 'true'
         run: .github/scripts/check-ci-model-drift.sh --self-test
 
