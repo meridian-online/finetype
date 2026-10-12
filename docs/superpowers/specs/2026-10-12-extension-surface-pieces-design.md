@@ -44,8 +44,8 @@ Five tracked places name the default model, and they have to agree: the CI workf
 
 | Pin | Where | How it is read |
 |---|---|---|
-| CI variable | `.github/workflows/ci.yml`, the workflow-level `env:` block | the `FINETYPE_CI_MODEL:` line |
-| release variable | `.github/workflows/release.yml`, same block | the same line |
+| CI variable | `.github/workflows/ci.yml` | every `FINETYPE_CI_MODEL:` line in the file, whichever `env:` block it sits in; a job that re-pins the model lower down downloads that model |
+| release variable | `.github/workflows/release.yml` | the same |
 | embedded default | `crates/finetype-cli/build.rs` | the `const DEFAULT_MODEL: &str = "…";` line |
 | symlink | `models/default` | `readlink`, then `cat` for the plain-text form a Windows checkout leaves |
 | ignored weights | `.gitignore` | a line equal to `models/<name>/` |
@@ -54,7 +54,7 @@ The symlink target is the reference the other four are compared against, as toda
 
 The job that runs the script, `CI model vs symlink drift`, already runs on every pull request and every push to `main`; it is renamed to say what it now checks. The release workflow keeps its variable and gains no check.
 
-The self-test keeps its shape, scratch trees held to an exit status and a message, and materialises the four files it now reads. New cases: a drift planted in each of the four new pins with the rest aligned; a missing gitignore line; a missing constant; a constant whose quotes or spacing differ from the canonical form, which must still be read. The aligned case materialises all five. `.github/gate-self-tests.tsv` lists the script as before; the four read files are not gate code, so they do not route the self-test.
+The self-test keeps its shape, scratch trees held to an exit status and a message, and materialises the four files it now reads. New cases: a drift planted in each of the four new pins with the rest aligned; a missing gitignore line; a missing constant; a constant whose spacing differs from the canonical form, which must still be read (the constant is read in its double-quoted `&str` form only; any other shape fails closed as a missing pin). The aligned case materialises all five. `.github/gate-self-tests.tsv` lists the script as before; the four read files are not gate code, so they do not route the self-test.
 
 ### Out of scope
 

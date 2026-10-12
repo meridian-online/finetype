@@ -64,7 +64,8 @@ check_drift() {
 
   for pin in .github/workflows/ci.yml .github/workflows/release.yml; do
     local found=false
-    while IFS= read -r value; do
+    # `|| [ -n ... ]` keeps a last line that has no newline after it.
+    while IFS= read -r value || [ -n "${value}" ]; do
       value="$(trim "${value}")"
       [ -n "${value}" ] || continue
       found=true
@@ -85,8 +86,10 @@ check_drift() {
     problems+=("${pin}=${value}")
   fi
 
-  # tr first: a Windows checkout writes the file with CRLF, and -x wants the whole line.
-  if ! tr -d '\r' < .gitignore 2>/dev/null | grep -qxF -- "models/${target}/"; then
+  # tr first: a Windows checkout writes the file with CRLF, and -x wants the whole
+  # line. Not grep -q: under pipefail an early exit would kill tr with SIGPIPE on a
+  # file larger than the pipe buffer and report the line missing.
+  if ! tr -d '\r' < .gitignore 2>/dev/null | grep -xF -- "models/${target}/" >/dev/null; then
     problems+=(".gitignore has no line models/${target}/ — the tree does not record which model directory CI fills")
   fi
 
@@ -273,14 +276,28 @@ self_test() {
     "0" "aligned with models/default \(a\)" \
     "plant a; printf 'models/a/\r\n' > .gitignore"
 
+  # The pin may be the file's last line with no newline after it.
+  run_case "aligned_workflow_pin_last_line_no_newline" \
+    "0" "aligned with models/default \(a\)" \
+    "plant a; printf 'env:\n  FINETYPE_CI_MODEL: a' > .github/workflows/ci.yml"
+
+  # A .gitignore larger than a pipe buffer, with the line near the top: the
+  # reader must consume the whole file rather than exit early under pipefail.
+  run_case "aligned_gitignore_large_file" \
+    "0" "aligned with models/default \(a\)" \
+    "plant a; { printf 'models/a/\n'; yes 'target/some/long/ignored/path/that/pads/the/file' | head -40000; } > .gitignore"
+
   run_case "aligned_environment_matches" \
     "0" "aligned with models/default \(a\)" \
     "plant a" \
     FINETYPE_CI_MODEL=a
 
-  run_case "ci_model_unset" \
+  # Set but empty: download-model.sh falls back to models/default, so there is
+  # no second name to compare and the tree alone decides.
+  run_case "ci_model_empty" \
     "0" "aligned with models/default \(a\)" \
-    "plant a"
+    "plant a" \
+    FINETYPE_CI_MODEL=
 
   echo
   echo "Results: ${PASS} passed, ${FAIL} failed"

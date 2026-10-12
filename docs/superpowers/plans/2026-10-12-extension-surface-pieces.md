@@ -166,14 +166,28 @@ Then the cases, replacing the existing list inside `self_test`:
     "0" "aligned with models/default \(a\)" \
     "plant a; printf 'models/a/\r\n' > .gitignore"
 
+  # The pin may be the file's last line with no newline after it.
+  run_case "aligned_workflow_pin_last_line_no_newline" \
+    "0" "aligned with models/default \(a\)" \
+    "plant a; printf 'env:\n  FINETYPE_CI_MODEL: a' > .github/workflows/ci.yml"
+
+  # A .gitignore larger than a pipe buffer, with the line near the top: the
+  # reader must consume the whole file rather than exit early under pipefail.
+  run_case "aligned_gitignore_large_file" \
+    "0" "aligned with models/default \(a\)" \
+    "plant a; { printf 'models/a/\n'; yes 'target/some/long/ignored/path/that/pads/the/file' | head -40000; } > .gitignore"
+
   run_case "aligned_environment_matches" \
     "0" "aligned with models/default \(a\)" \
     "plant a" \
     FINETYPE_CI_MODEL=a
 
-  run_case "ci_model_unset" \
+  # Set but empty: download-model.sh falls back to models/default, so there is
+  # no second name to compare and the tree alone decides.
+  run_case "ci_model_empty" \
     "0" "aligned with models/default \(a\)" \
-    "plant a"
+    "plant a" \
+    FINETYPE_CI_MODEL=
 ```
 
 Also change `run_case` so the scratch tree no longer pre-creates `models/` (the `plant` helper does): replace `(cd "${dir}" && mkdir -p models && eval "${setup}")` with `(cd "${dir}" && eval "${setup}")`.
@@ -181,7 +195,7 @@ Also change `run_case` so the scratch tree no longer pre-creates `models/` (the 
 - [ ] **Step 2: Run the self-test to see the new cases fail**
 
 Run: `.github/scripts/check-ci-model-drift.sh --self-test`
-Expected: 20 of 23 cases FAIL. The committed script exits 0 with "unset or empty" whenever `FINETYPE_CI_MODEL` is unset, so every case that reads the tree fails: the drift cases that no longer set the variable exit 0 instead of 1, and the aligned cases print the unset message instead of the aligned one. Only `drift_environment`, `ci_model_whitespace` and `aligned_environment_matches` pass.
+Expected: 21 of 25 cases FAIL. The committed script exits 0 with "unset or empty" whenever `FINETYPE_CI_MODEL` is unset, so every case that reads the tree fails: the drift cases that no longer set the variable exit 0 instead of 1, and the aligned cases print the unset message instead of the aligned one. Only `drift_environment`, `ci_model_whitespace`, `aligned_environment_matches` and `ci_model_empty` pass.
 
 - [ ] **Step 3: Replace `check_drift` with the five-pin version**
 
@@ -252,7 +266,8 @@ check_drift() {
 
   for pin in .github/workflows/ci.yml .github/workflows/release.yml; do
     local found=false
-    while IFS= read -r value; do
+    # `|| [ -n ... ]` keeps a last line that has no newline after it.
+    while IFS= read -r value || [ -n "${value}" ]; do
       value="$(trim "${value}")"
       [ -n "${value}" ] || continue
       found=true
@@ -273,8 +288,10 @@ check_drift() {
     problems+=("${pin}=${value}")
   fi
 
-  # tr first: a Windows checkout writes the file with CRLF, and -x wants the whole line.
-  if ! tr -d '\r' < .gitignore 2>/dev/null | grep -qxF -- "models/${target}/"; then
+  # tr first: a Windows checkout writes the file with CRLF, and -x wants the whole
+  # line. Not grep -q: under pipefail an early exit would kill tr with SIGPIPE on a
+  # file larger than the pipe buffer and report the line missing.
+  if ! tr -d '\r' < .gitignore 2>/dev/null | grep -xF -- "models/${target}/" >/dev/null; then
     problems+=(".gitignore has no line models/${target}/ — the tree does not record which model directory CI fills")
   fi
 
@@ -311,7 +328,7 @@ Keep `run_case`, `self_test` (with Step 1's cases) and the `case "${1:-}"` dispa
 - [ ] **Step 4: Run the self-test and the real tree**
 
 Run: `.github/scripts/check-ci-model-drift.sh --self-test`
-Expected: `Results: 23 passed, 0 failed`.
+Expected: `Results: 25 passed, 0 failed`.
 
 Run: `.github/scripts/check-ci-model-drift.sh`
 Expected: `CI model aligned with models/default (m2v8m-s43): ci.yml, release.yml, build.rs, .gitignore.` and exit 0.
