@@ -136,7 +136,8 @@ filtered out. This may be revisited when CJK datetime types are added to the tax
 ### Scripts
 
 - `scripts/download_cldr.sh` — Downloads CLDR JSON packages to `data/cldr/json/`
-- `scripts/extract_cldr_patterns.py` — Extracts and maps patterns, produces TSV tables
+- `scripts/extract_cldr_numbering.py` — Writes each date-pattern locale's default numbering system
+- `scripts/extract_cldr_patterns.py` — Extracted and mapped the pattern and name tables (removed; see Refreshing)
 
 ### Extracted Data Files
 
