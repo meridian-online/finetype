@@ -161,6 +161,7 @@ def cli_asset() -> str:
 
 def fetch_cli(version: str, into: Path) -> Path:
     url = f"https://github.com/duckdb/duckdb/releases/download/v{version}/{cli_asset()}"
+    into.mkdir(parents=True, exist_ok=True)
     zip_path = into / f"duckdb-{version}.zip"
     with urllib.request.urlopen(url, timeout=120) as resp, open(zip_path, "wb") as fh:
         fh.write(resp.read())
