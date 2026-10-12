@@ -19,9 +19,11 @@ WHAT IT DOES
     3. List every stable DuckDB release at or above the table's lowest
        version that has no row.
 
-A stale cell or a missing row is reported and the exit is 1. The README is
-never edited: a cell is a measurement with a date, and the fix is a new
-measurement a person commits.
+A stale cell or a missing row is reported and the exit is 1; when the
+release list cannot be fetched the cells are still compared, the report says
+so, and the exit is 2. One row's failed probe is that row's error, not the
+reading's. The README is never edited: a cell is a measurement with a date,
+and the fix is a new measurement a person commits.
 
 It is a signal, not a gate. The workflow that runs it is scheduled and never
 triggered by a pull request.
@@ -229,19 +231,38 @@ def measure(readme: Path, report: Path | None) -> int:
         work = Path(tmp)
         measured = measure_rows(rows, lambda v: probe(v, work))
     problems = compare(rows, measured)
-    missing = missing_rows(rows, fetch_releases())
-    lines = [f"Re-measured {len(rows)} rows on {platform.system()}/{platform.machine()}.", ""]
+    try:
+        missing, releases_error = missing_rows(rows, fetch_releases()), None
+    except Exception as e:  # noqa: BLE001 - the stale-cell half of the report still goes out
+        missing, releases_error = [], f"{type(e).__name__}: {e}"
+    text, code = render(
+        len(rows), f"{platform.system()}/{platform.machine()}", problems, missing, releases_error
+    )
+    print(text)
+    if report:
+        report.write_text(text + "\n", encoding="utf-8")
+    return code
+
+
+def render(
+    n_rows: int, where: str, problems: list[str], missing: list[str], releases_error: str | None
+) -> tuple[str, int]:
+    """The report text and the exit code: 0 when every cell matches and every
+    release has a row, 1 when a cell is stale or a release has no row, 2 when
+    the release list could not be fetched (the cells were still compared)."""
+    lines = [f"Re-measured {n_rows} rows on {where}.", ""]
     if problems:
         lines += ["Stale cells:"] + [f"- {p}" for p in problems] + [""]
     if missing:
         lines += ["DuckDB releases with no row:"] + [f"- {v}" for v in missing] + [""]
-    if not problems and not missing:
+    if releases_error:
+        lines += [f"DuckDB release list unavailable ({releases_error}); releases with no row not checked.", ""]
+    if not problems and not missing and not releases_error:
         lines.append("Every cell matches and every release has a row.")
-    text = "\n".join(lines)
-    print(text)
-    if report:
-        report.write_text(text + "\n", encoding="utf-8")
-    return 1 if problems or missing else 0
+    text = "\n".join(lines).rstrip("\n")
+    if releases_error:
+        return text, 2
+    return text, 1 if problems or missing else 0
 
 
 # ── self-test ───────────────────────────────────────────────────────────────
@@ -314,6 +335,15 @@ def self_test() -> int:
     ]
     case("missing_rows_above_floor", missing_rows(rows, releases) == ["1.5.7", "2.0.0"])
     case("prerelease_is_not_missing", "2.0.0-dev" not in missing_rows(rows, releases))
+
+    text, code = render(4, "Darwin/arm64", [], [], None)
+    case("render_clean_exits_0", code == 0 and "Every cell matches" in text, text)
+    text, code = render(4, "Darwin/arm64", ["1.5.6: README says version:0.6.57, measured version:0.6.61"], [], None)
+    case("render_stale_exits_1", code == 1 and "Stale cells:" in text, text)
+    text, code = render(4, "Darwin/arm64", [], ["2.0.0"], None)
+    case("render_missing_exits_1", code == 1 and "- 2.0.0" in text, text)
+    text, code = render(4, "Darwin/arm64", [], [], "HTTPError: 403")
+    case("render_release_list_failure_exits_2", code == 2 and "HTTPError: 403" in text and "not checked" in text, text)
 
     print(f"\nResults: {passed} passed, {failed} failed")
     return 0 if failed == 0 else 1

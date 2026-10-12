@@ -23,8 +23,6 @@ jobs:
     # macOS arm64: the table's rows were measured on osx_arm64.
     runs-on: macos-15
     timeout-minutes: 30
-    outputs:
-      status: ${{ steps.run.outcome }}
     steps:
       - uses: actions/checkout@v5
       - name: Re-measure every row
