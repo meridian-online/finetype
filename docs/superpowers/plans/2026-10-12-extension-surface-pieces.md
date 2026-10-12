@@ -386,7 +386,7 @@ Branch: `readme-version-table-check` from `main` after Part B merges. Pull reque
 - Modify: `.github/workflows/ci.yml` (`doc-surface` job, a guarded step after the `registry_expressions` self-test)
 
 **Interfaces:**
-- Produces: `check_readme_version_table.py --self-test` (offline); `check_readme_version_table.py --measure [--readme README.md] [--report report.md]` (network; exit 0 when nothing is stale or missing, 1 otherwise, 2 on a tool error); `parse_table(text) -> list[Row]`; `classify_cell(cell) -> Outcome`; `classify_probe(install_out, load_out, version_out) -> Outcome`; `missing_rows(rows, releases) -> list[str]`.
+- Produces: `check_readme_version_table.py --self-test` (offline); `check_readme_version_table.py --measure [--readme README.md] [--report report.md]` (network; exit 0 when nothing is stale or missing, 1 otherwise, 3 when a row could not be measured or the release list could not be fetched); `parse_table(text) -> list[Row]`; `classify_cell(cell) -> Outcome`; `classify_probe(install_out, load_out, version_out) -> Outcome`; `missing_rows(rows, releases) -> list[str]`.
 
 - [ ] **Step 1: Write the script with its self-test first**
 
