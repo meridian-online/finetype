@@ -826,7 +826,6 @@ datetime.component.year:
     minLength: 4
     maxLength: 4
   tier: [VARCHAR, component]
-  release_priority: 4
   samples: ["2021"]
 "#;
     let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -1068,7 +1067,6 @@ datetime.component.month_name:
   title: Full Month Name
   designation: locale_specific
   tier: [VARCHAR, component]
-  release_priority: 1
   samples: ["January"]
   validation:
     type: string
@@ -1107,7 +1105,6 @@ datetime.component.month_name:
   title: Full Month Name
   designation: locale_specific
   tier: [VARCHAR, component]
-  release_priority: 1
   samples: ["January"]
   validation:
     type: string
@@ -1146,7 +1143,6 @@ datetime.component.day_of_week:
   title: Day of Week Name
   designation: locale_specific
   tier: [VARCHAR, component]
-  release_priority: 1
   samples: ["Monday"]
   validation:
     type: string
@@ -1241,7 +1237,6 @@ datetime.timestamp.sql_standard:
   title: SQL Standard
   designation: universal
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   samples: ["2020-01-03 14:22:09"]
   validation:
     type: string
@@ -1287,7 +1282,6 @@ datetime.timestamp.iso_8601_milliseconds:
   title: ISO 8601 ms
   designation: universal
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   samples: ["2020-01-03T14:22:09.123Z"]
   validation:
     type: string

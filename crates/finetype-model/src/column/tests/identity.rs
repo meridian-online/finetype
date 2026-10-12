@@ -419,7 +419,6 @@ identity.person.phone_number:
   title: Phone Number
   designation: locale_specific
   tier: [VARCHAR, identity, person]
-  release_priority: 5
   samples: ["+1 (202) 555-0100"]
   validation:
     type: string
@@ -465,7 +464,6 @@ identity.person.phone_number:
   title: Phone Number
   designation: locale_specific
   tier: [VARCHAR, identity, person]
-  release_priority: 5
   samples: ["+44 20 7946 0958"]
   validation:
     type: string
@@ -512,7 +510,6 @@ identity.person.email:
   title: Email
   designation: universal
   tier: [VARCHAR, identity, person]
-  release_priority: 5
   samples: ["test@example.com"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -537,7 +534,6 @@ identity.person.phone_number:
   title: Phone Number
   designation: locale_specific
   tier: [VARCHAR, identity, person]
-  release_priority: 5
   samples: ["+1 (202) 555-0100"]
   validation_by_locale:
     EN_US:
@@ -569,7 +565,6 @@ identity.person.phone_number:
   title: Phone Number
   designation: locale_specific
   tier: [VARCHAR, identity, person]
-  release_priority: 5
   samples: ["+1 (202) 555-0100"]
   validation_by_locale:
     EN_US:

@@ -103,7 +103,6 @@ geography.transportation.icao_code:
     minLength: 4
     maxLength: 4
   tier: [VARCHAR, geography, transportation]
-  release_priority: 5
   samples: ["EGLL"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -140,7 +139,6 @@ geography.transportation.icao_code:
     type: string
     enum: ["EGLL", "KJFK", "LFPG", "EDDF", "RJTT", "VHHH"]
   tier: [VARCHAR, geography, transportation]
-  release_priority: 5
   samples: ["EGLL"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -172,7 +170,6 @@ representation.scientific.measurement_unit:
     type: string
     enum: [meter, kilogram, second, m, kg, s]
   tier: [VARCHAR, scientific]
-  release_priority: 3
   samples: ["meter"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -200,7 +197,6 @@ geography.coordinate.geohash:
     type: string
     pattern: "^[0-9b-hjkmnp-z]{6,12}$"
   tier: [VARCHAR, geography, coordinate]
-  release_priority: 5
   samples: ["u4pruyd"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -233,7 +229,6 @@ geography.coordinate.geohash:
     type: string
     pattern: "^[0-9b-hjkmnp-z]{6,12}$"
   tier: [VARCHAR, geography, coordinate]
-  release_priority: 5
   samples: ["u4pruyd"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -260,7 +255,6 @@ geography.coordinate.geohash:
     type: string
     pattern: "^[0-9b-hjkmnp-z]{6,12}$"
   tier: [VARCHAR, geography, coordinate]
-  release_priority: 5
   samples: ["u4pruyd"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -291,7 +285,6 @@ representation.scientific.measurement_unit:
     type: string
     enum: [meter, kilogram, second, m, kg, s]
   tier: [VARCHAR, scientific]
-  release_priority: 3
   samples: ["meter"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -323,7 +316,6 @@ datetime.offset.utc:
     type: string
     pattern: "^UTC [+-]\\d{2}:\\d{2}$"
   tier: [VARCHAR, datetime, offset]
-  release_priority: 4
   samples: ["UTC +05:00"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -355,7 +347,6 @@ datetime.offset.utc:
     type: string
     pattern: "^UTC [+-]\\d{2}:\\d{2}$"
   tier: [VARCHAR, datetime, offset]
-  release_priority: 4
   samples: ["UTC +05:00"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -378,7 +369,6 @@ technology.internet.url:
     type: string
     pattern: "^(?:https?|ftp|file)://[^\\s]+$"
   tier: [VARCHAR, technology, internet]
-  release_priority: 4
   samples: ["https://example.com"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -410,7 +400,6 @@ technology.internet.url:
     type: string
     pattern: "^(?:https?|ftp|file)://[^\\s]+$"
   tier: [VARCHAR, technology, internet]
-  release_priority: 4
   samples: ["https://example.com"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -439,7 +428,6 @@ geography.format.wkt:
     type: string
     pattern: "^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\\s*(Z|M|ZM)?\\s*(\\(|EMPTY)"
   tier: [VARCHAR, format]
-  release_priority: 3
   samples: ["POINT (30 10)"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -471,7 +459,6 @@ geography.format.wkt:
     type: string
     pattern: "^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\\s*(Z|M|ZM)?\\s*(\\(|EMPTY)"
   tier: [VARCHAR, format]
-  release_priority: 3
   samples: ["POINT (30 10)"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -501,7 +488,6 @@ technology.internet.user_agent:
     minLength: 10
     maxLength: 500
   tier: [VARCHAR, internet]
-  release_priority: 3
   samples: ["curl/7.64.1"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -540,7 +526,6 @@ technology.internet.user_agent:
     minLength: 10
     maxLength: 500
   tier: [VARCHAR, internet]
-  release_priority: 3
   samples: ["curl/7.64.1"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -581,7 +566,6 @@ geography.address.postal_code:
     minLength: 3
     maxLength: 10
   tier: [VARCHAR, geography, address]
-  release_priority: 5
   samples: ["10001"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -686,7 +670,6 @@ geography.address.postal_code:
       minLength: 5
       maxLength: 5
   tier: [VARCHAR, address]
-  release_priority: 4
   samples: ["10001"]
 "#;
     let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -746,7 +729,6 @@ geography.address.postal_code:
       minLength: 5
       maxLength: 5
   tier: [VARCHAR, address]
-  release_priority: 4
   samples: ["10001"]
 "#;
     let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -792,7 +774,6 @@ geography.address.postal_code:
       minLength: 5
       maxLength: 8
   tier: [VARCHAR, address]
-  release_priority: 4
   samples: ["10001"]
 "#;
     let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -836,7 +817,6 @@ geography.address.postal_code:
       minLength: 5
       maxLength: 10
   tier: [VARCHAR, address]
-  release_priority: 4
   samples: ["10001"]
 "#;
     let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -887,7 +867,6 @@ identity.person.phone_number:
       minLength: 10
       maxLength: 18
   tier: [VARCHAR, person]
-  release_priority: 4
   samples: ["+1 (555) 123-4567"]
 "#;
     let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -935,7 +914,6 @@ identity.person.phone_number:
       minLength: 10
       maxLength: 18
   tier: [VARCHAR, person]
-  release_priority: 4
   samples: ["+1 (555) 123-4567"]
 "#;
     let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -1023,13 +1001,11 @@ identity.person.gender:
   title: Gender
   designation: broad_words
   tier: [VARCHAR, identity, person]
-  release_priority: 1
   samples: ["Male"]
 identity.person.email:
   title: Email
   designation: universal
   tier: [VARCHAR, identity, person]
-  release_priority: 5
   samples: ["test@example.com"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -1054,7 +1030,6 @@ identity.person.password:
   title: Password
   designation: broad_characters
   tier: [VARCHAR, identity, person]
-  release_priority: 1
   samples: ["p@ssw0rd"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -1072,7 +1047,6 @@ representation.identifier.increment:
   title: Increment
   designation: broad_numbers
   tier: [BIGINT, identifier]
-  release_priority: 1
   samples: ["42"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -1112,7 +1086,6 @@ geography.address.postal_code:
   title: Postal Code
   designation: locale_specific
   tier: [VARCHAR, geography, address]
-  release_priority: 5
   samples: ["90210"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -1134,7 +1107,6 @@ identity.person.phone_number:
   title: Phone Number
   designation: locale_specific
   tier: [VARCHAR, identity, person]
-  release_priority: 5
   samples: ["+1 (202) 555-0100"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();

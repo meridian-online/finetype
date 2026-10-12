@@ -774,7 +774,6 @@ geography.contact.calling_code:
   title: International Calling Code
   designation: locale_specific
   tier: [VARCHAR, contact]
-  release_priority: 3
   samples: ["+1"]
   validation:
     type: string
@@ -817,7 +816,6 @@ geography.contact.calling_code:
   title: International Calling Code
   designation: locale_specific
   tier: [VARCHAR, contact]
-  release_priority: 3
   samples: ["+1"]
   validation:
     type: string

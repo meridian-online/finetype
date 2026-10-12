@@ -30,8 +30,6 @@ pub struct DefinitionCheckResult {
     pub has_pattern: bool,
     /// Individual failure details (capped to avoid flooding)
     pub failures: Vec<CheckFailure>,
-    /// Release priority of this definition
-    pub release_priority: u8,
     /// Domain for grouping
     pub domain: String,
 }
@@ -170,14 +168,6 @@ impl CheckReport {
     pub fn failures(&self) -> Vec<&DefinitionCheckResult> {
         self.results.iter().filter(|r| !r.passed()).collect()
     }
-
-    /// Get results at or above a priority level.
-    pub fn at_priority(&self, min_priority: u8) -> Vec<&DefinitionCheckResult> {
-        self.results
-            .iter()
-            .filter(|r| r.release_priority >= min_priority)
-            .collect()
-    }
 }
 
 /// Checker that validates generator ↔ taxonomy alignment.
@@ -236,17 +226,14 @@ impl Checker {
         let parts: Vec<&str> = key.split('.').collect();
         let domain = parts.first().copied().unwrap_or("unknown").to_string();
 
-        let (has_pattern, release_priority) = match definition {
-            Some(def) => {
-                let has_pat = def
-                    .validation
+        let has_pattern = definition
+            .map(|def| {
+                def.validation
                     .as_ref()
                     .and_then(|v| v.pattern.as_ref())
-                    .is_some();
-                (has_pat, def.release_priority)
-            }
-            None => (false, 0),
-        };
+                    .is_some()
+            })
+            .unwrap_or(false);
 
         // Pre-compile validator once for this definition
         let compiled = definition
@@ -310,7 +297,6 @@ impl Checker {
             samples_failed,
             has_pattern,
             failures,
-            release_priority,
             domain,
         }
     }
@@ -468,10 +454,7 @@ pub fn format_report(report: &CheckReport, verbose: bool) -> String {
     if !missing.is_empty() {
         out.push_str(&format!("MISSING GENERATORS ({})\n", missing.len()));
         for r in &missing {
-            out.push_str(&format!(
-                "  - {} (priority: {})\n",
-                r.key, r.release_priority
-            ));
+            out.push_str(&format!("  - {}\n", r.key));
         }
         out.push('\n');
     }
@@ -516,10 +499,7 @@ pub fn format_report(report: &CheckReport, verbose: bool) -> String {
         if !no_pattern.is_empty() {
             out.push_str(&format!("NO VALIDATION PATTERN ({})\n", no_pattern.len()));
             for r in &no_pattern {
-                out.push_str(&format!(
-                    "  - {} (priority: {})\n",
-                    r.key, r.release_priority
-                ));
+                out.push_str(&format!("  - {}\n", r.key));
             }
             out.push('\n');
         }
@@ -560,7 +540,6 @@ datetime.timestamp.iso_8601:
     minLength: 20
     maxLength: 20
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   samples:
     - "2024-01-15T10:30:00Z"
 
@@ -575,7 +554,6 @@ technology.internet.ip_v4:
     type: string
     pattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"
   tier: [VARCHAR, internet]
-  release_priority: 5
   samples:
     - "192.168.1.1"
 "#,
@@ -642,7 +620,6 @@ nonexistent.domain.type:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
-  release_priority: 1
   validation:
     type: string
     pattern: ".*"

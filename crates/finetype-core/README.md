@@ -31,7 +31,6 @@ finance.currency.currency_code:
     type: string
     enum: [USD, EUR, GBP, JPY, AUD]
   tier: [VARCHAR, currency]
-  release_priority: 4
   samples: ["USD"]
 "#;
 

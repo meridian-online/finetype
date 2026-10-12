@@ -62,16 +62,17 @@ impl Generator {
         }
     }
 
-    /// Generate samples for all labels at a given priority level.
+    /// Generate samples for every leaf in the generation set (`all` puts the
+    /// `generate: on_request` leaves back).
     ///
     /// For locale-specific types, randomly cycles through available locales
     /// to produce diverse training samples with 3-level labels. This ensures
     /// the model sees month names, phone formats, etc. from many locales
     /// without expanding the label space.
-    pub fn generate_all(&mut self, min_priority: u8, samples_per_label: usize) -> Vec<Sample> {
+    pub fn generate_all(&mut self, all: bool, samples_per_label: usize) -> Vec<Sample> {
         let entries: Vec<(String, Designation, Vec<String>)> = self
             .taxonomy
-            .at_priority(min_priority)
+            .generation_set(all)
             .into_iter()
             .map(|(k, d)| (k.clone(), d.designation.clone(), d.locales.clone()))
             .collect();
@@ -108,14 +109,10 @@ impl Generator {
     ///
     /// For locale_specific types, generates `samples_per_label` samples for EACH locale.
     /// For universal/broad types, generates samples with `.UNIVERSAL` suffix.
-    pub fn generate_all_localized(
-        &mut self,
-        min_priority: u8,
-        samples_per_label: usize,
-    ) -> Vec<Sample> {
+    pub fn generate_all_localized(&mut self, all: bool, samples_per_label: usize) -> Vec<Sample> {
         let entries: Vec<(String, Designation, Vec<String>)> = self
             .taxonomy
-            .at_priority(min_priority)
+            .generation_set(all)
             .into_iter()
             .map(|(k, d)| (k.clone(), d.designation.clone(), d.locales.clone()))
             .collect();
