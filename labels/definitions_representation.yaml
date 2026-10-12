@@ -43,7 +43,6 @@ representation.numeric.integer_number:
     type: string
     pattern: "^-?[0-9]+$"
   tier: [BIGINT, numeric]
-  release_priority: 5
   aliases: [integer, whole_number]
   samples:
     - "42"
@@ -83,7 +82,6 @@ representation.numeric.decimal_number:
     # tokens like "abc", "1.2.3", "12px", "1e", "e5" still reject.
     pattern: "^-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$"
   tier: [DOUBLE, numeric]
-  release_priority: 5
   aliases: [decimal, float, floating_point]
   samples:
     - "3.14"
@@ -128,7 +126,6 @@ representation.numeric.decimal_number_comma:
     type: string
     pattern: "^-?[0-9]{1,3}(\\.[0-9]{3})*(,[0-9]+)?$|^-?[0-9]+,[0-9]+$"
   tier: [DOUBLE, numeric]
-  release_priority: 3
   aliases: [eu_decimal, european_number, decimal_eu]
   samples:
     - "1.234,56"
@@ -169,7 +166,6 @@ representation.numeric.scientific_notation:
     type: string
     pattern: "^-?[0-9]+(\\.[0-9]+)?[eE][+-]?[0-9]+$"
   tier: [DOUBLE, numeric]
-  release_priority: 3
   aliases: [scientific, exponential]
   samples:
     - "1.23e-4"
@@ -202,7 +198,6 @@ representation.numeric.percentage:
     type: string
     pattern: "^-?[0-9]+(\\.[0-9]+)?%?$"
   tier: [DOUBLE, numeric]
-  release_priority: 3
   aliases: [percent]
   samples:
     - "50%"
@@ -248,7 +243,6 @@ representation.numeric.si_number:
     type: string
     pattern: "^[\\$€£+-]?\\d+\\.?\\d*[KkMmBbTt]$"
   tier: [DOUBLE, numeric]
-  release_priority: 3
   aliases: [business_notation, human_readable_number, abbreviated_number]
   samples:
     - "12.2K"
@@ -291,7 +285,7 @@ representation.text.plain_text:
     minLength: 1
     maxLength: 65536
   tier: [VARCHAR, text]
-  release_priority: 0
+  generate: on_request
   aliases: [text, description, content]
   samples:
     - "This is a plain text description"
@@ -300,9 +294,10 @@ representation.text.plain_text:
   icon: abc
   references: null
   notes: >
-    v1 migration: Was text.text marked broad_characters. Very broad category
-    with low release priority. Distinguishing from other text types (sentence,
-    word, etc.) requires statistical analysis.
+    v1 migration: Was text.text marked broad_characters. Very broad category.
+    Distinguishing from other text types (sentence, word, etc.) requires
+    statistical analysis. Generated on request only: a catch-all leaf whose
+    synthetic values have no shape, kept for the training set's label coverage.
 
 representation.text.word:
   title: "Single Word"
@@ -323,7 +318,6 @@ representation.text.word:
     minLength: 1
     maxLength: 100
   tier: [VARCHAR, text]
-  release_priority: 4
   aliases: null
   samples:
     - "hello"
@@ -354,7 +348,6 @@ representation.format.color_hex:
     type: string
     pattern: "^#?[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$"
   tier: [VARCHAR, text]
-  release_priority: 4
   aliases: [hex_color]
   samples:
     - "#FF0000"
@@ -389,7 +382,6 @@ representation.format.color_rgb:
     type: string
     pattern: "^(?:rgb)?\\(?([0-9]{1,3}),\\s*([0-9]{1,3}),\\s*([0-9]{1,3})\\)?$"
   tier: [VARCHAR, text]
-  release_priority: 3
   aliases: [rgb]
   # Samples are the ANCHORED rgb()/rgba() form — the self-identifying shape a
   # color_rgb column must carry. Bare triples ("255, 0, 0", "(128, 128, 128)")
@@ -431,7 +423,6 @@ representation.format.color_hsl:
     type: string
     pattern: "^hsla?\\(\\s*\\d{1,3}\\s*,\\s*\\d{1,3}%\\s*,\\s*\\d{1,3}%\\s*(,\\s*[\\d.]+\\s*)?\\)$"
   tier: [VARCHAR, text]
-  release_priority: 3
   aliases: [hsl_color, hsla_color]
   samples:
     - "hsl(120, 100%, 50%)"
@@ -466,7 +457,6 @@ representation.text.emoji:
     type: string
     pattern: "^[\\p{So}\\p{Sk}\\p{Mn}\\p{Cf}]+$"
   tier: [VARCHAR, text]
-  release_priority: 3
   aliases: null
   samples:
     - "😀"
@@ -501,7 +491,6 @@ representation.text.entity_name:
     minLength: 2
     maxLength: 200
   tier: [VARCHAR, text]
-  release_priority: 3
   aliases: [company_name, brand, product_name, venue_name, title]
   samples:
     - "The Olive Garden"
@@ -546,7 +535,6 @@ representation.file.extension:
     type: string
     pattern: "^\\.?[a-zA-Z0-9]{1,10}$"
   tier: [VARCHAR, file]
-  release_priority: 3
   aliases: [file_type]
   samples:
     - "txt"
@@ -582,7 +570,6 @@ representation.file.mime_type:
     type: string
     pattern: "^[a-zA-Z]+/[a-zA-Z0-9.+\\-]+(;.*)?$"
   tier: [VARCHAR, file]
-  release_priority: 3
   aliases: [content_type, media_type]
   samples:
     - "text/plain"
@@ -625,7 +612,6 @@ representation.file.file_size:
     type: string
     pattern: "^[0-9]+(\\.[0-9]+)?\\s*(B|KB|MB|GB|TB)?$"
   tier: [BIGINT, file]
-  release_priority: 3
   aliases: null
   samples:
     - "1024"
@@ -662,7 +648,6 @@ representation.file.excel_format:
     minLength: 1
     maxLength: 100
   tier: [VARCHAR, file]
-  release_priority: 3
   aliases: [number_format, cell_format, format_code]
   samples:
     - "#,##0.00"
@@ -704,7 +689,6 @@ representation.scientific.dna_sequence:
     type: string
     pattern: "^[ATGCRYSWKMBDHVN]+$"
   tier: [VARCHAR, scientific]
-  release_priority: 3
   aliases: [dna]
   samples:
     - "ATGCAGC"
@@ -738,7 +722,6 @@ representation.scientific.rna_sequence:
     type: string
     pattern: "^[AUGCRYSWKMBDHVN]+$"
   tier: [VARCHAR, scientific]
-  release_priority: 3
   aliases: [rna]
   samples:
     - "AUGCAGC"
@@ -771,7 +754,6 @@ representation.scientific.protein_sequence:
     type: string
     pattern: "^[ACDEFGHIKLMNPQRSTVWXY*]+$"
   tier: [VARCHAR, scientific]
-  release_priority: 3
   aliases: [protein, peptide, amino_acid_sequence]
   samples:
     - "MKVLLIVGS"
@@ -833,7 +815,6 @@ representation.scientific.measurement_unit:
       - L
       - g
   tier: [VARCHAR, scientific]
-  release_priority: 3
   aliases: [unit]
   samples:
     - "meter"
@@ -874,7 +855,6 @@ representation.scientific.cas_number:
     pattern: "^\\d{2,7}-\\d{2}-\\d$"
   checksum: cas
   tier: [VARCHAR, scientific]
-  release_priority: 3
   aliases: [cas_rn, cas_id, chemical_id]
   samples:
     - "7732-18-5"
@@ -913,7 +893,6 @@ representation.scientific.inchi:
     type: string
     pattern: "^InChI=1S?/.+$"
   tier: [VARCHAR, scientific]
-  release_priority: 3
   aliases: [international_chemical_identifier]
   samples:
     - "InChI=1S/H2O/h1H2"
@@ -951,7 +930,6 @@ representation.scientific.smiles:
     minLength: 1
     maxLength: 1000
   tier: [VARCHAR, scientific]
-  release_priority: 3
   aliases: [smiles_string, molecular_notation]
   samples:
     - "O"
@@ -1007,7 +985,6 @@ representation.discrete.ordinal:
     minLength: 1
     maxLength: 30
   tier: [VARCHAR, discrete]
-  release_priority: 3
   aliases: [rank, grade, rating, tier]
   samples:
     - "high"
@@ -1060,7 +1037,6 @@ representation.boolean.binary:
     type: string
     enum: ["0", "1"]
   tier: [BOOLEAN, binary]
-  release_priority: 5
   aliases: [binary_bool, bit]
   samples:
     - "0"
@@ -1091,7 +1067,6 @@ representation.boolean.initials:
     type: string
     enum: ["T", "F", "t", "f", "Y", "N", "y", "n"]
   tier: [BOOLEAN, initials]
-  release_priority: 5
   aliases: [initial_bool, char_bool]
   samples:
     - "T"
@@ -1131,7 +1106,6 @@ representation.boolean.terms:
            "enabled", "disabled", "Enabled", "Disabled", "ENABLED", "DISABLED",
            "active", "inactive", "Active", "Inactive", "ACTIVE", "INACTIVE"]
   tier: [BOOLEAN, terms]
-  release_priority: 5
   aliases: [word_bool, text_bool]
   samples:
     - "true"
@@ -1176,7 +1150,6 @@ representation.identifier.uuid:
     type: string
     pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
   tier: [UUID, identifier]
-  release_priority: 5
   aliases: [guid]
   samples:
     - "550e8400-e29b-41d4-a716-446655440000"
@@ -1214,7 +1187,6 @@ representation.identifier.alphanumeric_id:
     type: string
     pattern: "^[A-Za-z][A-Za-z0-9 /_.#-]*[0-9][A-Za-z0-9 /_.#-]*$|^[0-9][A-Za-z0-9 /_.#-]*[A-Za-z][A-Za-z0-9 /_.#-]*$"
   tier: [VARCHAR, identifier]
-  release_priority: 4
   aliases: [product_code, reference_code, ticket_id, lot_number]
   samples:
     - "SKU-12345"
@@ -1252,7 +1224,6 @@ representation.identifier.increment:
     type: string
     pattern: "^[0-9]+$"
   tier: [BIGINT, identifier]
-  release_priority: 3
   aliases: [counter, sequence, id]
   samples:
     - "1"
@@ -1292,7 +1263,6 @@ representation.identifier.numeric_code:
     type: string
     pattern: "^[0-9]+$"
   tier: [VARCHAR, identifier]
-  release_priority: 3
   aliases: [code, classification_code, category_code]
   samples:
     - "840"

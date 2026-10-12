@@ -51,7 +51,6 @@ finance.banking.swift_bic:
     type: string
     pattern: "^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$"
   tier: [VARCHAR, payment]
-  release_priority: 3
   aliases: [bic, swift_code]
   samples:
     - "DEUTDEFF"
@@ -93,7 +92,6 @@ finance.banking.iban:
     maxLength: 34
   checksum: iban
   tier: [VARCHAR, banking]
-  release_priority: 3
   aliases: [international_bank_account_number]
   samples:
     - "GB29NWBK60161331926819"
@@ -155,7 +153,6 @@ finance.currency.amount:
     #      spec 2026-04-29-validate-corpus-iter4 ac-01.
     pattern: "^[\\$£¥₹₩₿\\p{Sc}]?\\s?-?\\s?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?$|^-?[\\$£¥₹₩₿\\p{Sc}]\\s?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?$|^\\([\\$£¥₹₩₿\\p{Sc}]?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?\\)$|^-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$"
   tier: [VARCHAR, currency]
-  release_priority: 4
   aliases: [amount_us, currency_amount, money_us, price]
   samples:
     - "$1,234.56"
@@ -197,7 +194,6 @@ finance.currency.amount_comma:
     type: string
     pattern: "^[€\\$£¥₹₩₿\\p{Sc}]?\\s?-?\\s?[0-9]{1,3}(\\.[0-9]{3})*(,[0-9]{1,2})?\\s?[€\\$£¥₹₩₿\\p{Sc}]?$|^-?[€\\$£¥₹₩₿\\p{Sc}]?\\s?[0-9]{1,3}(\\.[0-9]{3})*(,[0-9]{1,2})?\\s?[€\\$£¥₹₩₿\\p{Sc}]?$"
   tier: [VARCHAR, currency]
-  release_priority: 4
   aliases: [amount_eu, currency_amount_eu, money_eu, price_eu]
   samples:
     - "€1.234,56"
@@ -250,7 +246,6 @@ finance.currency.currency_code:
       TZS, UAH, UGX, USD, UYU, UZS, VED, VES, VND, VUV, WST, XAF, XAG, XAU,
       XCD, XDR, XOF, XPD, XPF, XPT, YER, ZAR, ZMW, ZWL]
   tier: [VARCHAR, payment]
-  release_priority: 3
   aliases: [iso_4217, currency_iso]
   samples:
     - "USD"
@@ -285,7 +280,6 @@ finance.currency.currency_symbol:
     type: string
     pattern: "^[\\p{Sc}]+$"
   tier: [VARCHAR, payment]
-  release_priority: 3
   aliases: [currency_sign]
   samples:
     - "$"
@@ -333,7 +327,6 @@ finance.payment.credit_card_number:
   checksum: luhn
   pii: true
   tier: [VARCHAR, payment]
-  release_priority: 4
   aliases: [pan, credit_card]
   samples:
     - "4532015112830366"
@@ -377,7 +370,6 @@ finance.securities.cusip:
     pattern: "^[A-Z0-9]{8}[0-9]$"
   checksum: cusip
   tier: [VARCHAR, payment]
-  release_priority: 3
   aliases: null
   samples:
     - "037833100"
@@ -414,7 +406,6 @@ finance.securities.isin:
     pattern: "^[A-Z]{2}[A-Z0-9]{9}[0-9]$"
   checksum: isin
   tier: [VARCHAR, payment]
-  release_priority: 3
   aliases: null
   samples:
     - "US0378331005"
@@ -449,7 +440,6 @@ finance.securities.sedol:
     pattern: "^[B-DF-HJ-NP-TV-Z0-9]{6}[0-9]$"
   checksum: sedol
   tier: [VARCHAR, payment]
-  release_priority: 3
   aliases: null
   samples:
     - "0263494"
@@ -487,7 +477,6 @@ finance.securities.figi:
     pattern: "^[BCDFGHJKLMNPQRSTVWXYZ]{2}G[BCDFGHJKLMNPQRSTVWXYZ0-9]{8}\\d$"
   checksum: figi
   tier: [VARCHAR, payment]
-  release_priority: 3
   aliases: [bloomberg_id, open_figi]
   samples:
     - "BBG000BLNQ16"
@@ -528,7 +517,6 @@ finance.securities.lei:
     pattern: "^[A-Z0-9]{4}[A-Z0-9]{14}[0-9]{2}$"
   checksum: lei
   tier: [VARCHAR, payment]
-  release_priority: 3
   aliases: [legal_entity_identifier]
   samples:
     - "529900T8BM49AURSDO55"
@@ -570,7 +558,6 @@ finance.securities.ticker:
   # set is what distinguishes a real ticker. Set: labels/sets/us_tickers.txt.
   membership: us_tickers
   tier: [VARCHAR, payment]
-  release_priority: 4
   aliases: [ticker, ticker_symbol, stock_symbol, symbol]
   samples:
     - "AAPL"
@@ -613,7 +600,6 @@ finance.banking.aba_routing:
     pattern: "^(0[0-9]|1[0-2]|2[1-9]|3[0-2]|6[1-9]|7[0-2]|80)\\d{7}$"
   checksum: aba
   tier: [VARCHAR, banking]
-  release_priority: 3
   aliases: [routing_number, routing_transit_number, aba_number]
   samples:
     - "021000021"
@@ -653,7 +639,6 @@ finance.banking.bsb:
     type: string
     pattern: "^\\d{3}-\\d{3}$"
   tier: [VARCHAR, banking]
-  release_priority: 3
   aliases: [bank_state_branch]
   samples:
     - "062-000"
@@ -695,7 +680,6 @@ finance.crypto.bitcoin_address:
     type: string
     pattern: "^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^bc1[a-z0-9]{39,59}$"
   tier: [VARCHAR, payment]
-  release_priority: 3
   aliases: null
   samples:
     - "1A1z7agoat2GPFH7pPPPP..."
@@ -726,7 +710,6 @@ finance.crypto.ethereum_address:
     type: string
     pattern: "^0x[a-fA-F0-9]{40}$"
   tier: [VARCHAR, payment]
-  release_priority: 3
   aliases: null
   samples:
     - "0x742d35Cc6634C0532925a3b844Bc3e7c1f2B9C2C"
@@ -774,7 +757,6 @@ finance.currency.amount_accounting:
     type: string
     pattern: "^\\(?\\$?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?\\)?$"
   tier: [VARCHAR, currency]
-  release_priority: 5
   aliases: [amount_accounting_us, accounting, gaap_amount]
   samples:
     - "$1,234.56"
@@ -809,7 +791,6 @@ finance.currency.amount_comma_suffix:
     type: string
     pattern: "^-?[0-9]{1,3}(\\.[0-9]{3})*(,[0-9]{1,2})?\\s?[€$£¥₹₩₿\\p{Sc}]$"
   tier: [VARCHAR, currency]
-  release_priority: 5
   aliases: [amount_eu_suffix, eu_suffix]
   samples:
     - "1.234,56 €"
@@ -844,7 +825,6 @@ finance.currency.amount_space:
     type: string
     pattern: "^-?[0-9]{1,3}([\\s\\x{00A0}][0-9]{3})*(,[0-9]{1,2})?\\s?[€$£¥₹₩₿\\p{Sc}]?$"
   tier: [VARCHAR, currency]
-  release_priority: 4
   aliases: [amount_space_sep, fr_amount]
   samples:
     - "1 234,56 €"
@@ -879,7 +859,6 @@ finance.currency.amount_lakh:
     type: string
     pattern: "^[₹]?(?:Rs\\.?\\s?)?[0-9]{1,2}(,[0-9]{2})*(,[0-9]{3})(\\.[0-9]{1,2})?$"
   tier: [VARCHAR, currency]
-  release_priority: 5
   aliases: [amount_indian, lakh_crore, inr_amount]
   samples:
     - "₹12,34,567.89"
@@ -914,7 +893,6 @@ finance.currency.amount_apostrophe:
     type: string
     pattern: "^(CHF\\s?)?-?[0-9]{1,3}(['\\x{2019}][0-9]{3})*(\\.[0-9]{1,2})?(\\s?CHF)?$"
   tier: [VARCHAR, currency]
-  release_priority: 4
   aliases: [amount_ch, swiss_amount]
   samples:
     - "CHF 1'234.56"
@@ -948,7 +926,6 @@ finance.currency.amount_nodecimal:
     type: string
     pattern: "^[¥₩\\p{Sc}]?-?[0-9]{1,3}(,[0-9]{3})*[¥₩\\p{Sc}]?$"
   tier: [VARCHAR, currency]
-  release_priority: 5
   aliases: [jpy_amount, zero_decimal]
   samples:
     - "¥1,234"
@@ -982,7 +959,6 @@ finance.currency.amount_code_prefix:
     type: string
     pattern: "^[A-Z]{3}\\s?-?[0-9]{1,3}([,.]?[0-9]{3})*(\\.[0-9]{1,2})?$"
   tier: [VARCHAR, currency]
-  release_priority: 5
   aliases: [iso_code_amount]
   samples:
     - "USD 1,234.56"
@@ -1015,7 +991,6 @@ finance.currency.amount_crypto:
     type: string
     pattern: "^-?[0-9]+\\.?[0-9]*\\s?[A-Z]{2,5}$"
   tier: [VARCHAR, currency]
-  release_priority: 3
   aliases: [crypto_amount]
   samples:
     - "0.00123456 BTC"
@@ -1048,7 +1023,6 @@ finance.currency.amount_multisym:
     type: string
     pattern: "^(R\\$|HK\\$|NT\\$|S\\$|A\\$|C\\$|NZ\\$|kr|Kč|zł|Ft|lei|Rp|Rs\\.?)\\s?-?[0-9]+([.,\\s][0-9]+)*$"
   tier: [VARCHAR, currency]
-  release_priority: 4
   aliases: []
   samples:
     - "R$ 1.234,56"
@@ -1082,7 +1056,6 @@ finance.currency.amount_neg_trailing:
     type: string
     pattern: "^[\\$€£¥₹]?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?\\s?(-|CR|DR)$"
   tier: [VARCHAR, currency]
-  release_priority: 3
   aliases: [sap_amount, cobol_amount]
   samples:
     - "$1,234.56-"
@@ -1125,7 +1098,6 @@ finance.rate.basis_points:
     type: string
     pattern: "^-?[0-9]+(\\.[0-9]+)?\\s?(bps|bp)$"
   tier: [VARCHAR, rate]
-  release_priority: 3
   aliases: [bps]
   samples:
     - "125 bps"
@@ -1159,7 +1131,6 @@ finance.rate.yield:
     type: string
     pattern: "^[+-][0-9]+(\\.[0-9]+)?%$"
   tier: [VARCHAR, rate]
-  release_priority: 3
   aliases: [return_pct]
   samples:
     - "+2.5%"
