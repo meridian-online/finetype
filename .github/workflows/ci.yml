@@ -661,6 +661,14 @@ jobs:
         if: steps.route.outputs.registry_expressions == 'true'
         run: scripts/check_registry_expressions.py --self-test
 
+      - name: ...and the README version-table check reads cells and probes as the spec says
+        # Offline: fixture rows for each cell class, canned probe output for
+        # each outcome, a stale cell, an unreadable cell, and a release list
+        # with a prerelease that must not count as a missing row. The
+        # measurement itself runs on the weekly schedule, never here.
+        if: steps.route.outputs.readme_version_table == 'true'
+        run: scripts/check_readme_version_table.py --self-test
+
       - name: Every published sample satisfies its own leaf's pattern
         # The gate above puts a CHECK-DIGIT leaf's samples through
         # finetype-core; this puts EVERY leaf's samples through its own

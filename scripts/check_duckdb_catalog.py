@@ -352,6 +352,11 @@ NOT_FUNCTIONS = {
     "finetype_model": "a crate",
     "finetype_init_c_api": "the C entrypoint symbol",
     "finetype_reject_errors": "the sidecar TABLE the CLI writes, not a function",
+    "finetype_version": (
+        "the version function of the 0.2.0 build the community registry still "
+        "serves to DuckDB 1.4.4 and 1.5.0; the README version table reports it, "
+        "this tree does not register it"
+    ),
 }
 
 
