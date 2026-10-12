@@ -75,14 +75,18 @@ jobs:
               });
               return;
             }
+            // The report says what was found. A stale cell or a release with no
+            // row means the table needs a new measurement; a row that could not
+            // be measured or an unavailable release list means the run fell
+            // short and the table is not known to be wrong.
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `README version table is stale or incomplete (run ${context.runId})`,
+              title: `README version table: the weekly re-measurement needs a look (run ${context.runId})`,
               body: [
-                'The weekly re-measurement of the README DuckDB version table found a cell that no longer matches the community registry, or a DuckDB release with no row.',
+                'The weekly re-measurement of the README DuckDB version table did not come back clean. The report below says which: a stale cell or a DuckDB release with no row means the table needs a new measurement, committed with its date; a row that could not be measured or an unavailable release list means the run fell short, and the table is not known to be wrong.',
                 '',
-                'This is a signal, not a gate. Re-measure, update the table with the new date, and close this.',
+                'This is a signal, not a gate. Close this once the table is re-measured, or once a clean run follows.',
                 '',
                 '```', report.trim(), '```',
                 '',

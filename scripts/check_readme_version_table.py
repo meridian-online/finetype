@@ -19,11 +19,12 @@ WHAT IT DOES
     3. List every stable DuckDB release at or above the table's lowest
        version that has no row.
 
-A stale cell or a missing row is reported and the exit is 1; when the
-release list cannot be fetched the cells are still compared, the report says
-so, and the exit is 2. One row's failed probe is that row's error, listed
-apart from the stale cells, and the exit is 2 as well. The README is never
-edited: a cell is a measurement with a date,
+A stale cell or a missing row is reported and the exit is 1. When the run
+itself falls short, a row whose probe failed or a release list that could
+not be fetched, the other cells are still compared, the report lists what
+could not be measured apart from the stale cells, and the exit is 3 (2 is
+argparse's usage error). The README is never edited: a cell is a measurement
+with a date,
 and the fix is a new measurement a person commits.
 
 It is a signal, not a gate. The workflow that runs it is scheduled and never
@@ -268,7 +269,7 @@ def render(
     failed: list[str] | None = None,
 ) -> tuple[str, int]:
     """The report text and the exit code: 0 when every cell matches and every
-    release has a row, 1 when a cell is stale or a release has no row, 2 when
+    release has a row, 1 when a cell is stale or a release has no row, 3 when
     the run itself fell short: a row that could not be measured, or a release
     list that could not be fetched (the other cells were still compared)."""
     failed = failed or []
@@ -285,7 +286,7 @@ def render(
         lines.append("Every cell matches and every release has a row.")
     text = "\n".join(lines).rstrip("\n")
     if failed or releases_error:
-        return text, 2
+        return text, 3
     return text, 1 if problems or missing else 0
 
 
@@ -364,7 +365,7 @@ def self_test() -> int:
     case("compare_skips_unmeasured_rows", compare(rows, errored) == [], str(compare(rows, errored)))
     case("unmeasured_lists_the_failed_row", unmeasured(rows, errored) == ["1.5.1: URLError: timed out"], str(unmeasured(rows, errored)))
     text, code = render(4, "Darwin/arm64", [], [], None, ["1.5.1: URLError: timed out"])
-    case("render_unmeasured_exits_2", code == 2 and "could not be measured" in text and "Stale cells" not in text, text)
+    case("render_unmeasured_exits_3", code == 3 and "could not be measured" in text and "Stale cells" not in text, text)
 
     text, code = render(4, "Darwin/arm64", [], [], None)
     case("render_clean_exits_0", code == 0 and "Every cell matches" in text, text)
@@ -373,7 +374,7 @@ def self_test() -> int:
     text, code = render(4, "Darwin/arm64", [], ["2.0.0"], None)
     case("render_missing_exits_1", code == 1 and "- 2.0.0" in text, text)
     text, code = render(4, "Darwin/arm64", [], [], "HTTPError: 403")
-    case("render_release_list_failure_exits_2", code == 2 and "HTTPError: 403" in text and "not checked" in text, text)
+    case("render_release_list_failure_exits_3", code == 3 and "HTTPError: 403" in text and "not checked" in text, text)
 
     print(f"\nResults: {passed} passed, {failed} failed")
     return 0 if failed == 0 else 1
