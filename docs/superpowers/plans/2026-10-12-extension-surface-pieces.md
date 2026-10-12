@@ -150,6 +150,11 @@ Then the cases, replacing the existing list inside `self_test`:
     "0" "aligned with models/default \(a\)" \
     "plant a; printf 'models/z/\nmodels/a/\nmodels/y/\n' > .gitignore"
 
+  # A workflow pin may carry a trailing YAML comment; the name ends before it.
+  run_case "aligned_workflow_pin_with_comment" \
+    "0" "aligned with models/default \(a\)" \
+    "plant a; printf 'env:\n  FINETYPE_CI_MODEL: a  # bump with models/default\n' > .github/workflows/ci.yml"
+
   run_case "aligned_environment_matches" \
     "0" "aligned with models/default \(a\)" \
     "plant a" \
@@ -165,7 +170,7 @@ Also change `run_case` so the scratch tree no longer pre-creates `models/` (the 
 - [ ] **Step 2: Run the self-test to see the new cases fail**
 
 Run: `.github/scripts/check-ci-model-drift.sh --self-test`
-Expected: 17 of 20 cases FAIL. The committed script exits 0 with "unset or empty" whenever `FINETYPE_CI_MODEL` is unset, so every case that reads the tree fails: the drift cases that no longer set the variable exit 0 instead of 1, and the aligned cases print the unset message instead of the aligned one. Only `drift_environment`, `ci_model_whitespace` and `aligned_environment_matches` pass.
+Expected: 18 of 21 cases FAIL. The committed script exits 0 with "unset or empty" whenever `FINETYPE_CI_MODEL` is unset, so every case that reads the tree fails: the drift cases that no longer set the variable exit 0 instead of 1, and the aligned cases print the unset message instead of the aligned one. Only `drift_environment`, `ci_model_whitespace` and `aligned_environment_matches` pass.
 
 - [ ] **Step 3: Replace `check_drift` with the five-pin version**
 
@@ -211,9 +216,10 @@ trim() {
   printf '%s' "$1" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
 }
 
-# The FINETYPE_CI_MODEL value in a workflow's env block, or empty.
+# The FINETYPE_CI_MODEL value in a workflow's env block, or empty. A trailing
+# YAML comment is not part of the name.
 workflow_pin() {
-  sed -n 's/^[[:space:]]*FINETYPE_CI_MODEL:[[:space:]]*//p' "$1" 2>/dev/null | head -1 | tr -d '"'"'"
+  sed -n -e 's/^[[:space:]]*FINETYPE_CI_MODEL:[[:space:]]*//p' "$1" 2>/dev/null | head -1 | sed -e 's/[[:space:]]*#.*$//' | tr -d '"'"'"
 }
 
 # The DEFAULT_MODEL constant in build.rs, whatever cargo fmt did to the spacing.
@@ -285,7 +291,7 @@ Keep `run_case`, `self_test` (with Step 1's cases) and the `case "${1:-}"` dispa
 - [ ] **Step 4: Run the self-test and the real tree**
 
 Run: `.github/scripts/check-ci-model-drift.sh --self-test`
-Expected: `Results: 20 passed, 0 failed`.
+Expected: `Results: 21 passed, 0 failed`.
 
 Run: `.github/scripts/check-ci-model-drift.sh`
 Expected: `CI model aligned with models/default (m2v8m-s43): ci.yml, release.yml, build.rs, .gitignore.` and exit 0.

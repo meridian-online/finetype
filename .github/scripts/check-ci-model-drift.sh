@@ -39,9 +39,10 @@ trim() {
   printf '%s' "$1" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
 }
 
-# The FINETYPE_CI_MODEL value in a workflow's env block, or empty.
+# The FINETYPE_CI_MODEL value in a workflow's env block, or empty. A trailing
+# YAML comment is not part of the name.
 workflow_pin() {
-  sed -n 's/^[[:space:]]*FINETYPE_CI_MODEL:[[:space:]]*//p' "$1" 2>/dev/null | head -1 | tr -d '"'"'"
+  sed -n -e 's/^[[:space:]]*FINETYPE_CI_MODEL:[[:space:]]*//p' "$1" 2>/dev/null | head -1 | sed -e 's/[[:space:]]*#.*$//' | tr -d '"'"'"
 }
 
 # The DEFAULT_MODEL constant in build.rs, whatever cargo fmt did to the spacing.
@@ -246,6 +247,11 @@ self_test() {
   run_case "aligned_gitignore_among_others" \
     "0" "aligned with models/default \(a\)" \
     "plant a; printf 'models/z/\nmodels/a/\nmodels/y/\n' > .gitignore"
+
+  # A workflow pin may carry a trailing YAML comment; the name ends before it.
+  run_case "aligned_workflow_pin_with_comment" \
+    "0" "aligned with models/default \(a\)" \
+    "plant a; printf 'env:\n  FINETYPE_CI_MODEL: a  # bump with models/default\n' > .github/workflows/ci.yml"
 
   run_case "aligned_environment_matches" \
     "0" "aligned with models/default \(a\)" \
