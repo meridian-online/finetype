@@ -312,7 +312,6 @@ datetime.component.year:
     type: string
     pattern: "^\\d{4}(\\.0+)?$"
   tier: [INTEGER, year]
-  release_priority: 5
   aliases: []
   samples: ["1998"]
   references: null
@@ -331,7 +330,6 @@ identity.person.gender_code:
     type: string
     enum: ["M", "F", "X", "0", "1", "2", "9"]
   tier: [STRING, gender_code]
-  release_priority: 5
   aliases: []
   samples: ["M"]
   references: null

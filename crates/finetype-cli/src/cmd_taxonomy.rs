@@ -8,7 +8,7 @@ use super::*;
 
 pub(crate) fn cmd_generate(
     samples: usize,
-    priority: u8,
+    all: bool,
     output: PathBuf,
     taxonomy_path: PathBuf,
     seed: u64,
@@ -30,15 +30,17 @@ pub(crate) fn cmd_generate(
         "flat (3-level)"
     };
     eprintln!(
-        "Generating {} samples per label (priority >= {}, mode: {})",
-        samples, priority, mode
+        "Generating {} samples per label ({}, mode: {})",
+        samples,
+        if all { "every leaf" } else { "default leaves" },
+        mode
     );
 
     let mut generator = Generator::with_seed(taxonomy, seed);
     let all_samples = if localized {
-        generator.generate_all_localized(priority, samples)
+        generator.generate_all_localized(all, samples)
     } else {
-        generator.generate_all(priority, samples)
+        generator.generate_all(all, samples)
     };
 
     eprintln!("Generated {} total samples", all_samples.len());
@@ -66,14 +68,13 @@ pub(crate) fn cmd_taxonomy(
     file: PathBuf,
     domain: Option<String>,
     category: Option<String>,
-    priority: Option<u8>,
     output: OutputFormat,
     full: bool,
 ) -> Result<()> {
     let taxonomy = load_taxonomy(&file)?;
 
     // Collect matching definitions. A positional KEY takes precedence
-    // over --domain / --category / --priority filters and uses the same
+    // over the --domain / --category filters and uses the same
     // exact-match-or-glob predicate previously implemented in
     // `cmd_schema` (card 0006 absorbs that path).
     let mut defs: Vec<(&String, &finetype_core::Definition)> = if let Some(key) = &type_key {
@@ -122,20 +123,9 @@ pub(crate) fn cmd_taxonomy(
         taxonomy.by_category(dom, cat)
     } else if let Some(dom) = &domain {
         taxonomy.by_domain(dom)
-    } else if let Some(prio) = priority {
-        taxonomy.at_priority(prio)
     } else {
         taxonomy.definitions().collect()
     };
-
-    // Apply priority filter on top of domain/category. Skipped when a
-    // positional KEY is supplied (the KEY is authoritative — it pins to
-    // a single type or a glob and ignores priority).
-    if type_key.is_none() {
-        if let Some(prio) = priority {
-            defs.retain(|(_, d)| d.release_priority >= prio);
-        }
-    }
 
     defs.sort_by_key(|(k, _)| (*k).clone());
 
@@ -183,7 +173,6 @@ pub(crate) fn cmd_taxonomy(
                             "title": d.title,
                             "broad_type": d.broad_type,
                             "designation": format!("{:?}", d.designation),
-                            "priority": d.release_priority,
                             "transform": d.transform,
                             "locales": d.locales,
                         })
@@ -193,13 +182,12 @@ pub(crate) fn cmd_taxonomy(
             println!("{}", serde_json::to_string_pretty(&labels)?);
         }
         OutputFormat::Csv => {
-            println!("key,broad_type,priority,designation,title");
+            println!("key,broad_type,designation,title");
             for (key, def) in &defs {
                 println!(
-                    "\"{}\",\"{}\",{},\"{:?}\",\"{}\"",
+                    "\"{}\",\"{}\",\"{:?}\",\"{}\"",
                     key,
                     def.broad_type.as_deref().unwrap_or(""),
-                    def.release_priority,
                     def.designation,
                     def.title.as_deref().unwrap_or("")
                 );
@@ -269,7 +257,7 @@ pub(crate) fn definition_to_full_json(
     obj.insert("transform_ext".into(), json!(d.transform_ext));
     obj.insert("locales".into(), json!(d.locales));
     obj.insert("tier".into(), json!(d.tier));
-    obj.insert("release_priority".into(), json!(d.release_priority));
+    obj.insert("generate".into(), json!(d.generate));
     obj.insert("aliases".into(), json!(d.aliases));
     obj.insert("pii".into(), json!(d.pii));
     obj.insert("notes".into(), json!(d.notes));
@@ -344,7 +332,6 @@ pub(crate) fn cmd_check(
     taxonomy_path: PathBuf,
     samples: usize,
     seed: u64,
-    priority: Option<u8>,
     verbose: bool,
     output: OutputFormat,
 ) -> Result<()> {
@@ -372,7 +359,6 @@ pub(crate) fn cmd_check(
             let results: Vec<serde_json::Value> = report
                 .results
                 .iter()
-                .filter(|r| priority.map(|p| r.release_priority >= p).unwrap_or(true))
                 .map(|r| {
                     let mut obj = serde_json::Map::new();
                     obj.insert("key".to_string(), json!(r.key));
@@ -383,7 +369,6 @@ pub(crate) fn cmd_check(
                     obj.insert("samples_failed".to_string(), json!(r.samples_failed));
                     obj.insert("pass_rate".to_string(), json!(r.pass_rate()));
                     obj.insert("has_pattern".to_string(), json!(r.has_pattern));
-                    obj.insert("release_priority".to_string(), json!(r.release_priority));
                     obj.insert("passed".to_string(), json!(r.passed()));
                     if !r.failures.is_empty() {
                         let failures: Vec<serde_json::Value> = r
@@ -420,23 +405,20 @@ pub(crate) fn cmd_check(
             println!("{}", serde_json::to_string_pretty(&summary)?);
         }
         OutputFormat::Csv => {
-            println!("key,domain,generator_exists,samples_generated,samples_passed,samples_failed,pass_rate,has_pattern,priority,passed");
+            println!("key,domain,generator_exists,samples_generated,samples_passed,samples_failed,pass_rate,has_pattern,passed");
             for r in &report.results {
-                if priority.map(|p| r.release_priority >= p).unwrap_or(true) {
-                    println!(
-                        "\"{}\",\"{}\",{},{},{},{},{:.4},{},{},{}",
-                        r.key,
-                        r.domain,
-                        r.generator_exists,
-                        r.samples_generated,
-                        r.samples_passed,
-                        r.samples_failed,
-                        r.pass_rate(),
-                        r.has_pattern,
-                        r.release_priority,
-                        r.passed(),
-                    );
-                }
+                println!(
+                    "\"{}\",\"{}\",{},{},{},{},{:.4},{},{}",
+                    r.key,
+                    r.domain,
+                    r.generator_exists,
+                    r.samples_generated,
+                    r.samples_passed,
+                    r.samples_failed,
+                    r.pass_rate(),
+                    r.has_pattern,
+                    r.passed(),
+                );
             }
         }
     }

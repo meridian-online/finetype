@@ -10,7 +10,6 @@ test.test.test:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
-  release_priority: 1
 "#,
     )
     .unwrap()
@@ -439,7 +438,7 @@ fn test_localized_generation() {
     let taxonomy = Taxonomy::from_directory("../../labels").unwrap();
     let mut gen = Generator::with_seed(taxonomy, 42);
 
-    let samples = gen.generate_all_localized(5, 2);
+    let samples = gen.generate_all_localized(false, 2);
     assert!(!samples.is_empty(), "Should generate localized samples");
 
     // All labels should be 4-level (domain.category.type.LOCALE)

@@ -131,9 +131,10 @@ enum Commands {
         #[arg(short, long, default_value = "100")]
         samples: usize,
 
-        /// Minimum release priority
-        #[arg(short, long, default_value = "3")]
-        priority: u8,
+        /// Emit every leaf, including the three marked `generate: on_request`
+        /// in the taxonomy (the default output leaves them out)
+        #[arg(long)]
+        all: bool,
 
         /// Output file
         #[arg(short, long, default_value = "training.ndjson")]
@@ -155,8 +156,8 @@ enum Commands {
     /// Show taxonomy information (optionally filtered to a single type or glob)
     Taxonomy {
         /// Type key (e.g., "identity.person.email") or glob pattern
-        /// ("identity.person.*"). When supplied, --domain / --category /
-        /// --priority filters are ignored.
+        /// ("identity.person.*"). When supplied, --domain / --category are
+        /// ignored.
         type_key: Option<String>,
 
         /// Taxonomy file or directory
@@ -170,10 +171,6 @@ enum Commands {
         /// Filter by category
         #[arg(short, long)]
         category: Option<String>,
-
-        /// Minimum release priority
-        #[arg(long)]
-        priority: Option<u8>,
 
         /// Output format (plain, json, csv, json-schema)
         #[arg(short, long, default_value = "plain")]
@@ -198,10 +195,6 @@ enum Commands {
         /// Random seed for reproducibility
         #[arg(long, default_value = "42")]
         seed: u64,
-
-        /// Minimum release priority to check (0 = all)
-        #[arg(short, long)]
-        priority: Option<u8>,
 
         /// Show verbose failure details
         #[arg(short, long)]
@@ -551,31 +544,29 @@ fn main() -> Result<()> {
 
         Commands::Generate {
             samples,
-            priority,
+            all,
             output,
             taxonomy,
             seed,
             localized,
-        } => cmd_generate(samples, priority, output, taxonomy, seed, localized),
+        } => cmd_generate(samples, all, output, taxonomy, seed, localized),
 
         Commands::Taxonomy {
             type_key,
             file,
             domain,
             category,
-            priority,
             output,
             full,
-        } => cmd_taxonomy(type_key, file, domain, category, priority, output, full),
+        } => cmd_taxonomy(type_key, file, domain, category, output, full),
 
         Commands::Check {
             taxonomy,
             samples,
             seed,
-            priority,
             verbose,
             output,
-        } => cmd_check(taxonomy, samples, seed, priority, verbose, output),
+        } => cmd_check(taxonomy, samples, seed, verbose, output),
 
         Commands::ValidateValue {
             label,

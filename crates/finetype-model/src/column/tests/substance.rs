@@ -423,7 +423,6 @@ identity.commerce.isbn:
   title: ISBN
   designation: universal
   tier: [VARCHAR, commerce]
-  release_priority: 3
   samples: ["0306406152"]
 "#;
     let mut tax = Taxonomy::from_yaml(yaml).unwrap();
@@ -1873,7 +1872,6 @@ representation.identifier.numeric_code:
     type: string
     pattern: '^[0-9]+$'
   tier: [VARCHAR, identifier]
-  release_priority: 4
   samples: ["00120"]
 "#;
     let mut tax = Taxonomy::from_yaml(yaml).unwrap();
@@ -1921,7 +1919,6 @@ representation.identifier.numeric_code:
     type: string
     pattern: '^[0-9]+$'
   tier: [VARCHAR, identifier]
-  release_priority: 4
   samples: ["00120"]
 representation.identifier.increment:
   title: "Increment"
@@ -1929,7 +1926,6 @@ representation.identifier.increment:
     type: string
     pattern: '^[0-9]+$'
   tier: [VARCHAR, identifier]
-  release_priority: 4
   samples: ["1"]
 "#;
     let mut tax = Taxonomy::from_yaml(yaml).unwrap();
@@ -2053,7 +2049,6 @@ finance.banking.swift_bic:
     type: string
     pattern: "^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$"
   tier: [VARCHAR, banking]
-  release_priority: 3
   samples: ["DEUTDEFF"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -2083,7 +2078,6 @@ finance.banking.swift_bic:
     type: string
     pattern: "^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$"
   tier: [VARCHAR, banking]
-  release_priority: 3
   samples: ["DEUTDEFF"]
 "#;
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();

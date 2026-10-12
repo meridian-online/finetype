@@ -214,7 +214,6 @@ fn the_anchor_audit_names_an_unanchored_pattern_it_is_given() {
     type: string
     pattern: "{pattern}"
   tier: [VARCHAR, text]
-  release_priority: 5
   aliases: []
   samples:
     - "x"

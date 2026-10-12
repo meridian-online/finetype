@@ -962,7 +962,6 @@ datetime.timestamp.iso_8601:
     minLength: 20
     maxLength: 20
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   samples: ["2024-01-15T10:30:00Z"]
 "#;
         let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -1204,7 +1203,6 @@ datetime.timestamp.iso_8601:
     minLength: 20
     maxLength: 20
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   samples: ["2024-01-15T10:30:00Z"]
 
 technology.internet.ip_v4:
@@ -1213,7 +1211,6 @@ technology.internet.ip_v4:
     type: string
     pattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"
   tier: [VARCHAR, internet]
-  release_priority: 5
   samples: ["192.168.1.1"]
 "#;
         let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -1279,7 +1276,6 @@ datetime.timestamp.iso_8601:
     minLength: 20
     maxLength: 20
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   samples: ["2024-01-15T10:30:00Z"]
 "#;
         let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();

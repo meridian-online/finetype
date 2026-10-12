@@ -45,7 +45,6 @@ datetime.timestamp.iso_8601:
     minLength: 20
     maxLength: 27
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: [big_endian]
   samples:
     - "2024-01-15T10:30:00Z"
@@ -81,7 +80,6 @@ datetime.timestamp.iso_8601_compact:
     minLength: 15
     maxLength: 15
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: []
   samples:
     - "20240115T103000"
@@ -114,7 +112,6 @@ datetime.timestamp.iso_8601_microseconds:
     minLength: 27
     maxLength: 27
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: [iso_8601_ext]
   samples:
     - "2024-01-15T10:30:00.123456Z"
@@ -147,7 +144,6 @@ datetime.timestamp.iso_8601_offset:
     minLength: 24
     maxLength: 25
   tier: [TIMESTAMPTZ, timestamp]
-  release_priority: 5
   aliases: [iso_8601_with_time_zone_name]
   samples:
     - "2024-01-15T10:30:00+05:00"
@@ -179,7 +175,6 @@ datetime.timestamp.rfc_2822:
     type: string
     pattern: "^[A-Z][a-z]{2}, \\d{2} [A-Z][a-z]{2} \\d{4} \\d{2}:\\d{2}:\\d{2} .+$"
   tier: [TIMESTAMPTZ, timestamp]
-  release_priority: 5
   aliases: []
   samples:
     - "Tue, 15 Jan 2024 10:30:00 +0000"
@@ -214,7 +209,6 @@ datetime.timestamp.rfc_3339:
     type: string
     pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} ?([+-]\\d{2}:\\d{2}|[+-]\\d{4}|Z)$"
   tier: [TIMESTAMPTZ, timestamp]
-  release_priority: 5
   aliases: []
   samples:
     - "2024-01-15 10:30:00+00:00"
@@ -255,7 +249,6 @@ datetime.timestamp.sql_standard:
     minLength: 19
     maxLength: 19
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: []
   samples:
     - "2024-01-15 10:30:00"
@@ -290,7 +283,6 @@ datetime.timestamp.sql_minutes:
     minLength: 16
     maxLength: 16
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: []
   samples:
     - "2024-01-15 10:30"
@@ -327,7 +319,6 @@ datetime.timestamp.mdy_12h:
     type: string
     pattern: "^\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2} [AP]M$"
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: [middle_endian]
   samples:
     - "01/15/2024 10:30 AM"
@@ -357,7 +348,6 @@ datetime.timestamp.mdy_24h:
     type: string
     pattern: "^\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2}$"
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: [formatted_datetime]
   samples:
     - "01/15/2024 10:30:00"
@@ -385,7 +375,6 @@ datetime.timestamp.dmy_hm:
     type: string
     pattern: "^\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}$"
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: [little_endian]
   samples:
     - "15/01/2024 10:30"
@@ -417,7 +406,6 @@ datetime.timestamp.iso_microseconds:
     minLength: 26
     maxLength: 26
   tier: [TIMESTAMP, timestamp]
-  release_priority: 3
   aliases: []
   samples:
     - "2024-01-15T10:30:00.123456"
@@ -449,7 +437,6 @@ datetime.timestamp.iso_seconds:
     minLength: 19
     maxLength: 19
   tier: [TIMESTAMP, timestamp]
-  release_priority: 3
   aliases: []
   samples:
     - "2013-06-04T01:02:03"
@@ -486,7 +473,6 @@ datetime.timestamp.iso_minutes:
     minLength: 16
     maxLength: 16
   tier: [TIMESTAMP, timestamp]
-  release_priority: 3
   aliases: []
   samples:
     - "2013-06-04T01:02"
@@ -523,7 +509,6 @@ datetime.timestamp.iso_milliseconds:
     minLength: 23
     maxLength: 23
   tier: [TIMESTAMP, timestamp]
-  release_priority: 3
   aliases: []
   samples:
     - "2013-06-04T01:02:03.123"
@@ -556,7 +541,6 @@ datetime.timestamp.rfc_2822_ordinal:
     type: string
     pattern: "^\\d{1,2}(?:st|nd|rd|th) [A-Z][a-z]{2} \\d{4} \\d{2}:\\d{2}:\\d{2} [+-]\\d{4}$"
   tier: [TIMESTAMPTZ, timestamp]
-  release_priority: 3
   aliases: [rfc_2822_with_ordinals]
   samples:
     - "15th Jan 2024 10:30:00 +0000"
@@ -600,7 +584,6 @@ datetime.date.iso:
     minLength: 10
     maxLength: 10
   tier: [DATE, date]
-  release_priority: 5
   aliases: []
   samples:
     - "2024-01-15"
@@ -635,7 +618,6 @@ datetime.date.mdy_slash:
     minLength: 10
     maxLength: 10
   tier: [DATE, date]
-  release_priority: 5
   aliases: [formatted_date]
   samples:
     - "01/15/2024"
@@ -666,7 +648,6 @@ datetime.date.dmy_slash:
     minLength: 10
     maxLength: 10
   tier: [DATE, date]
-  release_priority: 5
   aliases: []
   samples:
     - "15/01/2024"
@@ -699,7 +680,6 @@ datetime.date.dmy_dot:
     minLength: 10
     maxLength: 10
   tier: [DATE, date]
-  release_priority: 5
   aliases: []
   samples:
     - "15.01.2024"
@@ -729,7 +709,6 @@ datetime.date.short_dmy:
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
-  release_priority: 3
   aliases: []
   samples:
     - "15-01-24"
@@ -761,7 +740,6 @@ datetime.date.short_mdy:
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
-  release_priority: 3
   aliases: []
   samples:
     - "01-15-24"
@@ -792,7 +770,6 @@ datetime.date.short_ymd:
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
-  release_priority: 3
   aliases: []
   samples:
     - "24-01-15"
@@ -838,7 +815,6 @@ datetime.date.compact_ymd:
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
-  release_priority: 5
   aliases: [numeric_ymd]
   samples:
     - "20240115"
@@ -894,7 +870,6 @@ datetime.date.compact_dmy:
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
-  release_priority: 3
   aliases: [numeric_dmy]
   samples:
     - "15012024"
@@ -925,7 +900,6 @@ datetime.date.compact_mdy:
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
-  release_priority: 3
   aliases: [numeric_mdy]
   samples:
     - "01152024"
@@ -970,7 +944,6 @@ datetime.date.abbreviated_month:
     type: string
     pattern: "^(?:[A-Za-z]{3,} \\d{1,2},? \\d{4}|\\d{1,2}\\.? [A-Za-z]{3,} \\d{4})$"
   tier: [DATE, date]
-  release_priority: 5
   aliases: []
   samples:
     - "Jan 15, 2024"
@@ -1012,7 +985,6 @@ datetime.date.long_full_month:
     type: string
     pattern: "^(?:[A-Za-z]+ \\d{1,2},? \\d{4}|\\d{1,2}\\.? [A-Za-z]+ \\d{4})$"
   tier: [DATE, date]
-  release_priority: 5
   aliases: [long_full_month_name]
   samples:
     - "January 15, 2024"
@@ -1047,7 +1019,6 @@ datetime.date.weekday_abbreviated_month:
     type: string
     pattern: "^[A-Za-z]+[, ]+(?:[A-Za-z]{3,} \\d{1,2},? \\d{4}|\\d{1,2}\\.? [A-Za-z]{3,} \\d{4})$"
   tier: [DATE, date]
-  release_priority: 5
   aliases: [full_weekday_abbreviated_month]
   samples:
     - "Monday, Jan 15, 2024"
@@ -1081,7 +1052,6 @@ datetime.date.weekday_full_month:
     type: string
     pattern: "^[A-Za-z]+[, ]+(?:[A-Za-z]+ \\d{1,2},? \\d{4}|\\d{1,2}\\.? [A-Za-z]+ \\d{4})$"
   tier: [DATE, date]
-  release_priority: 5
   aliases: [long_weekday_month_name]
   samples:
     - "Monday, January 15, 2024"
@@ -1111,7 +1081,6 @@ datetime.date.ordinal:
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
-  release_priority: 5
   aliases: []
   samples:
     - "2024-015"
@@ -1143,7 +1112,6 @@ datetime.date.julian:
     minLength: 6
     maxLength: 6
   tier: [DATE, date]
-  release_priority: 3
   aliases: []
   samples:
     - "24-015"
@@ -1175,7 +1143,6 @@ datetime.date.iso_week:
     type: string
     pattern: "^\\d{4}-W\\d{1,2}$"
   tier: [DATE, date]
-  release_priority: 3
   aliases: [week_date]
   samples:
     - "2024-W03"
@@ -1216,7 +1183,6 @@ datetime.time.iso:
     minLength: 10
     maxLength: 18
   tier: [TIME, time]
-  release_priority: 3
   aliases: []
   samples:
     - "10:30:00.123456"
@@ -1247,7 +1213,6 @@ datetime.time.hms_24h:
     minLength: 7
     maxLength: 15
   tier: [TIME, time]
-  release_priority: 5
   aliases: [formatted_time]
   samples:
     - "10:30:00"
@@ -1278,7 +1243,6 @@ datetime.time.hm_24h:
     minLength: 5
     maxLength: 5
   tier: [TIME, time]
-  release_priority: 5
   aliases: []
   samples:
     - "10:30"
@@ -1309,7 +1273,6 @@ datetime.time.hms_12h:
     minLength: 11
     maxLength: 11
   tier: [TIME, time]
-  release_priority: 5
   aliases: []
   samples:
     - "10:30:00 AM"
@@ -1340,7 +1303,6 @@ datetime.time.hm_12h:
     minLength: 8
     maxLength: 8
   tier: [TIME, time]
-  release_priority: 5
   aliases: []
   samples:
     - "10:30 AM"
@@ -1376,7 +1338,6 @@ datetime.epoch.unix_seconds:
     minLength: 10
     maxLength: 10
   tier: [BIGINT, epoch]
-  release_priority: 5
   aliases: [unix_timestamp, timestamp]
   samples:
     - "1705312200"
@@ -1412,7 +1373,6 @@ datetime.epoch.unix_milliseconds:
     minLength: 13
     maxLength: 13
   tier: [BIGINT, epoch]
-  release_priority: 5
   aliases: [unix_epoch_in_milliseconds]
   samples:
     - "1705312200000"
@@ -1444,7 +1404,6 @@ datetime.epoch.unix_microseconds:
     minLength: 16
     maxLength: 16
   tier: [BIGINT, epoch]
-  release_priority: 3
   aliases: []
   samples:
     - "1705312200000000"
@@ -1479,7 +1438,6 @@ datetime.offset.iana:
     type: string
     pattern: "^[A-Z][a-zA-Z]+/[A-Za-z_]+(/[A-Za-z_]+)?$"
   tier: [VARCHAR, offset]
-  release_priority: 5
   aliases: [timezone]
   samples:
     - "America/New_York"
@@ -1516,7 +1474,6 @@ datetime.offset.timezone_abbreviation:
     type: string
     pattern: "^(UTC|GMT|EST|EDT|CST|CDT|MST|MDT|PST|PDT|AKST|AKDT|HST|HAST|HADT|AST|ADT|NST|NDT|CET|CEST|EET|EEST|WET|WEST|BST|IST|WAT|CAT|EAT|SAST|MSK|GST|PKT|ICT|WIB|SGT|HKT|JST|KST|AEST|AEDT|ACST|ACDT|AWST|NZST|NZDT)$"
   tier: [VARCHAR, offset]
-  release_priority: 5
   aliases: [tz_abbrev, timezone_short]
   samples:
     - "EST"
@@ -1558,7 +1515,6 @@ datetime.offset.utc:
     type: string
     pattern: "^UTC [+-]\\d{2}:\\d{2}$"
   tier: [VARCHAR, offset]
-  release_priority: 4
   aliases: [gmt_offset]
   samples:
     - "UTC +05:00"
@@ -1603,7 +1559,6 @@ datetime.duration.iso_8601:
     type: string
     pattern: "^-?P(?=\\d|T\\d)(?:(\\d+)Y)?(?:(\\d+)M)?(?:(\\d+)[DW])?(?:T(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+(?:\\.\\d+)?)S)?)?$"
   tier: [INTERVAL, duration]
-  release_priority: 3
   aliases: [duration, iso_8601_verbose]
   samples:
     - "PT30M"
@@ -1651,7 +1606,6 @@ datetime.component.year:
     minimum: 1000
     maximum: 2100
   tier: [INTEGER, component]
-  release_priority: 3
   aliases: []
   samples:
     - "2024"
@@ -1807,7 +1761,6 @@ datetime.component.day_of_week:
       type: string
       enum: ["понеділок", "вівторок", "середа", "четвер", "пʼятниця", "субота", "неділя"]
   tier: [VARCHAR, component]
-  release_priority: 3
   aliases: []
   samples:
     - "Monday"
@@ -1958,7 +1911,6 @@ datetime.component.month_name:
       type: string
       enum: ["січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"]
   tier: [VARCHAR, component]
-  release_priority: 3
   aliases: [month]
   samples:
     - "January"
@@ -1998,7 +1950,6 @@ datetime.component.periodicity:
       - "Yearly"
       - "Never"
   tier: [VARCHAR, component]
-  release_priority: 3
   aliases: []
   samples:
     - "Daily"
@@ -2040,7 +1991,6 @@ datetime.timestamp.sql_microseconds:
     minLength: 26
     maxLength: 26
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: [sql_micro]
   samples:
     - "2024-01-15 14:30:00.123456"
@@ -2074,7 +2024,6 @@ datetime.timestamp.sql_milliseconds:
     minLength: 23
     maxLength: 23
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: [sql_millis]
   samples:
     - "2024-01-15 14:30:00.123"
@@ -2108,7 +2057,6 @@ datetime.timestamp.iso_8601_milliseconds:
     minLength: 24
     maxLength: 24
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: [js_iso, iso_millis]
   samples:
     - "2024-01-15T14:30:00.123Z"
@@ -2145,7 +2093,6 @@ datetime.timestamp.iso_8601_millis_offset:
     minLength: 29
     maxLength: 29
   tier: [TIMESTAMPTZ, timestamp]
-  release_priority: 4
   aliases: []
   samples:
     - "2024-01-15T14:30:00.123+05:30"
@@ -2179,7 +2126,6 @@ datetime.timestamp.iso_8601_micros_offset:
     minLength: 32
     maxLength: 32
   tier: [TIMESTAMPTZ, timestamp]
-  release_priority: 5
   aliases: [rfc_5424_micro]
   samples:
     - "2024-01-15T14:30:00.123456+00:00"
@@ -2217,7 +2163,6 @@ datetime.timestamp.clf:
     minLength: 24
     maxLength: 29
   tier: [TIMESTAMPTZ, timestamp]
-  release_priority: 5
   aliases: [apache, nginx_log]
   samples:
     - "15/Jan/2024:14:30:00 +0000"
@@ -2256,7 +2201,6 @@ datetime.timestamp.syslog_bsd:
     minLength: 15
     maxLength: 15
   tier: [VARCHAR, timestamp]
-  release_priority: 4
   aliases: [rfc_3164]
   samples:
     - "Jan 15 14:30:00"
@@ -2293,7 +2237,6 @@ datetime.timestamp.sql_microseconds_offset:
     minLength: 32
     maxLength: 32
   tier: [TIMESTAMPTZ, timestamp]
-  release_priority: 5
   aliases: [pg_timestamptz]
   samples:
     - "2024-01-15 14:30:00.123456+00:00"
@@ -2327,7 +2270,6 @@ datetime.timestamp.pg_short_offset:
     minLength: 28
     maxLength: 29
   tier: [TIMESTAMPTZ, timestamp]
-  release_priority: 3
   aliases: []
   samples:
     - "2024-01-15 14:30:00.123456-05"
@@ -2361,7 +2303,6 @@ datetime.timestamp.dot_dmy_24h:
     minLength: 19
     maxLength: 19
   tier: [TIMESTAMP, timestamp]
-  release_priority: 4
   aliases: [eu_dot_timestamp]
   samples:
     - "15.01.2024 14:30:00"
@@ -2394,7 +2335,6 @@ datetime.timestamp.slash_ymd_24h:
     minLength: 19
     maxLength: 19
   tier: [TIMESTAMP, timestamp]
-  release_priority: 4
   aliases: [jp_timestamp]
   samples:
     - "2024/01/15 14:30:00"
@@ -2427,7 +2367,6 @@ datetime.timestamp.ctime:
     minLength: 24
     maxLength: 24
   tier: [TIMESTAMP, timestamp]
-  release_priority: 3
   aliases: [asctime]
   samples:
     - "Mon Jan 15 14:30:00 2024"
@@ -2460,7 +2399,6 @@ datetime.timestamp.epoch_nanoseconds:
     minLength: 19
     maxLength: 19
   tier: [BIGINT, epoch]
-  release_priority: 3
   aliases: [unix_nano]
   samples:
     - "1705325400000000000"
@@ -2497,7 +2435,6 @@ datetime.timestamp.iso_space_zulu:
     minLength: 20
     maxLength: 20
   tier: [TIMESTAMP, timestamp]
-  release_priority: 4
   aliases: [sqlite_utc]
   samples:
     - "2024-01-15 14:30:00Z"
@@ -2531,7 +2468,6 @@ datetime.timestamp.dot_ymd_24h:
     minLength: 19
     maxLength: 19
   tier: [TIMESTAMP, timestamp]
-  release_priority: 3
   aliases: []
   samples:
     - "2024.01.15 14:30:00"
@@ -2575,7 +2511,6 @@ datetime.date.ymd_slash:
     minLength: 10
     maxLength: 10
   tier: [DATE, date]
-  release_priority: 5
   aliases: []
   samples:
     - "2024/01/15"
@@ -2607,7 +2542,6 @@ datetime.date.ymd_dot:
     minLength: 10
     maxLength: 10
   tier: [DATE, date]
-  release_priority: 4
   aliases: []
   samples:
     - "2024.01.15"
@@ -2640,7 +2574,6 @@ datetime.date.dmy_dash:
     minLength: 10
     maxLength: 10
   tier: [DATE, date]
-  release_priority: 5
   aliases: []
   samples:
     - "15-01-2024"
@@ -2673,7 +2606,6 @@ datetime.date.mdy_dash:
     minLength: 10
     maxLength: 10
   tier: [DATE, date]
-  release_priority: 4
   aliases: []
   samples:
     - "01-15-2024"
@@ -2707,7 +2639,6 @@ datetime.date.dmy_space_abbrev:
     minLength: 10
     maxLength: 11
   tier: [DATE, date]
-  release_priority: 5
   aliases: []
   samples:
     - "15 Jan 2024"
@@ -2739,7 +2670,6 @@ datetime.date.dmy_space_full:
     minLength: 12
     maxLength: 20
   tier: [DATE, date]
-  release_priority: 4
   aliases: []
   samples:
     - "15 January 2024"
@@ -2772,7 +2702,6 @@ datetime.date.abbrev_month_no_comma:
     minLength: 10
     maxLength: 11
   tier: [DATE, date]
-  release_priority: 5
   aliases: []
   samples:
     - "Jan 15 2024"
@@ -2805,7 +2734,6 @@ datetime.date.full_month_no_comma:
     minLength: 12
     maxLength: 20
   tier: [DATE, date]
-  release_priority: 3
   aliases: []
   samples:
     - "January 15 2024"
@@ -2838,7 +2766,6 @@ datetime.date.dmy_dash_abbrev:
     minLength: 10
     maxLength: 11
   tier: [DATE, date]
-  release_priority: 5
   aliases: [oracle_date]
   samples:
     - "15-Jan-2024"
@@ -2872,7 +2799,6 @@ datetime.date.dmy_dash_abbrev_short:
     minLength: 8
     maxLength: 9
   tier: [DATE, date]
-  release_priority: 5
   aliases: [oracle_date_short]
   samples:
     - "15-Jan-24"
@@ -2904,7 +2830,6 @@ datetime.date.mdy_short_slash:
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
-  release_priority: 5
   aliases: []
   samples:
     - "01/15/24"
@@ -2937,7 +2862,6 @@ datetime.date.dmy_short_slash:
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
-  release_priority: 5
   aliases: []
   samples:
     - "15/01/24"
@@ -2970,7 +2894,6 @@ datetime.date.dmy_short_dot:
     minLength: 8
     maxLength: 8
   tier: [DATE, date]
-  release_priority: 4
   aliases: []
   samples:
     - "15.01.24"
@@ -3004,7 +2927,6 @@ datetime.date.year_month:
     minLength: 7
     maxLength: 7
   tier: [DATE, date]
-  release_priority: 5
   aliases: [yearmonth]
   samples:
     - "2024-01"
@@ -3040,7 +2962,6 @@ datetime.date.compact_ym:
     minLength: 6
     maxLength: 6
   tier: [DATE, date]
-  release_priority: 3
   aliases: []
   samples:
     - "202401"
@@ -3073,7 +2994,6 @@ datetime.date.month_year_full:
     minLength: 8
     maxLength: 14
   tier: [VARCHAR, date]
-  release_priority: 3
   aliases: []
   samples:
     - "January 2024"
@@ -3105,7 +3025,6 @@ datetime.date.month_year_abbrev:
     minLength: 8
     maxLength: 8
   tier: [VARCHAR, date]
-  release_priority: 3
   aliases: []
   samples:
     - "Jan 2024"
@@ -3140,7 +3059,6 @@ datetime.date.month_year_slash:
     minLength: 5
     maxLength: 7
   tier: [VARCHAR, date]
-  release_priority: 4
   aliases: [card_expiry]
   samples:
     - "01/2024"
@@ -3176,7 +3094,6 @@ datetime.date.weekday_dmy_full:
     minLength: 22
     maxLength: 32
   tier: [DATE, date]
-  release_priority: 3
   aliases: []
   samples:
     - "Monday, 15 January 2024"
@@ -3206,7 +3123,6 @@ datetime.date.chinese_ymd:
     type: string
     pattern: "^\\d{4}\u5E74[1-9]\\d?\u6708[1-3]?\\d\u65E5$"
   tier: [VARCHAR, date]
-  release_priority: 4
   aliases: [cn_standard]
   samples:
     - "2024\u5E741\u670815\u65E5"
@@ -3236,7 +3152,6 @@ datetime.date.korean_ymd:
     type: string
     pattern: "^\\d{4}\uB144 [1-9]\\d?\uC6D4 [1-3]?\\d\uC77C$"
   tier: [VARCHAR, date]
-  release_priority: 3
   aliases: []
   samples:
     - "2024\uB144 1\uC6D4 15\uC77C"
@@ -3278,7 +3193,6 @@ datetime.date.jp_era_short:
     type: string
     pattern: "^[RHSTM]\\d{1,2}/\\d{1,2}/\\d{1,2}$"
   tier: [VARCHAR, date]
-  release_priority: 3
   aliases: [wareki_short]
   samples:
     - "R6/01/15"
@@ -3322,7 +3236,6 @@ datetime.date.jp_era_long:
     type: string
     pattern: "^(\u4EE4\u548C|\u5E73\u6210|\u662D\u548C|\u5927\u6B63|\u660E\u6CBB)\\d{1,2}\u5E74\\d{1,2}\u6708\\d{1,2}\u65E5$"
   tier: [VARCHAR, date]
-  release_priority: 3
   aliases: [wareki_long]
   samples:
     - "\u4EE4\u548C6\u5E741\u670815\u65E5"
@@ -3364,7 +3277,6 @@ datetime.period.quarter:
     type: string
     pattern: "^(Q[1-4]\\s?\\d{4}|\\d{4}[\\s-]?Q[1-4])$"
   tier: [VARCHAR, component]
-  release_priority: 4
   aliases: [quarter_iso]
   samples:
     - "Q1 2024"
@@ -3400,7 +3312,6 @@ datetime.period.fiscal_year:
     minLength: 4
     maxLength: 6
   tier: [VARCHAR, component]
-  release_priority: 3
   aliases: []
   samples:
     - "FY2024"

@@ -50,7 +50,6 @@ identity.person.full_name:
     maxLength: 200
     pattern: "^[\\p{L}\\s'\\-.,]+$"
   tier: [VARCHAR, person]
-  release_priority: 5
   aliases: [name, fullname]
   samples:
     - "John Smith"
@@ -88,7 +87,6 @@ identity.person.first_name:
     maxLength: 100
     pattern: "^[\\p{L}\\s'\\-]+$"
   tier: [VARCHAR, person]
-  release_priority: 4
   aliases: [given_name]
   samples:
     - "John"
@@ -123,7 +121,6 @@ identity.person.last_name:
     maxLength: 100
     pattern: "^[\\p{L}\\s'\\-]+$"
   tier: [VARCHAR, person]
-  release_priority: 4
   aliases: [surname, family_name]
   samples:
     - "Smith"
@@ -161,7 +158,6 @@ identity.person.email:
     minLength: 5
     maxLength: 254
   tier: [VARCHAR, person]
-  release_priority: 5
   aliases: [email_address]
   samples:
     - "john.smith@example.com"
@@ -444,7 +440,6 @@ identity.person.phone_number:
       minLength: 9
       maxLength: 35
   tier: [VARCHAR, person]
-  release_priority: 4
   aliases: [telephone, phone]
   samples:
     - "+1 (555) 123-4567"
@@ -483,7 +478,6 @@ identity.person.email_display:
     minLength: 10
     maxLength: 300
   tier: [VARCHAR, person]
-  release_priority: 3
   aliases: [mailbox, email_with_name]
   samples:
     - "\"John Doe\" <john@example.com>"
@@ -521,7 +515,6 @@ identity.person.phone_e164:
     minLength: 8
     maxLength: 16
   tier: [VARCHAR, person]
-  release_priority: 3
   aliases: [e164, international_phone]
   samples:
     - "+61412345678"
@@ -559,7 +552,6 @@ identity.person.username:
     maxLength: 32
     pattern: "^[a-zA-Z0-9_\\-.]{3,32}$"
   tier: [VARCHAR, person]
-  release_priority: 4
   aliases: [handle, account_name]
   samples:
     - "john.smith"
@@ -592,7 +584,7 @@ identity.person.password:
     minLength: 1
     maxLength: 255
   tier: [VARCHAR, person]
-  release_priority: 0
+  generate: on_request
   aliases: null
   samples:
     - "aB3#xY9@mK2"
@@ -604,6 +596,8 @@ identity.person.password:
     v1 migration: Was person.password marked broad_characters. NEVER store
     plaintext passwords. Always hash (bcrypt, Argon2) or encrypt.
     Detection is for audit purposes only.
+    Generated on request only: a catch-all leaf whose synthetic values have
+    no shape, kept for the training set's label coverage.
   pii: true
 
 identity.person.gender:
@@ -630,7 +624,6 @@ identity.person.gender:
       - other
       - unknown
   tier: [VARCHAR, person]
-  release_priority: 3
   aliases: null
   samples:
     - "Male"
@@ -676,7 +669,6 @@ identity.person.gender_code:
       - "2"
       - "9"
   tier: [VARCHAR, person]
-  release_priority: 3
   aliases: null
   samples:
     - "M"
@@ -720,7 +712,6 @@ identity.person.blood_type:
     type: string
     pattern: "^(A|B|AB|O)[+-]?$"
   tier: [VARCHAR, person]
-  release_priority: 3
   aliases: null
   samples:
     - "O+"
@@ -760,7 +751,6 @@ identity.person.height:
     type: string
     pattern: "^[0-9]+(\\.[0-9]+)?\\s*(cm|in|ft|inches|feet)?$|^[0-9]+'[0-9]+\"$"
   tier: [DOUBLE, person]
-  release_priority: 3
   aliases: null
   samples:
     - "180 cm"
@@ -797,7 +787,6 @@ identity.person.weight:
     type: string
     pattern: "^[0-9]+(\\.[0-9]+)?\\s*(kg|lbs|lb|g|oz|stones)?$"
   tier: [DOUBLE, person]
-  release_priority: 3
   aliases: null
   samples:
     - "75 kg"
@@ -860,7 +849,6 @@ identity.commerce.ean:
     pattern: "^[0-9]{8}$|^[0-9]{13}$"
   checksum: gs1
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: [upc]
   samples:
     - "5901234123457"
@@ -892,7 +880,6 @@ identity.commerce.isbn:
     pattern: "^(?:97[89]-)?[0-9]{1,5}-[0-9]+-[0-9]+-[0-9X]$|^[0-9]{9}[0-9X]$|^[0-9]{13}$"
   checksum: isbn
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: null
   samples:
     - "978-0-13-110362-7"
@@ -927,7 +914,6 @@ identity.commerce.issn:
     pattern: "^[0-9]{4}-[0-9]{3}[0-9X]$"
   checksum: issn
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: null
   samples:
     - "0028-0836"
@@ -967,7 +953,6 @@ identity.commerce.upc:
   # upc is the documented checksum-blind false alarm (gated-YDF 2.7% reliable here). gs1 was
   # already live on identity.commerce.ean. Residual: ~5% coincidental-pass tail.
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: [upc_a, barcode]
   samples:
     - "042100005264"
@@ -1005,7 +990,6 @@ identity.commerce.isrc:
     minLength: 12
     maxLength: 12
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: [recording_code]
   samples:
     - "USUAN1400011"
@@ -1058,7 +1042,6 @@ identity.medical.npi:
   # changes. Residual: ~13% coincidental-pass tail (junk that clears Luhn by chance). See
   # output/company-reference-audit W2b + retrain_recipe_draft.md.
   tier: [VARCHAR, medical]
-  release_priority: 3
   aliases: [national_provider_identifier, provider_id]
   samples:
     - "1234567893"
@@ -1094,7 +1077,6 @@ identity.medical.dea_number:
     maxLength: 9
   checksum: dea
   tier: [VARCHAR, medical]
-  release_priority: 3
   aliases: [dea, dea_registration]
   # All samples carry a VALID DEA check digit (the shipped dea_checksum_recovery
   # guard promotes only when >=90% pass; two of the prior samples were
@@ -1130,7 +1112,6 @@ identity.medical.ndc:
     type: string
     pattern: "^\\d{4}-\\d{4}-\\d{2}$|^\\d{5}-\\d{3}-\\d{2}$|^\\d{5}-\\d{4}-\\d{1}$|^\\d{11}$"
   tier: [VARCHAR, medical]
-  release_priority: 3
   aliases: [national_drug_code, drug_code]
   samples:
     - "0002-1433-80"
@@ -1163,7 +1144,6 @@ identity.medical.icd10:
     type: string
     pattern: "^[A-TV-Z][0-9][0-9AB](\\.[0-9A-TV-Z]{1,4})?$"
   tier: [VARCHAR, medical]
-  release_priority: 3
   aliases: [icd, diagnosis_code]
   samples:
     - "E11.9"
@@ -1197,7 +1177,6 @@ identity.medical.loinc:
     type: string
     pattern: "^\\d{1,5}-\\d$"
   tier: [VARCHAR, medical]
-  release_priority: 3
   aliases: [lab_code, observation_code]
   samples:
     - "2951-2"
@@ -1230,7 +1209,6 @@ identity.medical.cpt:
     type: string
     pattern: "^\\d{5}$|^\\d{4}[FTU]$"
   tier: [VARCHAR, medical]
-  release_priority: 3
   aliases: [procedure_code]
   samples:
     - "99213"
@@ -1264,7 +1242,6 @@ identity.medical.hcpcs:
     type: string
     pattern: "^[A-V]\\d{4}$"
   tier: [VARCHAR, medical]
-  release_priority: 3
   aliases: [hcpcs_code]
   samples:
     - "J1234"
@@ -1306,7 +1283,6 @@ identity.government.vin:
     minLength: 17
     maxLength: 17
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: [vehicle_id]
   samples:
     - "1HGBH41JXMN109186"
@@ -1340,7 +1316,6 @@ identity.government.eu_vat:
     type: string
     pattern: "^[A-Z]{2}[0-9A-Za-z+*.]{2,12}$"
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: [vat_number, vat_id]
   samples:
     - "DE123456789"
@@ -1378,7 +1353,6 @@ identity.government.ssn:
     minLength: 9
     maxLength: 11
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: [social_security_number]
   samples:
     - "078-05-1120"
@@ -1412,7 +1386,6 @@ identity.government.ein:
     minLength: 10
     maxLength: 10
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: [employer_id, tax_id]
   samples:
     - "12-3456789"
@@ -1446,7 +1419,6 @@ identity.government.pan_india:
     minLength: 10
     maxLength: 10
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: [pan, pan_number]
   samples:
     - "ABCPD1234E"
@@ -1482,7 +1454,6 @@ identity.government.abn:
     maxLength: 14
   checksum: abn
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: [australian_business_number]
   samples:
     - "51 824 753 556"
@@ -1526,7 +1497,6 @@ identity.academic.orcid:
     maxLength: 19
   checksum: orcid
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: [researcher_id]
   samples:
     - "0000-0002-1825-0097"
@@ -1578,7 +1548,6 @@ identity.industry.naics:
   # labels/sets/naics_codes.txt (US Census Bureau, public domain).
   membership: naics_codes
   tier: [VARCHAR, industry]
-  release_priority: 3
   aliases: [naics_code, industry_code]
   samples:
     - "541511"

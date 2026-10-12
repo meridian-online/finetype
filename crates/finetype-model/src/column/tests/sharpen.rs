@@ -292,7 +292,6 @@ technology.internet.url:
   title: URL
   designation: universal
   tier: [VARCHAR, internet]
-  release_priority: 3
   samples: ["https://x.com/a"]
   validation:
     type: string
@@ -338,7 +337,6 @@ technology.internet.url:
   title: URL
   designation: universal
   tier: [VARCHAR, internet]
-  release_priority: 3
   samples: ["https://x.com/a"]
   validation:
     type: string
@@ -431,7 +429,6 @@ technology.filesystem.windows_path:
   title: Windows Path
   designation: universal
   tier: [VARCHAR, filesystem]
-  release_priority: 3
   samples: ["C:\\x"]
   validation:
     type: string
@@ -440,7 +437,6 @@ technology.internet.message_id:
   title: Message ID
   designation: universal
   tier: [VARCHAR, internet]
-  release_priority: 3
   samples: ["<a@b>"]
   validation:
     type: string
@@ -449,7 +445,6 @@ technology.code.qualified_name:
   title: Qualified Name
   designation: universal
   tier: [VARCHAR, code]
-  release_priority: 3
   samples: ["a.b.c"]
   validation:
     type: string

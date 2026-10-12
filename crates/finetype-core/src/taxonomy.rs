@@ -30,6 +30,14 @@ pub enum TaxonomyError {
     GlobError(String),
 }
 
+/// Whether `finetype generate` emits a leaf by default. See `Definition::generate`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GeneratePolicy {
+    /// Emitted only when the caller asks for every leaf.
+    OnRequest,
+}
+
 /// Designation indicates the scope and stability of a label.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -422,9 +430,13 @@ pub struct Definition {
     /// Path from root to parent in the inference graph
     #[serde(default)]
     pub tier: Vec<String>,
-    /// Release priority (higher = more important)
-    #[serde(default)]
-    pub release_priority: u8,
+    /// When the generator emits this leaf. Absent for almost every leaf, which
+    /// `finetype generate` always emits. `on_request` marks a leaf the default
+    /// output leaves out and `--all` puts back: a catch-all whose synthetic
+    /// values have no shape, or a leaf a rule recovers rather than the model
+    /// predicts. The reason is in the leaf's `notes`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generate: Option<GeneratePolicy>,
     /// Aliases for this label
     pub aliases: Option<Vec<String>>,
     /// Example samples
@@ -697,11 +709,12 @@ impl Taxonomy {
         self.definitions.iter()
     }
 
-    /// Get definitions at or above a priority level
-    pub fn at_priority(&self, min_priority: u8) -> Vec<(&String, &Definition)> {
+    /// The leaves the generator emits: every leaf when `all`, otherwise the
+    /// leaves not marked `generate: on_request`.
+    pub fn generation_set(&self, all: bool) -> Vec<(&String, &Definition)> {
         self.definitions
             .iter()
-            .filter(|(_, d)| d.release_priority >= min_priority)
+            .filter(|(_, d)| all || d.generate.is_none())
             .collect()
     }
 
@@ -1336,7 +1349,6 @@ datetime.timestamp.iso_8601:
     minLength: 20
     maxLength: 20
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   aliases: [big_endian]
   samples:
     - "2024-01-15T10:30:00Z"
@@ -1375,7 +1387,6 @@ datetime.timestamp.iso_8601:
         let def = taxonomy.get("datetime.timestamp.iso_8601").unwrap();
         assert_eq!(def.title.as_deref(), Some("ISO 8601"));
         assert_eq!(def.broad_type.as_deref(), Some("TIMESTAMP"));
-        assert_eq!(def.release_priority, 5);
     }
 
     #[test]
@@ -1390,11 +1401,36 @@ datetime.timestamp.iso_8601:
         assert_eq!(taxonomy.categories("datetime"), vec!["timestamp"]);
     }
 
+    const GENERATE_YAML: &str = r#"
+a.b.default_leaf:
+  title: "Default"
+  tier: [VARCHAR]
+a.b.on_request_leaf:
+  title: "On request"
+  tier: [VARCHAR]
+  generate: on_request
+"#;
+
     #[test]
-    fn test_at_priority() {
-        let taxonomy = Taxonomy::from_yaml(SAMPLE_YAML).unwrap();
-        assert_eq!(taxonomy.at_priority(5).len(), 1);
-        assert_eq!(taxonomy.at_priority(6).len(), 0);
+    fn generation_set_skips_on_request_leaves_unless_asked() {
+        let taxonomy = Taxonomy::from_yaml(GENERATE_YAML).unwrap();
+        let default_keys: Vec<&String> = taxonomy
+            .generation_set(false)
+            .into_iter()
+            .map(|(k, _)| k)
+            .collect();
+        assert_eq!(default_keys, vec!["a.b.default_leaf"]);
+        assert_eq!(taxonomy.generation_set(true).len(), 2);
+    }
+
+    #[test]
+    fn generate_policy_rejects_unknown_value() {
+        let yaml = "a.b.c:\n  title: \"X\"\n  tier: [VARCHAR]\n  generate: sometimes\n";
+        let err = Taxonomy::from_yaml(yaml).unwrap_err().to_string();
+        assert!(
+            err.contains("sometimes"),
+            "error names the bad value: {err}"
+        );
     }
 
     const TIERED_YAML: &str = r#"
@@ -1409,7 +1445,6 @@ datetime.timestamp.iso_8601:
   validation:
     type: string
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   samples: ["2024-01-15T10:30:00Z"]
 
 datetime.timestamp.rfc_2822:
@@ -1423,7 +1458,6 @@ datetime.timestamp.rfc_2822:
   validation:
     type: string
   tier: [TIMESTAMP, timestamp]
-  release_priority: 5
   samples: ["Mon, 15 Jan 2024 10:30:00 +0000"]
 
 datetime.date.us_slash:
@@ -1437,7 +1471,6 @@ datetime.date.us_slash:
   validation:
     type: string
   tier: [DATE, date]
-  release_priority: 5
   samples: ["01/15/2024"]
 
 technology.internet.ip_v4:
@@ -1451,7 +1484,6 @@ technology.internet.ip_v4:
   validation:
     type: string
   tier: [INET, internet]
-  release_priority: 5
   samples: ["192.168.1.1"]
 
 technology.internet.ip_v6:
@@ -1465,7 +1497,6 @@ technology.internet.ip_v6:
   validation:
     type: string
   tier: [INET, internet]
-  release_priority: 5
   samples: ["::1"]
 "#;
 
@@ -1551,7 +1582,6 @@ representation.discrete.categorical:
   title: "Categorical"
   broad_type: VARCHAR
   tier: [VARCHAR, discrete]
-  release_priority: 3
   samples: ["red"]
 "#;
         let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
@@ -1972,7 +2002,6 @@ geography.address.postal_code:
       minLength: 5
       maxLength: 5
   tier: [VARCHAR, address]
-  release_priority: 4
   samples: ["10001"]
 "#;
 

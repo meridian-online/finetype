@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+
+- **`release_priority` leaves the taxonomy.** Every definition carried a rank from 0 to 5; the leaves are released, so the rank distinguished nothing. The field is gone from `labels/definitions_*.yaml`, from `finetype taxonomy`'s JSON (`release_priority`, `priority`) and CSV (`priority`) output, from `finetype check`'s output, and the `--priority` flag is gone from `generate`, `taxonomy` and `check`. Its one job survives as a per-leaf `generate: on_request` field on `container.object.s_expression`, `identity.person.password` and `representation.text.plain_text`: `finetype generate` leaves those three out unless passed `--all`, which is what the training data script passes. The field appears as `generate` in `finetype taxonomy --full` output, `"on_request"` or `null`, and any other value fails the taxonomy load.
+
 ### Fixed
 
 - **`finance.currency.amount_multisym` validates the whole value, not its first digit.** The pattern ended at `[0-9]` with no `$`, and JSON Schema's `pattern` is a search rather than a full match, so `finetype validate` accepted `R$ 1 apple` and `R$ 1.234,56 apple` as multi-symbol amounts. It now reads the amount to its end: an optional minus, digits, then groups separated by `.`, `,` or a space. The definition's own samples and the generator's output, negative form included, still pass. With its end anchor the pattern is precise, so the demotion guard counts it as positive evidence. A new audit in `precise_audit.rs` fails `cargo test -p finetype-core` for any `validation.pattern` that does not end in `$` unless it is one of three recorded prefixes: `container.object.yaml`, `geography.format.wkt` and `technology.internet.user_agent`, whose values run on past anything a pattern could name.

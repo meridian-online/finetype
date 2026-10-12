@@ -46,7 +46,6 @@ technology.internet.ip_v4:
     type: string
     pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
   tier: [INET, internet]
-  release_priority: 5
   aliases: [ipv4]
   samples:
     - "192.168.1.1"
@@ -80,7 +79,6 @@ technology.internet.ip_v4_with_port:
     type: string
     pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):[0-9]{1,5}$"
   tier: [INET, internet]
-  release_priority: 4
   aliases: [ipv4_port]
   samples:
     - "192.168.1.1:8080"
@@ -110,7 +108,6 @@ technology.internet.ip_v6:
     type: string
     pattern: "^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$"
   tier: [INET, internet]
-  release_priority: 4
   aliases: [ipv6]
   samples:
     - "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
@@ -141,7 +138,6 @@ technology.internet.mac_address:
     type: string
     pattern: "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
   tier: [INET, internet]
-  release_priority: 4
   aliases: [mac]
   samples:
     - "00:1a:2b:3c:4d:5e"
@@ -175,7 +171,6 @@ technology.internet.url:
     type: string
     pattern: "^(?:(?:https?|ftp|file):)?//(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?::\\d+)?(?:/[^?#]*)?(?:\\?[^#]*)?(?:#.*)?$"
   tier: [VARCHAR, internet]
-  release_priority: 5
   aliases: [web_url, uri]
   samples:
     - "https://example.com/path/to/resource"
@@ -216,7 +211,6 @@ technology.internet.hostname:
     type: string
     pattern: "^(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$"
   tier: [VARCHAR, internet]
-  release_priority: 4
   aliases: [domain_name]
   samples:
     - "example.com"
@@ -255,7 +249,6 @@ technology.internet.top_level_domain:
   # word" (Precision Principle). Guard-owned via `membership_substance_guard`.
   membership: tld
   tier: [VARCHAR, internet]
-  release_priority: 4
   aliases: [tld]
   samples:
     - "com"
@@ -294,7 +287,6 @@ technology.internet.user_agent:
     minLength: 10
     maxLength: 500
   tier: [VARCHAR, internet]
-  release_priority: 3
   aliases: null
   samples:
     - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -313,7 +305,7 @@ technology.internet.http_method:
   title: "HTTP Method"
   description: >
     HTTP request method (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE, CONNECT).
-    Broad categorization; lower release priority.
+    Broad categorization.
   designation: broad_words
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -334,7 +326,6 @@ technology.internet.http_method:
     pattern: "^(GET|Get|get|POST|Post|post|PUT|Put|put|DELETE|Delete|delete|PATCH|Patch|patch|HEAD|Head|head|OPTIONS|Options|options|TRACE|Trace|trace|CONNECT|Connect|connect)$"
     enum: [GET, Get, get, POST, Post, post, PUT, Put, put, DELETE, Delete, delete, PATCH, Patch, patch, HEAD, Head, head, OPTIONS, Options, options, TRACE, Trace, trace, CONNECT, Connect, connect]
   tier: [VARCHAR, internet]
-  release_priority: 3
   aliases: null
   samples:
     - "GET"
@@ -388,7 +379,6 @@ technology.cryptographic.hash:
     type: string
     pattern: "^[0-9a-f]{32}$|^[0-9a-f]{40}$|^[0-9a-f]{64}$|^[0-9a-f]{128}$"
   tier: [VARCHAR, cryptographic]
-  release_priority: 4
   aliases: null
   samples:
     - "5d41402abc4b2a76b9719d911017c592"
@@ -419,7 +409,6 @@ technology.cryptographic.token_urlsafe:
     type: string
     pattern: "^[A-Za-z0-9_-]{12,128}$"
   tier: [VARCHAR, cryptographic]
-  release_priority: 3
   aliases: [urlsafe_token]
   samples:
     - "SFMyNDI5STExOjEwMQ"
@@ -461,7 +450,6 @@ technology.code.imei:
   # substance guard demotes Luhn-failing IDs/epochs to integer_number (attractor curb).
   checksum: luhn
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: null
   # All samples carry a VALID Luhn check digit (the shipped imei_checksum_recovery
   # guard promotes a header-corroborated column only when >=90% pass Luhn; two of the
@@ -501,7 +489,6 @@ technology.code.doi:
     type: string
     pattern: "^10\\.[0-9]{4,9}/[^\\s]+$"
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: null
   samples:
     - "10.1038/nature12373"
@@ -537,7 +524,6 @@ technology.code.locale_code:
     type: string
     pattern: "^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{2,4})*$"
   tier: [VARCHAR, code]
-  release_priority: 4
   aliases: [bcp47, language_tag]
   samples:
     - "en"
@@ -577,7 +563,6 @@ technology.development.version:
     type: string
     pattern: "^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:-[a-zA-Z0-9.]+)?(?:\\+[a-zA-Z0-9.]+)?$"
   tier: [VARCHAR, development]
-  release_priority: 4
   aliases: null
   samples:
     - "1.2.3"
@@ -613,7 +598,6 @@ technology.development.calver:
     type: string
     pattern: "^[0-9]{4}\\.[0-9]{2}(?:\\.[0-9]{2})?(?:\\..*)?$"
   tier: [VARCHAR, development]
-  release_priority: 3
   aliases: null
   samples:
     - "2024.02.09"
@@ -647,7 +631,6 @@ technology.development.docker_ref:
     type: string
     pattern: "^(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?(?:[a-z0-9._\\-/]+)(?::[a-zA-Z0-9_.\\-]+)?(?:@sha256:[a-fA-F0-9]{64})?$"
   tier: [VARCHAR, development]
-  release_priority: 3
   aliases: [oci_image_ref, container_image]
   samples:
     - "nginx:latest"
@@ -686,7 +669,6 @@ technology.identifier.ulid:
     type: string
     pattern: "^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$"
   tier: [VARCHAR, identifier]
-  release_priority: 4
   aliases: null
   samples:
     - "01ARZ3NDEKTSV4RRFFQ69G5FAV"
@@ -718,7 +700,6 @@ technology.identifier.tsid:
     type: string
     pattern: "^[0-9a-f]{32}$"
   tier: [VARCHAR, identifier]
-  release_priority: 3
   aliases: null
   samples:
     - "0190a1b2c3d4e5f6a7b8c9d0e1f2a3b4"
@@ -752,7 +733,6 @@ technology.identifier.snowflake_id:
     type: string
     pattern: "^\\d{17,20}$"
   tier: [BIGINT, identifier]
-  release_priority: 3
   aliases: [twitter_id, discord_id]
   samples:
     - "175928847299117063"
@@ -793,7 +773,6 @@ technology.cloud.aws_arn:
     type: string
     pattern: "^arn:(aws|aws-cn|aws-us-gov):[a-zA-Z0-9\\-]+:[a-z0-9\\-]*:\\d{0,12}:.+$"
   tier: [VARCHAR, cloud]
-  release_priority: 3
   aliases: [amazon_resource_name]
   samples:
     - "arn:aws:s3:::my-bucket"
@@ -826,7 +805,6 @@ technology.cloud.s3_uri:
     type: string
     pattern: "^s3://[a-z0-9][a-z0-9.\\-]{1,61}[a-z0-9](/.*)?$"
   tier: [VARCHAR, cloud]
-  release_priority: 3
   aliases: null
   samples:
     - "s3://my-bucket/data/file.csv"
@@ -860,7 +838,6 @@ technology.cryptographic.jwt:
     type: string
     pattern: "^[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}$"
   tier: [VARCHAR, cryptographic]
-  release_priority: 3
   aliases: [json_web_token]
   samples:
     - "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
@@ -894,7 +871,6 @@ technology.internet.cidr:
     type: string
     pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/([0-9]|[12]\\d|3[0-2])$"
   tier: [INET, internet]
-  release_priority: 4
   aliases: [cidr_block, ip_range]
   samples:
     - "192.168.1.0/24"
@@ -930,7 +906,6 @@ technology.internet.urn:
     type: string
     pattern: "^urn:[a-z0-9][a-z0-9\\-]{0,31}:.+$"
   tier: [VARCHAR, internet]
-  release_priority: 3
   aliases: [uniform_resource_name]
   samples:
     - "urn:isbn:0451450523"
@@ -966,7 +941,6 @@ technology.internet.data_uri:
     type: string
     pattern: "^data:(?:[a-zA-Z0-9]+/[a-zA-Z0-9\\-+.]+)?(?:;[a-zA-Z0-9\\-]+=[^;,]*)*(?:;base64)?,.+$"
   tier: [VARCHAR, internet]
-  release_priority: 3
   aliases: null
   samples:
     - "data:text/plain;base64,SGVsbG8gV29ybGQ="
@@ -1003,7 +977,6 @@ technology.filesystem.windows_path:
     pattern: '^([A-Za-z]:\\|\\\\)[^\r\n]*$'
     minLength: 3
   tier: [VARCHAR, filesystem]
-  release_priority: 3
   aliases: [path, filepath, directory]
   samples:
     - "C:\\Windows\\System32\\drivers\\WdfLdr.sys"
@@ -1042,7 +1015,6 @@ technology.filesystem.filename:
     pattern: '^[^\\/\r\n\t]+\.[A-Za-z0-9]{1,8}$'
     minLength: 3
   tier: [VARCHAR, filesystem]
-  release_priority: 3
   aliases: [filename, file_name, fname]
   samples:
     - "report_final.xlsx"
@@ -1080,7 +1052,6 @@ technology.internet.message_id:
     type: string
     pattern: '^<[^<>@\s]+@[^<>@\s]+>$'
   tier: [VARCHAR, internet]
-  release_priority: 3
   aliases: [messageid, msgid]
   samples:
     - "<30365805.1075860998985.JavaMail.evans@thyme>"
@@ -1117,7 +1088,6 @@ technology.code.qualified_name:
     type: string
     pattern: '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){2,}$'
   tier: [VARCHAR, code]
-  release_priority: 3
   aliases: [fqn, classname, namespace]
   samples:
     - "com.google.javascript.jscomp.Compiler"

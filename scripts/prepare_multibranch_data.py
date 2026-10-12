@@ -1621,8 +1621,7 @@ def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, m
                 str(values_per_type),
                 "--seed",
                 str(seed),
-                "--priority",
-                "0",  # Include all types (password is priority 0)
+                "--all",  # the three generate-on-request leaves too
                 "--output",
                 tmp_path,
             ],
