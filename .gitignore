@@ -407,3 +407,7 @@ output/company-reference-audit/eval_sexp/sample_pass/
 # Supersedes the per-experiment enumeration above; already-tracked files are unaffected.
 output/
 models/**/tokenizer.json
+# roborev snapshots
+/.roborev/
+# Kata per-machine overrides
+.kata.local.toml
