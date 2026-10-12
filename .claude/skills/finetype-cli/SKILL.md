@@ -184,14 +184,13 @@ finetype taxonomy [TYPE_KEY] [OPTIONS]
 ```
 
 **Positional argument:**
-- `[TYPE_KEY]` — type key (e.g. `identity.person.email`) or glob pattern (e.g. `identity.person.*`). When supplied, the `--domain` / `--category` / `--priority` filters are ignored.
+- `[TYPE_KEY]` — type key (e.g. `identity.person.email`) or glob pattern (e.g. `identity.person.*`). When supplied, the `--domain` / `--category` filters are ignored.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-f, --file <DIR>` | `labels` | Taxonomy file or directory |
 | `-d, --domain <DOMAIN>` | — | Filter by domain |
 | `-c, --category <CATEGORY>` | — | Filter by category |
-| `--priority <N>` | — | Minimum release priority |
 | `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json`, `csv`, `markdown`, `arrow`, `json-schema` |
 | `--full` | — | Export all fields (description, validation, samples) |
 
@@ -210,7 +209,7 @@ finetype generate [OPTIONS]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-s, --samples <N>` | `100` | Samples per label |
-| `-p, --priority <N>` | `3` | Minimum release priority |
+| `--all` | — | Emit every leaf, including the three marked `generate: on_request` in the taxonomy (the default output leaves them out) |
 | `-o, --output <FILE>` | `training.ndjson` | Output file |
 | `-t, --taxonomy <DIR>` | `labels` | Taxonomy file or directory |
 | `--seed <N>` | `42` | Random seed |
@@ -231,7 +230,6 @@ finetype check [OPTIONS]
 | `-t, --taxonomy <DIR>` | `labels` | Taxonomy file or directory |
 | `-s, --samples <N>` | `50` | Samples per definition |
 | `--seed <N>` | `42` | Random seed |
-| `-p, --priority <N>` | — | Minimum release priority (0 = all) |
 | `-v, --verbose` | — | Show verbose failure details |
 | `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json` |
 

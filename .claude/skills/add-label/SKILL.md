@@ -24,7 +24,7 @@ author-approved). Confirm the *type* and its *placement* before minting — plac
 
 Add the leaf under the right `domain.category.type` key, matching the fields of a nearby sibling
 (copy `windows_path`/`message_id` as a template). Required: `title`, `description`, `designation`,
-`locales`, `broad_type`, `frictionless`, `transform`, `validation`, `tier`, `release_priority`,
+`locales`, `broad_type`, `frictionless`, `transform`, `validation`, `tier`,
 `aliases`, `samples`, `notes`. `samples` MUST pass the leaf's own `validation` (the check enforces it).
 
 **Precision Principle for the validator.** If the value *shape* is genuinely precise (drive-letter path,
