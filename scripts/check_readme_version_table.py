@@ -142,7 +142,10 @@ def compare(rows: list[Row], measured: dict[str, Outcome]) -> list[str]:
     for r in rows:
         got = measured[r.duckdb]
         if r.outcome.kind == "unreadable":
-            problems.append(f"{r.duckdb}: cell is not readable as a version or a known failure: {r.cell!r}")
+            problems.append(
+                f"{r.duckdb}: cell is not readable as a version or a known failure: "
+                f"{r.cell!r}; measured {got}"
+            )
         elif got != r.outcome:
             problems.append(f"{r.duckdb}: README says {r.outcome}, measured {got}")
     return problems
@@ -206,14 +209,25 @@ def fetch_releases() -> list[dict]:
         return json.load(resp)
 
 
+def measure_rows(rows: list[Row], prober) -> dict[str, Outcome]:
+    """Probe every row. A row whose probe raises (a failed download, an
+    unexpected archive, a timeout) is recorded as that row's error so the
+    other rows still reach the report."""
+    measured: dict[str, Outcome] = {}
+    for r in rows:
+        try:
+            measured[r.duckdb] = prober(r.duckdb)
+        except Exception as e:  # noqa: BLE001 - one row's failure must not lose the reading
+            measured[r.duckdb] = Outcome("error", f"{type(e).__name__}: {e}")
+        print(f"  {r.duckdb}: README {r.outcome}, measured {measured[r.duckdb]}")
+    return measured
+
+
 def measure(readme: Path, report: Path | None) -> int:
     rows = parse_table(readme.read_text(encoding="utf-8"))
-    measured: dict[str, Outcome] = {}
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        for r in rows:
-            measured[r.duckdb] = probe(r.duckdb, work)
-            print(f"  {r.duckdb}: README {r.outcome}, measured {measured[r.duckdb]}")
+        measured = measure_rows(rows, lambda v: probe(v, work))
     problems = compare(rows, measured)
     missing = missing_rows(rows, fetch_releases())
     lines = [f"Re-measured {len(rows)} rows on {platform.system()}/{platform.machine()}.", ""]
@@ -278,7 +292,18 @@ def self_test() -> int:
     stale = dict(measured, **{"1.5.6": Outcome("version", "0.6.61")})
     case("compare_stale_version", any("1.5.6" in p and "0.6.61" in p for p in compare(rows, stale)))
     unreadable = parse_table(FIXTURE + "> | 1.4.4 | served, probably |\n")
-    case("compare_reports_unreadable", any("1.4.4" in p and "not readable" in p for p in compare(unreadable, dict(measured, **{"1.4.4": Outcome("version", "0.6.0")}))))
+    unreadable_problems = compare(unreadable, dict(measured, **{"1.4.4": Outcome("version", "0.6.0")}))
+    case("compare_reports_unreadable", any("1.4.4" in p and "not readable" in p for p in unreadable_problems))
+    case("compare_unreadable_carries_measured", any("1.4.4" in p and "measured version:0.6.0" in p for p in unreadable_problems), str(unreadable_problems))
+
+    def prober(version: str) -> Outcome:
+        if version == "1.5.2":
+            raise OSError("download failed")
+        return measured[version]
+
+    got = measure_rows(rows, prober)
+    case("probe_failure_does_not_abort", got["1.5.6"] == measured["1.5.6"] and got["1.5.0"] == measured["1.5.0"], str(got))
+    case("probe_failure_is_that_row_s_error", got["1.5.2"].kind == "error" and "download failed" in got["1.5.2"].detail, str(got))
 
     releases = [
         {"tag_name": "v1.5.7", "prerelease": False},
