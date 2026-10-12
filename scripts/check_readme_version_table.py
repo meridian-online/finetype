@@ -21,8 +21,9 @@ WHAT IT DOES
 
 A stale cell or a missing row is reported and the exit is 1; when the
 release list cannot be fetched the cells are still compared, the report says
-so, and the exit is 2. One row's failed probe is that row's error, not the
-reading's. The README is never edited: a cell is a measurement with a date,
+so, and the exit is 2. One row's failed probe is that row's error, listed
+apart from the stale cells, and the exit is 2 as well. The README is never
+edited: a cell is a measurement with a date,
 and the fix is a new measurement a person commits.
 
 It is a signal, not a gate. The workflow that runs it is scheduled and never
@@ -140,9 +141,13 @@ def missing_rows(rows: list[Row], releases: list[dict]) -> list[str]:
 
 
 def compare(rows: list[Row], measured: dict[str, Outcome]) -> list[str]:
+    """The stale cells. A row whose probe failed is not compared: nothing in
+    the README is known to be wrong, see `unmeasured`."""
     problems = []
     for r in rows:
         got = measured[r.duckdb]
+        if got.kind == "error":
+            continue
         if r.outcome.kind == "unreadable":
             problems.append(
                 f"{r.duckdb}: cell is not readable as a version or a known failure: "
@@ -151,6 +156,11 @@ def compare(rows: list[Row], measured: dict[str, Outcome]) -> list[str]:
         elif got != r.outcome:
             problems.append(f"{r.duckdb}: README says {r.outcome}, measured {got}")
     return problems
+
+
+def unmeasured(rows: list[Row], measured: dict[str, Outcome]) -> list[str]:
+    """The rows whose probe failed, with the failure."""
+    return [f"{r.duckdb}: {measured[r.duckdb].detail}" for r in rows if measured[r.duckdb].kind == "error"]
 
 
 # ── measurement ─────────────────────────────────────────────────────────────
@@ -236,7 +246,12 @@ def measure(readme: Path, report: Path | None) -> int:
     except Exception as e:  # noqa: BLE001 - the stale-cell half of the report still goes out
         missing, releases_error = [], f"{type(e).__name__}: {e}"
     text, code = render(
-        len(rows), f"{platform.system()}/{platform.machine()}", problems, missing, releases_error
+        len(rows),
+        f"{platform.system()}/{platform.machine()}",
+        problems,
+        missing,
+        releases_error,
+        unmeasured(rows, measured),
     )
     print(text)
     if report:
@@ -245,22 +260,31 @@ def measure(readme: Path, report: Path | None) -> int:
 
 
 def render(
-    n_rows: int, where: str, problems: list[str], missing: list[str], releases_error: str | None
+    n_rows: int,
+    where: str,
+    problems: list[str],
+    missing: list[str],
+    releases_error: str | None,
+    failed: list[str] | None = None,
 ) -> tuple[str, int]:
     """The report text and the exit code: 0 when every cell matches and every
     release has a row, 1 when a cell is stale or a release has no row, 2 when
-    the release list could not be fetched (the cells were still compared)."""
+    the run itself fell short: a row that could not be measured, or a release
+    list that could not be fetched (the other cells were still compared)."""
+    failed = failed or []
     lines = [f"Re-measured {n_rows} rows on {where}.", ""]
     if problems:
         lines += ["Stale cells:"] + [f"- {p}" for p in problems] + [""]
     if missing:
         lines += ["DuckDB releases with no row:"] + [f"- {v}" for v in missing] + [""]
+    if failed:
+        lines += ["Rows that could not be measured (the README is not known to be wrong):"] + [f"- {f}" for f in failed] + [""]
     if releases_error:
         lines += [f"DuckDB release list unavailable ({releases_error}); releases with no row not checked.", ""]
-    if not problems and not missing and not releases_error:
+    if not problems and not missing and not failed and not releases_error:
         lines.append("Every cell matches and every release has a row.")
     text = "\n".join(lines).rstrip("\n")
-    if releases_error:
+    if failed or releases_error:
         return text, 2
     return text, 1 if problems or missing else 0
 
@@ -335,6 +359,12 @@ def self_test() -> int:
     ]
     case("missing_rows_above_floor", missing_rows(rows, releases) == ["1.5.7", "2.0.0"])
     case("prerelease_is_not_missing", "2.0.0-dev" not in missing_rows(rows, releases))
+
+    errored = dict(measured, **{"1.5.1": Outcome("error", "URLError: timed out")})
+    case("compare_skips_unmeasured_rows", compare(rows, errored) == [], str(compare(rows, errored)))
+    case("unmeasured_lists_the_failed_row", unmeasured(rows, errored) == ["1.5.1: URLError: timed out"], str(unmeasured(rows, errored)))
+    text, code = render(4, "Darwin/arm64", [], [], None, ["1.5.1: URLError: timed out"])
+    case("render_unmeasured_exits_2", code == 2 and "could not be measured" in text and "Stale cells" not in text, text)
 
     text, code = render(4, "Darwin/arm64", [], [], None)
     case("render_clean_exits_0", code == 0 and "Every cell matches" in text, text)
