@@ -85,6 +85,12 @@ Then the cases, replacing the existing list inside `self_test`:
     "1" "\.github/workflows/ci\.yml=b" \
     "plant a; printf 'env:\n  FINETYPE_CI_MODEL: b\n' > .github/workflows/ci.yml"
 
+  # A job- or step-level env block lower in the file re-pins the model; every
+  # FINETYPE_CI_MODEL line counts, not the first.
+  run_case "drift_second_workflow_pin_line" \
+    "1" "\.github/workflows/ci\.yml=b" \
+    "plant a; printf 'env:\n  FINETYPE_CI_MODEL: a\njobs:\n  x:\n    env:\n      FINETYPE_CI_MODEL: b\n' > .github/workflows/ci.yml"
+
   run_case "drift_release_workflow" \
     "1" "\.github/workflows/release\.yml=b" \
     "plant a; printf 'env:\n  FINETYPE_CI_MODEL: b\n' > .github/workflows/release.yml"
@@ -155,6 +161,11 @@ Then the cases, replacing the existing list inside `self_test`:
     "0" "aligned with models/default \(a\)" \
     "plant a; printf 'env:\n  FINETYPE_CI_MODEL: a  # bump with models/default\n' > .github/workflows/ci.yml"
 
+  # A Windows checkout writes .gitignore with CRLF; the line still matches.
+  run_case "aligned_gitignore_crlf" \
+    "0" "aligned with models/default \(a\)" \
+    "plant a; printf 'models/a/\r\n' > .gitignore"
+
   run_case "aligned_environment_matches" \
     "0" "aligned with models/default \(a\)" \
     "plant a" \
@@ -170,7 +181,7 @@ Also change `run_case` so the scratch tree no longer pre-creates `models/` (the 
 - [ ] **Step 2: Run the self-test to see the new cases fail**
 
 Run: `.github/scripts/check-ci-model-drift.sh --self-test`
-Expected: 18 of 21 cases FAIL. The committed script exits 0 with "unset or empty" whenever `FINETYPE_CI_MODEL` is unset, so every case that reads the tree fails: the drift cases that no longer set the variable exit 0 instead of 1, and the aligned cases print the unset message instead of the aligned one. Only `drift_environment`, `ci_model_whitespace` and `aligned_environment_matches` pass.
+Expected: 20 of 23 cases FAIL. The committed script exits 0 with "unset or empty" whenever `FINETYPE_CI_MODEL` is unset, so every case that reads the tree fails: the drift cases that no longer set the variable exit 0 instead of 1, and the aligned cases print the unset message instead of the aligned one. Only `drift_environment`, `ci_model_whitespace` and `aligned_environment_matches` pass.
 
 - [ ] **Step 3: Replace `check_drift` with the five-pin version**
 
@@ -216,10 +227,12 @@ trim() {
   printf '%s' "$1" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
 }
 
-# The FINETYPE_CI_MODEL value in a workflow's env block, or empty. A trailing
-# YAML comment is not part of the name.
-workflow_pin() {
-  sed -n -e 's/^[[:space:]]*FINETYPE_CI_MODEL:[[:space:]]*//p' "$1" 2>/dev/null | head -1 | sed -e 's/[[:space:]]*#.*$//' | tr -d '"'"'"
+# Every FINETYPE_CI_MODEL value in a workflow, one per line, or nothing. Every
+# env block counts, not only the workflow-level one: a job that re-pins the
+# model lower in the file downloads that model. A trailing YAML comment is not
+# part of the name.
+workflow_pins() {
+  sed -n -e 's/^[[:space:]]*FINETYPE_CI_MODEL:[[:space:]]*//p' "$1" 2>/dev/null | sed -e 's/[[:space:]]*#.*$//' | tr -d '"'"'"
 }
 
 # The DEFAULT_MODEL constant in build.rs, whatever cargo fmt did to the spacing.
@@ -238,11 +251,17 @@ check_drift() {
   fi
 
   for pin in .github/workflows/ci.yml .github/workflows/release.yml; do
-    value="$(trim "$(workflow_pin "${pin}")")"
-    if [ -z "${value}" ]; then
+    local found=false
+    while IFS= read -r value; do
+      value="$(trim "${value}")"
+      [ -n "${value}" ] || continue
+      found=true
+      if [ "${value}" != "${target}" ]; then
+        problems+=("${pin}=${value}")
+      fi
+    done < <(workflow_pins "${pin}")
+    if ! ${found}; then
       problems+=("${pin} names no model (no FINETYPE_CI_MODEL line)")
-    elif [ "${value}" != "${target}" ]; then
-      problems+=("${pin}=${value}")
     fi
   done
 
@@ -254,7 +273,8 @@ check_drift() {
     problems+=("${pin}=${value}")
   fi
 
-  if ! grep -qxF -- "models/${target}/" .gitignore 2>/dev/null; then
+  # tr first: a Windows checkout writes the file with CRLF, and -x wants the whole line.
+  if ! tr -d '\r' < .gitignore 2>/dev/null | grep -qxF -- "models/${target}/"; then
     problems+=(".gitignore has no line models/${target}/ — the tree does not record which model directory CI fills")
   fi
 
@@ -291,7 +311,7 @@ Keep `run_case`, `self_test` (with Step 1's cases) and the `case "${1:-}"` dispa
 - [ ] **Step 4: Run the self-test and the real tree**
 
 Run: `.github/scripts/check-ci-model-drift.sh --self-test`
-Expected: `Results: 21 passed, 0 failed`.
+Expected: `Results: 23 passed, 0 failed`.
 
 Run: `.github/scripts/check-ci-model-drift.sh`
 Expected: `CI model aligned with models/default (m2v8m-s43): ci.yml, release.yml, build.rs, .gitignore.` and exit 0.

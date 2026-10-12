@@ -39,10 +39,12 @@ trim() {
   printf '%s' "$1" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
 }
 
-# The FINETYPE_CI_MODEL value in a workflow's env block, or empty. A trailing
-# YAML comment is not part of the name.
-workflow_pin() {
-  sed -n -e 's/^[[:space:]]*FINETYPE_CI_MODEL:[[:space:]]*//p' "$1" 2>/dev/null | head -1 | sed -e 's/[[:space:]]*#.*$//' | tr -d '"'"'"
+# Every FINETYPE_CI_MODEL value in a workflow, one per line, or nothing. Every
+# env block counts, not only the workflow-level one: a job that re-pins the
+# model lower in the file downloads that model. A trailing YAML comment is not
+# part of the name.
+workflow_pins() {
+  sed -n -e 's/^[[:space:]]*FINETYPE_CI_MODEL:[[:space:]]*//p' "$1" 2>/dev/null | sed -e 's/[[:space:]]*#.*$//' | tr -d '"'"'"
 }
 
 # The DEFAULT_MODEL constant in build.rs, whatever cargo fmt did to the spacing.
@@ -61,11 +63,17 @@ check_drift() {
   fi
 
   for pin in .github/workflows/ci.yml .github/workflows/release.yml; do
-    value="$(trim "$(workflow_pin "${pin}")")"
-    if [ -z "${value}" ]; then
+    local found=false
+    while IFS= read -r value; do
+      value="$(trim "${value}")"
+      [ -n "${value}" ] || continue
+      found=true
+      if [ "${value}" != "${target}" ]; then
+        problems+=("${pin}=${value}")
+      fi
+    done < <(workflow_pins "${pin}")
+    if ! ${found}; then
       problems+=("${pin} names no model (no FINETYPE_CI_MODEL line)")
-    elif [ "${value}" != "${target}" ]; then
-      problems+=("${pin}=${value}")
     fi
   done
 
@@ -77,7 +85,8 @@ check_drift() {
     problems+=("${pin}=${value}")
   fi
 
-  if ! grep -qxF -- "models/${target}/" .gitignore 2>/dev/null; then
+  # tr first: a Windows checkout writes the file with CRLF, and -x wants the whole line.
+  if ! tr -d '\r' < .gitignore 2>/dev/null | grep -qxF -- "models/${target}/"; then
     problems+=(".gitignore has no line models/${target}/ — the tree does not record which model directory CI fills")
   fi
 
@@ -183,6 +192,12 @@ self_test() {
     "1" "\.github/workflows/ci\.yml=b" \
     "plant a; printf 'env:\n  FINETYPE_CI_MODEL: b\n' > .github/workflows/ci.yml"
 
+  # A job- or step-level env block lower in the file re-pins the model; every
+  # FINETYPE_CI_MODEL line counts, not the first.
+  run_case "drift_second_workflow_pin_line" \
+    "1" "\.github/workflows/ci\.yml=b" \
+    "plant a; printf 'env:\n  FINETYPE_CI_MODEL: a\njobs:\n  x:\n    env:\n      FINETYPE_CI_MODEL: b\n' > .github/workflows/ci.yml"
+
   run_case "drift_release_workflow" \
     "1" "\.github/workflows/release\.yml=b" \
     "plant a; printf 'env:\n  FINETYPE_CI_MODEL: b\n' > .github/workflows/release.yml"
@@ -252,6 +267,11 @@ self_test() {
   run_case "aligned_workflow_pin_with_comment" \
     "0" "aligned with models/default \(a\)" \
     "plant a; printf 'env:\n  FINETYPE_CI_MODEL: a  # bump with models/default\n' > .github/workflows/ci.yml"
+
+  # A Windows checkout writes .gitignore with CRLF; the line still matches.
+  run_case "aligned_gitignore_crlf" \
+    "0" "aligned with models/default \(a\)" \
+    "plant a; printf 'models/a/\r\n' > .gitignore"
 
   run_case "aligned_environment_matches" \
     "0" "aligned with models/default \(a\)" \
