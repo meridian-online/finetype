@@ -395,7 +395,7 @@ The script is the committed file `scripts/check_readme_version_table.py`, not a 
 - [ ] **Step 2: Run the self-test**
 
 Run: `chmod +x scripts/check_readme_version_table.py && scripts/check_readme_version_table.py --self-test`
-Expected: `Results: 27 passed, 0 failed`. If a case fails, fix the classifier, not the case: each case is the spec's outcome table.
+Expected: `Results: 28 passed, 0 failed`. If a case fails, fix the classifier, not the case: each case is the spec's outcome table.
 
 - [ ] **Step 3: Register the self-test and route it**
 

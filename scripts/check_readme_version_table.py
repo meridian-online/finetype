@@ -58,6 +58,12 @@ RELEASES_URL = "https://api.github.com/repos/duckdb/duckdb/releases?per_page=100
 
 ROW_RE = re.compile(r"^> \| (\d+\.\d+\.\d+) \| (.*) \|\s*$")
 VERSION_RE = re.compile(r"`finetype (\d+\.\d+\.\d+)`")
+# DuckDB's refusal of a build made for another release, in the two wordings
+# its releases print: "built specifically for DuckDB version 'vX'" (1.5) and
+# "built for DuckDB version 'vX', but we can only load" (later). Matched
+# this narrowly because every install error ends in a troubleshooting link
+# carrying "?version=", so the bare word would call an outage a refusal.
+REFUSED_RE = re.compile(r"built (?:specifically )?for duckdb version '", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -106,21 +112,23 @@ def classify_probe(install_out: str, load_out: str, version_out: str) -> Outcome
     """Classify one DuckDB release's probe from the three statements' output.
 
     A refused build surfaces at INSTALL on some releases and at LOAD on others,
-    so both outputs are read the same way: a 404 means no build is published,
-    a version complaint means the served build is for another DuckDB.
+    so both outputs are read the same way: an HTTP 404 means no build is
+    published, DuckDB's refusal of a build made for another release means the
+    served build is for another DuckDB, and any other error is reported by
+    its first line (the last is a troubleshooting link).
     """
     for out in (install_out, load_out):
         if "Error" not in out:
             continue
-        if "404" in out:
+        if "HTTP 404" in out:
             return Outcome("not_published")
-        if "version" in out.lower():
+        if REFUSED_RE.search(out):
             return Outcome("refused")
-        return Outcome("error", out.strip().splitlines()[-1])
+        return Outcome("error", out.strip().splitlines()[0])
     m = re.search(r"finetype (\d+\.\d+\.\d+)", version_out)
     if m:
         return Outcome("version", m.group(1))
-    return Outcome("error", version_out.strip().splitlines()[-1] if version_out.strip() else "no output")
+    return Outcome("error", version_out.strip().splitlines()[0] if version_out.strip() else "no output")
 
 
 def missing_rows(rows: list[Row], releases: list[dict]) -> list[str]:
@@ -324,9 +332,16 @@ def self_test() -> int:
     case("committed_readme_rows_all_readable", committed and all(r.outcome.kind != "unreadable" for r in committed), str([(r.duckdb, r.cell) for r in committed if r.outcome.kind == "unreadable"]))
 
     case("probe_version", classify_probe("", "", "finetype 0.6.57\n") == Outcome("version", "0.6.57"))
-    case("probe_404", classify_probe("IO Error: Failed to download extension ... HTTP 404", "", "").kind == "not_published")
-    case("probe_refused_at_load", classify_probe("", "Invalid Input Error: ... built for DuckDB version 'v1.5.0' ...", "").kind == "refused")
-    case("probe_refused_at_install", classify_probe("IO Error: ... built for DuckDB version 'v1.5.0' ...", "", "").kind == "refused")
+    # The messages below are the real ones, captured from the 1.5.1 and 1.5.2
+    # CLIs on osx_arm64 on 2026-10-12; the load-time refusal is the shape
+    # newer DuckDB releases print.
+    link = "For more info, visit https://duckdb.org/docs/stable/extensions/troubleshooting?version=v1.5.2&platform=osx_arm64&extension=finetype"
+    missing_build = 'HTTP Error: Failed to download extension "finetype" at URL "http://community-extensions.duckdb.org/v1.5.2/osx_arm64/finetype.duckdb_extension.gz" (HTTP 404)\n\nCandidate extensions: "inet", "fts"\n' + link
+    case("probe_404", classify_probe(missing_build, "", "").kind == "not_published")
+    case("probe_refused_at_install", classify_probe("IO Error: Failed to install 'finetype'\nThe file was built specifically for DuckDB version 'v1.5.0' and can only be loaded with that version of DuckDB. (this version of DuckDB is 'v1.5.1')", "", "").kind == "refused")
+    case("probe_refused_at_load", classify_probe("", "Invalid Input Error: Failed to load 'finetype': The file was built for DuckDB version 'v1.5.0', but we can only load extensions built for DuckDB version 'v1.5.1'.", "").kind == "refused")
+    outage = missing_build.replace("(HTTP 404)", "(HTTP 503)")
+    case("probe_registry_outage_is_error_not_refused", classify_probe(outage, "", "").kind == "error", str(classify_probe(outage, "", "")))
     case("probe_other_error", classify_probe("", "", "Catalog Error: ft_version does not exist").kind == "error")
 
     measured = {
