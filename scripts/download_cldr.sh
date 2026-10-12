@@ -3,7 +3,8 @@
 #
 # Fetches cldr-dates-full and cldr-numbers-full npm packages to data/cldr/json/.
 # These provide locale-specific date/time format patterns, month/day names,
-# and number formatting rules used by extract_cldr_patterns.py.
+# and number formatting rules. extract_cldr_numbering.py reads the default
+# numbering system from cldr-numbers-full.
 #
 # Usage: ./scripts/download_cldr.sh
 #
