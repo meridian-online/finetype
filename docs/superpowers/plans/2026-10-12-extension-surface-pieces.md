@@ -97,6 +97,11 @@ Then the cases, replacing the existing list inside `self_test`:
     "1" "\.gitignore has no line models/a/" \
     "plant a; printf 'models/b/\n' > .gitignore"
 
+  # The name is a literal, not a pattern: `a.b` must not be satisfied by `axb`.
+  run_case "drift_gitignore_name_is_literal" \
+    "1" "\.gitignore has no line models/a\.b/" \
+    "plant a.b; printf 'models/axb/\n' > .gitignore"
+
   # The environment is a sixth voice when set, as before.
   run_case "drift_environment" \
     "1" "FINETYPE_CI_MODEL=b" \
@@ -140,7 +145,7 @@ Then the cases, replacing the existing list inside `self_test`:
     "0" "aligned with models/default \(a\)" \
     "plant a; printf 'const DEFAULT_MODEL : &str=\"a\" ;\n' > crates/finetype-cli/build.rs"
 
-  # The gitignore line may sit among others and carry a trailing comment.
+  # The gitignore line may sit among others; it is matched whole.
   run_case "aligned_gitignore_among_others" \
     "0" "aligned with models/default \(a\)" \
     "plant a; printf 'models/z/\nmodels/a/\nmodels/y/\n' > .gitignore"
@@ -160,7 +165,7 @@ Also change `run_case` so the scratch tree no longer pre-creates `models/` (the 
 - [ ] **Step 2: Run the self-test to see the new cases fail**
 
 Run: `.github/scripts/check-ci-model-drift.sh --self-test`
-Expected: the `drift_ci_workflow`, `drift_release_workflow`, `drift_build_rs`, `drift_gitignore`, `ci_workflow_missing_variable` and `build_rs_missing_constant` cases FAIL (the script exits 0 or says "unset or empty" where a drift message was wanted); the `ci_model_unset` case FAILS because the current script prints the unset message rather than the aligned one.
+Expected: 16 of 19 cases FAIL. The committed script exits 0 with "unset or empty" whenever `FINETYPE_CI_MODEL` is unset, so every case that reads the tree fails: the drift cases that no longer set the variable exit 0 instead of 1, and the aligned cases print the unset message instead of the aligned one. Only `drift_environment`, `ci_model_whitespace` and `aligned_environment_matches` pass.
 
 - [ ] **Step 3: Replace `check_drift` with the five-pin version**
 
@@ -176,8 +181,9 @@ Replace the `check_drift` function and the header comment:
 #   .github/workflows/release.yml       — FINETYPE_CI_MODEL, the model the release builds
 #   crates/finetype-cli/build.rs        — DEFAULT_MODEL, the model a `cargo install`
 #                                         binary embeds, where no symlink ships
-#   .gitignore                          — the `models/<name>/` line keeping the
-#                                         weights out of git
+#   .gitignore                          — the `models/<name>/` line recording which
+#                                         model directory download-model.sh fills (the
+#                                         weight files are ignored by the globs above it)
 #
 # The build-script constant drifted from the symlink for a week in June 2026
 # with CI green, because this script read the environment and the symlink and
@@ -242,8 +248,8 @@ check_drift() {
     problems+=("${pin}=${value}")
   fi
 
-  if ! grep -qx "models/${target}/" .gitignore 2>/dev/null; then
-    problems+=(".gitignore has no line models/${target}/ — the weights are not ignored")
+  if ! grep -qxF -- "models/${target}/" .gitignore 2>/dev/null; then
+    problems+=(".gitignore has no line models/${target}/ — the tree does not record which model directory CI fills")
   fi
 
   local raw="${FINETYPE_CI_MODEL:-}"
@@ -279,7 +285,7 @@ Keep `run_case`, `self_test` (with Step 1's cases) and the `case "${1:-}"` dispa
 - [ ] **Step 4: Run the self-test and the real tree**
 
 Run: `.github/scripts/check-ci-model-drift.sh --self-test`
-Expected: `Results: 19 passed, 0 failed`.
+Expected: `Results: 20 passed, 0 failed`.
 
 Run: `.github/scripts/check-ci-model-drift.sh`
 Expected: `CI model aligned with models/default (m2v8m-s43): ci.yml, release.yml, build.rs, .gitignore.` and exit 0.
@@ -374,7 +380,7 @@ Branch: `no-priority-dimension` from `main` after Part A merges. Pull request ti
 - Modify: `crates/finetype-core/src/generator/mod.rs:65-80`, `:108-120`
 - Modify: `crates/finetype-core/src/checker.rs:33-34`, `:174-180`, `:239-247`, `:313`, `:471-474`, `:519-522`, and its test YAML
 - Modify: `crates/finetype-core/src/generator/tests.rs:13`, `:442`
-- Modify: `crates/finetype-core/src/validation_veto.rs`, `crates/finetype-core/src/validator.rs`, `crates/finetype-core/tests/precise_audit.rs` (test YAML lines only)
+- Modify: `crates/finetype-core/src/validation_veto.rs`, `crates/finetype-core/src/validator.rs`, `crates/finetype-core/tests/precise_audit.rs`, `crates/finetype-model/src/column/tests/{attractor,datetime,geo,identity,sharpen,substance}.rs` (test YAML lines only)
 - Modify: `crates/finetype-core/README.md:34`
 
 **Interfaces:**
@@ -468,8 +474,8 @@ sed -i '' '/^[[:space:]]*release_priority: [0-9]*[[:space:]]*$/d' \
   crates/finetype-core/src/taxonomy.rs crates/finetype-core/src/checker.rs \
   crates/finetype-core/src/generator/tests.rs crates/finetype-core/src/validation_veto.rs \
   crates/finetype-core/src/validator.rs crates/finetype-core/tests/precise_audit.rs \
-  crates/finetype-core/README.md
-grep -rn "release_priority" crates/finetype-core/ && echo "still referenced" || echo "clean"
+  crates/finetype-core/README.md crates/finetype-model/src/column/tests/*.rs
+grep -rn "release_priority" crates/ && echo "still referenced" || echo "clean"
 ```
 
 Then remove the remaining references the grep lists (the `assert_eq!` line and the generator and checker uses below).
@@ -612,8 +618,10 @@ Expected: the first test fails because `--all` is an unknown flag; the second fa
 
 ```bash
 sed -i '' '/^  release_priority: [0-9]*$/d' labels/definitions_*.yaml
-grep -c "release_priority" labels/definitions_*.yaml   # every file: 0
+grep -n "release_priority" labels/definitions_*.yaml   # one hit left: a notes sentence in container.object.json
 ```
+
+Delete that sentence, `Set release_priority to 3 (medium) due to complexity of recursive inference.`, from the `notes` of `container.object.json` in `labels/definitions_container.yaml`; the grep then prints nothing.
 
 Then add the field and the reason to the three leaves. In `labels/definitions_container.yaml`, on `container.object.s_expression`, after the `tier:` line add `  generate: on_request` and append to its `notes` block: `Generated on request only: the model does not predict this leaf, a rule recovers it, so its synthetic values exist for the training set's label coverage and not for the default output.` In `labels/definitions_identity.yaml`, on `identity.person.password`, after `tier:` add `  generate: on_request` and append to `notes`: `Generated on request only: a catch-all leaf whose synthetic values have no shape, kept for the training set's label coverage.` In `labels/definitions_representation.yaml`, on `representation.text.plain_text`, the same line and the same note.
 
@@ -729,9 +737,10 @@ WHAT IT DOES
        404), or "refused" (INSTALL serves a file the version refuses to load).
     2. For each row, download that DuckDB CLI release for this platform and
        run the README's two lines, INSTALL finetype FROM community; and
-       LOAD finetype; then SELECT finetype_version(), falling back to
-       SELECT ft_version() when the first name does not exist. Classify the
-       result the same way and compare.
+       LOAD finetype; then SELECT ft_version(), falling back to
+       SELECT finetype_version() when the first name does not exist (the
+       build that predates the ft_ names). Classify the result the same way
+       and compare.
     3. List every stable DuckDB release at or above the table's lowest
        version that has no row.
 
@@ -905,9 +914,10 @@ def probe(version: str, work: Path) -> Outcome:
     load_out = run_sql(exe, ext_dir, "LOAD finetype;")
     if "Error" in load_out:
         return classify_probe(install_out, load_out, "")
-    version_out = run_sql(exe, ext_dir, "LOAD finetype; SELECT finetype_version();")
+    version_out = run_sql(exe, ext_dir, "LOAD finetype; SELECT ft_version();")
     if "Catalog Error" in version_out:
-        version_out = run_sql(exe, ext_dir, "LOAD finetype; SELECT ft_version();")
+        # The build predates the ft_ names (the 1.5.0 row); its old name answers.
+        version_out = run_sql(exe, ext_dir, "LOAD finetype; SELECT finetype_version();")
     return classify_probe(install_out, load_out, version_out)
 
 
@@ -1068,7 +1078,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Files:**
 - Create: `.github/workflows/weekly-readme-version-table.yml`
-- Modify: `README.md:127` (the 1.5.0 row)
+- Modify: `README.md:126-130` (the 1.5.0 row, the 1.4 sentence under the table)
 
 - [ ] **Step 1: The workflow**
 
@@ -1140,6 +1150,18 @@ jobs:
             let report = '(no report file: the measurement itself failed; read the run log)';
             try { report = fs.readFileSync('report/report.md', 'utf8'); } catch (e) {}
             const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            // A stale cell stays stale until a person commits a new measurement,
+            // so the same finding lands on the open issue rather than a new one.
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, labels: label, state: 'open', per_page: 1,
+            });
+            if (open.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: open.data[0].number,
+                body: ['Re-measured again.', '', '```', report.trim(), '```', '', `Run: ${run}`].join('\n'),
+              });
+              return;
+            }
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -1173,14 +1195,29 @@ with:
 > | 1.5.0 | `ft_version()` does not exist — the build is `finetype 0.2.0`, from before the `ft_` verbs; `SELECT finetype_version()` answers |
 ```
 
-and in the paragraph under the table, change `so always check what you actually got with `SELECT ft_version();` rather than assuming.` to `so always check what you actually got with `SELECT ft_version();` (or `SELECT finetype_version();` on a build that predates the `ft_` names) rather than assuming.`
-
 This was measured on 2026-10-12 on `osx_arm64`: the 1.5.0 build lists `finetype`, `finetype_cast`, `finetype_detail`, `finetype_unpack` and `finetype_version`, and `SELECT finetype_version()` returns `finetype 0.2.0`.
+
+Then move the 1.4 facts from prose into rows. Replace the three `> `-prefixed lines under the table:
+
+```
+> Rows are the 1.5 line. The 1.4 maintenance line has the same gaps — 1.4.4 is served; 1.4.0 to
+> 1.4.3 and 1.4.5 are not — so always check what you actually got with `SELECT ft_version();`
+> rather than assuming.
+```
+
+with:
+
+```
+> Always check what you actually got with `SELECT ft_version();` (or `SELECT finetype_version();`
+> on a build that predates the `ft_` names) rather than assuming.
+```
+
+and add one row per 1.4 release (1.4.5 down to 1.4.0) below the 1.5.0 row, each cell written from Step 3's measurement in the same form as the 1.5 cells: a `finetype X.Y.Z` string, `no build published — `INSTALL` fails with HTTP 404`, or the refused-load form. Change the note's date line `Measured 2026-10-11 on `osx_arm64`` to the date of Step 3's run. The 1.5 cells stay as they were measured.
 
 - [ ] **Step 3: Run the real measurement once, locally**
 
-Run: `scripts/check_readme_version_table.py --measure --report /tmp/readme-table.md; echo "exit $?"`
-Expected on 2026-10-12: every 1.5 row matches and exit 0, unless the registry has republished since 2026-10-11, in which case the report names the cell; either way, paste the report into the pull request. It downloads seven DuckDB CLIs, so allow several minutes.
+Run it twice. First with placeholder 1.4 rows (cell text `to measure`), which the parser reports as unreadable while printing each measured outcome: `scripts/check_readme_version_table.py --measure --report /tmp/readme-table.md; echo "exit $?"`. Write each 1.4 cell from the printed outcome. Then run it again.
+Expected on the second run: every row matches and exit 0, unless the registry has republished since 2026-10-11, in which case the report names the 1.5 cell; either way, paste the report into the pull request. It downloads thirteen DuckDB CLIs, so allow several minutes.
 
 - [ ] **Step 4: Gates, commit, push, pull request**
 

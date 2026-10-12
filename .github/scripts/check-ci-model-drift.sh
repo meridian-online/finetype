@@ -7,8 +7,9 @@
 #   .github/workflows/release.yml  — FINETYPE_CI_MODEL, the model the release builds
 #   crates/finetype-cli/build.rs   — DEFAULT_MODEL, the model a `cargo install` binary
 #                                    embeds, where no symlink ships
-#   .gitignore                     — the `models/<name>/` line keeping the weights out
-#                                    of git
+#   .gitignore                     — the `models/<name>/` line recording which model
+#                                    directory download-model.sh fills (the weight
+#                                    files themselves are ignored by the globs above it)
 #
 # The build-script constant drifted from the symlink for a week in June 2026
 # with CI green, because this script read the environment and the symlink and
@@ -75,8 +76,8 @@ check_drift() {
     problems+=("${pin}=${value}")
   fi
 
-  if ! grep -qx "models/${target}/" .gitignore 2>/dev/null; then
-    problems+=(".gitignore has no line models/${target}/ — the weights are not ignored")
+  if ! grep -qxF -- "models/${target}/" .gitignore 2>/dev/null; then
+    problems+=(".gitignore has no line models/${target}/ — the tree does not record which model directory CI fills")
   fi
 
   local raw="${FINETYPE_CI_MODEL:-}"
@@ -193,6 +194,11 @@ self_test() {
     "1" "\.gitignore has no line models/a/" \
     "plant a; printf 'models/b/\n' > .gitignore"
 
+  # The name is a literal, not a pattern: `a.b` must not be satisfied by `axb`.
+  run_case "drift_gitignore_name_is_literal" \
+    "1" "\.gitignore has no line models/a\.b/" \
+    "plant a.b; printf 'models/axb/\n' > .gitignore"
+
   # The environment is a sixth voice when set, as before.
   run_case "drift_environment" \
     "1" "FINETYPE_CI_MODEL=b" \
@@ -236,7 +242,7 @@ self_test() {
     "0" "aligned with models/default \(a\)" \
     "plant a; printf 'const DEFAULT_MODEL : &str=\"a\" ;\n' > crates/finetype-cli/build.rs"
 
-  # The gitignore line may sit among others.
+  # The gitignore line may sit among others; it is matched whole.
   run_case "aligned_gitignore_among_others" \
     "0" "aligned with models/default \(a\)" \
     "plant a; printf 'models/z/\nmodels/a/\nmodels/y/\n' > .gitignore"
