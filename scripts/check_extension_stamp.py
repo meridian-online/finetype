@@ -2008,8 +2008,8 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
             "the release job no longer needing the extension build",
 
             {RELEASE_WORKFLOW: sub(
-                "    needs: [build, build-extension, taxonomy-catalogue]\n",
-                "    needs: [build, taxonomy-catalogue]\n")},
+                "    needs: [tag-guard, build, build-extension, taxonomy-catalogue]\n",
+                "    needs: [tag-guard, build, taxonomy-catalogue]\n")},
             EXIT_UNWIRED, "does not `needs:` the job that builds the extension")
         wiring_case(
             "the whole release job behind a condition",
