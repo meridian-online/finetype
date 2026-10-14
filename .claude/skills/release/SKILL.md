@@ -333,11 +333,11 @@ docs stay as they are until a deliberate refresh.
 
 ### crates.io (library crates — published by the release workflow)
 
-Pushing a `v*` tag publishes the five library crates (`finetype-core`, `finetype-model`,
+Pushing a `vX.Y.Z` tag publishes the five library crates (`finetype-core`, `finetype-model`,
 `finetype-mcp`, `finetype-train`, `finetype-cli`) to crates.io along with the binaries. The
-`publish-crates` job in `.github/workflows/release.yml` needs only the `release` job and runs
+`publish-crates` job in `.github/workflows/release.yml` needs only the `release` job (which waits on `tag-guard`, so a refused tag publishes no crate) and runs
 `.github/scripts/publish-crates.sh`; there is no separate publish step to run afterwards. A
-`v*` tag publishes them whether or not the release changed library-visible behaviour. A
+release tag publishes them whether or not the release changed library-visible behaviour. A
 taxonomy/validator change is **embedded into `finetype-core`** at build time, so the tag's
 publish is how it reaches crate consumers (a `labels/*.yaml` change like the 0.6.41 checksum
 guards is one).

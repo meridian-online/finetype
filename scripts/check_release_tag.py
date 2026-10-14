@@ -425,6 +425,12 @@ def _run_guard(lines: list[str], workdir: Path, tag: str) -> int:
 def check_rehearsal(root: Path) -> None:
     lines = _guard_lines(root)
     version = workspace_version(root / MANIFEST_REL)
+    if not TAG_RE.match(f"v{version}"):
+        raise Refused(
+            EXIT_CANNOT_RUN,
+            f"{MANIFEST_REL}'s workspace version `{version}` is not three dot-separated "
+            "numbers, so no tag could release this tree and there is nothing to rehearse",
+        )
     major, minor, patch = (int(p) for p in version.split("."))
     findings: list[str] = []
 
@@ -551,6 +557,8 @@ def self_test() -> int:
         control = wired_tree("control")
         expect("wiring: this tree", lambda: check_wiring(control), 0)
         expect("rehearsal: this tree", lambda: check_rehearsal(control), 0)
+        prerelease = wired_tree("prerelease", (MANIFEST_REL, '[workspace.package]\nversion = "', '[workspace.package]\nversion = "9.9.9-rc1"\nold_version = "'))
+        expect("rehearsal: a workspace version that is not three numbers", lambda: check_rehearsal(prerelease), EXIT_CANNOT_RUN)
 
         guard_call = f"python3 {SCRIPT_REL} {GUARD_ARGS}"
         wiring_cases = (

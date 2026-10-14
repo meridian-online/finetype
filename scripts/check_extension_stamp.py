@@ -132,7 +132,7 @@ UNTAGGED BUILDS
     unchanged: a pull-request build stamps its sha, which is a true statement
     about what was built and is what the community CI does for every other
     extension. `--tag` is never passed on an untagged build, and it takes both
-    workflows that pass it to say so. release.yml triggers on `tags: ['v*']`, so
+    workflows that pass it to say so. release.yml triggers only on `vX.Y.Z` tags, so
     every build it checks has one. MainDistributionPipeline.yml runs on pushes
     to main, on pull requests and on dispatch as well, so the trigger settles
     nothing there -- what does is the `GITHUB_REF_TYPE` test in its stamp step,
