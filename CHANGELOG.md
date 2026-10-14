@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **A release's notes are its `CHANGELOG.md` section, and only a version tag starts a release.** `release.yml` and `MainDistributionPipeline.yml` triggered on any tag starting with `v`, and a training-run tag, `v19-train-state`, started a release in June 2026 that failed partway. Both now trigger only on `v` followed by three dot-separated numbers. `release.yml`'s new first job, `tag-guard`, runs `scripts/check_release_tag.py`, and every other job waits on it: a tag whose number is not `Cargo.toml`'s workspace version, or that has no non-empty `## [X.Y.Z]` heading in `CHANGELOG.md`, fails there, before a binary is built, a release created or the Homebrew formula written. The release body is that heading's section in place of GitHub's generated notes. `ci.yml` checks the wiring and rehearses the guard step on every pull request, so a version bump without its changelog heading fails before it is tagged.
+
 ## [0.6.62] - 2026-10-13
 
 ### Added

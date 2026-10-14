@@ -2,7 +2,7 @@
 #
 # Publish the FineType library crates to crates.io, in dependency order.
 #
-# Coupled to the Release workflow: runs on every `v*` tag push, so a release and
+# Coupled to the Release workflow: runs on every `vX.Y.Z` tag push that passes `tag-guard`, so a release and
 # its crates.io publish are one action, not two. Properties that make that safe:
 #
 #   * Idempotent — a version already on crates.io is skipped, so re-running a tag

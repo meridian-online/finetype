@@ -225,9 +225,9 @@ git tag v0.6.X
 git push && git push --tags
 ```
 
-The `v*` tag triggers `.github/workflows/release.yml` which:
+A `vX.Y.Z` tag triggers `.github/workflows/release.yml`; no other tag shape does. Its first job, `tag-guard`, refuses the tag before anything is built if its number is not `Cargo.toml`'s version or `CHANGELOG.md` has no non-empty `## [X.Y.Z]` heading (see `docs/RELEASE.md`, "What a release tag must be"). Then it:
 - Builds cross-platform binaries (Linux x86/arm, macOS x86/arm, Windows)
-- Creates a GitHub release with auto-generated release notes
+- Creates a GitHub release whose body is the tag's `CHANGELOG.md` section
 - Updates the Homebrew tap formula (`meridian-online/homebrew-tap`)
 - Dispatches install script update to `install.meridian.online`
 
@@ -333,11 +333,11 @@ docs stay as they are until a deliberate refresh.
 
 ### crates.io (library crates — published by the release workflow)
 
-Pushing a `v*` tag publishes the five library crates (`finetype-core`, `finetype-model`,
+Pushing a `vX.Y.Z` tag publishes the five library crates (`finetype-core`, `finetype-model`,
 `finetype-mcp`, `finetype-train`, `finetype-cli`) to crates.io along with the binaries. The
-`publish-crates` job in `.github/workflows/release.yml` needs only the `release` job and runs
+`publish-crates` job in `.github/workflows/release.yml` needs only the `release` job (which waits on `tag-guard`, so a refused tag publishes no crate) and runs
 `.github/scripts/publish-crates.sh`; there is no separate publish step to run afterwards. A
-`v*` tag publishes them whether or not the release changed library-visible behaviour. A
+release tag publishes them whether or not the release changed library-visible behaviour. A
 taxonomy/validator change is **embedded into `finetype-core`** at build time, so the tag's
 publish is how it reaches crate consumers (a `labels/*.yaml` change like the 0.6.41 checksum
 guards is one).
