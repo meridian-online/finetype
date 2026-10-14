@@ -82,7 +82,8 @@ NOTES_JOB_OUTPUT = f"${{{{ steps.{GUARD_STEP_ID}.outputs.{NOTES_OUTPUT} }}}}"
 NOTES_BODY = f"${{{{ needs.{GUARD_JOB}.outputs.{NOTES_OUTPUT} }}}}"
 
 # Status functions that let a job run after a job it needs has failed.
-RUNS_AFTER_FAILURE = re.compile(r"\b(always|cancelled|failure)\s*\(")
+# GitHub reads function names case-insensitively, so this does too.
+RUNS_AFTER_FAILURE = re.compile(r"\b(always|cancelled|failure)\s*\(", re.IGNORECASE)
 TAG_RE = re.compile(r"^v([0-9]+\.[0-9]+\.[0-9]+)$")
 HEADING_RE = re.compile(r"^## \[([^\]]+)\]")
 
@@ -583,7 +584,7 @@ def self_test() -> int:
             ("generated notes switched back on", (RELEASE_WORKFLOW, f"          body: {NOTES_BODY}", "          generate_release_notes: true")),
             ("the release job stops needing the guard", (RELEASE_WORKFLOW, f"    needs: [{GUARD_JOB}, build,", "    needs: [build,")),
             ("update-homebrew made to run after a refusal", (RELEASE_WORKFLOW, "    name: Update Homebrew Formula\n    needs: release\n", "    name: Update Homebrew Formula\n    needs: release\n    if: ${{ always() }}\n")),
-            ("build made to run unless cancelled", (RELEASE_WORKFLOW, f"    needs: {GUARD_JOB}\n    runs-on: ${{{{ matrix.os }}}}", f"    needs: {GUARD_JOB}\n    if: ${{{{ !cancelled() }}}}\n    runs-on: ${{{{ matrix.os }}}}")),
+            ("build made to run unless cancelled, in capitals", (RELEASE_WORKFLOW, f"    needs: {GUARD_JOB}\n    runs-on: ${{{{ matrix.os }}}}", f"    needs: {GUARD_JOB}\n    if: ${{{{ !Cancelled() }}}}\n    runs-on: ${{{{ matrix.os }}}}")),
             ("the guard's job output renamed", (RELEASE_WORKFLOW, f"      {NOTES_OUTPUT}: {NOTES_JOB_OUTPUT}", f"      body: {NOTES_JOB_OUTPUT}")),
         )
         for label, edit in wiring_cases:
