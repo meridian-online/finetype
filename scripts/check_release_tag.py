@@ -81,6 +81,8 @@ NOTES_OUTPUT = "notes"
 NOTES_JOB_OUTPUT = f"${{{{ steps.{GUARD_STEP_ID}.outputs.{NOTES_OUTPUT} }}}}"
 NOTES_BODY = f"${{{{ needs.{GUARD_JOB}.outputs.{NOTES_OUTPUT} }}}}"
 
+# Status functions that let a job run after a job it needs has failed.
+RUNS_AFTER_FAILURE = re.compile(r"\b(always|cancelled|failure)\s*\(")
 TAG_RE = re.compile(r"^v([0-9]+\.[0-9]+\.[0-9]+)$")
 HEADING_RE = re.compile(r"^## \[([^\]]+)\]")
 
@@ -366,11 +368,20 @@ def check_wiring(root: Path) -> None:
             return True
         return any(needs_guard(n, seen | {job_id}) for n in job.needs)
 
-    for job_id in jobs:
-        if job_id != GUARD_JOB and not needs_guard(job_id):
+    for job_id, job in jobs.items():
+        if job_id == GUARD_JOB:
+            continue
+        if not needs_guard(job_id):
             findings.append(
                 f"{RELEASE_WORKFLOW}: job `{job_id}` does not wait on `{GUARD_JOB}`, so it "
                 "runs for a tag the guard refuses"
+            )
+        # `needs:` stops a job only under the default `success()` condition. A
+        # status function in its `if:` runs it after the guard has refused.
+        if RUNS_AFTER_FAILURE.search(job.condition):
+            findings.append(
+                f"{RELEASE_WORKFLOW}: job `{job_id}` carries `if: {job.condition}`, which "
+                f"runs it even when `{GUARD_JOB}` refuses the tag"
             )
 
     publishing = [s for s in steps if s.uses.startswith(PUBLISH_ACTION)]
@@ -571,6 +582,8 @@ def self_test() -> int:
             ("the guard call commented out", (RELEASE_WORKFLOW, f"        run: {guard_call}", f"        run: echo skipped # {guard_call}")),
             ("generated notes switched back on", (RELEASE_WORKFLOW, f"          body: {NOTES_BODY}", "          generate_release_notes: true")),
             ("the release job stops needing the guard", (RELEASE_WORKFLOW, f"    needs: [{GUARD_JOB}, build,", "    needs: [build,")),
+            ("update-homebrew made to run after a refusal", (RELEASE_WORKFLOW, "    name: Update Homebrew Formula\n    needs: release\n", "    name: Update Homebrew Formula\n    needs: release\n    if: ${{ always() }}\n")),
+            ("build made to run unless cancelled", (RELEASE_WORKFLOW, f"    needs: {GUARD_JOB}\n    runs-on: ${{{{ matrix.os }}}}", f"    needs: {GUARD_JOB}\n    if: ${{{{ !cancelled() }}}}\n    runs-on: ${{{{ matrix.os }}}}")),
             ("the guard's job output renamed", (RELEASE_WORKFLOW, f"      {NOTES_OUTPUT}: {NOTES_JOB_OUTPUT}", f"      body: {NOTES_JOB_OUTPUT}")),
         )
         for label, edit in wiring_cases:
