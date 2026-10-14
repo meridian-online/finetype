@@ -13,6 +13,22 @@ amalgamation risk that applies to a `duckdb` *pin bump* (see the binary-release
 pre-flight) does **not** apply to ingestion. Any CI job that runs `profile`/
 `validate` end-to-end must install the `duckdb` CLI (the smoke job does).
 
+## What a release tag must be
+
+A pushed tag starts a release only when it is `v` followed by three dot-separated numbers, such as `v0.6.63`. Both `release.yml` and `MainDistributionPipeline.yml` filter their tag trigger on `v[0-9]+.[0-9]+.[0-9]+`, so a tag such as `v19-train-state` or `v0.7.0-rc1` starts neither workflow.
+
+A version tag then has to pass `release.yml`'s first job, `tag-guard`, before anything else runs. Every other job in the workflow waits on it, so a refusal stops the run before a binary is built, a release is created or the Homebrew formula is written. `scripts/check_release_tag.py` refuses when:
+
+- the tag is not a version (exit 3), which is the second line of defence behind the trigger filter;
+- the tag's number differs from `version` under `[workspace.package]` in `Cargo.toml` (exit 4);
+- `CHANGELOG.md` has no `## [X.Y.Z]` heading for that number (exit 5), or the heading has nothing under it (exit 6).
+
+The release body is that heading's section of `CHANGELOG.md`, passed from `tag-guard` to `Create release` as a job output. GitHub's generated notes are off. So the changelog entry is what readers of the release page see: write it before tagging, not after.
+
+Pull requests check this without a tag. `ci.yml`'s `doc-surface` job runs `check_release_tag.py --wiring`, which reads both tag filters, the guard step and the release body out of the workflows, and `--release-rehearsal`, which executes the `tag-guard` job's own `run:` line against a copy of the tree with this tree's version and with each refusal. Both run on every pull request, so a version bump without its changelog heading fails before it can be tagged. `--self-test` mutates each of those and requires the check to refuse. What no check here can run is GitHub's own tag matching; `--wiring` reads the filter text, and the guard's exit 3 sits behind it.
+
+Earlier versions with no changelog entry are not backfilled; the guard only reads the version being tagged.
+
 ## Promotion flow (new model → release)
 
 After the v0.6.17 release we decoupled CI from the `models/default` symlink (see `spec 2026-04-20-ci-decouple-default-symlink`). The 3-step flow:

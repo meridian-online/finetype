@@ -109,6 +109,9 @@ gate_routing	.github/scripts/gate-self-tests.py --self-test	.github/scripts/gate
 extension_stamp	scripts/check_extension_stamp.py --self-test --artifact target/release/finetype.duckdb_extension	scripts/check_extension_stamp.py, Makefile, .gitignore, .gitmodules, .github/workflows/release.yml, .github/workflows/MainDistributionPipeline.yml, .github/scripts/gate-self-tests.py, .github/scripts/assemble-release-assets.sh
 release_wiring	scripts/check_extension_stamp.py --release-wiring	-	always
 release_rehearsal	scripts/check_extension_stamp.py --release-rehearsal --artifact target/release/finetype.duckdb_extension	-	always
+release_tag	python3 scripts/check_release_tag.py --self-test	scripts/check_release_tag.py, .github/workflows/release.yml, .github/workflows/MainDistributionPipeline.yml, .github/scripts/gate-self-tests.py
+release_tag_wiring	python3 scripts/check_release_tag.py --wiring	-	always
+release_tag_rehearsal	python3 scripts/check_release_tag.py --release-rehearsal	-	always
 
 label_stability	python3 scripts/check_label_stability.py --self-test	scripts/check_label_stability.py, tests/fixtures/label_stability/BASELINE.md, tests/fixtures/label_stability/gleif_corpus.csv, tests/fixtures/label_stability/naics_corpus.csv
 readme_version_table	scripts/check_readme_version_table.py --self-test	scripts/check_readme_version_table.py, README.md

@@ -2,7 +2,12 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    # `v` and three dot-separated numbers, and nothing else: GitHub's filter
+    # reads `+` as one or more of the character before it, so `v19-train-state`
+    # (a training-run tag that started a failed release in June 2026) and
+    # `v0.7.0-rc1` start no run. The `tag-guard` job below refuses the same
+    # shapes again, for the day this filter is loosened.
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
 
 permissions:
   contents: write
@@ -14,8 +19,34 @@ env:
   FINETYPE_CI_MODEL: m2v8m-s43
 
 jobs:
+  # Every other job waits on this one, so a tag that does not name this tree's
+  # release fails here, in about a minute, before anything is built, published
+  # or written into the tap. scripts/check_release_tag.py refuses a tag whose
+  # number differs from Cargo.toml's workspace version (exit 4) or has no
+  # heading in CHANGELOG.md (exit 5, or 6 when the heading is empty), and sets
+  # that heading's section as the `notes` output, which `Create release`
+  # publishes as the release body. An output rather than an uploaded artifact:
+  # every upload here is a release asset to check_release_asset_contract.py.
+  #
+  # This job runs only on a pushed tag. ci.yml runs the script's --wiring and
+  # --release-rehearsal on pull requests: the second executes this job's `run:`
+  # line, read out of this file, against a copy of the tree, so the line below
+  # is exercised without a tag. Keep the call on one line; --wiring requires it.
+  tag-guard:
+    name: The tag names this tree's version and its changelog entry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      notes: ${{ steps.guard.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tag, Cargo.toml and CHANGELOG.md agree
+        id: guard
+        run: python3 scripts/check_release_tag.py --tag "${GITHUB_REF_NAME}" --github-output "${GITHUB_OUTPUT}"
+
   build:
     name: Build ${{ matrix.target }}
+    needs: tag-guard
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -133,6 +164,7 @@ jobs:
   # reads that name back apart to find each platform's binary.
   build-extension:
     name: Build DuckDB extension
+    needs: tag-guard
     uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.3
     with:
       duckdb_version: v1.5.3
@@ -155,6 +187,7 @@ jobs:
   # would prove nothing five times over.
   taxonomy-catalogue:
     name: Generate + prove the taxonomy schema catalogue
+    needs: tag-guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -223,7 +256,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build, build-extension, taxonomy-catalogue]
+    needs: [tag-guard, build, build-extension, taxonomy-catalogue]
     runs-on: ubuntu-latest
     env:
       # Must equal build-extension's `duckdb_version` input above verbatim —
@@ -349,7 +382,10 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          # The tag's section of CHANGELOG.md, read by `tag-guard`. Not
+          # GitHub's generated notes, which list pull-request titles rather
+          # than what changed.
+          body: ${{ needs.tag-guard.outputs.notes }}
           # Default is false: an entry below that matched nothing would be
           # skipped with a warning and the release published without it. Every
           # entry matches in a normal run — the `.zip` from the windows leg,

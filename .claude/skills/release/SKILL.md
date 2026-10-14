@@ -225,9 +225,9 @@ git tag v0.6.X
 git push && git push --tags
 ```
 
-The `v*` tag triggers `.github/workflows/release.yml` which:
+A `vX.Y.Z` tag triggers `.github/workflows/release.yml`; no other tag shape does. Its first job, `tag-guard`, refuses the tag before anything is built if its number is not `Cargo.toml`'s version or `CHANGELOG.md` has no non-empty `## [X.Y.Z]` heading (see `docs/RELEASE.md`, "What a release tag must be"). Then it:
 - Builds cross-platform binaries (Linux x86/arm, macOS x86/arm, Windows)
-- Creates a GitHub release with auto-generated release notes
+- Creates a GitHub release whose body is the tag's `CHANGELOG.md` section
 - Updates the Homebrew tap formula (`meridian-online/homebrew-tap`)
 - Dispatches install script update to `install.meridian.online`
 

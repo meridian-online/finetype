@@ -513,6 +513,22 @@ jobs:
         # check in this repository green.
         run: scripts/check_extension_stamp.py --release-wiring
 
+      # The tag guard: release.yml's first job, which every other release job
+      # waits on. --wiring reads both workflows' tag filters and the guard's
+      # place in the release job graph; --release-rehearsal executes the
+      # `tag-guard` job's own `run:` line against a copy of this tree, once
+      # with this tree's version and once for each refusal. Both unguarded, as
+      # `always` rows, for the reason given above: the diffs likeliest to break
+      # them are a version bump without its CHANGELOG.md heading, or an edit to
+      # release.yml, and neither touches the guard script.
+      - name: Only a version tag starts a release, and the guard runs first
+        run: python3 scripts/check_release_tag.py --wiring
+      - name: The tag guard passes this tree's version and refuses the bad tags
+        run: python3 scripts/check_release_tag.py --release-rehearsal
+      - name: ...and the tag guard detects each defect it exists for
+        if: steps.route.outputs.release_tag == 'true'
+        run: python3 scripts/check_release_tag.py --self-test
+
       - run: rustup show
 
       - uses: Swatinem/rust-cache@v2

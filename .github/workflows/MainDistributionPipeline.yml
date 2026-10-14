@@ -16,7 +16,9 @@ name: DuckDB Extension Distribution
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    # Same filter as release.yml, and for the same reason: a tag that is not
+    # `v` and three numbers is not a release and builds nothing here.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   pull_request:
     branches: [main]
   workflow_dispatch:
