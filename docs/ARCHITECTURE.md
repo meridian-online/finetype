@@ -165,12 +165,9 @@ Citations to that retired substrate used to appear throughout the comments, docs
 scripts here as raw paths. They have been rewritten in place as plain prose — "spec
 2026-04-24-amount-variant-generators", "choice 0065" — because the path resolved only inside
 the private planning repo and never inside this one. The slug is the durable part: it still
-names the record to look up. `scripts/check-public-hygiene.sh` keeps the raw form out.
+names the record to look up.
 
-A handful of path VALUES survive, in research scripts that pass them to the filesystem and in
-two recorded measurement provenances. Those are listed with their reasons in
-`scripts/public-hygiene-allowlist.txt`: rewriting a string a program opens changes what it
-reads, which is not the same act as rewriting a sentence that describes it.
+Some path VALUES survive, in research scripts that pass them to the filesystem and in recorded measurement provenances. They are deliberate: rewriting a string a program opens changes what it reads, which is not the same act as rewriting a sentence that describes it.
 
 ---
 

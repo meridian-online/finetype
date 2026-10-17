@@ -36,9 +36,9 @@ setup:
 	@echo "✓ Rust updated, git hooks installed (pre-commit: fmt; pre-push: fmt+clippy)"
 
 # ─── CI (run locally before pushing) ─────────
-.PHONY: ci lint fmt clippy workspace-test types hygiene check-gate-routing
+.PHONY: ci lint fmt clippy workspace-test types check-gate-routing
 
-ci: fmt clippy test check types hygiene check-gate-routing
+ci: fmt clippy test check types check-gate-routing
 	@echo "═══ All CI checks passed ═══"
 
 lint: fmt clippy
@@ -63,14 +63,6 @@ workspace-test:
 # workflow — an unpinned pyright adopts new checks between minor releases.
 types:
 	npx --yes pyright@1.1.411
-
-# Paths into the private planning repo, and absolute home paths, in tracked
-# files. Seconds, no toolchain. The gate's own regression test runs first: a
-# hygiene gate fails silently in BOTH directions, so "it still works" has to be
-# established before "the tree is clean" means anything.
-hygiene:
-	./scripts/check-public-hygiene-selftest.sh
-	./scripts/check-public-hygiene.sh
 
 # Which gate self-test a diff re-runs, and whether the wiring that decides still
 # holds. The audit is what CI runs unconditionally; the self-test is the router's

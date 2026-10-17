@@ -105,9 +105,9 @@ SELFTEST_ENTRY = re.compile(
     re.MULTILINE,
 )
 
-# A file that IS somebody's self-test, by name. `scripts/check-public-hygiene.sh`
-# and `scripts/check-formula-asset.sh` take no `--self-test` flag; their proofs
-# are separate scripts, and this is how those are found.
+# A file that IS somebody's self-test, by name. `scripts/check-formula-asset.sh`
+# takes no `--self-test` flag; its proofs are separate scripts, and this is how
+# those are found.
 SELFTEST_NAME = re.compile(r"(-selftest\.(?:sh|py)$)|([-_]mutations\.(?:sh|py)$)")
 
 # A `run:` line that looks like a gate self-test being invoked. Used in the
