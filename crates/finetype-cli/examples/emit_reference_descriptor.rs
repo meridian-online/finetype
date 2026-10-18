@@ -3,13 +3,13 @@
 //!
 //! Nothing in CI runs `frictionless` — it is a Python package and this is a
 //! Rust workspace — so the gate that ships is
-//! `crates/finetype-mcp/tests/conformance.rs`, which asks
+//! `crates/finetype-cli/tests/datapackage_conformance.rs`, which asks
 //! `finetype-core::frictionless_vocabulary` the same question the reference
 //! implementation asks. This example is how that gate is confirmed to be
 //! asking it correctly, by hand, against the real thing:
 //!
 //! ```text
-//! cargo run -p finetype-mcp --example emit_reference_descriptor > dp.json
+//! cargo run -p finetype-cli --example emit_reference_descriptor > dp.json
 //! uv run --with frictionless==5.19.0 python -c \
 //!   'from frictionless import Package; Package("dp.json"); print("ACCEPTED")'
 //! ```
@@ -18,8 +18,8 @@
 //! emits the named columns, each `name=label`, which is how a descriptor
 //! already published can be re-emitted through the current engine and re-tested.
 
+use finetype_core::datapackage::{emit_datapackage, DatapackageColumn, ResourceMeta};
 use finetype_core::Taxonomy;
-use finetype_mcp::datapackage::{emit_datapackage, DatapackageColumn, ResourceMeta};
 
 fn main() {
     let taxonomy = Taxonomy::embedded().expect("embedded taxonomy");

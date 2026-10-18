@@ -10,7 +10,7 @@
 #   * Inert until enabled — with no CARGO_REGISTRY_TOKEN secret it warns and
 #     no-ops, so merging this leaves the release green and unchanged until the
 #     author opts in by adding the secret.
-#   * Dependency-ordered — core → model → {mcp, train} → cli. cargo publish
+#   * Dependency-ordered — core → model → train → cli. cargo publish
 #     (Rust >= 1.66) blocks until each crate lands in the index before the next
 #     one resolves its internal deps.
 #
@@ -28,7 +28,7 @@ VERSION="${GITHUB_REF_NAME#v}"
 UA="finetype-release-ci (+https://github.com/meridian-online/finetype)"
 
 # Dependency order — a crate's internal deps must already be on the index.
-CRATES=(finetype-core finetype-model finetype-mcp finetype-train finetype-cli)
+CRATES=(finetype-core finetype-model finetype-train finetype-cli)
 
 for crate in "${CRATES[@]}"; do
   if curl -sf -A "$UA" "https://crates.io/api/v1/crates/${crate}/${VERSION}" -o /dev/null; then

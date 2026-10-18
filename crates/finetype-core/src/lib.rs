@@ -6,10 +6,12 @@
 //! - `generator` — synthetic data generation for all 251 types
 //! - `checker` — taxonomy ↔ generator alignment validation
 //! - `tokenizer` — text tokenization for model training
+//! - `json_schema`, `datapackage` — JSON Schema and Frictionless Data Package emitters
 
 pub mod checker;
 pub mod checksum;
 pub mod constraint_fit;
+pub mod datapackage;
 pub mod datetime_format;
 pub mod enum_domain;
 pub mod fast_path;
@@ -17,6 +19,7 @@ pub mod frictionless_vocabulary;
 pub mod generator;
 pub mod infer;
 pub mod json_reader;
+pub mod json_schema;
 pub mod locale_data;
 pub mod membership;
 pub mod quality;

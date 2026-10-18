@@ -706,7 +706,7 @@ fn golden_taxonomy_json_schema_iso_date() {
 // emits a table-level JSON Schema document to stdout. The output replaces
 // the table-mode of the legacy `finetype schema <file.csv>` invocation
 // (deletion ships with card 0006). Helper module:
-// `crates/finetype-mcp/src/json_schema.rs`.
+// `crates/finetype-core/src/json_schema.rs`.
 
 /// Run `finetype profile -f <path> -o json-schema [extra args]` and return parsed JSON.
 fn run_profile_json_schema(csv_path: &Path, extra_args: &[&str]) -> Value {

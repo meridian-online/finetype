@@ -2,8 +2,8 @@
 
 use super::*;
 use finetype_cli::enum_emission::collect_unique_values_if_categorical;
+use finetype_core::datapackage;
 use finetype_core::enum_domain::{detect_enum_domain, EnumConfig, EnumDomain};
-use finetype_mcp::datapackage;
 use rayon::prelude::*;
 
 // Honest confidence signal (spec 2026-06-18-calibrated-confidence-abstention).
@@ -111,8 +111,8 @@ fn json_column_object(p: &ColProfile, verbose: bool) -> serde_json::Value {
     }
     // x-finetype-unknown-reason: why an `unknown` column stayed
     // untyped — parity with the json-schema surface (ab75b83) so
-    // the explanation reads identically across CLI json,
-    // json-schema and MCP. None for any typed column.
+    // the explanation reads identically across CLI json and
+    // json-schema. None for any typed column.
     if let Some(reason) = unknown_reason_for(p) {
         obj.insert("x-finetype-unknown-reason".to_string(), json!(reason));
     }

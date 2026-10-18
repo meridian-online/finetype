@@ -7,8 +7,8 @@ use clap::{Parser, Subcommand};
 use finetype_cli::transform_projection::{
     build_transform_projection, format_column_name, SchemaExtensions,
 };
+use finetype_core::json_schema;
 use finetype_core::{format_report, Checker, Generator, Label, Taxonomy};
-use finetype_mcp::json_schema;
 use serde_json::json;
 use std::io::{self, BufRead, Read, Write};
 use std::path::PathBuf;
@@ -27,19 +27,26 @@ mod embedded {
 ///
 /// The CLI no longer exposes a `--model` flag — every subcommand that
 /// loads a model reads this env var. The default is `models/default`,
-/// which mirrors the runtime default used by the DuckDB extension and
-/// MCP server.
+/// which mirrors the runtime default used by the DuckDB extension.
 fn resolve_model_path() -> PathBuf {
     std::env::var_os("FINETYPE_MODEL")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("models/default"))
 }
 
+/// Where agents and analysts connect: printed under `finetype --help` and by the
+/// `finetype mcp` stub.
+const AGENT_HELP: &str =
+    "AI agents: finetype runs no MCP server. Connect an agent through arcform's \
+`arc mcp`, which calls this binary's infer, profile, taxonomy, validate and \
+generate commands, and install the agent skills with `arc skills install`.";
+
 #[derive(Parser)]
 #[command(name = "finetype")]
 #[command(author = "Hugh Cameron")]
 #[command(version)]
 #[command(about = "Precision format detection for text data", long_about = None)]
+#[command(after_help = AGENT_HELP)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -355,7 +362,10 @@ enum Commands {
         nominations: Option<PathBuf>,
     },
 
-    /// Start MCP server for AI agent integration (stdio transport)
+    /// Removed: finetype no longer runs an MCP server. Kept so existing MCP
+    /// client configurations get a message naming `arc mcp` instead of an
+    /// unknown-command error.
+    #[command(hide = true)]
     Mcp,
 
     /// Train a multi-branch Sherlock-style model from FTMB feature data

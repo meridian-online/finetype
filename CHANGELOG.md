@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+
+- **finetype's MCP server and its two agent skills.** AI agents connect through arcform instead: `arc mcp` serves `infer`, `profile`, `taxonomy`, `validate` and `generate` by running this binary, and `arc skills install` installs the skills. `finetype mcp` is now a hidden stub that exits non-zero with a message naming both, so an MCP client still configured for it says where to go, and `finetype --help` ends with the same pointer. The `finetype-mcp` crate is no longer built or published; versions already on crates.io stay there. The `finetype-cli` and `finetype-pipeline` skills and `scripts/verify-cli-skill-coverage.sh` are deleted.
+
 ### Changed
+
+- **The JSON Schema and Data Package emitters moved into `finetype-core`**, as `finetype_core::json_schema` and `finetype_core::datapackage`, so a library user keeps them without the server crate. Their output is unchanged. `ResourceMeta::for_inline`, used only by the removed server, is gone. The Data Package conformance test now lives in `finetype-cli`.
 
 - **A release's notes are its `CHANGELOG.md` section, and only a version tag starts a release.** `release.yml` and `MainDistributionPipeline.yml` triggered on any tag starting with `v`, and a training-run tag, `v19-train-state`, started a release in June 2026 that failed partway. Both now trigger only on `v` followed by three dot-separated numbers. `release.yml`'s new first job, `tag-guard`, runs `scripts/check_release_tag.py`, and every other job waits on it: a tag whose number is not `Cargo.toml`'s workspace version, or that has no non-empty `## [X.Y.Z]` heading in `CHANGELOG.md`, fails there, before a binary is built, a release created or the Homebrew formula written. The release body is that heading's section in place of GitHub's generated notes. `ci.yml` checks the wiring and rehearses the guard step on every pull request, so a version bump without its changelog heading fails before it is tagged.
 

@@ -12,7 +12,7 @@ both tables in the Rust form the module holds them in.
 Nothing in CI runs this: the workspace is Rust and `frictionless` is a Python
 package, so adding it to CI would mean a Python toolchain on every pull request
 for a table that changes when the pin moves. The gate that ships is
-`crates/finetype-mcp/tests/conformance.rs`, and
+`crates/finetype-cli/tests/datapackage_conformance.rs`, and
 `crates/finetype-core/tests/frictionless_vocabulary.rs` pins the table against
 the profile. Re-run this by hand when either pin moves:
 

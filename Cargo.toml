@@ -4,7 +4,6 @@ members = [
     "crates/finetype-core",
     "crates/finetype-model",
     "crates/finetype-cli",
-    "crates/finetype-mcp",
     "crates/finetype-duckdb",
     "crates/finetype-eval",
     "crates/finetype-train",

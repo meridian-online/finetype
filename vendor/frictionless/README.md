@@ -43,7 +43,7 @@ directly. No drift, no subset to maintain.
     `FRICTIONLESS_TYPES` is the taxonomy's sixteen-entry declaration vocabulary
     and permits it, so `Frictionless::validate` is **weaker** here than the
     profile, not stricter. Pinned by
-    `crates/finetype-mcp/tests/conformance.rs`.
+    `crates/finetype-cli/tests/datapackage_conformance.rs`.
   - **Each branch's `constraints` has its own properties**, disjoint across type
     families: `pattern`/`minLength`/`maxLength` belong to `string`,
     `minimum`/`maximum` to the numeric and temporal types. The profile itself
@@ -77,7 +77,7 @@ directly. No drift, no subset to maintain.
   conformance test validates `profile -o datapackage` output against this file).
 - FineType: `finetype-core::frictionless_vocabulary`, which answers *which
   constraint keywords may sit beside this type* for both Data Package emitters
-  in the family — `finetype-mcp::datapackage` and dovetail's
+  in the family — `finetype-core::datapackage` and dovetail's
   `dovetail-core::datapackage`. It is a `finetype-core` export precisely so the
   second emitter adopts the answer rather than copying the table.
 - dovetail: Phase 2 of memo `2026-06-24-finetype-owns-frictionless-type-map` —

@@ -4,8 +4,8 @@
 //! Each column in the schema's `properties` is validated independently,
 //! producing per-row error records and per-column statistics.
 //!
-//! This module is consumed by the CLI `validate` command, MCP server,
-//! and DuckDB extension.
+//! This module is consumed by the CLI `validate` command and the DuckDB
+//! extension.
 
 use crate::quality::FileQualityGrade;
 use jsonschema::error::{TypeKind, ValidationErrorKind};
@@ -169,7 +169,7 @@ fn map_kind(kind: &ValidationErrorKind) -> (String, Option<String>) {
 
 /// Per-column enum membership, matched case-insensitively.
 ///
-/// The CLI/MCP validation path compiles a `jsonschema::Validator` per column,
+/// The CLI validation path compiles a `jsonschema::Validator` per column,
 /// but the jsonschema crate matches `enum` byte-exactly. Learned enums (gender,
 /// status) are sampled lower-case while the data is Title-case, so an exact
 /// match rejects valid values purely on letter-case. The taxonomy's own

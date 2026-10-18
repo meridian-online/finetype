@@ -18,8 +18,8 @@
 //!   Data Package — the vendored v2.0 profile sets `additionalProperties: false`
 //!   nowhere, so the extensions validate cleanly.
 
-use finetype_core::enum_domain::{detect_enum_domain, label_is_enum_keyword_eligible, EnumConfig};
-use finetype_core::{LabelPublication, PatternSource, Taxonomy};
+use crate::enum_domain::{detect_enum_domain, label_is_enum_keyword_eligible, EnumConfig};
+use crate::{LabelPublication, PatternSource, Taxonomy};
 use serde_json::{json, Map, Value};
 use std::collections::BTreeSet;
 
@@ -96,19 +96,6 @@ impl ResourceMeta {
             .to_ascii_lowercase();
         let (format, mediatype, text) = format_for_ext(&ext);
         Self::assemble(name, rel, format, mediatype, text, content)
-    }
-
-    /// Build resource metadata for inline data with no file path (MCP `data`
-    /// argument). Assumes CSV; `name`/`path` use a synthetic `data` stem.
-    pub fn for_inline(content: &[u8]) -> Self {
-        Self::assemble(
-            "data".into(),
-            "data.csv".into(),
-            "csv".into(),
-            "text/csv",
-            true,
-            content,
-        )
     }
 
     fn assemble(
@@ -305,7 +292,7 @@ struct FieldConstraints {
     off_type: Map<String, Value>,
 }
 
-/// A field's `constraints`, split as [`finetype_core::Taxonomy::publication_for`]
+/// A field's `constraints`, split as [`crate::Taxonomy::publication_for`]
 /// splits them, plus the one keyword that is a fact about THIS column rather
 /// than about its label: the closed-categorical `enum`.
 ///
@@ -353,7 +340,7 @@ fn constraints_for(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finetype_core::Taxonomy;
+    use crate::Taxonomy;
 
     fn test_taxonomy() -> Taxonomy {
         // A string/email with validation + pii, and a bare date/pattern.

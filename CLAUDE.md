@@ -60,7 +60,7 @@ The author reads fast and decides faster — write so they can act, not parse. B
 **Campaign head (NOT shipped):** `sherlock-v22-boundary-relu-s44` is the newest trained multi-branch model (5-branch: char+embed+stats+header+validation, ReLU+BatchNorm, val_acc 0.9305) and the training-target baseline the corpus diagnostic ran against. **Promotion to default was deferred** (spec `2026-05-26-v22-gated-direction-review`): gated cell-2 vs v19 = **−10.4% (Partial band)** on 503k columns — country **−31.5%**, region −12.8%, city −10.2% per `output/v22-direction-review/` — and it is not published to HuggingFace. So the diagnostic's gaps are *v22* false positives; on the shipped v19 default they may differ (re-baseline before treating them as ground truth — see v24 ac-00).
 **Codebase:** ~77k lines of Rust across 9 crates (measured 2026-06-10). Zero Python dependencies in build + runtime; the eval/training tooling under `scripts/` is ~110 Python files, not shipped.
 **Ingestion (v0.6.32, choice 0100):** `profile` and `validate` read CSV/Parquet by **shelling out to the external `duckdb` CLI** (`read_csv_input` in `crates/finetype-cli/src/profile_io.rs`; `-csv` output mode, `.nullvalue ''` pinned). The `duckdb` CLI is a **hard runtime dependency** (on PATH; clear actionable error otherwise; Homebrew `depends_on "duckdb"`). It is a shell-out, NOT a link — the release binary is unchanged across platforms (no `libduckdb` compile, no Windows/MSVC risk).
-**Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server.
+**Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged). finetype ships no MCP server or agent skills: agents connect through arcform's `arc mcp`, which shells out to `infer`/`profile`/`taxonomy`/`validate`/`generate` (keep those five stable), and get skills from `arc skills install`.
 
 ## Current sprint
 
@@ -110,7 +110,7 @@ To run the **B07 consumer-graph audit** before a load-bearing edit, use the **co
 
 ## Tier-2 references — load on demand
 
-**Before modifying the engine, model pipeline, taxonomy, MCP, DuckDB extension, training, or eval infrastructure:** Read `docs/ARCHITECTURE.md`.
+**Before modifying the engine, model pipeline, taxonomy, DuckDB extension, training, or eval infrastructure:** Read `docs/ARCHITECTURE.md`.
 
 **Before changing CLI surface, env vars, or build/test commands:** Read `docs/DEVELOPMENT.md`.
 

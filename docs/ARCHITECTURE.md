@@ -96,10 +96,9 @@ Pure Rust, no Python runtime, no external C++ dependencies. Integrates cleanly w
 
 | Crate | Role | Key Dependencies |
 |-------|------|------------------|
-| `finetype-core` | Taxonomy parsing, tokenizer, synthetic data generation, validation | `serde_yaml`, `fake`, `chrono`, `uuid`, `jsonschema` |
+| `finetype-core` | Taxonomy parsing, tokenizer, synthetic data generation, validation, JSON Schema and Data Package emitters | `serde_yaml`, `fake`, `chrono`, `uuid`, `jsonschema`, `sha2` |
 | `finetype-model` | Flat CharCNN + Sense→Sharpen inference, feature extraction, column-mode disambiguation, Model2Vec | `candle-core`, `candle-nn` |
-| `finetype-cli` | Binary: CLI commands (infer, profile, load, check, generate, taxonomy, schema, train, mcp) | `clap`, `csv` |
-| `finetype-mcp` | MCP server library (rmcp, 6 tools, taxonomy resources) | `rmcp`, `tokio` |
+| `finetype-cli` | Binary: CLI commands (infer, profile, validate, check, generate, taxonomy, train) | `clap`, `csv` |
 | `finetype-duckdb` | DuckDB extension: 5 scalar functions + 2 aggregates + 2 table macros with embedded model | `duckdb`, `libduckdb-sys` |
 | `finetype-eval` | Evaluation binaries (profile, actionability, GitTables, SOTAB) | `csv`, `duckdb`, `arrow` |
 | `finetype-train` | Pure Rust ML training (Sense, Entity, CharCNN, sibling-context attention, data pipeline) | `candle-core`, `candle-nn`, `duckdb` |
@@ -112,8 +111,7 @@ finetype-core  (no internal deps — taxonomy, generators, validation)
     |
 finetype-model (depends on core — CharCNN, tiered inference, column mode)
     |
-    +--- finetype-cli   (depends on core + model + mcp — CLI binary)
-    +--- finetype-mcp   (depends on core + model — MCP server library)
+    +--- finetype-cli   (depends on core + model — CLI binary)
     +--- finetype-duckdb (depends on core + model — DuckDB extension)
 
 finetype-eval  (standalone — eval binaries)
@@ -173,7 +171,7 @@ Some path VALUES survive, in research scripts that pass them to the filesystem a
 
 ## Sense Stage Implementation — Multi-Branch
 
-The Sense→Sharpen architecture has two stages: **Sense** (broad classification) and **Sharpen** (rule-based post-processing on top of the Sense output). The Sense stage is implemented by the **multi-branch model**; the default is **`m2v8m-s43`** (potion-8M dual-encoder, 244-label, shipped v0.6.36 — `sherlock-v19-relu-s42` was retired as the default on 2026-06-24 and remains only as the prior baseline). Multi-branch is the only inference path at the CLI / MCP / DuckDB call sites; the legacy Sense→Sharpen / late-fusion / CharCNN value-level paths were removed (choice 0107). See CLAUDE.md for the current default and gating policy.
+The Sense→Sharpen architecture has two stages: **Sense** (broad classification) and **Sharpen** (rule-based post-processing on top of the Sense output). The Sense stage is implemented by the **multi-branch model**; the default is **`m2v8m-s43`** (potion-8M dual-encoder, 244-label, shipped v0.6.36 — `sherlock-v19-relu-s42` was retired as the default on 2026-06-24 and remains only as the prior baseline). Multi-branch is the only inference path at the CLI / DuckDB call sites; the legacy Sense→Sharpen / late-fusion / CharCNN value-level paths were removed (choice 0107). See CLAUDE.md for the current default and gating policy.
 
 The Sharpen stage is unchanged across implementations: the rules, header hints, and disambiguation logic that follow Sense are shared infrastructure.
 
@@ -233,23 +231,11 @@ migration, and two of the six do not map by renaming. The `ft_detail` scalar and
 
 Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. The two aggregates share one state per group, a seeded reservoir of up to 100 values, so `ft_detail` explains the verdict `ft_profile` gives over the same rows.
 
-## MCP Server
+## AI agents
 
-`finetype mcp` starts an MCP server over stdio transport (rmcp v1.1.0). AI agents launch it as a subprocess.
+finetype serves no MCP server and ships no agent skills. arcform's `arc mcp` is the MCP server for the family: it runs this binary's `infer`, `profile`, `taxonomy`, `validate` and `generate` subcommands as subprocesses, so those five commands and their flags and output shapes are the contract arc depends on. Removing or renaming one breaks `arc mcp`; removing anything else does not. The agent skills that teach those commands ship from arcform (`arc skills install`).
 
-**Tools (8):**
-
-| Tool | Purpose |
-|---|---|
-| `infer` | Classify values (single or column mode with header) |
-| `profile` | Profile all columns in CSV file (path or inline data) |
-| `ddl` | Generate CREATE TABLE DDL from file profiling |
-| `taxonomy` | Search/filter type taxonomy by domain/category/query |
-| `schema` | Export JSON Schema — type-level (by key) or table-level (by file path/data) |
-| `validate` | Schema-driven CSV validation — returns valid/invalid counts + error details |
-| `generate` | Generate synthetic sample data for a type |
-
-**Resources:** `finetype://taxonomy`, `finetype://taxonomy/{domain}`, `finetype://taxonomy/{d}.{c}.{t}`. All tools return JSON primary content + markdown summary. File tools accept `path` or inline `data`.
+`finetype mcp` is a hidden stub kept for MCP clients still configured for the removed server: it exits non-zero with a message naming `arc mcp` and `arc skills install`, and `finetype --help` carries the same pointer.
 
 ## Training Infrastructure (Detail)
 
@@ -290,7 +276,7 @@ The CLI uses `FINETYPE_MODEL` env var (default: `models/default`); the eval scri
 | Sibling-context attention (training only) | `crates/finetype-model/src/sibling_context.rs` |
 | Table validator (core engine) | `crates/finetype-core/src/table_validator.rs` |
 | CLI entry point | `crates/finetype-cli/src/main.rs` |
-| MCP server + tools | `crates/finetype-mcp/src/` |
+| JSON Schema + Data Package emitters | `crates/finetype-core/src/json_schema.rs`, `crates/finetype-core/src/datapackage.rs` |
 | DuckDB extension | `crates/finetype-duckdb/src/` |
 | Training crate | `crates/finetype-train/src/` |
 | Training TUI + renderer trait | `crates/finetype-train/src/tui.rs` |

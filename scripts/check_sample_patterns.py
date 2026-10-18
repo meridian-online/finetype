@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Gate every published `samples:` value against its own leaf's `validation.pattern`.
 
-`samples:` is a publication surface. `crates/finetype-mcp/src/json_schema.rs`,
-`crates/finetype-mcp/src/resources.rs` and `crates/finetype-cli/src/cmd_taxonomy.rs`
-all read it, which is how a sample reaches the type registry, the MCP resources
-and the published taxonomy. `validation.pattern` is published beside it and
+`samples:` is a publication surface. `crates/finetype-core/src/json_schema.rs`
+and `crates/finetype-cli/src/cmd_taxonomy.rs` both read it, which is how a sample
+reaches the type registry and the published taxonomy. `validation.pattern` is published beside it and
 describes the same type. When the two contradict each other, one of them is a
 wrong claim about a data type, shipped to a stranger.
 

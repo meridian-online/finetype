@@ -333,8 +333,8 @@ docs stay as they are until a deliberate refresh.
 
 ### crates.io (library crates — published by the release workflow)
 
-Pushing a `vX.Y.Z` tag publishes the five library crates (`finetype-core`, `finetype-model`,
-`finetype-mcp`, `finetype-train`, `finetype-cli`) to crates.io along with the binaries. The
+Pushing a `vX.Y.Z` tag publishes the four library crates (`finetype-core`, `finetype-model`,
+`finetype-train`, `finetype-cli`) to crates.io along with the binaries. The
 `publish-crates` job in `.github/workflows/release.yml` needs only the `release` job (which waits on `tag-guard`, so a refused tag publishes no crate) and runs
 `.github/scripts/publish-crates.sh`; there is no separate publish step to run afterwards. A
 release tag publishes them whether or not the release changed library-visible behaviour. A
@@ -352,11 +352,12 @@ version stays public: settle what the library crates carry before you push the t
 on it:**
 
 ```
-core → model → mcp → train → cli
+core → model → train → cli
 ```
 
-`finetype-cli` depends on `finetype-mcp` + `finetype-train`, so those publish first even
-though their READMEs mark them internal/no-stability. The script walks the crates in that
+`finetype-cli` depends on `finetype-train`, so it publishes first even though its README
+marks it internal/no-stability. `finetype-mcp` is no longer built or published; its versions
+already on crates.io stay there. The script walks the crates in that
 order, and `cargo publish` blocks until each crate is in the index before the next one
 resolves its internal dependencies. It publishes with `--no-verify`, so the workflow does not
 compile the packaged crates.

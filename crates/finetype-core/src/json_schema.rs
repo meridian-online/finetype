@@ -3,20 +3,16 @@
 //! Two emitters live here, one per shape:
 //!
 //! - `emit_table_schema()` — table-level, one schema per CSV/Parquet file.
-//!   Call sites: CLI `profile -o json-schema` (card 0003), MCP `profile`
-//!   tool's `format: "json-schema"` branch (card 0003).
+//!   Call site: CLI `profile -o json-schema` (card 0003).
 //! - `emit_type_schema()` — per-type, one schema per taxonomy definition.
-//!   Call sites: CLI `taxonomy KEY -o json-schema` (card 0006), MCP
-//!   `taxonomy` tool's `format: "json-schema"` branch (choice 0101 —
-//!   absorbed from the retired `schema` tool's type-key branch).
+//!   Call site: CLI `taxonomy KEY -o json-schema` (card 0006).
 //!
 //! Both emitters share the verbosity contract below — exactly two
 //! `x-finetype-*` extensions on emitted schemas (`x-finetype-label` and
 //! `x-finetype-pii`).
 //!
-//! The helpers live in `finetype-mcp` because both `finetype-cli` (which
-//! depends on this crate) and the MCP tools need them, and the rally
-//! deliberately keeps them out of `finetype-core` for v0.6.19.
+//! The helpers live in `finetype-core` so a library consumer can emit the
+//! same schemas the CLI prints without depending on the CLI.
 //!
 //! ## Verbosity contract (PR #51)
 //!
@@ -40,8 +36,8 @@
 //! (card 0020 honest typing). Like the `--stats` diagnostics, it is an
 //! analyst-facing annotation outside the typed-column verbosity contract.
 
-use finetype_core::enum_domain::{detect_enum_domain, label_is_enum_keyword_eligible, EnumConfig};
-use finetype_core::{Definition, Taxonomy};
+use crate::enum_domain::{detect_enum_domain, label_is_enum_keyword_eligible, EnumConfig};
+use crate::{Definition, Taxonomy};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 
@@ -226,7 +222,7 @@ fn attach_stats(
 
     // Conservative standard `enum` keyword (a CLOSED validation constraint):
     // categorical/boolean only, to avoid enum_overfit (card 0014). Shared gate so
-    // the CLI json-schema and MCP emit the SAME keyword (was cardinality-only — an
+    // json-schema and datapackage emit the SAME keyword (was cardinality-only — an
     // enum_overfit hazard; spec 2026-06-17-enum-domain-emission).
     if enum_threshold > 0
         && cardinality <= enum_threshold
@@ -266,8 +262,7 @@ fn attach_enum_domain(prop: &mut serde_json::Map<String, Value>, col: &TableSche
 
 /// Emit a per-type JSON Schema document for a single taxonomy definition.
 ///
-/// Used by `taxonomy KEY -o json-schema` (CLI, card 0006) and the MCP
-/// `taxonomy` tool's `format: "json-schema"` branch (choice 0101). The emitter merges validation
+/// Used by `taxonomy KEY -o json-schema` (CLI, card 0006). The emitter merges validation
 /// keywords from the taxonomy definition (pattern, type, minLength, etc.)
 /// alongside the `$schema` / `$id` / `title` / `description` envelope and
 /// surfaces sample values as JSON Schema `examples`.
@@ -332,16 +327,15 @@ mod tests {
     use std::path::PathBuf;
 
     fn labels_path() -> PathBuf {
-        // Walk up from CARGO_MANIFEST_DIR (crates/finetype-mcp) to
+        // Walk up from CARGO_MANIFEST_DIR (crates/finetype-core) to
         // workspace root, then into `labels`.
         let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         manifest.parent().unwrap().parent().unwrap().join("labels")
     }
 
     // ac-03 parity / behaviour guard (spec 2026-06-17-enum-domain-emission).
-    // emit_table_schema is the SHARED json-schema emitter for both the CLI
-    // (`profile -o json-schema`) and the MCP profile tool, so this locks the
-    // unified enum policy for both surfaces at once.
+    // emit_table_schema is the json-schema emitter behind `profile -o
+    // json-schema`, so this locks its enum policy.
     #[test]
     fn table_schema_enum_policy_open_domain_denylist_conservative_keyword() {
         let taxonomy = Taxonomy::from_directory(labels_path()).expect("load taxonomy");
