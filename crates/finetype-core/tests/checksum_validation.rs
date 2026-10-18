@@ -44,7 +44,7 @@ fn workspace_root() -> PathBuf {
 }
 
 fn taxonomy() -> Taxonomy {
-    Taxonomy::from_directory(&workspace_root().join("labels"))
+    Taxonomy::from_directory(workspace_root().join("labels"))
         .expect("load taxonomy from labels/ — is labels/ present in the workspace?")
 }
 
