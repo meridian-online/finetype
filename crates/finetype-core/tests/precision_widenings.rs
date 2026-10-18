@@ -337,7 +337,7 @@ fn pvc_finance_coverage_lei_validates() {
     let lei_idx = headers
         .iter()
         .position(|&h| h == "lei")
-        .expect(&format!("lei column exists in {}", path.display()));
+        .unwrap_or_else(|| panic!("lei column exists in {}", path.display()));
 
     // Collect non-empty lei values
     let leis: Vec<&str> = lines
