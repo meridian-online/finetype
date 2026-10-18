@@ -819,7 +819,7 @@ jobs:
         with:
           # Distinct from the `test`/`clippy`/`check` caches: this job's
           # dependency graph is a superset (candle-transformers, libduckdb-sys,
-          # rmcp, ratatui) and sharing a key would evict theirs on every run.
+          # ratatui) and sharing a key would evict theirs on every run.
           prefix-key: v0-rust-workspace
       - name: Download model from HuggingFace
         # crates/finetype-cli/build.rs PANICS when models/default is absent or is

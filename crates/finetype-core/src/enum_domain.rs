@@ -6,8 +6,8 @@
 //! validation-enforced JSON-Schema `enum` keyword (an open domain there re-creates
 //! the `enum_overfit` failure mode, card 0014). Decoupled from the semantic label
 //! (0102): any bounded, non-denylisted column gets its domain regardless of type
-//! (a `country_code` column is an enum AND a country). Shared by the CLI and MCP
-//! emitters so the MCP shadows the CLI — one policy, not two.
+//! (a `country_code` column is an enum AND a country). Shared by the json-schema
+//! and datapackage emitters — one policy, not two.
 //!
 //! Predicate (calibrated, spec ac-00): `distinct <= max_distinct` AND
 //! `distinct/rows <= max_ratio` AND the label is not denylisted. Character-shape
@@ -70,10 +70,9 @@ pub fn is_enum_denylisted(label: &str) -> bool {
 /// on an open domain rejects legitimate new values. The OPEN domain goes to the
 /// descriptive `x-finetype-enum` extension instead (`detect_enum_domain`), which now
 /// surfaces by DEFAULT for any bounded column — so a controlled vocabulary is still
-/// visible even where the closed keyword does not apply. Shared so the CLI and MCP
-/// emit the SAME conservative keyword (the MCP shadows the CLI, not a separate feature
-/// set). Moved here from the CLI's `enum_emission.rs` so both surfaces depend on one
-/// policy.
+/// visible even where the closed keyword does not apply. Shared so every emitter
+/// emits the SAME conservative keyword. Moved here from the CLI's `enum_emission.rs`
+/// so every surface depends on one policy.
 ///
 /// NB `representation.discrete.categorical` is retired as an emitted leaf (choice 0102)
 /// and remapped to `word` at finalize, so it no longer reaches here in production; the

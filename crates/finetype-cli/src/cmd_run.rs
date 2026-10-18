@@ -40,52 +40,11 @@ pub(crate) fn cmd_infer_explain_batch(taxonomy_path: &std::path::Path) -> Result
     Ok(())
 }
 
-// The MCP server role (`FineTypeServer::new` + `serve_stdio`) is deprecated in
-// favour of arcform's `arc mcp`. The `finetype mcp` subcommand is kept working for
-// now, so this internal call site opts out of the deprecation lint at function scope.
-#[allow(deprecated)]
+/// `finetype mcp` is a stub: the MCP server was removed in favour of arcform's
+/// `arc mcp`. It exits non-zero so an MCP client configured for it reports the
+/// failure along with where to connect instead.
 pub(crate) fn cmd_mcp() -> Result<()> {
-    use finetype_model::{ColumnClassifier, ColumnConfig};
-
-    eprintln!("Starting FineType MCP server...");
-
-    let config = ColumnConfig {
-        sample_size: 100,
-        ..Default::default()
-    };
-
-    // Build the multi-branch column classifier (the shipped model).
-    let model_path = PathBuf::from("models/default");
-    let mb = load_multi_branch_classifier(&model_path)?;
-    eprintln!(
-        "Loaded multi-branch classifier ({} classes)",
-        mb.n_classes()
-    );
-    let mut column_classifier = ColumnClassifier::with_multi_branch(mb, config);
-    wire_model2vec(&mut column_classifier);
-
-    // Load taxonomy for validation-based disambiguation
-    let taxonomy_path = PathBuf::from("labels");
-    let mut taxonomy = load_taxonomy(&taxonomy_path)?;
-    taxonomy.compile_validators();
-    taxonomy.compile_locale_validators();
-    eprintln!(
-        "Loaded taxonomy ({} types, {} validators cached, {} with locale validators)",
-        taxonomy.labels().len(),
-        taxonomy.validator_count(),
-        taxonomy.locale_validator_count()
-    );
-    column_classifier.set_taxonomy(taxonomy.clone());
-
-    // Create MCP server with fully-configured classifier
-    let server = finetype_mcp::FineTypeServer::new(column_classifier, taxonomy);
-
-    eprintln!("FineType MCP server ready (stdio transport)");
-
-    // Run the async server
-    tokio::runtime::Runtime::new()?.block_on(server.serve_stdio())?;
-
-    Ok(())
+    anyhow::bail!("`finetype mcp` has been removed. {AGENT_HELP}")
 }
 
 /// Re-sharpen cached Sense predictions through the real Sharpen stack without the

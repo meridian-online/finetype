@@ -30,7 +30,7 @@ identity.person.email
 - **251 semantic types** across 7 domains — dates, times, IPs, emails, UUIDs, financial identifiers, currencies, geospatial formats, medical codes, and more
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing. 99.9% actionability across 120 tested types.
 - **Locale-aware** — validates 65 locales for postal codes, 46 for phone numbers, 27 for month/day names
-- **MCP server** — `finetype mcp` exposes type inference to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/)
+- **For AI agents** — through arcform: `arc mcp` serves finetype's commands over the [Model Context Protocol](https://modelcontextprotocol.io/), and `arc skills install` adds the agent skills (see [AI agents](#ai-agents))
 - **DuckDB extension** — 5 scalar functions, 2 aggregates and 2 table macros, a `profile → schema → validate` surface in SQL: `ft_profile()` types a column or every column of a table, `ft_detail()` explains why a column typed as it did, `ft_validate()` checks a table against a JSON Schema, plus `ft_infer()` / `ft_cast()` / `ft_unpack()` scalars. The full table, gated against the loaded extension's catalog, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#duckdb-extension)
 - **Schema-driven validation** — `finetype validate data.csv schema.json --db out.db --table orders` materialises typed DuckDB tables (per-column transforms applied) plus a `finetype_reject_errors` sidecar in a single pass
 - **Pure Rust** — no Python runtime or dependencies
@@ -80,9 +80,6 @@ finetype infer -i "bc89:60a9:23b8:c1e9:3924:56de:3eb1:3b90"
 
 # Profile a CSV file — detect all column types
 finetype profile -f data.csv
-
-# Start MCP server for AI agent integration
-finetype mcp
 
 # Show taxonomy (filter by domain, category)
 finetype taxonomy --domain datetime
@@ -232,21 +229,9 @@ SELECT ft_unpack(json_col) FROM my_table;
 
 On first use, the extension downloads model weights from HuggingFace and caches them locally. Set `FINETYPE_MODEL_DIR` to use a local model path instead.
 
-### MCP Server
+### AI agents
 
-FineType exposes type inference to AI agents via the [Model Context Protocol](https://modelcontextprotocol.io/). Configure your MCP client to launch `finetype mcp` as a stdio subprocess.
-
-The MCP tool surface mirrors the CLI (one capability surface, enforced by a parity-guard test):
-
-| Tool | Purpose |
-|---|---|
-| `infer` | Classify values (single or column mode with header) |
-| `profile` | Profile all columns in a CSV/Parquet/JSON file (path or inline data); `format: "json-schema"` for a table-level schema |
-| `taxonomy` | Search/filter the type taxonomy; with a `key`/glob + `format: "json-schema"`, export per-type JSON Schema |
-| `validate` | Schema-driven CSV validation — valid/invalid counts + error details |
-| `generate` | Generate synthetic sample data for a type |
-
-**Resources:** `finetype://taxonomy`, `finetype://taxonomy/{domain}`, `finetype://taxonomy/{domain}.{category}.{type}`
+finetype runs no MCP server and ships no agent skills. Agents connect through [arcform](https://github.com/meridian-online/arcform): `arc mcp` serves finetype's `infer`, `profile`, `taxonomy`, `validate` and `generate` to an MCP client by calling this binary, and `arc skills install` installs the skills that teach an agent how to use them. `finetype --help` says the same. `finetype mcp` remains only as a stub that exits non-zero with that message, so an MCP client still configured for it reports where to connect.
 
 ### As a Library
 
@@ -336,6 +321,6 @@ Contributions welcome! Please open an issue or PR.
 
 Part of the [Meridian](https://meridian.online) project.
 
-Built with [Candle](https://github.com/huggingface/candle) (Rust ML), [DuckDB](https://duckdb.org), [QSV](https://github.com/dathere/qsv) (CSV toolkit), [rmcp](https://github.com/modelcontextprotocol/rust-sdk) (MCP SDK), and [Serde](https://serde.rs).
+Built with [Candle](https://github.com/huggingface/candle) (Rust ML), [DuckDB](https://duckdb.org), [QSV](https://github.com/dathere/qsv) (CSV toolkit), and [Serde](https://serde.rs).
 
 Training TUI dashboard inspired by [Burn](https://github.com/tracel-ai/burn)'s training renderer ([`burn-train`](https://github.com/tracel-ai/burn/tree/main/crates/burn-train/src/renderer/tui)).

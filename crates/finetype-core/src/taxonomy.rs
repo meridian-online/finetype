@@ -1173,7 +1173,7 @@ pub fn frictionless_for(label: &str) -> Option<Frictionless> {
 // constraints routed by whether that declared type has a place for them.
 //
 // It is here, beside `frictionless_for`, because two independent emitters of
-// the Data Package spec read it — `finetype-mcp::datapackage` and dovetail's
+// the Data Package spec read it — `finetype-core::datapackage` and dovetail's
 // `dovetail-core::datapackage`. Answering it in either one would give that
 // emitter's callers the answer and leave the other guessing.
 // ═══════════════════════════════════════════════════════════════════════════

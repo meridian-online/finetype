@@ -25,6 +25,7 @@ jsonschema = { workspace = true }
 regex = { workspace = true }
 thiserror = { workspace = true }
 indexmap = { workspace = true }
+sha2 = { workspace = true }
 
 [features]
 # Embed the taxonomy YAMLs at compile time so crate consumers can read the

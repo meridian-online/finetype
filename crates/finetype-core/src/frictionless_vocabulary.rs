@@ -10,7 +10,7 @@
 //!
 //! Both Data Package emitters in the family ask this question, so it is
 //! answered here rather than in either of them:
-//! `finetype-mcp::datapackage` and dovetail's `dovetail-core::datapackage`.
+//! `finetype-core::datapackage` and dovetail's `dovetail-core::datapackage`.
 //!
 //! [`CONSTRAINT_VOCABULARY`] is pinned against
 //! `vendor/frictionless/datapackage-profile.json` by

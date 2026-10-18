@@ -5,9 +5,9 @@
 //! Mirrors dovetail-core/tests/conformance.rs. Uses the embedded taxonomy
 //! (feature `embedded-taxonomy`) so type/format come from the real map.
 
+use finetype_core::datapackage::{emit_datapackage, DatapackageColumn, ResourceMeta};
 use finetype_core::frictionless_vocabulary::{constraint_vocabulary, is_profile_field_type};
 use finetype_core::{frictionless_for, Taxonomy};
-use finetype_mcp::datapackage::{emit_datapackage, DatapackageColumn, ResourceMeta};
 use std::path::{Path, PathBuf};
 
 fn repo_root() -> PathBuf {

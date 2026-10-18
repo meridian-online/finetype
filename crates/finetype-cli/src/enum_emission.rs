@@ -27,7 +27,7 @@
 /// `representation.boolean.{binary,initials,terms}` — boolean variants
 /// receive the same gate treatment as categorical ones.
 pub fn label_is_enum_eligible(label: &str) -> bool {
-    // Delegates to the shared policy in finetype-core so the CLI and MCP emit the
+    // Delegates to the shared policy in finetype-core so every emitter emits the
     // same conservative `enum` keyword (spec 2026-06-17-enum-domain-emission).
     finetype_core::enum_domain::label_is_enum_keyword_eligible(label)
 }
