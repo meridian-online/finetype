@@ -43,9 +43,11 @@ jobs:
       # The Rust toolchain builds the cdylib; python3 backs the metadata-stamp
       # venv and the sqllogictest test runner.
       extra_toolchains: 'rust;python3'
-      # The 2.0 workflow's default `auto` mode skips platforms it judges
-      # redundant; every job downstream needs all five binaries.
+      # Every job downstream needs all five binaries. The 2.0 workflow's
+      # default `auto` mode skips platforms it judges redundant, and on the
+      # 2.0 tools osx_amd64 is opt-in, so it is named here.
       reduced_ci_mode: 'disabled'
+      opt_in_archs: 'osx_amd64'
       # Distribute Linux x86/arm, macOS x86/arm, Windows amd64. Everything else
       # is excluded: wasm_* and linux_amd64_musl per the community registry,
       # plus linux_arm64_musl, windows_arm64, and windows_amd64_mingw which the

@@ -173,9 +173,11 @@ jobs:
       ci_tools_version: 78bd1e4abbd543822166d5b07644751ba1fc6e8d
       extension_name: finetype
       extra_toolchains: 'rust;python3'
-      # The 2.0 workflow's default `auto` mode skips platforms it judges
-      # redundant; every job downstream needs all five binaries.
+      # Every job downstream needs all five binaries. The 2.0 workflow's
+      # default `auto` mode skips platforms it judges redundant, and on the
+      # 2.0 tools osx_amd64 is opt-in, so it is named here.
       reduced_ci_mode: 'disabled'
+      opt_in_archs: 'osx_amd64'
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
 
   # Generates the taxonomy schema catalogue from labels/definitions_*.yaml AT
