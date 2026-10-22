@@ -7,11 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.63] - 2026-10-22
+
 ### Removed
 
 - **finetype's MCP server and its two agent skills.** AI agents connect through arcform instead: `arc mcp` serves `infer`, `profile`, `taxonomy`, `validate` and `generate` by running this binary, and `arc skills install` installs the skills. `finetype mcp` is now a hidden stub that exits non-zero with a message naming both, so an MCP client still configured for it says where to go, and `finetype --help` ends with the same pointer. The `finetype-mcp` crate is no longer built or published; versions already on crates.io stay there. The `finetype-cli` and `finetype-pipeline` skills and `scripts/verify-cli-skill-coverage.sh` are deleted.
 
 ### Changed
+
+- **The DuckDB extension is built and tested for DuckDB 2.0.0.** The distribution, release and weekly-compatibility workflows call `duckdb/extension-ci-tools` at the head of its `v2.0-cyanoptera` branch, pinned by commit because that repo has no `v2.0.0` tag yet, with `duckdb_version: v2.0.0`. The release's extension assets are built and tested for 2.0.0, and CI installs the 2.0.0 CLI. The binary still uses DuckDB's stable C API at the 1.2 floor, so it loads on 1.5 as well as 2.0. Nothing changes for DuckDB 1.5: the community registry keeps serving what it already builds for it. The 2.0 build workflow makes macOS x86 opt-in and can skip platforms in its reduced-CI mode, so every call opts in to `osx_amd64` and turns that mode off. The gates that load the extension through the DuckDB CLI set `extension_directories` instead of `extension_directory`, which 2.0 deprecates with a warning on stdout.
+
+- **`ft_profile` and `ft_detail` take an aggregate-level `ORDER BY` on DuckDB 2.0.** DuckDB 2.0 fixes the C API aggregate update that read out of bounds under `ft_profile(col ORDER BY col)` (duckdb/duckdb#26455). `test/sql/finetype_order_by.test` runs both aggregates under one, with and without `GROUP BY`, over 200,000 rows. The fix is not in DuckDB 1.5, where the same statement still crashes the process, so the docs keep the limitation for 1.5.
+
+- **The README's DuckDB version table has a 2.0.0 row**, which serves finetype 0.6.62, and was re-measured on 2026-10-22. `scripts/check_readme_version_table.py` downloads 2.0's renamed CLI tarballs.
 
 - **The JSON Schema and Data Package emitters moved into `finetype-core`**, as `finetype_core::json_schema` and `finetype_core::datapackage`, so a library user keeps them without the server crate. Their output is unchanged. `ResourceMeta::for_inline`, used only by the removed server, is gone. The Data Package conformance test now lives in `finetype-cli`.
 
