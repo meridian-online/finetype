@@ -37,7 +37,7 @@ WHAT IS ASSERTED, AND WHAT IS ONLY RECORDED
     delimited columns, which is the defect #124 narrowed rather than closed. A
     100-value sample of a published column can still widen where the whole file
     does not. This figure is RECORDED and not asserted because it moves with the
-    duckdb version — this repository's CI installs v1.5.3 and a developer's
+    duckdb version — this repository's CI installs v2.0.0 and a developer's
     machine may hold any later one — and a gate that reddens on a dependency's
     patch release gets switched off. What IS refused is a pool where no window
     read at all: a measurement that did not happen is never a pass.

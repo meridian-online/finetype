@@ -38,7 +38,7 @@ It is registered in `.github/gate-self-tests.tsv` as `label_stability` and runs 
 
 **The figures above were re-derived by that gate on the build the frontmatter names**, replacing the `finetype 0.6.57` measurement that predated #124's sniff-first read. Every modal label survived the change of read path; four of the six agreement figures moved, and `naics_corpus` left 1.000.
 
-Every figure in the table then reproduced digit for digit on the x86_64 Linux runner under duckdb v1.5.3, against a measurement taken on arm64 macOS under v1.5.5. Both the seeded draw and the inference are reproducible across those two platforms; that is measured, not assumed, and it is why the seed is in the frontmatter.
+Every figure in the table then reproduced digit for digit on the x86_64 Linux runner under duckdb v1.5.3, against a measurement taken on arm64 macOS under v1.5.5, and again on that runner under duckdb v2.0.0 on 2026-10-22, when CI moved to it. Both the seeded draw and the inference are reproducible across those two platforms; that is measured, not assumed, and it is why the seed is in the frontmatter.
 
 ## The one-window-in-sixty widening is fixed, and this card is why
 
