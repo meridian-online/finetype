@@ -437,8 +437,8 @@ jobs:
         # Both gates below read the catalog / run the examples through this CLI.
         # Same pin as the smoke job.
         run: |
-          curl -fsSL -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
-          unzip -o duckdb.zip
+          curl -fsSL -o duckdb.tar.gz https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-cli-linux-amd64.tar.gz
+          tar xzf duckdb.tar.gz
           sudo mv duckdb /usr/local/bin/duckdb
           duckdb --version
       - name: Build the extension
@@ -931,8 +931,8 @@ jobs:
         # `validate` shell out to it for CSV/Parquet ingestion. smoke.sh exercises
         # `profile`, so the CLI must be on PATH.
         run: |
-          curl -fsSL -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
-          unzip -o duckdb.zip
+          curl -fsSL -o duckdb.tar.gz https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-cli-linux-amd64.tar.gz
+          tar xzf duckdb.tar.gz
           sudo mv duckdb /usr/local/bin/duckdb
           duckdb --version
       - name: Download model from HuggingFace
@@ -970,8 +970,8 @@ jobs:
         # A hard runtime dependency (choice 0100): `profile` shells out to it to
         # read a CSV, so every window this job draws goes through it.
         run: |
-          curl -fsSL -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
-          unzip -o duckdb.zip
+          curl -fsSL -o duckdb.tar.gz https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-cli-linux-amd64.tar.gz
+          tar xzf duckdb.tar.gz
           sudo mv duckdb /usr/local/bin/duckdb
           duckdb --version
       - name: Download model from HuggingFace

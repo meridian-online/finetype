@@ -540,7 +540,7 @@ def _duckdb(sql: str, extension: Path, tmp: Path) -> list:
     """Run one statement against a hermetic DuckDB with `json` and the build loaded."""
     if shutil.which("duckdb") is None:
         raise Fatal("duckdb is not on PATH — this gate reads the DuckDB catalog")
-    prelude = f"SET extension_directory='{tmp}';\nLOAD json;\nLOAD '{extension}';\n"
+    prelude = f"SET extension_directories=['{tmp}'];\nLOAD json;\nLOAD '{extension}';\n"
     proc = subprocess.run(
         ["duckdb", "-unsigned", "-no-init", "-json", "-c", prelude + sql],
         capture_output=True,

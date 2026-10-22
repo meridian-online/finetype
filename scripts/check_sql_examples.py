@@ -404,7 +404,7 @@ def model_preflight(root: Path) -> str | None:
 def _duckdb(
     script: str, cwd: Path, extension: Path, tmp: Path, extra_env: dict | None = None
 ) -> tuple[int, str, str]:
-    prelude = f"SET extension_directory='{tmp}';\nLOAD '{extension}';\n"
+    prelude = f"SET extension_directories=['{tmp}'];\nLOAD '{extension}';\n"
     proc = subprocess.run(
         ["duckdb", "-unsigned", "-no-init", "-json", "-c", prelude + script],
         capture_output=True,
