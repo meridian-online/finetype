@@ -149,7 +149,7 @@ fn ft_infer_reads_the_page_loop_as_the_cli_does() {
         .collect();
     let ext_dir = std::env::temp_dir().join(format!("finetype-ext-{}", std::process::id()));
     let sql = format!(
-        "SET extension_directory='{}';\nLOAD '{}';\nSELECT ft_infer(v) FROM (VALUES {}) t(i, v) ORDER BY i;",
+        "SET extension_directories=['{}'];\nLOAD '{}';\nSELECT ft_infer(v) FROM (VALUES {}) t(i, v) ORDER BY i;",
         ext_dir.display(),
         extension.display(),
         rows.join(", ")

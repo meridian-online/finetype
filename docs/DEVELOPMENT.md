@@ -8,7 +8,7 @@
 could not invoke duckdb CLI (is duckdb on PATH?): … Install it from https://duckdb.org/docs/installation
 ```
 
-Install it via your platform package manager (`brew install duckdb`, etc.) or from <https://duckdb.org/docs/installation>. This is a *shell-out*, not a link — the cross-platform release build is unchanged (no `libduckdb` compile/link), so the Windows/MSVC amalgamation issue that sank choice 0099 cannot occur. Tested against duckdb v1.5.3.
+Install it via your platform package manager (`brew install duckdb`, etc.) or from <https://duckdb.org/docs/installation>. This is a *shell-out*, not a link — the cross-platform release build is unchanged (no `libduckdb` compile/link), so the Windows/MSVC amalgamation issue that sank choice 0099 cannot occur. Tested against duckdb v2.0.0.
 
 ## Training (Pure Rust)
 
@@ -138,7 +138,7 @@ The metadata format follows DuckDB's extension specification: a custom section (
 
 ### 2. Community-extensions build contract (extension-ci-tools)
 
-This is the path `duckdb/community-extensions` CI uses when it rebuilds the registered extension. It is driven by the vendored `extension-ci-tools` submodule (pinned to `v1.5.3`) plus the `configure/` directory and the contract targets in the root `Makefile`. It needs Python 3 (for the venv + metadata script) and a Rust toolchain.
+This is the path `duckdb/community-extensions` CI uses when it rebuilds the registered extension. It is driven by the vendored `extension-ci-tools` submodule (pinned to the head of its `v2.0-cyanoptera` branch on 2026-10-22, since it has no `v2.0.0` tag yet) plus the `configure/` directory and the contract targets in the root `Makefile`. It needs Python 3 (for the venv + metadata script) and a Rust toolchain.
 
 ```bash
 git submodule update --init --recursive   # first time only
@@ -188,7 +188,7 @@ The surface is organised by *what you hand it*, not by how it is implemented:
 
 The header hint is the second argument. It feeds the model's header branch, which is why the table macro passes each column's own name: profiling a column called `email` is a different question from profiling the same values with no name attached.
 
-**An aggregate-level `ORDER BY` is not supported.** `ft_profile(col ORDER BY col)` and `ft_detail(col ORDER BY col)` read out of bounds inside DuckDB. The fault is in the C API's shared update path, not in either aggregate: the sorted path makes the state vector constant, and `CAPIAggregateUpdate` flattens the input vectors without flattening the state — its `combine` and `finalize` siblings both do. It is reported upstream and deferred. Order the statement instead.
+**An aggregate-level `ORDER BY` works on DuckDB 2.0 and crashes on 1.5.** On DuckDB 1.5, `ft_profile(col ORDER BY col)` and `ft_detail(col ORDER BY col)` read out of bounds inside DuckDB. The fault is in the C API's shared update path, not in either aggregate: the sorted path makes the state vector constant, and `CAPIAggregateUpdate` flattens the input vectors without flattening the state — its `combine` and `finalize` siblings both do. DuckDB 2.0 fixes it (duckdb/duckdb#26455), and the fix is not backported to 1.5, so on 1.5 order the statement instead. `test/sql/finetype_order_by.test` runs both aggregates under an aggregate `ORDER BY` on 2.0 in every distribution build. It is a file of its own, but the test runner reads all of `test/sql`, so what keeps it off 1.5 is that nothing builds 1.5 from a commit that carries it: CI builds only for 2.0, and the community registry's 1.5 builds stay pinned to an earlier commit.
 
 `ft_profile` reached this shape by giving up a scalar. It was `ft_profile(list(col))`, a scalar over an assembled `LIST`, because duckdb-rs exposes no aggregate-UDF registration API. DuckDB's C API does, and the extension already talks to it directly — but an aggregate cannot be registered at a name a scalar already holds, so the `list()` forms retired to free the name. `ft_profile(list(col))` becomes `ft_profile(col)`, and `ft_profile(list(col), h)` becomes `ft_profile(col, h)`.
 

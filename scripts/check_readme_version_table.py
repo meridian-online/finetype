@@ -45,6 +45,7 @@ import os
 import platform
 import re
 import subprocess
+import tarfile
 import sys
 import tempfile
 import urllib.request
@@ -173,31 +174,56 @@ def unmeasured(rows: list[Row], measured: dict[str, Outcome]) -> list[str]:
 
 # ── measurement ─────────────────────────────────────────────────────────────
 
-def cli_asset() -> str:
-    system, machine = platform.system(), platform.machine()
-    if system == "Darwin":
-        return "duckdb_cli-osx-universal.zip"
-    if system == "Linux":
-        return "duckdb_cli-linux-aarch64.zip" if machine in ("arm64", "aarch64") else "duckdb_cli-linux-amd64.zip"
+def _major(version: str) -> int:
+    return int(version.split(".")[0])
+
+
+def cli_asset(version: str, system: str | None = None, machine: str | None = None) -> str:
+    """The CLI release asset for this platform. DuckDB 2.0 renamed them and ships tarballs."""
+    system = system or platform.system()
+    machine = machine or platform.machine()
+    arm = machine in ("arm64", "aarch64")
+    if _major(version) >= 2:
+        if system == "Darwin":
+            return "duckdb-cli-osx-universal.tar.gz"
+        if system == "Linux":
+            return "duckdb-cli-linux-arm64.tar.gz" if arm else "duckdb-cli-linux-amd64.tar.gz"
+    else:
+        if system == "Darwin":
+            return "duckdb_cli-osx-universal.zip"
+        if system == "Linux":
+            return "duckdb_cli-linux-aarch64.zip" if arm else "duckdb_cli-linux-amd64.zip"
     raise SystemExit(f"unsupported platform {system}/{machine}")
 
 
+def extension_dir_setting(version: str, ext_dir: Path) -> str:
+    """Point DuckDB at ext_dir. 2.0 deprecates the singular setting and prints the warning on stdout."""
+    if _major(version) >= 2:
+        return f"SET extension_directories=['{ext_dir}'];"
+    return f"SET extension_directory='{ext_dir}';"
+
+
 def fetch_cli(version: str, into: Path) -> Path:
-    url = f"https://github.com/duckdb/duckdb/releases/download/v{version}/{cli_asset()}"
+    asset = cli_asset(version)
+    url = f"https://github.com/duckdb/duckdb/releases/download/v{version}/{asset}"
     into.mkdir(parents=True, exist_ok=True)
-    zip_path = into / f"duckdb-{version}.zip"
-    with urllib.request.urlopen(url, timeout=120) as resp, open(zip_path, "wb") as fh:
+    archive = into / asset
+    with urllib.request.urlopen(url, timeout=120) as resp, open(archive, "wb") as fh:
         fh.write(resp.read())
-    with zipfile.ZipFile(zip_path) as zf:
-        zf.extract("duckdb", into)
+    if asset.endswith(".tar.gz"):
+        with tarfile.open(archive) as tf:
+            tf.extract("duckdb", into, filter="data")
+    else:
+        with zipfile.ZipFile(archive) as zf:
+            zf.extract("duckdb", into)
     exe = into / "duckdb"
     exe.chmod(0o755)
     return exe
 
 
-def run_sql(exe: Path, ext_dir: Path, sql: str) -> str:
+def run_sql(exe: Path, version: str, ext_dir: Path, sql: str) -> str:
     proc = subprocess.run(
-        [str(exe), "-noheader", "-csv", "-c", f"SET extension_directory='{ext_dir}'; {sql}"],
+        [str(exe), "-noheader", "-csv", "-c", f"{extension_dir_setting(version, ext_dir)} {sql}"],
         capture_output=True, text=True, timeout=300,
     )
     return proc.stdout + proc.stderr
@@ -207,16 +233,16 @@ def probe(version: str, work: Path) -> Outcome:
     exe = fetch_cli(version, work / version)
     ext_dir = work / version / "ext"
     ext_dir.mkdir(parents=True, exist_ok=True)
-    install_out = run_sql(exe, ext_dir, "INSTALL finetype FROM community;")
+    install_out = run_sql(exe, version, ext_dir, "INSTALL finetype FROM community;")
     if "Error" in install_out:
         return classify_probe(install_out, "", "")
-    load_out = run_sql(exe, ext_dir, "LOAD finetype;")
+    load_out = run_sql(exe, version, ext_dir, "LOAD finetype;")
     if "Error" in load_out:
         return classify_probe(install_out, load_out, "")
-    version_out = run_sql(exe, ext_dir, "LOAD finetype; SELECT ft_version();")
+    version_out = run_sql(exe, version, ext_dir, "LOAD finetype; SELECT ft_version();")
     if "Catalog Error" in version_out:
         # The build predates the ft_ names (the 1.5.0 row); its old name answers.
-        version_out = run_sql(exe, ext_dir, "LOAD finetype; SELECT finetype_version();")
+        version_out = run_sql(exe, version, ext_dir, "LOAD finetype; SELECT finetype_version();")
     return classify_probe(install_out, load_out, version_out)
 
 
@@ -391,6 +417,20 @@ def self_test() -> int:
     case("render_missing_exits_1", code == 1 and "- 2.0.0" in text, text)
     text, code = render(4, "Darwin/arm64", [], [], "HTTPError: 403")
     case("render_release_list_failure_exits_3", code == 3 and "HTTPError: 403" in text and "not checked" in text, text)
+
+    # DuckDB 2.0 renamed its CLI assets and ships them as tarballs, and
+    # deprecates `extension_directory`, printing the warning into the output
+    # classify_probe reads. Asset names checked against the v1.5.6 and v2.0.0
+    # release listings on 2026-10-22.
+    case("asset_2x_darwin", cli_asset("2.0.0", "Darwin", "arm64") == "duckdb-cli-osx-universal.tar.gz")
+    case("asset_2x_linux_arm", cli_asset("2.0.0", "Linux", "aarch64") == "duckdb-cli-linux-arm64.tar.gz")
+    case("asset_2x_linux_x86", cli_asset("2.0.0", "Linux", "x86_64") == "duckdb-cli-linux-amd64.tar.gz")
+    case("asset_1x_darwin", cli_asset("1.5.6", "Darwin", "arm64") == "duckdb_cli-osx-universal.zip")
+    case("asset_1x_linux_arm", cli_asset("1.5.6", "Linux", "aarch64") == "duckdb_cli-linux-aarch64.zip")
+    case("dir_setting_2x_is_the_list", extension_dir_setting("2.0.0", Path("/x")) == "SET extension_directories=['/x'];")
+    case("dir_setting_1x_is_the_string", extension_dir_setting("1.5.6", Path("/x")) == "SET extension_directory='/x';")
+    row_2x = parse_table(FIXTURE + "> | 2.0.0 | `finetype 0.6.62` |\n")
+    case("cell_2x_row_reads", any(r.duckdb == "2.0.0" and r.outcome == Outcome("version", "0.6.62") for r in row_2x), str(row_2x))
 
     print(f"\nResults: {passed} passed, {failed} failed")
     return 0 if failed == 0 else 1

@@ -493,7 +493,10 @@ def duckdb_readings(extension: Path) -> dict:
             os.link(extension.resolve(), loadable)
         except OSError:
             shutil.copyfile(extension.resolve(), loadable)
-        prelude = f"SET extension_directory='{ext_dir}';\nLOAD '{loadable}';\n"
+        # `extension_directories` (a list), not `extension_directory`: DuckDB
+        # 2.0 deprecates the singular name and prints the warning on stdout,
+        # ahead of the JSON this reads. 1.5 accepts the list form too.
+        prelude = f"SET extension_directories=['{ext_dir}'];\nLOAD '{loadable}';\n"
         proc = subprocess.run(
             ["duckdb", "-unsigned", "-no-init", "-json", "-c", prelude + LOAD_SQL],
             capture_output=True,
@@ -728,14 +731,14 @@ ASSEMBLER = "assemble-release-assets.sh"
 # What an installation of the DuckDB CLI fetches. The step that LOADs an asset
 # needs `duckdb` on PATH, and the runner has none: an install step that goes
 # missing turns the load into "duckdb is not on PATH" on a tag and nowhere else.
-DUCKDB_CLI_MARK = "duckdb_cli-"
+DUCKDB_CLI_MARK = "duckdb-cli-"
 # How it is fetched. The marker alone is a MENTION, and both places that read it
-# were reading mentions: a comment naming `duckdb_cli-` satisfied the rung below
+# were reading mentions: a comment naming `duckdb-cli-` satisfied the rung below
 # that requires an install above the load, and exempted a step from the
 # rehearsal's enumeration. Measured: replacing the install step's `curl` with a
 # comment naming the marker and an `echo` left every check in this repository
 # green while a tag would exit 2 at the load, and a step whose entire `run:` was
-# `# same pin as the duckdb_cli- install above` / `exit 3` was never run by
+# `# same pin as the duckdb-cli- install above` / `exit 3` was never run by
 # anything. Same reason `_invocation_re` exists for the gate itself.
 DUCKDB_CLI_FETCH = "curl"
 
@@ -1252,9 +1255,9 @@ def check_release_rehearsal(root: Path, artifact: Path) -> list[str]:
     # pushed tag executed; a step added to this job tomorrow is another one, and
     # a rehearsal that quietly walked past it would read exactly like a
     # rehearsal that covered it. One kind of step is skipped: any step whose
-    # `run:` lines mention `duckdb_cli-`, meant as the DuckDB CLI install, which
+    # `run:` lines mention `duckdb-cli-`, meant as the DuckDB CLI install, which
     # is a `curl` and a `sudo mv` that no contributor's machine can run. That is
-    # matched by INVOCATION -- a `curl` fetching `duckdb_cli-...`, on a logical
+    # matched by INVOCATION -- a `curl` fetching `duckdb-cli-...`, on a logical
     # line -- so a step that merely names the marker in a comment is enumerated
     # like any other and has to be run or explained.
     unexercised = [
@@ -2127,16 +2130,16 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
         # ...and the same step LEFT IN PLACE with its fetch replaced by a
         # comment that names the asset. Everything the rung above reads is
         # still true -- the step exists, it is unguarded, it is above the load,
-        # and its `run:` contains `duckdb_cli-` -- and there is no duckdb on
+        # and its `run:` contains `duckdb-cli-` -- and there is no duckdb on
         # the runner. Measured green before this rung matched invocations, with
         # the tag exiting 2 at the load and publishing nothing.
         wiring_case(
             "the duckdb CLI fetch replaced by a comment naming the asset",
             {RELEASE_WORKFLOW: sub(
-                "          curl -fsSL -o duckdb.zip "
-                "https://github.com/duckdb/duckdb/releases/download/v1.5.3/"
-                "duckdb_cli-linux-amd64.zip\n",
-                "          # the duckdb_cli-linux-amd64.zip pin is shared with ci.yml\n"
+                "          curl -fsSL -o duckdb.tar.gz "
+                "https://github.com/duckdb/duckdb/releases/download/v2.0.0/"
+                "duckdb-cli-linux-amd64.tar.gz\n",
+                "          # the duckdb-cli-linux-amd64.tar.gz pin is shared with ci.yml\n"
                 '          echo "installing the duckdb CLI"\n')},
             EXIT_UNWIRED, f"fetching `{DUCKDB_CLI_MARK}...`")
 
@@ -2244,7 +2247,7 @@ label: str, edits: dict, want: int, expect_text: str = "") -> None:
                 "      - name: Something a tag alone would run\n"
                 "        shell: bash\n"
                 "        run: |\n"
-                "          # same pin as the duckdb_cli- install above\n"
+                "          # same pin as the duckdb-cli- install above\n"
                 "          exit 3\n" + publish_step)},
             EXIT_REHEARSAL, "neither executes nor knowingly exempts")
         rehearsal_case(

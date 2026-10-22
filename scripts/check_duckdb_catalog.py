@@ -122,7 +122,7 @@ def _duckdb(sql: str, extension: Path, tmp: Path) -> list:
     if shutil.which("duckdb") is None:
         raise Fatal("duckdb is not on PATH — this gate reads the extension catalog")
     prelude = (
-        f"SET extension_directory='{tmp}';\n"
+        f"SET extension_directories=['{tmp}'];\n"
         f"LOAD '{extension}';\n"
     )
     proc = subprocess.run(

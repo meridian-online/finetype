@@ -110,10 +110,11 @@ LOAD finetype;
 ```
 
 > **Version note:** the community channel builds per DuckDB version, so what you get depends on
-> which DuckDB you run — and all of it lags this repo. Measured 2026-10-12 on `osx_arm64`:
+> which DuckDB you run — and all of it lags this repo. Measured 2026-10-22 on `osx_arm64`:
 >
 > | DuckDB | `SELECT ft_version()` |
 > |---|---|
+> | 2.0.0 | `finetype 0.6.62` |
 > | 1.5.6 | `finetype 0.6.57` |
 > | 1.5.5 | `finetype 0.6.57` |
 > | 1.5.4 | `finetype 0.6.36` |
@@ -171,8 +172,9 @@ SELECT * FROM ft_profile('my_table');
 SELECT ft_profile(value) FROM my_table;
 -- {'type': datetime.date.mdy_slash, 'confidence': 0.833, 'duckdb_type': DATE}
 -- A second argument is a header hint, fed to the model's header branch:
--- ft_profile(value, 'value'). GROUP BY, FILTER and DISTINCT all work; an
--- aggregate-level ORDER BY inside the call does not — see docs/DEVELOPMENT.md.
+-- ft_profile(value, 'value'). GROUP BY, FILTER and DISTINCT all work. An
+-- aggregate-level ORDER BY inside the call works on DuckDB 2.0 and crashes
+-- DuckDB 1.5 — see docs/DEVELOPMENT.md.
 
 -- Ask WHY it typed the column that way. ft_detail is the same aggregate with the
 -- full answer, drawn from the same sample, so over the same rows it explains the

@@ -30,17 +30,24 @@ concurrency:
 jobs:
   duckdb-stable-build:
     name: Build extension binaries
-    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.3
+    # extension-ci-tools has no v2.0.0 tag yet: pinned to the head of its
+    # v2.0-cyanoptera branch on 2026-10-22. Move to the tag once one exists.
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@78bd1e4abbd543822166d5b07644751ba1fc6e8d
     with:
-      # Latest stable DuckDB. The artifact is stamped with the stable C API
+      # DuckDB 2.0.0, the latest stable. The artifact is stamped with the stable C API
       # (C_STRUCT) at the v1.2.0 floor by the in-tree Makefile, so one binary
-      # loads on DuckDB 1.2 through 1.5+ regardless of this build target.
-      duckdb_version: v1.5.3
-      ci_tools_version: v1.5.3
+      # loads on DuckDB 1.2 and later, 2.0 included, regardless of this build target.
+      duckdb_version: v2.0.0
+      ci_tools_version: 78bd1e4abbd543822166d5b07644751ba1fc6e8d
       extension_name: finetype
       # The Rust toolchain builds the cdylib; python3 backs the metadata-stamp
       # venv and the sqllogictest test runner.
       extra_toolchains: 'rust;python3'
+      # Every job downstream needs all five binaries. The 2.0 workflow's
+      # default `auto` mode skips platforms it judges redundant, and on the
+      # 2.0 tools osx_amd64 is opt-in, so it is named here.
+      reduced_ci_mode: 'disabled'
+      opt_in_archs: 'osx_amd64'
       # Distribute Linux x86/arm, macOS x86/arm, Windows amd64. Everything else
       # is excluded: wasm_* and linux_amd64_musl per the community registry,
       # plus linux_arm64_musl, windows_arm64, and windows_amd64_mingw which the
@@ -77,7 +84,7 @@ jobs:
       # artifacts/<artifact-name>/ and the glob below reads them back out.
       - uses: actions/download-artifact@v4
         with:
-          pattern: finetype-v1.5.3-extension-*
+          pattern: finetype-v2.0.0-extension-*
           path: artifacts
 
       - name: Read the stamp off each binary

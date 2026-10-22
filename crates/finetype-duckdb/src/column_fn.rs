@@ -18,9 +18,9 @@
 //! FROM values_table GROUP BY col_name;
 //! ```
 //!
-//! Neither aggregate supports an aggregate-level `ORDER BY`:
-//! `ft_profile(col ORDER BY col)` and `ft_detail(col ORDER BY col)` read out of
-//! bounds inside DuckDB (see `profile_agg.rs`).
+//! Both aggregates take an aggregate-level `ORDER BY` on DuckDB 2.0. On DuckDB
+//! 1.5, `ft_profile(col ORDER BY col)` and `ft_detail(col ORDER BY col)` read
+//! out of bounds inside DuckDB (see `profile_agg.rs`).
 
 use crate::type_mapping;
 

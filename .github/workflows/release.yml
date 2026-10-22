@@ -165,12 +165,19 @@ jobs:
   build-extension:
     name: Build DuckDB extension
     needs: tag-guard
-    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.3
+    # extension-ci-tools has no v2.0.0 tag yet: pinned to the head of its
+    # v2.0-cyanoptera branch on 2026-10-22. Move to the tag once one exists.
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@78bd1e4abbd543822166d5b07644751ba1fc6e8d
     with:
-      duckdb_version: v1.5.3
-      ci_tools_version: v1.5.3
+      duckdb_version: v2.0.0
+      ci_tools_version: 78bd1e4abbd543822166d5b07644751ba1fc6e8d
       extension_name: finetype
       extra_toolchains: 'rust;python3'
+      # Every job downstream needs all five binaries. The 2.0 workflow's
+      # default `auto` mode skips platforms it judges redundant, and on the
+      # 2.0 tools osx_amd64 is opt-in, so it is named here.
+      reduced_ci_mode: 'disabled'
+      opt_in_archs: 'osx_amd64'
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
 
   # Generates the taxonomy schema catalogue from labels/definitions_*.yaml AT
@@ -261,7 +268,7 @@ jobs:
     env:
       # Must equal build-extension's `duckdb_version` input above verbatim —
       # see that job's comment.
-      EXTENSION_DUCKDB_VERSION: v1.5.3
+      EXTENSION_DUCKDB_VERSION: v2.0.0
     steps:
       - uses: actions/checkout@v5
 
@@ -341,15 +348,15 @@ jobs:
       #
       # The cost of the split is that the install can now go missing on its own,
       # leaving the load below to exit 2 with "duckdb is not on PATH" on a tag.
-      # --release-wiring refuses that: it requires a step fetching duckdb_cli-*
+      # --release-wiring refuses that: it requires a step fetching duckdb-cli-*
       # above every `--load` step in this job.
       #
       # Same pin as ci.yml's `Install duckdb CLI` step.
       - name: Install duckdb CLI
         shell: bash
         run: |
-          curl -fsSL -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
-          unzip -o duckdb.zip
+          curl -fsSL -o duckdb.tar.gz https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-cli-linux-amd64.tar.gz
+          tar xzf duckdb.tar.gz
           sudo mv duckdb /usr/local/bin/duckdb
           duckdb --version
 

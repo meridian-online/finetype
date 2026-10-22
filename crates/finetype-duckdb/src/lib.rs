@@ -17,9 +17,10 @@
 //!   reservoir: why the column typed as it did → a JSON string with `type`,
 //!   `confidence`, `duckdb_type`, `samples`, `votes`, and `disambiguation` when a
 //!   rule fired. It shares `ft_profile`'s state and sampling, so over the same
-//!   rows it explains the verdict `ft_profile` gives. Neither aggregate supports
-//!   an aggregate-level `ORDER BY` — `ft_profile(col ORDER BY col)` and
-//!   `ft_detail(col ORDER BY col)` read out of bounds inside DuckDB.
+//!   rows it explains the verdict `ft_profile` gives. Both take an
+//!   aggregate-level `ORDER BY` on DuckDB 2.0; on DuckDB 1.5,
+//!   `ft_profile(col ORDER BY col)` and `ft_detail(col ORDER BY col)` read out
+//!   of bounds inside DuckDB (see `profile_agg.rs`).
 //! - `ft_validate(tbl, schema)` — table macro: one row per column, with reject counts
 //! - `ft_validate_text(value, schema)` — Per-cell validation →
 //!   `STRUCT(valid, constraint, message)`
