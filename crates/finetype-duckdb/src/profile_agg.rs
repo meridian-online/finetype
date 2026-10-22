@@ -52,17 +52,19 @@
 //! every value in the group keeps roughly the same chance of reaching the
 //! classifier however DuckDB happened to partition the scan.
 //!
-//! ## Unsupported: an aggregate-level `ORDER BY`
+//! ## An aggregate-level `ORDER BY`: DuckDB 2.0 only
 //!
-//! `ft_profile(col ORDER BY col)` and `ft_detail(col ORDER BY col)` read out of
-//! bounds inside DuckDB and can crash the process or return a silently wrong
-//! answer. The sorted-aggregate
+//! On DuckDB 1.5, `ft_profile(col ORDER BY col)` and `ft_detail(col ORDER BY
+//! col)` read out of bounds inside DuckDB and can crash the process or return
+//! a silently wrong answer. The sorted-aggregate
 //! path makes the state vector constant and the C API flattens only the inputs,
 //! so the callback receives a one-element state buffer with a multi-row count.
-//! It is upstream (duckdb/duckdb#21537, deferred), it is not specific to this
+//! It is upstream (duckdb/duckdb#21537), it is not specific to this
 //! aggregate, and the callback cannot detect it — the pointer and the count
-//! both arrive from DuckDB and look valid. The `ft_profile(tbl)` table macro
-//! never emits one.
+//! both arrive from DuckDB and look valid. DuckDB 2.0 fixes it
+//! (duckdb/duckdb#26455, not backported to 1.5), and
+//! `test/sql/finetype_order_by.test` runs both aggregates under one on 2.0.
+//! The `ft_profile(tbl)` table macro never emits one.
 
 use crate::column_fn::{format_column_result_json, PROFILE_SAMPLE_CAP};
 use crate::{get_column_classifier, type_mapping};

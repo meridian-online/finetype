@@ -1,0 +1,43 @@
+# name: test/sql/finetype_order_by.test
+# description: ft_profile and ft_detail under an aggregate-level ORDER BY
+# group: [finetype]
+#
+# Needs DuckDB 2.0 or later. On DuckDB 1.5 these statements read out of bounds
+# inside DuckDB and crash the process: the C API's shared aggregate update path
+# flattens the input vectors but not the constant state vector the sorted path
+# hands it. Fixed upstream in DuckDB 2.0 (duckdb/duckdb#26455), not backported
+# to 1.5.
+#
+# The test runner reads every file in test/sql, so a 1.5 build of a commit that
+# carries this file runs it too. None is made: this repository's CI builds only
+# for 2.0, and the community registry's 1.5 builds stay pinned to a commit from
+# before this file existed. A 1.5 build that did reach it would crash, which is
+# the true 1.5 behaviour, not a test fault.
+#
+# 200,000 rows in 7 groups is the size that crashed DuckDB 1.5.6. No type label
+# is asserted, for the reason finetype.test gives: labels are model-dependent.
+
+require finetype
+
+statement ok
+CREATE TABLE emails AS SELECT 'user' || i || '@example.com' AS x, i % 7 AS g FROM range(200000) r(i);
+
+query I
+SELECT ft_profile(x ORDER BY x).type IS NOT NULL FROM emails;
+----
+true
+
+query I
+SELECT count(*) FROM (SELECT ft_profile(x ORDER BY x DESC) FROM emails GROUP BY g);
+----
+7
+
+query I
+SELECT json_valid(ft_detail(x ORDER BY x)) FROM emails;
+----
+true
+
+query I
+SELECT count(*) FROM (SELECT ft_detail(x ORDER BY x DESC) FROM emails GROUP BY g);
+----
+7
