@@ -1,0 +1,136 @@
+# Validation rules that agree with their sources — design
+
+## Intent
+
+finetype is released and being downloaded. An external type review found 55 types whose validation rule disagrees with the source that defines the type. Most are too strict: uppercase UUIDs, `50 %` with the SI-prescribed space, eight-digit hex colours. A few are too loose: MGRS letters, out-of-range Plus Codes. One, `technology.identifier.tsid`, describes a different format altogether. Analysts see these disagreements as surprises: a column of uppercase UUIDs profiles as `alphanumeric_id` with "vetoed: uuid (0% pass)".
+
+These rules have a history of being fragile, where moving one upsets others. The cause is structural. One rule per type serves four roles at once:
+
+1. **Model input.** The multi-branch model's validation branch takes every type's pass rate as a feature (`crates/finetype-model/src/validation_features.rs`). These pass rates are recomputed from the *live* taxonomy at inference. The shipped model was trained on whatever the rules said when its training data was built, so every rule edit since then has shifted its inputs without a retrain. The LEI and compact-date rules have both changed since the default model was trained.
+2. **Discrimination in Sharpen.** The veto (`finetype-core/src/validation_veto.rs`, hard for the 92 allowlisted labels in `data/veto_safe.txt`), `schema_fail_demotion` (`column/value_sharpen.rs`), `ceded_leaf_recovery` and the guards in `column/guards.rs` all decide *which type a column is* from the same rule.
+3. **Published conformance.** The JSON Schema output copies the pattern. `finetype validate` grades files against it, and DuckDB's `ft_validate_text` grades cells against a schema fragment. Downstream tools build on these; one marks a column Unusable when more than 10% of its first 500 values fail.
+4. **The transform.** `CAST({col} AS UUID)` already accepts uppercase while the rule rejects it, so a type can disagree with itself.
+
+A change made for one role moves the other three. This design separates the roles, then fixes the 55 rules into the separated structure.
+
+## What Hugh decided
+
+- **finetype gives its best assessment of the type.** A column of uppercase UUIDs is a UUID column. A 2021 column carrying `HRK` (withdrawn in 2023) is a currency-code column, because the code was valid in its day. Recognition accepts every form the defining source allows.
+- **Validation tells the analyst the quality of the data.** It reports on values once the type is settled. It is a different question from recognition.
+- **finetype makes no usability verdicts.** Whether a column is usable depends on the analysis: a column that is 100% null can be the point when it marks non-expiry. finetype reports what is true of the values. The downstream tool decides what is usable. The 10% Unusable threshold belongs to that tool, and taking the fixed release is that tool's own work item.
+- **The analyst experience is the bar, not the gold score.** Losing a point or two of gold accuracy (0.850 today) is an acceptable price for fewer surprises. Gold covers only 55 of the 251 types, so it guards what it covers and cannot speak for the rest.
+- **finetype should attempt a type even when a column has one distinct value.** It performs better at higher cardinality, but a constant column still gets an assessment.
+- **Approach B** (below).
+
+## Goals
+
+1. Each type's published rule agrees with its defining source: it accepts what the source allows and rejects what the source does not define.
+2. Fixing a published rule does not move the shipped model. The model reads the rules it was trained on until a retrain adopts new ones on purpose.
+3. Validation reports a grade per value: **conforms**, **conforms with a note** (with the reason, such as non-canonical case or a withdrawn code), or **fails** (with the reason). The grade appears in `finetype validate`, in `ft_validate_text`, and in the JSON Schema output as far as JSON Schema can express it.
+4. All 55 disputed rules are resolved, the 13 on the veto allowlist first: percentage, uuid, file_size, boolean initials, locale_code, abbreviated_month, rfc_3339, iso_8601_offset, currency_code, username, blood_type, npi, tsid.
+5. A column whose every value is one valid value of a type keeps that type. For example, one uppercase UUID repeated 40 times profiles as uuid. Tests pin this for each fixed type.
+
+## Non-goals
+
+- Usability verdicts of any kind.
+- A per-type parser engine replacing regexes (approach C). Per-locale rules are added only where a disputed rule needs them.
+- Adding the veto to the DuckDB extension. The CLI and the extension can still report different types for one column; that is a known divergence, recorded, not fixed here.
+- Retraining the model. A retrain may later adopt the fixed rules; it is not part of this work.
+- Changing the minimum-distinct-value gates on existing Sharpen guards. Broader single-value behaviour beyond goal 5 is a follow-up.
+- The 55 types' description, notes, sample and transform disagreements, except where a rule fix needs them (tsid's samples and description must change with its rule).
+
+## Anti-goals
+
+These would make the work a failure even if every rule technically matched its source:
+
+- A rule fix that silently changes the model's predictions.
+- A loosened rule that makes a type confirm most random input, so that it becomes a new attractor in Sharpen. The Precision Principle still governs discrimination, even where it no longer governs the published rule.
+- A downstream tool's behaviour changing without a release note that says which types now accept or reject which forms.
+
+## Approaches
+
+**A. Fix the 55 rules one at a time in today's structure.** Cheapest per fix. But every fix moves the model, the veto, Sharpen and every published output at once, which is the fragility that prompted this work. Validation stays pass/fail, so it cannot report quality. Rejected.
+
+**B. Separate the roles, then fix the rules into the new structure.** Chosen. The model reads a frozen snapshot of the rules it was trained on. The published rule becomes the source-conformant definition. Validation gains grades. Sharpen keeps any discrimination stricter than the source in its own code. The cost is a structural change before any rule is fixed; the return is that rule fixes stop moving the model and analysts get a quality report.
+
+**C. Rewrite validation as a per-type rule engine** with parsers instead of regexes and locale rules for every type. Most thorough, but months of work across 251 types to fix 55. B can grow towards it type by type later. Rejected for now.
+
+## The design
+
+### 1. The model reads a frozen rule snapshot
+
+- At training-data build time, the training pipeline writes the validation block of every type in the model's `type_index_keys` into the model directory, as a snapshot file next to `config.json`.
+- At inference, `ValidationFeatureExtractor` compiles its validators from the model's snapshot, not from the live taxonomy. The snapshot is embedded in the release binary alongside the model, as the value-embedding model already is (`build.rs`), and is fetched by `download-model.sh`.
+- **The snapshot for the shipped default `m2v8m-s43` is today's live rules, frozen as they stand on `main` at 0.6.63.** This is the analyst-visible behaviour that gold (0.850) and the other bands were measured on, so landing the snapshot changes no output. Reconstructing the rules the model was actually trained on in June would change current behaviour, and is a decision for whichever retrain comes next.
+- A model directory without a snapshot keeps today's behaviour (live rules), so older models still load.
+- **The DuckDB extension uses the snapshot too** (Hugh, 2026-10-26). The extension downloads the model from Hugging Face using a fixed file list (`MODEL_FILES` in `crates/finetype-duckdb/src/lib.rs`). So the snapshot is published to the Hugging Face model repo, added to that list, and read by the extension's feature extraction. The extension is released by hand, so it needs its own release once the snapshot lands. An extension that finds no snapshot falls back to its compiled-in rules, as the CLI does.
+
+The proof that step 1 is a no-op: `profile` output on the gold corpus, the representative band and the external band is identical before and after.
+
+### 2. The published rule is the source-conformant definition
+
+The taxonomy's `validation` block (and `validation_by_locale`, `checksum`, `membership`) is the type's definition as its source gives it. It drives the veto, JSON Schema, `finetype validate`, `ft_validate_text` and Sharpen's conformance checks.
+
+Where the Precision Principle and the source collide, the published rule still follows the source. An example is a source that allows a shape too broad to tell the type apart from its neighbours. In that case the discrimination the type needs lives in a Sharpen detector, as `ticker` and `filename` already do (a shape validator plus a value detector in `finetype_core::structure`). Before a loosening lands, the fix measures whether the type now confirms most random input. If it does, the type's Sharpen use of the rule is re-pointed at a detector in the same change.
+
+### 3. Validation reports grades
+
+A value conforms, conforms with a note, or fails. Notes come from optional per-type sub-rules that sit beside the accepting rule:
+
+- a **canonical form**: for example, lowercase for UUIDs. A value that the accepting rule passes but the canonical form rejects gets the note "non-canonical form" and the form's name;
+- a **historic set**: for example, withdrawn ISO 4217 codes with their withdrawal dates. A historic value conforms, with the note "withdrawn" and the date.
+
+Failures keep today's reason tokens (`pattern`, `enum`, `min_length`, `checksum`…). `ft_validate_text` gains the grade and the note. In `finetype validate`, the reject records and quarantine output still hold failures only. Noted values are reported in a separate, additive section: per column, a count for each kind of note plus example values. A tool that counts rejects therefore sees no new failures. *(Builder-check call.)* Whether the schema-fragment interface can carry checksum and membership checks, which today only the CLI path applies, is settled by the builder.
+
+**Compatibility.** The existing boolean `valid` keeps meaning "not a failure", so a value that conforms with a note is valid. A tool reading only `valid` sees fewer failures after the fix and nothing new to parse. The grade is additive.
+
+### 4. Sharpen and the veto
+
+The veto, `schema_fail_demotion` and `ceded_leaf_recovery` read the published rule, so fixing a too-strict rule fixes the analyst's surprise directly. The uppercase-UUID column stops being vetoed. There is one exception: a type whose source-conformant rule confirms most random input (section 2). For such a type, the veto, `schema_fail_demotion` and `ceded_leaf_recovery` read its Sharpen detector instead of the published rule. Otherwise the loosened rule would let the model's overcalls through. This needs a per-type detector hook in those three places. *(Builder-check call.)* A fix that loosens a rule must check `ceded_leaf_recovery`'s exactly-one-match gate: two leaves that now both validate a sample make it defer, which is a recall loss to measure, not a crash.
+
+### 5. Fixing the 55
+
+The per-type findings are held in the project tracker, one item per type. Each item gives the disagreement and the source it cites. When sources conflict, the newest standard that obsoletes the others wins: RFC 9562 over RFC 4122 for UUIDs, for example. For tsid the definition comes from the tsid-creator reference implementation's README: 64 bits, written as 13 Crockford base32 characters.
+
+The rules are fixed in batches, after steps 1–3 land:
+
+1. the 13 veto-allowlist types;
+2. the rest, grouped by domain.
+
+Each fix:
+- cites its source, and carries ACCEPT and REJECT fixtures drawn from it (the `precision_widenings.rs` / `precision_tightenings.rs` pattern);
+- carries a one-distinct-value test (goal 5). It is a veto-and-Sharpen-level test with the type supplied, so it does not depend on the model. Where the model also predicts the type for a constant column, an end-to-end `profile` test is added. Types that only a minimum-distinct-value guard can reach are listed as recorded exceptions. *(Builder-check call.)*
+- is checked for whether it makes the type confirm most random input (anti-goal 2).
+
+Each child's disagreement is one of three kinds:
+
+- **too strict**: loosen the accepting rule, and put the old form in a canonical-form note if it is the source's recommended form;
+- **too loose**: tighten the rule, or move the excess into a historic set if it was once valid (currency codes);
+- **wrong format**: rewrite the definition. This is tsid. The model will keep predicting `tsid` for 32-hex columns until a retrain. Those columns then fail the new rule and are vetoed, which is correct (they are not TSIDs). Real Crockford-base32 TSIDs are not recognised until a Sharpen recovery or a retrain adds them. The builder decides whether a recovery belongs in this work.
+
+### 6. Gates and measurement
+
+Per batch:
+
+- `cargo test` (the precision fixtures above);
+- the gold corpus, re-scored, with every type whose result moved named. A drop of up to two points is acceptable when each moved column is explained by the source. The two points are cumulative across the whole job, measured from 0.850, not per batch. A batch that would take the total past two points stops for Hugh's ruling. *(Builder-check call.)*
+- where a fix shows a gold label was written against the old rule, for example uppercase-UUID columns labelled `alphanumeric_id`, the re-label goes through the existing panel-proposes, Hugh-ratifies route within the batch. Until it is ratified, the batch reports that row as a known wrong label. *(Builder-check call.)*
+- the representative and external bands (advisory);
+- the corpus-honest gate. It stays blocking for rule changes. Its oracle was gated by the *old* rules, so a NO-GO on a fixed type is adjudicated transition by transition against the defining source. An override is Hugh's explicit ruling, as with the npi/upc checksum guards.
+
+At the end: the release that carries the changes is re-scored on gold, with each moved type named. Its release notes list which types now accept or reject which forms, for downstream tools.
+
+## Constraints
+
+- One cargo build at a time on Hugh's Mac (16 GB).
+- `finetype`'s `infer`/`profile`/`taxonomy`/`validate`/`generate` surfaces stay stable for `arc mcp`; additions are additive.
+- Rules must remain value-based. No header-based discrimination is added.
+- Public repo: no private planning references in tracked text.
+
+## Left to the builder
+
+- The snapshot file's format and name, and how the training pipeline writes it.
+- The schema of canonical-form and historic-set sub-rules in the taxonomy YAML, and how they surface in JSON Schema (an `x-finetype-*` extension is the expected route).
+- The exact field names of the grade and note in `ft_validate_text` and reject records.
+- Batch boundaries after the first.
+- Whether tsid gets a Sharpen recovery in this work.
