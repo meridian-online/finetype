@@ -60,10 +60,10 @@ No code. This records the numbers every later task compares against.
 
 **Interfaces:**
 - Produces:
-  - `pub struct ValidatorSnapshot { pub format: u32, pub validations: BTreeMap<String, Validation> }` (Serialize/Deserialize; `format` = 1)
+  - `pub struct ValidatorSnapshot { pub format: u32, pub keys: Vec<String>, pub validations: BTreeMap<String, Validation> }` (Serialize/Deserialize; `format` = 1)
   - `pub const SNAPSHOT_FILE: &str = "validation_snapshot.json";`
   - `impl ValidatorSnapshot { pub fn from_taxonomy(tax: &Taxonomy, keys: &[String]) -> Self; pub fn from_json(bytes: &[u8]) -> Result<Self, ValidatorError>; pub fn to_json_pretty(&self) -> String; pub fn compile(&self) -> Result<HashMap<String, CompiledValidator>, ValidatorError>; pub fn keys(&self) -> impl Iterator<Item=&String> }`
-  - A key whose type has no `validation` is present in `keys` but absent from `validations`.
+  - `keys` holds every key passed to `from_taxonomy`, in order. A key whose type has no `validation` is present in `keys` but absent from `validations`. `from_json` refuses a wrong `format`, duplicate keys, and a `validations` label not in `keys`.
 
 - [ ] **Step 1: Write the failing tests**
   - `snapshot_round_trips_and_compiles_like_live`: load `labels/`, build a snapshot over `tax.labels()`, then serialise and parse it back. For each of `uuid`, `currency_code` and `percentage`, `compile()[label].is_valid(v)` equals `tax.get_validator(label).unwrap().is_valid(v)` for the type's own `samples` and for `"not-a-value"`.
@@ -84,7 +84,7 @@ No code. This records the numbers every later task compares against.
 - Consumes: `ValidatorSnapshot`, `SNAPSHOT_FILE` (Task 1)
 - Produces:
   - `ValidationFeatureExtractor::with_snapshot(type_keys: Vec<String>, snapshot: &ValidatorSnapshot) -> Result<Self, InferenceError>`, which errors when `snapshot.keys()` ≠ `type_keys` as sets.
-  - `extract(&self, values, taxonomy)` uses its pinned validators when present, and `taxonomy.get_validator` otherwise. The signature is unchanged.
+  - `extract(&self, values, taxonomy)` uses its pinned validators when present, and `taxonomy.get_validator` otherwise. When pinned, a key listed in the snapshot with no rule is a frozen "no rule" (feature 0.0), never a fall-back to the live taxonomy. The signature is unchanged.
   - `MultiBranchClassifier::from_bytes` gains a trailing `snapshot: Option<&[u8]>` parameter. `load` reads `dir.join(SNAPSHOT_FILE)` if it exists.
 
 - [ ] **Step 1: Write the failing tests**
