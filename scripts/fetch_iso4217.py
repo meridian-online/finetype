@@ -7,7 +7,9 @@ Two SIX files feed the rule:
 1. list-one.xml   - the codes in current use. Every one is accepted.
 2. list-three.xml - historic codes with their withdrawal date. A historic
    code is kept when it was withdrawn on or after 1999-01-01, is not in
-   list one, and carries a month-precise date; it is accepted and graded
+   list one, and carries a withdrawal date reducible to a month (a full date
+   is cut to its month; a year-only or range date at or after 1999 stops the
+   script, earlier ones are skipped); it is accepted and graded
    `Noted(Withdrawn, "withdrawn YYYY-MM")` through validation_notes.historic.
    A code listed several times takes its latest withdrawal date. A code in
    both lists (a reused code) belongs to list one only.
@@ -58,10 +60,19 @@ def build():
     withdrawn = {}
     for e in ET.fromstring(curl(LIST_THREE).encode()).iter("HstrcCcyNtry"):
         code, when = e.findtext("Ccy"), (e.findtext("WthdrwlDt") or "").strip()
-        # Month-precise dates only; the year-only and range forms are all
-        # pre-1999 and fall below the cutoff anyway.
-        if code and re.fullmatch(r"\d{4}-\d{2}", when):
-            withdrawn[code] = max(withdrawn.get(code, ""), when)
+        if not code:
+            continue
+        month = re.fullmatch(r"(\d{4}-\d{2})(?:-\d{2})?", when)
+        if month:
+            # A full date (2025-03-31) reduces to its month.
+            withdrawn[code] = max(withdrawn.get(code, ""), month.group(1))
+            continue
+        # Year-only and range forms cannot be reduced to a month. They are
+        # skipped when wholly before the cutoff; otherwise stop rather than
+        # silently drop a code.
+        years = [int(y) for y in re.findall(r"\d{4}", when)]
+        if not years or max(years) >= int(CUTOFF[:4]):
+            raise RuntimeError(f"{code}: withdrawal date {when!r} cannot be reduced to a month")
     historic = {c: d for c, d in withdrawn.items() if c not in one and d >= CUTOFF}
     if not one or not historic:
         raise RuntimeError("empty list one or historic set; refusing to rewrite")
