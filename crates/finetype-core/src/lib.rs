@@ -29,6 +29,7 @@ pub mod taxonomy;
 pub mod tokenizer;
 pub mod validation_veto;
 pub mod validator;
+pub mod validator_snapshot;
 
 pub use checker::{format_report, CheckReport, Checker};
 pub use constraint_fit::{fit_pattern_to_observed, PatternFit, MAX_OBSERVED_SHAPES};

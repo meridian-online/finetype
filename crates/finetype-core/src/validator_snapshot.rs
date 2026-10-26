@@ -1,0 +1,139 @@
+//! A frozen, serialisable copy of the taxonomy's `validation` blocks.
+//!
+//! A model is trained against the rules as they stood at training time. The
+//! snapshot is written beside the model so inference can compile those rules
+//! rather than whatever the live taxonomy says today.
+
+use crate::taxonomy::{Taxonomy, Validation};
+use crate::validator::{CompiledValidator, ValidatorError};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
+
+/// File name of the snapshot inside a model directory.
+pub const SNAPSHOT_FILE: &str = "validation_snapshot.json";
+
+const SNAPSHOT_FORMAT: u32 = 1;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidatorSnapshot {
+    pub format: u32,
+    /// Validation block per label key. A type with no validation is absent.
+    pub validations: BTreeMap<String, Validation>,
+}
+
+impl ValidatorSnapshot {
+    /// Freeze the validation blocks of `keys` as the taxonomy has them now.
+    pub fn from_taxonomy(tax: &Taxonomy, keys: &[String]) -> Self {
+        let validations = keys
+            .iter()
+            .filter_map(|k| {
+                let validation = tax.get(k)?.validation.clone()?;
+                Some((k.clone(), validation))
+            })
+            .collect();
+        Self {
+            format: SNAPSHOT_FORMAT,
+            validations,
+        }
+    }
+
+    pub fn from_json(bytes: &[u8]) -> Result<Self, ValidatorError> {
+        serde_json::from_slice(bytes).map_err(|e| ValidatorError::SchemaCompilationError {
+            label: SNAPSHOT_FILE.to_string(),
+            detail: e.to_string(),
+        })
+    }
+
+    pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self).expect("a snapshot of plain data serialises")
+    }
+
+    /// Compile every frozen rule, failing on the first that does not compile.
+    pub fn compile(&self) -> Result<HashMap<String, CompiledValidator>, ValidatorError> {
+        self.validations
+            .iter()
+            .map(|(label, v)| Ok((label.clone(), CompiledValidator::new_for_label(v, label)?)))
+            .collect()
+    }
+
+    /// The labels that have a frozen rule.
+    pub fn keys(&self) -> impl Iterator<Item = &String> {
+        self.validations.keys()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const UUID: &str = "representation.identifier.uuid";
+    const UPPER_UUID: &str = "550E8400-E29B-41D4-A716-446655440000";
+
+    fn labels_dir() -> Option<&'static str> {
+        ["labels", "../../labels"]
+            .into_iter()
+            .find(|d| std::path::Path::new(d).is_dir())
+    }
+
+    fn live_taxonomy() -> Taxonomy {
+        let mut tax = Taxonomy::from_directory(labels_dir().expect("labels/ not found"))
+            .expect("labels/ parses");
+        tax.compile_validators();
+        tax
+    }
+
+    #[test]
+    fn snapshot_round_trips_and_compiles_like_live() {
+        let tax = live_taxonomy();
+        let snapshot = ValidatorSnapshot::from_taxonomy(&tax, tax.labels());
+        let snapshot = ValidatorSnapshot::from_json(snapshot.to_json_pretty().as_bytes()).unwrap();
+        let compiled = snapshot.compile().unwrap();
+
+        for label in [
+            UUID,
+            "finance.currency.currency_code",
+            "representation.numeric.percentage",
+        ] {
+            let live = tax.get_validator(label).unwrap();
+            let mut values: Vec<String> = tax
+                .get(label)
+                .unwrap()
+                .samples
+                .iter()
+                .filter_map(|s| match s {
+                    serde_yaml::Value::String(s) => Some(s.clone()),
+                    other => serde_yaml::to_string(other)
+                        .ok()
+                        .map(|s| s.trim().to_string()),
+                })
+                .collect();
+            assert!(!values.is_empty(), "{label} has no samples");
+            values.push("not-a-value".to_string());
+            for v in values {
+                assert_eq!(
+                    compiled[label].is_valid(&v),
+                    live.is_valid(&v),
+                    "{label} disagrees on {v:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn snapshot_ignores_later_taxonomy_edits() {
+        let tax = live_taxonomy();
+        let snapshot = ValidatorSnapshot::from_taxonomy(&tax, tax.labels());
+
+        let dir = labels_dir().unwrap();
+        let yaml =
+            std::fs::read_to_string(format!("{dir}/definitions_representation.yaml")).unwrap();
+        let old = r#"pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$""#;
+        assert!(yaml.contains(old), "uuid pattern moved; update this test");
+        let edited = yaml.replace(old, &old.replace("0-9a-f", "0-9a-fA-F"));
+        let mut edited_tax = Taxonomy::from_yaml(&edited).unwrap();
+        edited_tax.compile_validators();
+
+        assert!(edited_tax.get_validator(UUID).unwrap().is_valid(UPPER_UUID));
+        assert!(!snapshot.compile().unwrap()[UUID].is_valid(UPPER_UUID));
+    }
+}
