@@ -123,8 +123,7 @@ api = HfApi()
 files = ["model.safetensors", "config.json", "label_map.json", "validation_snapshot.json"]
 ops = [CommitOperationAdd(path_in_repo=name, path_or_fileobj=f"{model_dir}/{name}")
        for name in files if os.path.exists(f"{model_dir}/{name}")]
-# The header encoder is shared across models, at models/model2vec (or the directory
-# the served model's config.json names).
+# The header encoder is shared across models, at models/model2vec.
 header_dir = "models/model2vec"
 if not os.path.isdir(header_dir):
     raise SystemExit(f"header encoder not found at {header_dir}; the root set needs model2vec/")
@@ -140,8 +139,8 @@ api.create_commit(repo_id="meridian-online/finetype-model", repo_type="model", o
 ```
 (`upload_folder` from a directory holding just those files also commits once.)
 
-`models/hf-root/validation_snapshot.json` is the exception: it freezes the rules the extension served before
-this change (0.6.63), so publishing it changes no extension output. For any other model trained before
+`models/hf-root/validation_snapshot.json` is the exception: it freezes the rules the extension served
+at 0.6.63, before validation snapshots existed, so publishing it changes no extension output. For any other model trained before
 snapshots existed, which has none, write its snapshot from the labels of **that
 model's training commit**, never from the current `labels/`, whose rules the model was not trained under:
 ```bash
@@ -321,7 +320,7 @@ ask the user** — don't skip quietly:
 the current rules rather than the ones it was trained under:
 ```bash
 root=https://huggingface.co/meridian-online/finetype-model/resolve/main
-cfg=$(curl -sfL "$root/config.json") || { echo "cannot fetch the root config.json; stop"; exit 1; }
+cfg=$(curl -sfL "$root/config.json") || { echo "cannot fetch the root config.json; stop"; return 1 2>/dev/null || false; }
 if grep -q type_index_keys <<<"$cfg"; then
   curl -sfIL "$root/validation_snapshot.json" >/dev/null \
     && echo "OK: root snapshot present" \
@@ -331,7 +330,7 @@ else
 fi
 ```
 For the root model served today, `models/hf-root/validation_snapshot.json` is the file to upload. It freezes
-the rules the extension served before this change (0.6.63), so publishing it changes no extension output;
+the rules the extension served at 0.6.63, before validation snapshots existed, so publishing it changes no extension output;
 that deliberately differs from the training-commit recipe in step 2b for other pre-snapshot models. If the
 root model has changed, rebuild its snapshot as step 2b describes.
 
