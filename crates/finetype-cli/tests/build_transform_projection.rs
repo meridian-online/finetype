@@ -246,3 +246,52 @@ fn percentage_transform_extracts_the_number_from_every_accepted_form() {
         .expect("run the duckdb CLI");
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "true");
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn file_size_transform_gives_bytes_for_every_unit_family() {
+    // Runs the published transform through the external `duckdb` CLI.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let transform = tax
+        .ddl_info("representation.file.file_size")
+        .expect("file_size is a known label")
+        .transform
+        .clone()
+        .expect("file_size has a transform");
+    let cases: &[(&str, f64)] = &[
+        ("512", 512.0),
+        ("100 B", 100.0),
+        ("2 TB", 2e12),
+        ("1.5 kB", 1500.0),
+        ("1 MB", 1e6),
+        ("3 GB", 3e9),
+        ("1 PB", 1e15),
+        ("4KiB", 4096.0),
+        ("3 GiB", 3.0 * 1073741824.0),
+        ("2 TiB", 2.0 * 1099511627776.0),
+        ("10M", 10.0 * 1048576.0),
+        ("2T", 2.0 * 1099511627776.0),
+        ("1P", 1125899906842624.0),
+    ];
+    for (value, expected) in cases {
+        let sql = format!(
+            "SELECT {}",
+            transform.replace("{col}", &format!("'{}'", value))
+        );
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(
+            out.status.success(),
+            "duckdb failed on {value:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let got: f64 = String::from_utf8_lossy(&out.stdout)
+            .trim()
+            .parse()
+            .unwrap_or_else(|_| panic!("non-numeric result for {value:?}"));
+        assert_eq!(got, *expected, "{value:?}");
+    }
+}

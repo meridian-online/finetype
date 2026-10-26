@@ -194,7 +194,7 @@ representation.boolean.terms	0.0000	0.0000	0.0000	0.0000
 representation.discrete.ordinal	0.7454	0.7454	1.0000	1.0000
 representation.file.excel_format	0.2230	0.2230	1.0000	1.0000
 representation.file.extension	0.0436	0.0436	0.4981	0.4981
-representation.file.file_size	0.0022	0.0022	1.0000	1.0000
+representation.file.file_size	0.0023	0.0023	1.0000	1.0000
 representation.file.mime_type	0.0009	0.0009	0.0000	0.0000
 representation.format.color_hex	0.0003	0.0003	0.1043	0.1043
 representation.format.color_hsl	0.0000	0.0000	0.0000	0.0000

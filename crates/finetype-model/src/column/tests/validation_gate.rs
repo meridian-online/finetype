@@ -212,3 +212,17 @@ fn percentage_constant_column_keeps_type() {
     assert!(!veto.vetoed, "vetoed: {veto:?}");
     assert!(schema_fail_demotion(&values, PERCENTAGE, &tax).is_none());
 }
+
+/// A column of one repeated IEC size (`4KiB`, which the old rule rejected) is
+/// not vetoed or demoted.
+#[test]
+fn file_size_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const FILE_SIZE: &str = "representation.file.file_size";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["4KiB".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(FILE_SIZE, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, FILE_SIZE, &tax).is_none());
+}

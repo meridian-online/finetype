@@ -458,3 +458,22 @@ fn percentage_json_schema_pattern_has_literal_spaces() {
     assert!(pattern.contains('\u{202F}'), "{pattern:?}");
     assert!(!pattern.contains("\\u00A0"), "{pattern:?}");
 }
+
+const FILE_SIZE_LABEL: &str = "representation.file.file_size";
+const FILE_SIZE_ACCEPT: &[&str] = &[
+    "512", "1.5 kB", "1.5 KB", "2 TB", "3 PB", "4KiB", "3 GiB", "2 TiB", "1 PiB", "10M", "10 K",
+    "7G", "2T", "1P", "100 B",
+];
+const FILE_SIZE_REJECT: &[&str] = &["1.5 XB", "MB", "5 Mb", "5 mb", "3 gib", "1 KIB", "2 EB"];
+
+/// NIST/IEC and GNU coreutils: B-suffixed units, the `iB` units and the bare
+/// size letters are all defined, with an optional space after the number.
+#[test]
+fn file_size_accepts_source_forms() {
+    assert_pattern_boundary(FILE_SIZE_LABEL, FILE_SIZE_ACCEPT, &[]);
+}
+
+#[test]
+fn file_size_rejects_undefined_forms() {
+    assert_pattern_boundary(FILE_SIZE_LABEL, &[], FILE_SIZE_REJECT);
+}

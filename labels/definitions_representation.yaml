@@ -592,8 +592,11 @@ representation.file.mime_type:
 representation.file.file_size:
   title: "File Size"
   description: >
-    File size in bytes, kilobytes, megabytes, etc. (e.g., 1024, 1.5MB, 2 GB).
-    Transforms to BIGINT (bytes).
+    File size in bytes, kilobytes, megabytes, etc. (e.g., 1024, 1.5 MB, 2 GiB,
+    10M). Units follow NIST and the IEC binary prefixes and the GNU coreutils
+    size letters: B-suffixed units (kB, KB, MB, GB, TB, PB) are decimal powers
+    of 1000; IEC units (KiB, MiB, GiB, TiB, PiB) and the bare letters
+    K, M, G, T, P are binary powers of 1024. Transforms to BIGINT (bytes).
   designation: universal
   locales: [UNIVERSAL]
   broad_type: BIGINT
@@ -601,20 +604,33 @@ representation.file.file_size:
     type: integer
   format_string: null
   transform: >
-    CASE
-      WHEN UPPER({col}) LIKE '%GB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE) * 1024 * 1024 * 1024
-      WHEN UPPER({col}) LIKE '%MB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE) * 1024 * 1024
-      WHEN UPPER({col}) LIKE '%KB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE) * 1024
-      WHEN UPPER({col}) LIKE '%B%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE)
-      ELSE CAST({col} AS BIGINT)
-    END
+    CASE REGEXP_EXTRACT({col}, '([A-Za-z]+)$', 1)
+      WHEN '' THEN 1
+      WHEN 'B' THEN 1
+      WHEN 'kB' THEN 1000
+      WHEN 'KB' THEN 1000
+      WHEN 'MB' THEN 1000000
+      WHEN 'GB' THEN 1000000000
+      WHEN 'TB' THEN 1000000000000
+      WHEN 'PB' THEN 1000000000000000
+      WHEN 'K' THEN 1024
+      WHEN 'KiB' THEN 1024
+      WHEN 'M' THEN 1048576
+      WHEN 'MiB' THEN 1048576
+      WHEN 'G' THEN 1073741824
+      WHEN 'GiB' THEN 1073741824
+      WHEN 'T' THEN 1099511627776
+      WHEN 'TiB' THEN 1099511627776
+      WHEN 'P' THEN 1125899906842624
+      WHEN 'PiB' THEN 1125899906842624
+    END * CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE)
   transform_ext: null
   decompose:
     size: "CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)', 1) AS DOUBLE)"
     unit: "UPPER(COALESCE(NULLIF(REGEXP_EXTRACT({col}, '([A-Za-z]+)$', 1), ''), 'B'))"
   validation:
     type: string
-    pattern: "^[0-9]+(\\.[0-9]+)?\\s*(B|KB|MB|GB|TB)?$"
+    pattern: "^[0-9]+(\\.[0-9]+)?\\s*(B|[kK]B|[MGTP]B|[KMGTP]iB|[KMGTP])?$"
   tier: [BIGINT, file]
   aliases: null
   samples:
@@ -625,8 +641,12 @@ representation.file.file_size:
   icon: file
   references: null
   notes: >
-    v1 migration: Was file.size. Transform converts to bytes.
-    Handles B, KB, MB, GB, TB. Decompose extracts size value and unit.
+    v1 migration: Was file.size. The transform converts to bytes. Units are
+    case-sensitive (5 Mb is megabits, not accepted). Behaviour change: KB, MB
+    and GB are now decimal (1 MB = 1,000,000 bytes, as NIST defines it), where
+    the transform previously multiplied by powers of 1024; use MiB, GiB or the
+    bare letters for binary. TB, PB, TiB and PiB are handled. Decompose
+    extracts size value and unit.
 
 representation.file.excel_format:
   title: "Excel Number Format String"
