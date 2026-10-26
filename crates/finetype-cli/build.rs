@@ -384,8 +384,8 @@ fn generate_embedded_models(models_base: &Path, labels_base: &Path) {
         code.push_str("pub const MB_VALUE_MODEL: &[u8] = &[];\n");
     }
 
-    // Validation snapshot: the validation rules the model was shipped with, frozen
-    // beside config.json. Absent for older or hand-built model dirs → false stub,
+    // Validation snapshot: the validation rules the model reads, frozen
+    // beside config.json (the default model's freezes the rules as of 0.6.63). Absent for older or hand-built model dirs → false stub,
     // and the loader passes None so those models read the live taxonomy as before.
     let snapshot = model_dir.join("validation_snapshot.json");
     if snapshot.exists() {

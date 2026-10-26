@@ -22,9 +22,10 @@
 # that file (its keys checked against the injected type_index_keys), not a fresh
 # snapshot taken after training. A reused $FTMB is refused when the sidecar is
 # missing or differs from a fresh snapshot of the live labels, since its features
-# were then computed under other rules. Set ALLOW_STALE_FTMB=1 to proceed anyway;
-# each model then gets a snapshot of the live labels, which its training features
-# do not match.
+# were then computed under other rules. Set ALLOW_STALE_FTMB=1 to proceed anyway:
+# with a recorded sidecar, each model gets that sidecar and the keys in it (the
+# ones the file was built with); with none, each gets a snapshot of the live
+# labels, which its training features may not match.
 set -eo pipefail
 cd "$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -117,7 +118,9 @@ if [[ "$SCORE_ONLY" != "true" ]]; then
   elif ! "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --check "$SIDECAR"; then
     if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
       if [[ -f "$SIDECAR" ]]; then
-        echo "WARN: $FTMB was built under other validation rules; ALLOW_STALE_FTMB=1, proceeding with its recorded snapshot $SIDECAR"
+        echo "WARN: $FTMB was built under other validation rules; ALLOW_STALE_FTMB=1, proceeding with its recorded snapshot $SIDECAR and the keys in it"
+        # The keys the FTMB was built with are the sidecar's, not the live binary's.
+        "$PY" -c "import json,sys; json.dump(json.load(open(sys.argv[1]))['keys'], open(sys.argv[2],'w'))" "$SIDECAR" "$KEYS_FILE"
       else
         echo "WARN: $FTMB has no recorded snapshot; ALLOW_STALE_FTMB=1, proceeding with a snapshot of the live labels, which its features may not match"
         SIDECAR=""

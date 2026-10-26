@@ -575,7 +575,7 @@ const ABBREVIATED_MONTH_REJECT: &[&str] = &[
     "4 F\u{d7}b 2023",
     "4 F\u{f7}b 2023",
 ];
-/// Unicode CLDR en (Jan..Dec), en-GB (Sept), and the US military form with a
+/// Unicode CLDR en (Jan..Dec), en-GB (Sept), and the dotted AP-style form with a
 /// full stop after the month; a two-digit year in the day-first form.
 #[test]
 fn abbreviated_month_accepts_source_forms() {

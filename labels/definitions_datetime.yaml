@@ -162,8 +162,11 @@ datetime.timestamp.iso_8601_offset:
       link: "https://www.iso.org/standard/70907.html"
   notes: >
     v1 name: datetime.iso_8601_with_time_zone_name. The published format
-    strings describe the canonical form; the noted forms (lower-case t, an
-    offset without a colon, a one-digit hour) cast through the transform.
+    strings describe the upper-case-T, colon-offset form and do not parse
+    lower-case t, an offset without a colon or a one-digit hour; those cast
+    through the transform. Graded: lower-case t and the hour-only offset
+    (+05) conform; noted are the offset without a colon (+0530) and a
+    one-digit hour (+5:30).
 
 datetime.timestamp.rfc_2822:
   title: RFC 2822
@@ -242,11 +245,11 @@ datetime.timestamp.rfc_3339:
     timezone indicator; primary format_string handles numeric offsets.
     DuckDB %z handles +HH:MM but not Z, hence the alt format. The
     transform casts instead, after upper-casing z and closing up a space
-    before the offset or Z. RFC 3339 also allows a fraction of a second and
-    lower-case t and z; the space before an offset or Z is accepted with a note.
-    The published format strings describe the canonical form; the noted
-    forms (fraction, lower-case, space before the offset) cast through
-    the transform.
+    before the offset or Z. The published format strings do not parse a
+    fraction of a second, a lower-case z or a space before the offset or Z;
+    those cast through the transform. Graded: a fraction and a lower-case z
+    conform, as RFC 3339 allows them; noted are an offset without a colon
+    (+0530) and a space before the offset or Z.
 
 datetime.timestamp.sql_standard:
   title: SQL Standard
@@ -938,7 +941,7 @@ datetime.date.abbreviated_month:
     abbreviations vary by language (Jan vs janv. vs ene). The month token is
     any run of three or more Latin letters with an optional full stop, which
     takes the abbreviations of Unicode CLDR in en (Feb), en-GB (Sept), fr
-    (janv.) and the other locales, and the US military form
+    (janv.) and the other locales, and the dotted AP-style form
     (Feb. 4, 2023).
   designation: locale_specific
   locales:

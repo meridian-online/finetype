@@ -123,8 +123,13 @@ api = HfApi()
 files = ["model.safetensors", "config.json", "label_map.json", "validation_snapshot.json"]
 ops = [CommitOperationAdd(path_in_repo=name, path_or_fileobj=f"{model_dir}/{name}")
        for name in files if os.path.exists(f"{model_dir}/{name}")]
-ops += [CommitOperationAdd(path_in_repo=f"model2vec/{f}", path_or_fileobj=f"{model_dir}/model2vec/{f}")
-        for f in os.listdir(f"{model_dir}/model2vec")]
+# The header encoder is shared across models, at models/model2vec (or the directory
+# the served model's config.json names).
+header_dir = "models/model2vec"
+if not os.path.isdir(header_dir):
+    raise SystemExit(f"header encoder not found at {header_dir}; the root set needs model2vec/")
+ops += [CommitOperationAdd(path_in_repo=f"model2vec/{f}", path_or_fileobj=f"{header_dir}/{f}")
+        for f in os.listdir(header_dir)]
 # A model with no snapshot must not leave an old root snapshot in place:
 if not os.path.exists(f"{model_dir}/validation_snapshot.json"):
     ops.append(CommitOperationDelete(path_in_repo="validation_snapshot.json"))
