@@ -7,7 +7,7 @@
 use crate::taxonomy::{Taxonomy, Validation};
 use crate::validator::{CompiledValidator, ValidatorError};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// File name of the snapshot inside a model directory.
 pub const SNAPSHOT_FILE: &str = "validation_snapshot.json";
@@ -40,18 +40,36 @@ impl ValidatorSnapshot {
         }
     }
 
+    /// Parse a snapshot, refusing an unknown format, duplicate keys, or a rule
+    /// for a label the snapshot does not list.
     pub fn from_json(bytes: &[u8]) -> Result<Self, ValidatorError> {
-        serde_json::from_slice(bytes).map_err(|e| ValidatorError::SchemaCompilationError {
+        let bad = |detail: String| ValidatorError::SchemaCompilationError {
             label: SNAPSHOT_FILE.to_string(),
-            detail: e.to_string(),
-        })
+            detail,
+        };
+        let snapshot: Self = serde_json::from_slice(bytes).map_err(|e| bad(e.to_string()))?;
+        if snapshot.format != SNAPSHOT_FORMAT {
+            return Err(bad(format!(
+                "unsupported format {} (expected {SNAPSHOT_FORMAT})",
+                snapshot.format
+            )));
+        }
+        let listed: HashSet<&String> = snapshot.keys.iter().collect();
+        if listed.len() != snapshot.keys.len() {
+            return Err(bad("duplicate keys".to_string()));
+        }
+        if let Some(stray) = snapshot.validations.keys().find(|k| !listed.contains(k)) {
+            return Err(bad(format!("validation for unlisted label {stray}")));
+        }
+        Ok(snapshot)
     }
 
     pub fn to_json_pretty(&self) -> String {
         serde_json::to_string_pretty(self).expect("a snapshot of plain data serialises")
     }
 
-    /// Compile every frozen rule, failing on the first that does not compile.
+    /// Compile every frozen rule. Unlike the live taxonomy, which skips a bad
+    /// rule, a frozen artefact fails loudly on the first that does not compile.
     pub fn compile(&self) -> Result<HashMap<String, CompiledValidator>, ValidatorError> {
         self.validations
             .iter()
@@ -134,6 +152,30 @@ mod tests {
         assert!(snapshot.keys().any(|k| *k == keyless));
         assert!(!snapshot.validations.contains_key(&keyless));
         assert_eq!(snapshot.keys, keys);
+    }
+
+    fn refusal(json: &str) -> String {
+        ValidatorSnapshot::from_json(json.as_bytes())
+            .unwrap_err()
+            .to_string()
+    }
+
+    #[test]
+    fn from_json_refuses_wrong_format() {
+        let msg = refusal(r#"{"format":2,"keys":["a"],"validations":{}}"#);
+        assert!(msg.contains("unsupported format"), "{msg}");
+    }
+
+    #[test]
+    fn from_json_refuses_duplicate_keys() {
+        let msg = refusal(r#"{"format":1,"keys":["a","a"],"validations":{}}"#);
+        assert!(msg.contains("duplicate"), "{msg}");
+    }
+
+    #[test]
+    fn from_json_refuses_stray_validation() {
+        let msg = refusal(r#"{"format":1,"keys":["a"],"validations":{"b":{"type":"string"}}}"#);
+        assert!(msg.contains("unlisted label b"), "{msg}");
     }
 
     #[test]
