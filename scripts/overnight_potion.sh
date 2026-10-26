@@ -212,9 +212,29 @@ fi
 
 echo "--- STEP 3: build gold FTMB (potion embed) ---"
 SV_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && SV_ARG=(--store-values "$STORE_VALUES")
+# The gold FTMB's validation features come from the live labels too, so it carries
+# a rules record like the training FTMB and must match it.
+: "${SNAP_BIN=}"; [[ -n "$SNAP_BIN" ]] || SNAP_BIN=(cargo run -q -p finetype-build-tools --bin write_validation_snapshot --)
+: "${SIDECAR=$FTMB.validation_snapshot.json}"
+KEYS_FILE="${KEYS_FILE:-$FTMB.type_index_keys.json}"
+GOLD_SIDECAR="$GOLDFTMB.validation_snapshot.json"
 if [[ ! -f "$GOLDFTMB" ]]; then
+  [[ -f "$KEYS_FILE" ]] || { echo "FAIL: $KEYS_FILE missing; cannot record the gold FTMB's rules"; exit 1; }
+  "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --out "$GOLD_SIDECAR"
   "$PY" scripts/build_gold_ftmb_potion.py --gold "$GOLD" --columns "$COLS" --binary "$BIN" \
     --potion "$POTION" "${TV_ARG[@]}" "${SV_ARG[@]}" --out "$GOLDFTMB"
+fi
+if [[ -z "$SIDECAR" ]] || ! "$PY" -c "
+import json, sys
+sys.exit(0 if json.load(open(sys.argv[1])) == json.load(open(sys.argv[2])) else 1)
+" "$GOLD_SIDECAR" "$SIDECAR" 2>/dev/null; then
+  if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
+    echo "WARN: $GOLDFTMB has no rules record matching the training FTMB's; ALLOW_STALE_FTMB=1, scoring anyway"
+  else
+    echo "FAIL: $GOLDFTMB was built under other validation rules than the training file (or has no record)."
+    echo "      Delete it to rebuild, or set ALLOW_STALE_FTMB=1."
+    exit 1
+  fi
 fi
 
 echo "--- STEP 4: score each seed (Sense + composed) ---"

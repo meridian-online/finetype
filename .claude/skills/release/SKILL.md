@@ -140,7 +140,9 @@ api.create_commit(repo_id="meridian-online/finetype-model", repo_type="model", o
 ```
 (`upload_folder` from a directory holding just those files also commits once.)
 
-A model trained before snapshots existed has none. Write its root snapshot from the labels of **that
+`models/hf-root/validation_snapshot.json` is the exception: it freezes the rules the extension served before
+this change (0.6.63), so publishing it changes no extension output. For any other model trained before
+snapshots existed, which has none, write its snapshot from the labels of **that
 model's training commit**, never from the current `labels/`, whose rules the model was not trained under:
 ```bash
 git worktree add ../finetype-train-labels <training-commit>
@@ -318,13 +320,20 @@ ask the user** — don't skip quietly:
 `type_index_keys`, the root must also hold `validation_snapshot.json`, or the extension feeds that model
 the current rules rather than the ones it was trained under:
 ```bash
-curl -sfL "https://huggingface.co/meridian-online/finetype-model/resolve/main/config.json" | grep -q type_index_keys \
-  && { curl -sfIL "https://huggingface.co/meridian-online/finetype-model/resolve/main/validation_snapshot.json" >/dev/null \
-       || echo "root snapshot missing: upload models/hf-root/validation_snapshot.json before releasing the extension"; }
+root=https://huggingface.co/meridian-online/finetype-model/resolve/main
+cfg=$(curl -sfL "$root/config.json") || { echo "cannot fetch the root config.json; stop"; exit 1; }
+if grep -q type_index_keys <<<"$cfg"; then
+  curl -sfIL "$root/validation_snapshot.json" >/dev/null \
+    && echo "OK: root snapshot present" \
+    || echo "root snapshot missing: upload models/hf-root/validation_snapshot.json before releasing the extension"
+else
+  echo "OK: root model has no type_index_keys"
+fi
 ```
-For the root model served today, `models/hf-root/validation_snapshot.json` is the file to upload (built from
-the labels before the snapshot work, for that model's `config.json`, kept beside it); if the root model has
-changed, rebuild it as step 2b describes.
+For the root model served today, `models/hf-root/validation_snapshot.json` is the file to upload. It freezes
+the rules the extension served before this change (0.6.63), so publishing it changes no extension output;
+that deliberately differs from the training-commit recipe in step 2b for other pre-snapshot models. If the
+root model has changed, rebuild its snapshot as step 2b describes.
 
 Read `{community_version}` from the descriptor (or the last merged upstream PR):
 
