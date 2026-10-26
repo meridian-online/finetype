@@ -141,7 +141,7 @@ fn resolve_model_dir() -> std::result::Result<PathBuf, Box<dyn Error>> {
         if !snapshot_in_use(snapshot, dir) {
             tracing::warn!(
                 "Validation snapshot was fetched into a different model revision and is not \
-                 in use; the model validates against the live taxonomy"
+                 in use; the model validates against the extension's compiled-in rules"
             );
         }
     }
@@ -155,15 +155,19 @@ fn snapshot_in_use(snapshot: &std::path::Path, model_dir: &std::path::Path) -> b
 }
 
 /// Fetch the model's validation snapshot, if the repo has one. A missing file
-/// (404) or any failed fetch means "no snapshot": the required files above have
-/// already been fetched, so the model loads against the live taxonomy as before.
+/// (404) or any failed fetch means "no snapshot": that is not a load failure, so
+/// the model loads against the extension's compiled-in rules as before, and the
+/// fallback is logged at `warn` so it is visible.
 fn fetch_optional_snapshot<E: std::fmt::Display>(
     get: impl FnOnce(&str) -> std::result::Result<PathBuf, E>,
 ) -> Option<PathBuf> {
     match get(VALIDATION_SNAPSHOT) {
         Ok(path) => Some(path),
         Err(e) => {
-            tracing::debug!("No validation snapshot fetched ({e}); using the live taxonomy");
+            tracing::warn!(
+                "No validation snapshot fetched ({e}); the model validates against the \
+                 extension's compiled-in rules"
+            );
             None
         }
     }

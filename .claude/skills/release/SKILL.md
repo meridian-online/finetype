@@ -41,6 +41,9 @@ Run these checks and **stop on any failure**:
    - `value_model2vec/` (required for dual-encoder models — the co-located value
      encoder; profile-time loading fails without it, an empty snapshot masquerades as
      a model failure)
+   - `validation_snapshot.json` (required for a model trained against the frozen
+     validation snapshot — the loader reads it beside `model.safetensors`; a model
+     published without it validates against whatever rules the reader compiled in)
    - `results.json` (optional — training metrics)
 
 2. **Tests pass** — `cargo test -p finetype-model` must pass with zero failures.
@@ -55,7 +58,7 @@ Present the pre-flight summary and wait for confirmation before proceeding.
 
 ### 2. Upload to HuggingFace
 
-Upload the three required files to `meridian-online/finetype-model`:
+Upload the required files to `meridian-online/finetype-model`:
 
 ```python
 from huggingface_hub import HfApi
@@ -76,6 +79,20 @@ for file in files:
         repo_type="model",
         commit_message=f"Add {model_name}/{file}"
     )
+
+# The validation snapshot is read from TWO places, so it is uploaded to both:
+# the repo root (the DuckDB extension resolves top-level files) and
+# `{model_name}/` (what .github/scripts/download-model.sh reads).
+snapshot = Path(model_dir) / "validation_snapshot.json"
+if snapshot.is_file():
+    for path_in_repo in ("validation_snapshot.json", f"{model_name}/validation_snapshot.json"):
+        api.upload_file(
+            path_or_fileobj=str(snapshot),
+            path_in_repo=path_in_repo,
+            repo_id="meridian-online/finetype-model",
+            repo_type="model",
+            commit_message=f"Add {path_in_repo}"
+        )
 ```
 
 Where `model_name` is the directory basename (e.g. `sherlock-v11`).
@@ -86,7 +103,12 @@ install time, not at release time):
 ```bash
 curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/{model_name}/model.safetensors"
 curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/{model_name}/value_model2vec/model.safetensors"  # dual-encoder only
+curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/validation_snapshot.json"                 # DuckDB extension reads the repo root
+curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/{model_name}/validation_snapshot.json"   # download-model.sh reads this one
 ```
+A reader that cannot fetch the snapshot does not fail; it falls back to its compiled-in rules (the
+DuckDB extension logs a warning), so a missing upload only shows up as a model that disagrees with its
+training. Check both URLs.
 
 ### 3. Update Default Symlink
 
