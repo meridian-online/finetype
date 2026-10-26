@@ -63,10 +63,17 @@ fn note_text(note: &Note) -> String {
 /// `finetype_core::table_validator`) plus the value's grade:
 ///   - `valid` — true if the value passes (or is null-skipped, or carries no
 ///     constraint).
-///   - `constraint_token` — canonical token of the first failed constraint
+///   - `constraint` — canonical token of the first failed constraint
 ///     (`pattern` | `min_length` | `max_length` | `enum` | `type` |
 ///     `required` | `other`), or `None` when valid.
 ///   - `message` — human-readable `jsonschema` error, or `None` when valid.
+///
+/// Scope: `valid` and `grade` reflect the fragment's JSON Schema keywords plus
+/// its note extensions (`x-finetype-canonical`, `x-finetype-historic`). The
+/// checksum (`x-finetype-label`) and case-folded enum checks that
+/// `finetype validate` applies are NOT applied here, so a right-shape value
+/// with a bad check digit conforms.
+///
 ///   - `grade` / `note` — `conforms`, or `noted` with the note the fragment's
 ///     `x-finetype-canonical` / `x-finetype-historic` extensions give the value
 ///     (the same matcher `finetype validate` uses), or `fails`.
@@ -260,6 +267,17 @@ mod tests {
         assert_eq!(bad.grade, Some("fails"));
         assert_eq!(bad.note, None);
         assert_eq!(bad.constraint.as_deref(), Some("pattern"));
+    }
+
+    /// Pins the documented gap: this scalar does not apply the checksum that
+    /// `finetype validate` applies for an `x-finetype-label` type, so a
+    /// right-shape ISBN-10 with a bad check digit conforms here.
+    #[test]
+    fn test_detail_checksum_label_not_applied() {
+        let frag = r#"{"type":"string","pattern":"^[0-9]{9}[0-9X]$","x-finetype-label":"identity.media.isbn"}"#;
+        let d = validate_value_detail(Some("0306406153"), Some(frag)); // correct check digit is 2
+        assert!(d.valid);
+        assert_eq!(d.grade, Some("conforms"));
     }
 
     /// A historic value is noted as withdrawn.
