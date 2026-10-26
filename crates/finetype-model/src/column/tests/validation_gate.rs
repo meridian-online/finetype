@@ -266,7 +266,11 @@ fn rfc_3339_constant_column_keeps_type() {
     use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
     const RFC_3339: &str = "datetime.timestamp.rfc_3339";
     let tax = super::shipped_taxonomy();
-    for value in ["2024-01-01 10:00:00.123+05:30", "2024-01-01 10:00:00z"] {
+    for value in [
+        "2024-01-01 10:00:00.123+05:30",
+        "2024-01-01 10:00:00z",
+        "2024-01-01 10:00:00 Z",
+    ] {
         let values: Vec<String> = vec![value.to_string(); 40];
         let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
         let veto = evaluate_validation_veto(RFC_3339, &refs, &tax, &audited_safe_labels());
@@ -288,5 +292,44 @@ fn iso_8601_offset_constant_column_keeps_type() {
         let veto = evaluate_validation_veto(ISO_8601_OFFSET, &refs, &tax, &audited_safe_labels());
         assert!(!veto.vetoed, "{value}: vetoed: {veto:?}");
         assert!(schema_fail_demotion(&values, ISO_8601_OFFSET, &tax).is_none());
+    }
+}
+
+/// `rfc_3339` now accepts a fraction, so a column of microsecond-offset values
+/// validates under both `rfc_3339` and `sql_microseconds_offset`. Both are in
+/// `labels/ceded_leaves.txt` (the model's dropped head), but neither is in
+/// `CEDED_RECOVERY_LEAVES`: datetime formats belong to `datetime_format_refinement`,
+/// so `ceded_leaf_recovery` never weighs them and the double match costs no
+/// recall. Pinned so that adding either leaf to the recovery list is a visible
+/// decision (the exactly-one-match gate would then defer on such columns).
+#[test]
+fn microsecond_offset_double_match_does_not_reach_ceded_leaf_recovery() {
+    let tax = super::shipped_taxonomy();
+    let sample: Vec<String> = [
+        "2024-01-01 10:00:00.123456+05:30",
+        "2024-02-03 11:12:13.654321-08:00",
+        "2024-03-04 00:00:00.000001+00:00",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    assert!(super::super::label_validates_sample(
+        &tax,
+        "datetime.timestamp.rfc_3339",
+        &sample
+    ));
+    assert!(super::super::label_validates_sample(
+        &tax,
+        "datetime.timestamp.sql_microseconds_offset",
+        &sample
+    ));
+    for leaf in [
+        "datetime.timestamp.rfc_3339",
+        "datetime.timestamp.sql_microseconds_offset",
+    ] {
+        assert!(
+            !super::super::CEDED_RECOVERY_LEAVES.contains(&leaf),
+            "{leaf} entered CEDED_RECOVERY_LEAVES; the double match now defers recovery"
+        );
     }
 }

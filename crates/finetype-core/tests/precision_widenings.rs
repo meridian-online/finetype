@@ -589,6 +589,7 @@ const RFC_3339_ACCEPT: &[&str] = &[
     "2024-01-01 10:00:00+05:30",
     "2024-01-01 10:00:00+0530",
     "2024-01-01 10:00:00 +0000",
+    "2024-01-01 10:00:00 Z",
 ];
 const RFC_3339_REJECT: &[&str] = &[
     "2024-01-01 10:00:00+5:30",
@@ -623,7 +624,11 @@ fn rfc_3339_grades_offset_forms() {
             "{value}"
         );
     }
-    for value in ["2024-01-01 10:00:00 +0000", "2024-01-01 10:00:00+0530"] {
+    for value in [
+        "2024-01-01 10:00:00 +0000",
+        "2024-01-01 10:00:00 Z",
+        "2024-01-01 10:00:00+0530",
+    ] {
         match grade_value_for_label(value, RFC_3339_LABEL, &tax) {
             Grade::Noted(note) => {
                 assert_eq!(note.kind, NoteKind::Nonstandard, "{value}");
@@ -643,6 +648,7 @@ const ISO_8601_OFFSET_ACCEPT: &[&str] = &[
     "2024-01-01T10:00:00+05",
     "2024-01-01t10:00:00+05:30",
     "2024-01-01T10:00:00+5:30",
+    "2024-01-01T10:00:00+0:53",
     "2024-01-01T10:00:00-08:00",
 ];
 const ISO_8601_OFFSET_REJECT: &[&str] = &[
@@ -651,6 +657,9 @@ const ISO_8601_OFFSET_REJECT: &[&str] = &[
     "2024-01-01 10:00:00+05:30",
     "2024-01-01T10:00:00+123:45",
     "2024-01-01T10:00:00+05:3",
+    "2024-01-01T10:00:00+053",
+    "2024-01-01T10:00:00+530",
+    "2024-01-01T10:00:00+5",
 ];
 
 #[test]
@@ -664,13 +673,13 @@ fn iso_8601_offset_rejects_undefined_forms() {
 }
 
 #[test]
-fn iso_8601_offset_grades_one_digit_hour_as_noted() {
+fn iso_8601_offset_grades_noncanonical_offsets_as_noted() {
     use finetype_core::{grade_value_for_label, Grade, NoteKind};
     let tax = load_taxonomy();
     for value in [
         "2024-01-01T10:00:00+05:30",
-        "2024-01-01T10:00:00+0530",
         "2024-01-01T10:00:00+05",
+        "2024-01-01t10:00:00-08:00",
     ] {
         assert_eq!(
             grade_value_for_label(value, ISO_8601_OFFSET_LABEL, &tax),
@@ -678,11 +687,13 @@ fn iso_8601_offset_grades_one_digit_hour_as_noted() {
             "{value}"
         );
     }
-    match grade_value_for_label("2024-01-01T10:00:00+5:30", ISO_8601_OFFSET_LABEL, &tax) {
-        Grade::Noted(note) => {
-            assert_eq!(note.kind, NoteKind::Nonstandard);
-            assert_eq!(note.detail, "two-digit offset hour");
+    for value in ["2024-01-01T10:00:00+5:30", "2024-01-01T10:00:00+0530"] {
+        match grade_value_for_label(value, ISO_8601_OFFSET_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::Nonstandard, "{value}");
+                assert_eq!(note.detail, "extended-format offset", "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
         }
-        other => panic!("+5:30 should be noted, got {other:?}"),
     }
 }

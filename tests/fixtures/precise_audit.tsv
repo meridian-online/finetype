@@ -81,7 +81,7 @@ datetime.timestamp.iso_8601_micros_offset	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\
 datetime.timestamp.iso_8601_microseconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$	true
 datetime.timestamp.iso_8601_millis_offset	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$	true
 datetime.timestamp.iso_8601_milliseconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$	true
-datetime.timestamp.iso_8601_offset	false	^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}[+-]\d{1,2}(?::?\d{2})?$	true
+datetime.timestamp.iso_8601_offset	false	^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}[+-](?:\d{2}(?::?\d{2})?|\d:\d{2})$	true
 datetime.timestamp.iso_microseconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}$	true
 datetime.timestamp.iso_milliseconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$	true
 datetime.timestamp.iso_minutes	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$	true
