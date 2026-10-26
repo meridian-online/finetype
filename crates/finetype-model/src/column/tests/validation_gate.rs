@@ -253,6 +253,8 @@ fn abbreviated_month_constant_column_keeps_type() {
         let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
         let veto = evaluate_validation_veto(ABBREVIATED_MONTH, &refs, &tax, &audited_safe_labels());
         assert!(!veto.vetoed, "{value}: vetoed: {veto:?}");
+        // Vacuous for this label (it is not in schema_fail_demotion's allowlist);
+        // the veto assertion above is the one that bites.
         assert!(schema_fail_demotion(&values, ABBREVIATED_MONTH, &tax).is_none());
     }
 }

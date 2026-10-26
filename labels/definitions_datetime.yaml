@@ -915,11 +915,11 @@ datetime.date.abbreviated_month:
   description: >
     Date with an abbreviated month name, month-first (Feb 4, 2023) or
     day-first (4 Feb 2023, 4 Feb 23). Locale-specific because month
-    abbreviations vary by language (Jan vs janv. vs Gen). The universal rule
-    takes the English abbreviations of Unicode CLDR (en), plus the Sept of
-    en-GB, each with an optional full stop, as in the US military date format
-    (Feb. 4, 2023); the French abbreviations of CLDR (fr) are in the FR
-    locale rule.
+    abbreviations vary by language (Jan vs janv. vs ene). The month token is
+    any run of three or more Latin letters with an optional full stop, which
+    takes the abbreviations of Unicode CLDR in en (Feb), en-GB (Sept), fr
+    (janv.) and the other locales, and the US military form
+    (Feb. 4, 2023).
   designation: locale_specific
   locales:
     - EN
@@ -947,14 +947,7 @@ datetime.date.abbreviated_month:
   decompose: null
   validation:
     type: string
-    pattern: "^(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\\.? \\d{1,2},? \\d{4}|\\d{1,2}\\.? (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\\.? (?:\\d{4}|\\d{2}))$"
-  validation_by_locale:
-    # Source: Unicode CLDR (cldr-dates-full, fr, abbreviated months, format
-    # context). Day-first, as in French; the abbreviations are lowercase and
-    # janv., févr., avr., juil., sept., oct., nov., déc. end in a full stop.
-    FR:
-      type: string
-      pattern: "^\\d{1,2} (?:janv\\.|f\u00e9vr\\.|mars|avr\\.|mai|juin|juil\\.|ao\u00fbt|sept\\.|oct\\.|nov\\.|d\u00e9c\\.) \\d{4}$"
+    pattern: "^(?:[A-Za-z\u00c0-\u00ff]{3,}\\.? \\d{1,2},? \\d{4}|\\d{1,2}\\.? [A-Za-z\u00c0-\u00ff]{3,}\\.? (?:\\d{4}|\\d{2}))$"
   tier: [DATE, date]
   aliases: []
   samples:
@@ -964,12 +957,11 @@ datetime.date.abbreviated_month:
   icon: calendar
   references: null
   notes: >
-    The universal rule is English only; French goes through the FR locale
-    rule, which needs a locale to be consulted. French values do not cast:
-    the transform uses DuckDB strptime, whose %b reads English month names, so
-    a column of 4 janv. 2023 validates under FR but stays text. The transform
-    first rewrites Sept (en-GB) to Sep. Per-locale samples needed for
-    non-EN locales.
+    The month token is letter-based, so French and other non-English
+    abbreviations are recognised but not castable: the transform uses DuckDB
+    strptime, whose %b reads English month names, so a column of 4 janv. 2023
+    validates and stays text. The transform first rewrites Sept (en-GB) to
+    Sep. Per-locale samples needed for non-EN locales.
 
 datetime.date.long_full_month:
   title: Long Date with Full Month Name
