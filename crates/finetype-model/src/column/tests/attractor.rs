@@ -1299,3 +1299,54 @@ fn entity_name_vocab_veto_keeps_high_cardinality_columns() {
     let l = vocab_veto_label("brand", &refs, "representation.text.entity_name", 0.55);
     assert_eq!(l, "representation.text.entity_name");
 }
+
+// username: the published rule follows useradd(8) (up to 256 characters), so a
+// detector keeps column discrimination at the older 3-32 shape. These pin that
+// the attractor demotion consults it.
+fn username_taxonomy() -> finetype_core::taxonomy::Taxonomy {
+    super::shipped_taxonomy()
+}
+
+#[test]
+fn username_detector_keeps_attractor_demotion() {
+    let tax = username_taxonomy();
+    let uuids: Vec<String> = (0..40)
+        .map(|i| format!("123e4567-e89b-12d3-a456-4266141740{:02}", i))
+        .collect();
+    let hashes: Vec<String> = (0..40).map(|i| format!("{:064x}", i * 7919 + 1)).collect();
+    for values in [uuids, hashes] {
+        let result =
+            sharpen_attractor_demotion(&values, "identity.person.username", 0.95, Some(&tax));
+        let (_, reason) = result.expect("UUID/hash column labelled username is demoted");
+        assert!(
+            reason.starts_with("attractor_demotion_validation:"),
+            "{reason}"
+        );
+    }
+}
+
+#[test]
+fn username_dollar_names_are_not_demoted() {
+    let tax = username_taxonomy();
+    let values: Vec<String> = (0..40).map(|i| format!("svc_{}$", i)).collect();
+    let result = sharpen_attractor_demotion(&values, "identity.person.username", 0.95, Some(&tax));
+    assert!(result.is_none(), "{result:?}");
+}
+
+#[test]
+fn username_detector_keeps_vote_attractor_demotion() {
+    let tax = username_taxonomy();
+    let uuids: Vec<String> = (0..40)
+        .map(|i| format!("123e4567-e89b-12d3-a456-4266141740{:02}", i))
+        .collect();
+    let votes = vec![("identity.person.username".to_string(), 40)];
+    let (_, reason) = disambiguate_attractor_demotion(&uuids, &votes, 40, Some(&tax))
+        .expect("UUID column labelled username is demoted");
+    assert!(
+        reason.starts_with("attractor_demotion_validation:"),
+        "{reason}"
+    );
+
+    let names: Vec<String> = (0..40).map(|i| format!("svc_{}$", i)).collect();
+    assert!(disambiguate_attractor_demotion(&names, &votes, 40, Some(&tax)).is_none());
+}

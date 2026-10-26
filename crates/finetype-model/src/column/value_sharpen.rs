@@ -758,16 +758,21 @@ pub(crate) fn sharpen_attractor_demotion(
             }
 
             if !locale_confirmed {
+                let detector = finetype_core::discrimination::detector_for(result_label);
                 let fail_count = if let Some(compiled) = taxonomy.get_validator(result_label) {
-                    non_empty.iter().filter(|v| !compiled.is_valid(v)).count()
+                    non_empty
+                        .iter()
+                        .filter(|v| !detector.map_or_else(|| compiled.is_valid(v), |d| d(v)))
+                        .count()
                 } else if let Some(def) = taxonomy.get(result_label) {
                     if let Some(validation) = &def.validation {
                         non_empty
                             .iter()
-                            .filter(|v| {
-                                finetype_core::validate_value(v, validation)
+                            .filter(|v| match detector {
+                                Some(d) => !d(v),
+                                None => finetype_core::validate_value(v, validation)
                                     .map(|r| !r.is_valid)
-                                    .unwrap_or(false)
+                                    .unwrap_or(false),
                             })
                             .count()
                     } else {
@@ -1083,18 +1088,23 @@ pub(crate) fn disambiguate_attractor_demotion(
 
             // If locale validators didn't confirm, fall through to universal validation.
             if !locale_confirmed {
+                let detector = finetype_core::discrimination::detector_for(top_label);
                 let fail_count = if let Some(compiled) = taxonomy.get_validator(top_label) {
                     // Fast path: pre-compiled validator (no per-value regex compilation)
-                    non_empty.iter().filter(|v| !compiled.is_valid(v)).count()
+                    non_empty
+                        .iter()
+                        .filter(|v| !detector.map_or_else(|| compiled.is_valid(v), |d| d(v)))
+                        .count()
                 } else if let Some(def) = taxonomy.get(top_label) {
                     if let Some(validation) = &def.validation {
                         // Fallback: compile per-call (shouldn't happen with cache populated)
                         non_empty
                             .iter()
-                            .filter(|v| {
-                                finetype_core::validate_value(v, validation)
+                            .filter(|v| match detector {
+                                Some(d) => !d(v),
+                                None => finetype_core::validate_value(v, validation)
                                     .map(|r| !r.is_valid)
-                                    .unwrap_or(false)
+                                    .unwrap_or(false),
                             })
                             .count()
                     } else {

@@ -465,3 +465,40 @@ fn offset_timestamp_transforms_parse_every_accepted_form() {
         }
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn blood_type_decompose_normalises_the_minus_sign() {
+    // Runs the published decompose expressions through the external `duckdb` CLI.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let decompose = tax
+        .ddl_info("identity.person.blood_type")
+        .expect("blood_type is a known label")
+        .decompose
+        .clone()
+        .expect("blood_type has decompose");
+    let run = |part: &str, value: &str| -> String {
+        let expr = decompose[part].as_str().expect("decompose part");
+        let sql = format!("SELECT {}", expr.replace("{col}", &format!("'{}'", value)));
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(
+            out.status.success(),
+            "duckdb failed on {value:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    for (value, group, rh) in [
+        ("AB\u{2212}", "AB", "-"),
+        ("O-", "O", "-"),
+        ("a+", "A", "+"),
+        ("AB", "AB", ""),
+    ] {
+        assert_eq!(run("blood_group", value), group, "group of {value:?}");
+        assert_eq!(run("rh_factor", value), rh, "rh of {value:?}");
+    }
+}
