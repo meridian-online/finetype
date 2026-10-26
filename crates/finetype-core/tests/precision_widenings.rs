@@ -697,3 +697,48 @@ fn iso_8601_offset_grades_noncanonical_offsets_as_noted() {
         }
     }
 }
+
+// ── finance.currency.currency_code (ISO 4217, SIX lists one and three) ──
+
+const CURRENCY_CODE_LABEL: &str = "finance.currency.currency_code";
+const CURRENCY_CODE_ACCEPT: &[&str] = &["USD", "EUR", "XCG", "HRK", "BGN", "ZWL", "DEM"];
+const CURRENCY_CODE_REJECT: &[&str] = &["ABC", "US", "USDD", "UDP", "TCP"];
+
+#[test]
+fn currency_code_accepts_source_forms() {
+    assert_pattern_boundary(CURRENCY_CODE_LABEL, CURRENCY_CODE_ACCEPT, &[]);
+}
+
+#[test]
+fn currency_code_rejects_undefined_forms() {
+    assert_pattern_boundary(CURRENCY_CODE_LABEL, &[], CURRENCY_CODE_REJECT);
+}
+
+/// List-one codes conform; withdrawn codes validate with a note carrying
+/// SIX's withdrawal month.
+#[test]
+fn currency_code_grades_withdrawn_codes_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in ["USD", "EUR", "XCG"] {
+        assert_eq!(
+            grade_value_for_label(value, CURRENCY_CODE_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    for (value, detail) in [
+        ("HRK", "withdrawn 2023-01"),
+        ("BGN", "withdrawn 2026-01"),
+        ("ZWL", "withdrawn 2024-09"),
+        ("DEM", "withdrawn 2002-03"),
+    ] {
+        match grade_value_for_label(value, CURRENCY_CODE_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::Withdrawn, "{value}");
+                assert_eq!(note.detail, detail, "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
+        }
+    }
+}

@@ -295,6 +295,20 @@ fn iso_8601_offset_constant_column_keeps_type() {
     }
 }
 
+/// A column of one repeated `XCG` (the Caribbean guilder, which the old
+/// enum lacked) is not vetoed or demoted.
+#[test]
+fn currency_code_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const CURRENCY_CODE: &str = "finance.currency.currency_code";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["XCG".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(CURRENCY_CODE, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, CURRENCY_CODE, &tax).is_none());
+}
+
 /// `rfc_3339` now accepts a fraction, so a column of microsecond-offset values
 /// validates under both `rfc_3339` and `sql_microseconds_offset`. Both are in
 /// `labels/ceded_leaves.txt` (the model's dropped head), but neither is in

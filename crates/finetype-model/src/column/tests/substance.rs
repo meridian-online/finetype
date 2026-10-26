@@ -543,6 +543,27 @@ representation.identifier.uuid:
 }
 
 #[test]
+fn ceded_leaf_recovery_promotes_a_list_one_currency_column() {
+    // currency_code is a ceded leaf: a column of ISO 4217 list-one codes
+    // (including XCG, new in the published rule) is promoted from a relocated label.
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(shipped_taxonomy());
+    let codes: Vec<String> = ["USD", "EUR", "XCG", "GBP", "JPY", "USD", "EUR", "XCG"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("ccy", &codes, "representation.text.word", 1.0)
+        .unwrap();
+    assert_eq!(r.label, "finance.currency.currency_code");
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("ceded_leaf_recovery")
+    );
+}
+
+#[test]
 fn ceded_leaf_recovery_declines_non_validating_values() {
     // Same eligible leaf (uuid), but the values are NOT uuids — recovery must NOT fire
     // (no over-emission onto non-matching columns).
