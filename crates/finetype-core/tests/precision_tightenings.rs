@@ -833,3 +833,51 @@ fn ptc_amount_multisym_samples_and_generator_output_pass_the_anchored_pattern() 
         "500 draws produced no negative amount — the negative form is not exercised"
     );
 }
+
+const TSID_LABEL: &str = "technology.identifier.tsid";
+// Three values from the generator arm, which builds real TSIDs, then lower case.
+const TSID_ACCEPT: &[&str] = &[
+    "0JMVQ049NFN6K",
+    "0SFTS78GP0CQ7",
+    "0T3WM4QFBK5NV",
+    "0jmvq049nfn6k",
+    "0sfts78gp0cq7",
+    "0t3wm4qfbk5nv",
+];
+const TSID_REJECT: &[&str] = &[
+    // The old registry form: 32 hex characters.
+    "0190a1b2c3d4e5f6a7b8c9d0e1f2a3b4",
+    // First character above F: more than 64 bits.
+    "GAWE5HZP3SKTK",
+    // U is not in Crockford's alphabet.
+    "0AWE5HZP3SKTU",
+];
+
+/// tsid-creator: a TSID is 13 Crockford base32 characters; decoding ignores case.
+#[test]
+fn tsid_accepts_source_forms() {
+    assert_pattern_boundary(TSID_LABEL, TSID_ACCEPT, &[]);
+}
+
+#[test]
+fn tsid_rejects_undefined_forms() {
+    assert_pattern_boundary(TSID_LABEL, &[], TSID_REJECT);
+}
+
+/// The generator arm builds 64-bit TSIDs, and the definition's samples pass.
+#[test]
+fn tsid_generator_and_samples_pass_the_rule() {
+    let tax = load_taxonomy();
+    let mut generator = finetype_core::Generator::with_seed(load_taxonomy(), 42);
+    for _ in 0..500 {
+        let value = generator
+            .generate_value(TSID_LABEL)
+            .expect("generator output");
+        assert!(
+            validate_value_for_label(&value, TSID_LABEL, &tax)
+                .unwrap()
+                .is_valid,
+            "generated {value:?} fails the rule"
+        );
+    }
+}

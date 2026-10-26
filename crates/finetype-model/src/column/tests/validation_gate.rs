@@ -391,3 +391,46 @@ fn npi_valid_constant_column_is_kept() {
     assert!(!veto.vetoed, "vetoed: {veto:?}");
     assert!(schema_fail_demotion(&values, NPI, &tax).is_none());
 }
+
+/// A column of one repeated real TSID (13 Crockford characters, which the old
+/// 32-hex rule rejected) is not vetoed or demoted.
+#[test]
+fn tsid_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const TSID: &str = "technology.identifier.tsid";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["0JMVQ049NFN6K".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(TSID, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, TSID, &tax).is_none());
+}
+
+/// The model still predicts `tsid` for 32-hex columns (trained on the old
+/// samples). Such a column fails the new rule, is vetoed (tsid is on the
+/// allowlist), and the shape fallback lands it on alphanumeric_id.
+#[test]
+fn tsid_label_on_32_hex_column_is_vetoed_to_alphanumeric_id() {
+    use finetype_core::validation_veto::{
+        audited_safe_labels, evaluate_validation_veto, veto_shape_fallback,
+    };
+    const TSID: &str = "technology.identifier.tsid";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = (0..40u64)
+        .map(|i| {
+            format!(
+                "{:016x}{:016x}",
+                0x0190a1b2c3d4e5f6u64 + i * 7919,
+                0xa7b8c9d0e1f2a3b4u64 ^ (i * 104_729)
+            )
+        })
+        .collect();
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    assert!(audited_safe_labels().contains(TSID));
+    let veto = evaluate_validation_veto(TSID, &refs, &tax, &audited_safe_labels());
+    assert!(veto.vetoed, "not vetoed: {veto:?}");
+    assert_eq!(
+        veto_shape_fallback(&refs),
+        Some("representation.identifier.alphanumeric_id")
+    );
+}

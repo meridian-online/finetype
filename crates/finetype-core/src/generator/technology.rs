@@ -579,13 +579,20 @@ impl Generator {
                 Ok(format!("{}{}", ts_str, rand_chars))
             }
             ("identifier", "tsid") => {
-                // 32 hex chars with realistic timestamp in leading bytes
-                let base_ms: u64 = 1_577_836_800_000; // 2020-01-01
-                let range_ms: u64 = 315_360_000_000; // ~10 years
-                let ts = base_ms + self.rng.gen_range(0..range_ms);
-                let ts_hex = format!("{:012x}", ts);
-                let random_hex = self.gen_hex_string(20);
-                Ok(format!("{}{}", ts_hex, random_hex))
+                // A TSID (tsid-creator): 64 bits = 42-bit milliseconds since
+                // 2020-01-01T00:00:00Z, 10 node bits, 12 counter bits, written as
+                // 13 Crockford base32 characters (the first carries 4 bits, so
+                // it is at most F).
+                let crockford = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+                let range_ms: u64 = 315_360_000_000; // ~10 years after the epoch
+                let ms = self.rng.gen_range(0..range_ms);
+                let node: u64 = self.rng.gen_range(0..1024);
+                let counter: u64 = self.rng.gen_range(0..4096);
+                let id: u64 = (ms << 22) | (node << 12) | counter;
+                let tsid: String = (0..13)
+                    .map(|i| crockford[((id >> (5 * (12 - i))) & 31) as usize] as char)
+                    .collect();
+                Ok(tsid)
             }
             ("identifier", "snowflake_id") => {
                 // Twitter snowflake: (timestamp_ms - epoch) << 22 | worker << 12 | sequence
