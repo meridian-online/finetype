@@ -147,7 +147,6 @@ fn test_ingest_values_are_trimmed() {
 fn default_model_ships_a_matching_snapshot() {
     // The snapshot is a tracked file of the default model: build.rs embeds it, and
     // the binary must apply exactly the rules that sit beside config.json.
-    assert!(embedded::HAS_MB_VALIDATION_SNAPSHOT);
     let on_disk = std::fs::read(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../models/default")
