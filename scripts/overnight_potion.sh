@@ -15,6 +15,16 @@
 #   ./scripts/overnight_potion.sh --potion minishlab/potion-base-4M --two-view minishlab/potion-base-32M \
 #        --config models/m2v-tv-4m32m-244-config.json --tag m2v-tv-4m32m
 #   ./scripts/overnight_potion.sh --score-only        # reuse models, just rescore
+#
+# Validation rules: the training file's validation features are computed under the
+# rules in labels/ when STEP 1 builds it, so STEP 1 also writes
+# "$FTMB.validation_snapshot.json" beside it, and each trained model gets a copy of
+# that file (its keys checked against the injected type_index_keys), not a fresh
+# snapshot taken after training. A reused $FTMB is refused when the sidecar is
+# missing or differs from a fresh snapshot of the live labels, since its features
+# were then computed under other rules. Set ALLOW_STALE_FTMB=1 to proceed anyway;
+# each model then gets a snapshot of the live labels, which its training features
+# do not match.
 set -eo pipefail
 cd "$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -91,8 +101,24 @@ if [[ "$SCORE_ONLY" != "true" ]]; then
   echo "--- STEP 1: build training FTMB (potion embed, full width) ---"
   SV_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && SV_ARG=(--store-values "$STORE_VALUES")
   [[ "$STORE_VALUES" -gt 0 ]] && echo "  per-value attention: storing $STORE_VALUES values/record (FTMB v6)"
+  SNAP_BIN=(cargo run -q -p finetype-build-tools --bin write_validation_snapshot --)
+  SIDECAR="$FTMB.validation_snapshot.json"
+  KEYS_FILE="$FTMB.type_index_keys.json"
+  echo '["test"]' | "$BIN" extract-features --json --header "test" --validation 2>/dev/null | \
+    "$PY" -c "import json,sys; print(json.dumps(json.load(sys.stdin)['type_index_keys']))" > "$KEYS_FILE" \
+    || { echo "FAIL: cannot derive type_index_keys from $BIN"; exit 1; }
   if [[ ! -f "$FTMB" ]]; then
     "$PY" scripts/build_ftmb_v5_potion.py --potion "$POTION" "${TV_ARG[@]}" "${SV_ARG[@]}" --output "$FTMB" --workers 8
+    "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --out "$SIDECAR"
+  elif ! "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --check "$SIDECAR"; then
+    if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
+      echo "WARN: $FTMB was built under other validation rules; ALLOW_STALE_FTMB=1, proceeding"
+      SIDECAR=""
+    else
+      echo "FAIL: $FTMB has no validation snapshot matching the live labels, so its validation"
+      echo "      features come from other rules. Delete it to rebuild, or set ALLOW_STALE_FTMB=1."
+      exit 1
+    fi
   fi
   # GATE: dims + truncation. A misaligned binary doesn't crash training — it wastes the night.
   VERIFY_OUT=$("$PY" scripts/read_ftmb.py "$FTMB" --stats --verify 2>&1) || { echo "$VERIFY_OUT"; echo "FAIL: read_ftmb verify"; exit 1; }
@@ -152,11 +178,17 @@ print(f'Injected {len(c[\"type_index_keys\"])} type_index_keys')
       fi
     fi
 
-    # Freeze the validation rules beside config.json (after the keys above exist),
-    # so this model keeps them when labels/ later changes. Refuses a rule that does
-    # not compile.
+    # Freeze the validation rules the training file was built under beside
+    # config.json, so this model keeps them when labels/ later changes. The sidecar
+    # is only copied once it is shown to hold exactly the injected keys.
     if grep -q '"type_index_keys"' "$SAVED_CONFIG"; then
-      cargo run -q -p finetype-build-tools --bin write_validation_snapshot -- "$OUT"
+      if [[ -n "$SIDECAR" ]]; then
+        cargo run -q -p finetype-build-tools --bin write_validation_snapshot -- "$OUT" --check "$SIDECAR" \
+          || { echo "FAIL: $SIDECAR does not match $OUT's type_index_keys"; exit 1; }
+        cp "$SIDECAR" "$OUT/validation_snapshot.json"
+      else
+        cargo run -q -p finetype-build-tools --bin write_validation_snapshot -- "$OUT"
+      fi
     fi
   done
 fi

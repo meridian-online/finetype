@@ -108,11 +108,38 @@ upload only shows up as a model that disagrees with its training.
 #### 2b. Serve the model to the DuckDB extension (only when the extension should switch to it)
 
 The DuckDB extension reads the repo **root**: `model.safetensors`, `config.json`, `label_map.json`,
-`model2vec/` and `validation_snapshot.json`. Publish these as one set, from the same model, in one step:
-a root snapshot paired with another model's weights validates that model against the wrong rules without
-any warning. When the model being served has no snapshot, delete the root snapshot
-(`api.delete_file("validation_snapshot.json", repo_id=..., repo_type="model")`) rather than leave an old
-one in place. Then check the root copy:
+`model2vec/` and `validation_snapshot.json`. It does not fetch `value_model2vec/`
+(`resolve_model_dir` in `crates/finetype-duckdb/src/lib.rs`), so a **dual-encoder model** (one whose
+`config.json` sets `value_embed_model`, as the current default does) cannot be served at the root until
+the extension fetches that directory; serve a single-encoder model, or change the extension first.
+
+Publish the root set as one set, from the same model, in one commit: a root snapshot paired with another
+model's weights validates that model against the wrong rules without any warning, and separate uploads
+leave a window where the root is mixed. Stage the files and commit them together:
+```python
+import os
+from huggingface_hub import HfApi, CommitOperationAdd, CommitOperationDelete
+api = HfApi()
+ops = [CommitOperationAdd(path_in_repo=name, path_or_fileobj=f"{model_dir}/{name}")
+       for name in ("model.safetensors", "config.json", "label_map.json", "validation_snapshot.json")]
+ops += [CommitOperationAdd(path_in_repo=f"model2vec/{f}", path_or_fileobj=f"{model_dir}/model2vec/{f}")
+        for f in os.listdir(f"{model_dir}/model2vec")]
+# A model with no snapshot must not leave an old root snapshot in place:
+# ops = [o for o in ops if o.path_in_repo != "validation_snapshot.json"]
+# ops.append(CommitOperationDelete(path_in_repo="validation_snapshot.json"))
+api.create_commit(repo_id="meridian-online/finetype-model", repo_type="model", operations=ops,
+                  commit_message=f"Serve {model_name} at the root")
+```
+(`upload_folder` from a directory holding just those files also commits once.)
+
+A model trained before snapshots existed has none. Write its root snapshot from the labels of **that
+model's training commit**, never from the current `labels/`, whose rules the model was not trained under:
+```bash
+git worktree add ../finetype-train-labels <training-commit>
+cargo run -q -p finetype-build-tools --bin write_validation_snapshot -- <model_dir> --labels ../finetype-train-labels/labels
+git worktree remove ../finetype-train-labels
+```
+Then check the root copy:
 ```bash
 curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/validation_snapshot.json"
 ```
