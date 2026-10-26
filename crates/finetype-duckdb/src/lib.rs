@@ -69,8 +69,8 @@ const HF_REPO: &str = "meridian-online/finetype-model";
 const MODEL_FILES: &[&str] = &["model.safetensors", "label_map.json", "config.json"];
 
 /// The model's frozen validation rules. Optional: models published before the
-/// snapshot existed lack it, and `MultiBranchClassifier::load` then reads the
-/// live taxonomy as it always did.
+/// snapshot existed lack it, and the model then validates against the
+/// extension's compiled-in rules.
 const VALIDATION_SNAPSHOT: &str = finetype_core::validator_snapshot::SNAPSHOT_FILE;
 
 /// Model2Vec files (embed + header branches) — fetched from the `model2vec/`

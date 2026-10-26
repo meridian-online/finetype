@@ -80,19 +80,16 @@ for file in files:
         commit_message=f"Add {model_name}/{file}"
     )
 
-# The validation snapshot is read from TWO places, so it is uploaded to both:
-# the repo root (the DuckDB extension resolves top-level files) and
-# `{model_name}/` (what .github/scripts/download-model.sh reads).
+# The model's frozen validation rules go beside its weights.
 snapshot = Path(model_dir) / "validation_snapshot.json"
 if snapshot.is_file():
-    for path_in_repo in ("validation_snapshot.json", f"{model_name}/validation_snapshot.json"):
-        api.upload_file(
-            path_or_fileobj=str(snapshot),
-            path_in_repo=path_in_repo,
-            repo_id="meridian-online/finetype-model",
-            repo_type="model",
-            commit_message=f"Add {path_in_repo}"
-        )
+    api.upload_file(
+        path_or_fileobj=str(snapshot),
+        path_in_repo=f"{model_name}/validation_snapshot.json",
+        repo_id="meridian-online/finetype-model",
+        repo_type="model",
+        commit_message=f"Add {model_name}/validation_snapshot.json"
+    )
 ```
 
 Where `model_name` is the directory basename (e.g. `sherlock-v11`).
@@ -103,12 +100,23 @@ install time, not at release time):
 ```bash
 curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/{model_name}/model.safetensors"
 curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/{model_name}/value_model2vec/model.safetensors"  # dual-encoder only
-curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/validation_snapshot.json"                 # DuckDB extension reads the repo root
 curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/{model_name}/validation_snapshot.json"   # download-model.sh reads this one
 ```
-A reader that cannot fetch the snapshot does not fail; it falls back to its compiled-in rules (the
-DuckDB extension logs a warning), so a missing upload only shows up as a model that disagrees with its
-training. Check both URLs.
+A reader that cannot fetch the snapshot does not fail; it falls back to its compiled-in rules, so a missing
+upload only shows up as a model that disagrees with its training.
+
+#### 2b. Serve the model to the DuckDB extension (only when the extension should switch to it)
+
+The DuckDB extension reads the repo **root**: `model.safetensors`, `config.json`, `label_map.json`,
+`model2vec/` and `validation_snapshot.json`. Publish these as one set, from the same model, in one step:
+a root snapshot paired with another model's weights validates that model against the wrong rules without
+any warning. When the model being served has no snapshot, delete the root snapshot
+(`api.delete_file("validation_snapshot.json", repo_id=..., repo_type="model")`) rather than leave an old
+one in place. Then check the root copy:
+```bash
+curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/validation_snapshot.json"
+```
+Release the extension afterwards; it logs a warning when it finds no snapshot.
 
 ### 3. Update Default Symlink
 
@@ -150,7 +158,8 @@ Report:
 Released {model_name} to HuggingFace.
 
   HF repo:  meridian-online/finetype-model
-  Files:    {model_name}/model.safetensors, config.json, label_map.json
+  Files:    {model_name}/model.safetensors, config.json, label_map.json, validation_snapshot.json
+  Root:     served to the DuckDB extension? (2b: model files + validation_snapshot.json as one set, or not changed)
   Default:  models/default → {model_name}
   Eval:     {score}/{total} ({pct}% label)
 
