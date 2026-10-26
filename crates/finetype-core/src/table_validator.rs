@@ -7,7 +7,7 @@
 //! This module is consumed by the CLI `validate` command and the DuckDB
 //! extension.
 
-use crate::grade::NoteKind;
+use crate::grade::{NoteKind, NotesMatcher};
 use crate::quality::FileQualityGrade;
 use jsonschema::error::{TypeKind, ValidationErrorKind};
 use serde::Serialize;
@@ -25,6 +25,8 @@ pub enum TableValidatorError {
     MissingProperties,
     #[error("Failed to compile schema for column '{column}': {detail}")]
     SchemaCompilation { column: String, detail: String },
+    #[error("Invalid validation notes for column '{column}': {detail}")]
+    InvalidNotes { column: String, detail: String },
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -247,56 +249,6 @@ fn build_checksum_check(col_schema: &Value) -> Option<ChecksumCheck> {
     Some(ChecksumCheck { scheme, verify })
 }
 
-/// Per-column notes, compiled once from the column schema's extensions.
-///
-/// Reads `x-finetype-historic` and `x-finetype-canonical` off the property so a
-/// stored schema works without the taxonomy. Historic values fold case, like
-/// `EnumCheck`, and win over the canonical pattern, as in `grade`.
-struct NotesCheck {
-    /// Lower-cased withdrawn values.
-    historic: HashSet<String>,
-    canonical: Option<(NoteKind, regex::Regex)>,
-}
-
-fn build_notes_check(col_schema: &Value) -> Option<NotesCheck> {
-    let historic: HashSet<String> = col_schema
-        .get("x-finetype-historic")
-        .and_then(|h| h.as_array())
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|i| i.get("value")?.as_str())
-                .map(|v| v.to_lowercase())
-                .collect()
-        })
-        .unwrap_or_default();
-    let canonical = col_schema.get("x-finetype-canonical").and_then(|c| {
-        let kind: NoteKind = serde_json::from_value(c.get("kind")?.clone()).ok()?;
-        let re = regex::Regex::new(c.get("pattern")?.as_str()?).ok()?;
-        Some((kind, re))
-    });
-    if historic.is_empty() && canonical.is_none() {
-        return None;
-    }
-    Some(NotesCheck {
-        historic,
-        canonical,
-    })
-}
-
-impl NotesCheck {
-    /// The note a valid value carries, if any.
-    fn note(&self, value: &str) -> Option<NoteKind> {
-        if self.historic.contains(&value.to_lowercase()) {
-            return Some(NoteKind::Withdrawn);
-        }
-        match &self.canonical {
-            Some((kind, re)) if !re.is_match(value) => Some(*kind),
-            _ => None,
-        }
-    }
-}
-
 /// Split a column schema into a jsonschema validator (with `enum` removed), an
 /// optional case-folded `EnumCheck`, and an optional `ChecksumCheck`. When the
 /// schema carries no `enum`, the validator is compiled unchanged and the check
@@ -410,19 +362,25 @@ pub fn validate_table(
         jsonschema::Validator,
         Option<EnumCheck>,
         Option<ChecksumCheck>,
-        Option<NotesCheck>,
+        Option<NotesMatcher>,
     )> = Vec::new();
     for (col_name, col_schema) in properties {
         if let Some(&col_idx) = header_index.get(col_name.as_str()) {
             let (validator, enum_check, checksum_check) =
                 build_column_validator(col_name, col_schema)?;
+            let notes_check = NotesMatcher::from_schema_property(col_schema).map_err(|e| {
+                TableValidatorError::InvalidNotes {
+                    column: col_name.clone(),
+                    detail: e.to_string(),
+                }
+            })?;
             validators.push((
                 col_idx,
                 col_name.clone(),
                 validator,
                 enum_check,
                 checksum_check,
-                build_notes_check(col_schema),
+                notes_check,
             ));
         }
         // Columns in schema but not in data are tracked in missing_columns
@@ -555,7 +513,11 @@ pub fn validate_table(
                     stats.0 += 1;
                 }
                 // A valid value can still carry a note; it stays valid.
-                if let Some(kind) = notes_check.as_ref().and_then(|n| n.note(value_str)) {
+                if let Some(kind) = notes_check
+                    .as_ref()
+                    .and_then(|n| n.note(value_str))
+                    .map(|n| n.kind)
+                {
                     let entry = notes_by_col.entry(*col_idx).or_insert_with(|| ColumnNotes {
                         column_name: col_name.clone(),
                         counts: BTreeMap::new(),
@@ -783,6 +745,38 @@ mod tests {
         let notes = &result.column_notes[0];
         assert_eq!(notes.counts[&NoteKind::Withdrawn], 1);
         assert_eq!(notes.examples, vec!["DEM".to_string()]);
+    }
+
+    #[test]
+    fn malformed_note_extensions_are_errors() {
+        let bad = |prop: Value| {
+            let schema = json!({ "type": "object", "properties": { "c": prop } });
+            validate_table(&["c".into()], &[vec![s("x")]], &schema)
+        };
+        let bad_kind = bad(json!({
+            "type": "string",
+            "x-finetype-canonical": { "kind": "bogus", "name": "n", "pattern": "x" }
+        }));
+        assert!(matches!(
+            bad_kind,
+            Err(TableValidatorError::InvalidNotes { .. })
+        ));
+        let bad_pattern = bad(json!({
+            "type": "string",
+            "x-finetype-canonical": { "kind": "nonstandard", "name": "n", "pattern": "(" }
+        }));
+        assert!(matches!(
+            bad_pattern,
+            Err(TableValidatorError::InvalidNotes { .. })
+        ));
+        let bad_historic = bad(json!({
+            "type": "string",
+            "x-finetype-historic": [{ "value": "A" }]
+        }));
+        assert!(matches!(
+            bad_historic,
+            Err(TableValidatorError::InvalidNotes { .. })
+        ));
     }
 
     #[test]

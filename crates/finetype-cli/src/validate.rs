@@ -537,6 +537,9 @@ pub(crate) fn cmd_validate_table(
     Ok(())
 }
 
+/// Characters of the first example shown on a noted column's line.
+const NOTE_EXAMPLE_CHARS: usize = 12;
+
 /// One line for a column with noted values: `uuid: 1 non_canonical (e.g. 550E8400-…)`.
 /// Noted values are valid, so this sits apart from the reject counts.
 fn format_column_notes(notes: &finetype_core::ColumnNotes) -> String {
@@ -553,8 +556,8 @@ fn format_column_notes(notes: &finetype_core::ColumnNotes) -> String {
         .collect();
     let mut line = format!("{}: {}", notes.column_name, counts.join(", "));
     if let Some(first) = notes.examples.first() {
-        let shown: String = first.chars().take(12).collect();
-        let ellipsis = if first.chars().count() > 12 {
+        let shown: String = first.chars().take(NOTE_EXAMPLE_CHARS).collect();
+        let ellipsis = if first.chars().count() > NOTE_EXAMPLE_CHARS {
             "…"
         } else {
             ""

@@ -4,9 +4,11 @@
 //! case: a value the published rule accepts that a type's `validation_notes`
 //! still flags, such as an upper-case UUID or a withdrawn currency code.
 
-use crate::taxonomy::Taxonomy;
+use crate::taxonomy::{Taxonomy, ValidationNotes};
 use crate::validator::validate_value_for_label;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use thiserror::Error;
 
 /// Why an accepted value carries a note.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -26,6 +28,86 @@ pub struct Note {
     pub kind: NoteKind,
     /// `"lowercase"`, `"withdrawn 2023-01"`, …
     pub detail: String,
+}
+
+/// A `validation_notes` block (or a schema property's note extensions) that
+/// cannot be compiled: an unknown kind or a pattern that is not a regex.
+#[derive(Error, Debug)]
+#[error("invalid validation notes: {0}")]
+pub struct NotesError(pub String);
+
+/// The note rule compiled once: historic values first (case-folded, like enum
+/// matching), then a miss on the canonical pattern. The single home of that
+/// rule, used by `grade_value_for_label` and by the table validator.
+#[derive(Debug, Clone)]
+pub struct NotesMatcher {
+    /// Lower-cased withdrawn value → `until`; the first listing wins.
+    historic: HashMap<String, String>,
+    canonical: Option<(NoteKind, String, regex::Regex)>,
+}
+
+impl NotesMatcher {
+    /// Compile `notes`; fails if the canonical pattern is not a valid regex.
+    pub fn compile(notes: &ValidationNotes) -> Result<Self, NotesError> {
+        let mut historic = HashMap::new();
+        for h in &notes.historic {
+            historic
+                .entry(h.value.to_lowercase())
+                .or_insert_with(|| h.until.clone());
+        }
+        let canonical = match &notes.canonical {
+            Some(c) => {
+                let re = regex::Regex::new(&c.pattern)
+                    .map_err(|e| NotesError(format!("canonical pattern: {e}")))?;
+                Some((c.kind, c.name.clone(), re))
+            }
+            None => None,
+        };
+        Ok(Self {
+            historic,
+            canonical,
+        })
+    }
+
+    /// Build from a schema property's `x-finetype-canonical` /
+    /// `x-finetype-historic` extensions, as `emit_table_schema` writes them.
+    /// `Ok(None)` when the property carries neither.
+    pub fn from_schema_property(prop: &serde_json::Value) -> Result<Option<Self>, NotesError> {
+        let canonical = prop.get("x-finetype-canonical");
+        let historic = prop.get("x-finetype-historic");
+        if canonical.is_none() && historic.is_none() {
+            return Ok(None);
+        }
+        let notes = ValidationNotes {
+            canonical: canonical
+                .map(|c| serde_json::from_value(c.clone()))
+                .transpose()
+                .map_err(|e| NotesError(format!("x-finetype-canonical: {e}")))?,
+            historic: historic
+                .map(|h| serde_json::from_value(h.clone()))
+                .transpose()
+                .map_err(|e| NotesError(format!("x-finetype-historic: {e}")))?
+                .unwrap_or_default(),
+        };
+        Self::compile(&notes).map(Some)
+    }
+
+    /// The note an accepted `value` carries, if any.
+    pub fn note(&self, value: &str) -> Option<Note> {
+        if let Some(until) = self.historic.get(&value.to_lowercase()) {
+            return Some(Note {
+                kind: NoteKind::Withdrawn,
+                detail: format!("withdrawn {until}"),
+            });
+        }
+        match &self.canonical {
+            Some((kind, name, re)) if !re.is_match(value) => Some(Note {
+                kind: *kind,
+                detail: name.clone(),
+            }),
+            _ => None,
+        }
+    }
 }
 
 /// The grade of one value against one type.
@@ -91,30 +173,23 @@ pub fn grade_value_for_label(value: &str, label: &str, tax: &Taxonomy) -> Grade 
     let Some(notes) = &def.validation_notes else {
         return Grade::Conforms;
     };
-    // Enum matching folds case, so a historic value does too.
-    let folded = value.to_lowercase();
-    if let Some(h) = notes
-        .historic
-        .iter()
-        .find(|h| h.value.to_lowercase() == folded)
-    {
-        return Grade::Noted(Note {
-            kind: NoteKind::Withdrawn,
-            detail: format!("withdrawn {}", h.until),
-        });
-    }
-    if let Some(c) = &notes.canonical {
-        // A pattern that does not compile is rejected by `Taxonomy::validate`.
-        if let Ok(re) = regex::Regex::new(&c.pattern) {
-            if !re.is_match(value) {
-                return Grade::Noted(Note {
-                    kind: c.kind,
-                    detail: c.name.clone(),
-                });
+    // The taxonomy's compiled cache when it has one, else compile for this call.
+    // A pattern that does not compile is rejected by `Taxonomy::validate`.
+    let owned;
+    let matcher = match tax.get_notes_matcher(label) {
+        Some(m) => m,
+        None => match NotesMatcher::compile(notes) {
+            Ok(m) => {
+                owned = m;
+                &owned
             }
-        }
+            Err(_) => return Grade::Conforms,
+        },
+    };
+    match matcher.note(value) {
+        Some(note) => Grade::Noted(note),
+        None => Grade::Conforms,
     }
-    Grade::Conforms
 }
 
 #[cfg(test)]

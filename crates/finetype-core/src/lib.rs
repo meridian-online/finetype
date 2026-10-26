@@ -39,7 +39,7 @@ pub use frictionless_vocabulary::{
     constraint_allowed, constraint_vocabulary, is_profile_field_type, PROFILE_FIELD_TYPES,
 };
 pub use generator::{Generator, Sample};
-pub use grade::{grade_value_for_label, Grade, Note, NoteKind};
+pub use grade::{grade_value_for_label, Grade, Note, NoteKind, NotesError, NotesMatcher};
 pub use json_reader::{collect_json, collect_ndjson, JsonPathMap};
 pub use quality::{
     compute_column_quality, compute_file_grade, ColumnQualityScore, FileQualityGrade,

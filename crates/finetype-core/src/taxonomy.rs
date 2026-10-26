@@ -635,6 +635,8 @@ pub struct Taxonomy {
     /// Populated via `compile_locale_validators()`. `None` until first call.
     compiled_locale_validators:
         Option<HashMap<String, HashMap<String, crate::validator::CompiledValidator>>>,
+    /// Compiled `validation_notes` keyed by label, filled by `compile_validators()`.
+    compiled_notes: Option<HashMap<String, crate::grade::NotesMatcher>>,
 }
 
 // Manual Debug: jsonschema::Validator doesn't implement Debug
@@ -671,6 +673,7 @@ impl Clone for Taxonomy {
             labels: self.labels.clone(),
             compiled_validators: None,
             compiled_locale_validators: None,
+            compiled_notes: None,
         }
     }
 }
@@ -712,6 +715,7 @@ impl Taxonomy {
             labels,
             compiled_validators: None,
             compiled_locale_validators: None,
+            compiled_notes: None,
         })
     }
 
@@ -789,6 +793,7 @@ impl Taxonomy {
             labels,
             compiled_validators: None,
             compiled_locale_validators: None,
+            compiled_notes: None,
         })
     }
 
@@ -809,6 +814,7 @@ impl Taxonomy {
             labels,
             compiled_validators: None,
             compiled_locale_validators: None,
+            compiled_notes: None,
         })
     }
 
@@ -928,6 +934,22 @@ impl Taxonomy {
             }
         }
         self.compiled_validators = Some(cache);
+
+        let notes = self
+            .definitions
+            .iter()
+            .filter_map(|(label, def)| {
+                let m = crate::grade::NotesMatcher::compile(def.validation_notes.as_ref()?).ok()?;
+                Some((label.clone(), m))
+            })
+            .collect();
+        self.compiled_notes = Some(notes);
+    }
+
+    /// The compiled notes matcher for a label, once `compile_validators()` has
+    /// run. `None` if not compiled or the label has no notes.
+    pub fn get_notes_matcher(&self, label: &str) -> Option<&crate::grade::NotesMatcher> {
+        self.compiled_notes.as_ref().and_then(|c| c.get(label))
     }
 
     /// Get a pre-compiled validator for a label.
