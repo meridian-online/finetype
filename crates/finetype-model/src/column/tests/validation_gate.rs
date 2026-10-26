@@ -258,3 +258,35 @@ fn abbreviated_month_constant_column_keeps_type() {
         assert!(schema_fail_demotion(&values, ABBREVIATED_MONTH, &tax).is_none());
     }
 }
+
+/// A column of one repeated RFC 3339 value with a fraction (or a lower-case
+/// `z`), which the old rule rejected, is not vetoed or demoted.
+#[test]
+fn rfc_3339_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const RFC_3339: &str = "datetime.timestamp.rfc_3339";
+    let tax = super::shipped_taxonomy();
+    for value in ["2024-01-01 10:00:00.123+05:30", "2024-01-01 10:00:00z"] {
+        let values: Vec<String> = vec![value.to_string(); 40];
+        let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+        let veto = evaluate_validation_veto(RFC_3339, &refs, &tax, &audited_safe_labels());
+        assert!(!veto.vetoed, "{value}: vetoed: {veto:?}");
+        assert!(schema_fail_demotion(&values, RFC_3339, &tax).is_none());
+    }
+}
+
+/// A column of one repeated `+05` offset (or lower-case `t`), which the old rule
+/// rejected, is not vetoed or demoted.
+#[test]
+fn iso_8601_offset_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const ISO_8601_OFFSET: &str = "datetime.timestamp.iso_8601_offset";
+    let tax = super::shipped_taxonomy();
+    for value in ["2024-01-01T10:00:00+05", "2024-01-01t10:00:00+05:30"] {
+        let values: Vec<String> = vec![value.to_string(); 40];
+        let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+        let veto = evaluate_validation_veto(ISO_8601_OFFSET, &refs, &tax, &audited_safe_labels());
+        assert!(!veto.vetoed, "{value}: vetoed: {veto:?}");
+        assert!(schema_fail_demotion(&values, ISO_8601_OFFSET, &tax).is_none());
+    }
+}

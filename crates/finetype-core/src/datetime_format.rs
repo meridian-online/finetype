@@ -536,6 +536,40 @@ mod tests {
         );
     }
 
+    /// The published rules for `iso_8601_offset` and `rfc_3339` accept more than
+    /// this detector reads; pin where each accepted form routes, so a change to
+    /// either rule shows up here.
+    #[test]
+    fn offset_forms_route_to_the_same_leaves() {
+        for v in [
+            "2024-01-01T10:00:00+05:30",
+            "2024-01-01T10:00:00+0530",
+            "2024-01-01 10:00:00 +0000",
+            "2024-01-01 10:00:00+05:30",
+        ] {
+            let want = if v.contains('T') {
+                "datetime.timestamp.iso_8601_offset"
+            } else {
+                "datetime.timestamp.rfc_3339"
+            };
+            assert_eq!(leaf(&[v, v, v]), Some(want), "{v}");
+        }
+        assert_eq!(
+            leaf(&["2024-01-01 10:00:00Z"]),
+            Some("datetime.timestamp.iso_space_zulu")
+        );
+        // The detector does not read these; the published rule accepts them.
+        for v in [
+            "2024-01-01T10:00:00+05",
+            "2024-01-01t10:00:00+05:30",
+            "2024-01-01T10:00:00+5:30",
+            "2024-01-01 10:00:00z",
+            "2024-01-01 10:00:00.123+05:30",
+        ] {
+            assert_eq!(leaf(&[v, v, v]), None, "{v}");
+        }
+    }
+
     #[test]
     fn iso_date_and_year_month() {
         assert_eq!(

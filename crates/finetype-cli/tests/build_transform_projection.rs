@@ -403,3 +403,63 @@ fn abbreviated_month_transform_casts_every_accepted_form() {
         .expect("run the duckdb CLI");
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "true");
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn offset_timestamp_transforms_parse_every_accepted_form() {
+    // Runs the published transforms through the external `duckdb` CLI, in UTC.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let rfc_3339: &[(&str, &str)] = &[
+        ("2024-01-01 10:00:00Z", "2024-01-01 10:00:00+00"),
+        ("2024-01-01 10:00:00z", "2024-01-01 10:00:00+00"),
+        (
+            "2024-01-01 10:00:00.123+05:30",
+            "2024-01-01 04:30:00.123+00",
+        ),
+        ("2024-01-01 10:00:00+05:30", "2024-01-01 04:30:00+00"),
+        ("2024-01-01 10:00:00+0530", "2024-01-01 04:30:00+00"),
+        ("2024-01-01 10:00:00 +0000", "2024-01-01 10:00:00+00"),
+        ("2024-01-01 10:00:00 -05:00", "2024-01-01 15:00:00+00"),
+    ];
+    let iso_8601_offset: &[(&str, &str)] = &[
+        ("2024-01-01T10:00:00+05:30", "2024-01-01 04:30:00+00"),
+        ("2024-01-01T10:00:00+0530", "2024-01-01 04:30:00+00"),
+        ("2024-01-01T10:00:00+05", "2024-01-01 05:00:00+00"),
+        ("2024-01-01t10:00:00+05:30", "2024-01-01 04:30:00+00"),
+        ("2024-01-01T10:00:00+5:30", "2024-01-01 04:30:00+00"),
+        ("2024-01-01T10:00:00+5", "2024-01-01 05:00:00+00"),
+        ("2024-01-01T10:00:00-08:00", "2024-01-01 18:00:00+00"),
+    ];
+    for (label, cases) in [
+        ("datetime.timestamp.rfc_3339", rfc_3339),
+        ("datetime.timestamp.iso_8601_offset", iso_8601_offset),
+    ] {
+        let transform = tax
+            .ddl_info(label)
+            .unwrap_or_else(|| panic!("{label} is a known label"))
+            .transform
+            .clone()
+            .unwrap_or_else(|| panic!("{label} has a transform"));
+        for (value, expected) in cases {
+            let sql = format!(
+                "SET TimeZone='UTC'; SELECT {}",
+                transform.replace("{col}", &format!("'{}'", value))
+            );
+            let out = Command::new("duckdb")
+                .args(["-no-init", "-noheader", "-list", "-c", &sql])
+                .output()
+                .expect("run the duckdb CLI");
+            assert!(
+                out.status.success(),
+                "duckdb failed on {label} {value:?}: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            assert_eq!(
+                String::from_utf8_lossy(&out.stdout).trim(),
+                *expected,
+                "{label} {value:?}"
+            );
+        }
+    }
+}

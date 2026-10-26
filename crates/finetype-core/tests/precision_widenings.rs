@@ -577,3 +577,112 @@ fn abbreviated_month_accepts_source_forms() {
 fn abbreviated_month_rejects_undefined_forms() {
     assert_pattern_boundary(ABBREVIATED_MONTH_LABEL, &[], ABBREVIATED_MONTH_REJECT);
 }
+
+const RFC_3339_LABEL: &str = "datetime.timestamp.rfc_3339";
+// RFC 3339 section 5.6: a numeric offset is a sign, two-digit hours, a colon and
+// two-digit minutes; the fraction of a second is optional; section 5.6 also
+// permits lower-case `t` and `z`.
+const RFC_3339_ACCEPT: &[&str] = &[
+    "2024-01-01 10:00:00Z",
+    "2024-01-01 10:00:00.123+05:30",
+    "2024-01-01 10:00:00z",
+    "2024-01-01 10:00:00+05:30",
+    "2024-01-01 10:00:00+0530",
+    "2024-01-01 10:00:00 +0000",
+];
+const RFC_3339_REJECT: &[&str] = &[
+    "2024-01-01 10:00:00+5:30",
+    "2024-01-01 10:00:00",
+    "2024-01-01T10:00:00Z",
+    "2024-01-01 10:00:00.+05:30",
+];
+
+#[test]
+fn rfc_3339_accepts_source_forms() {
+    assert_pattern_boundary(RFC_3339_LABEL, RFC_3339_ACCEPT, &[]);
+}
+
+#[test]
+fn rfc_3339_rejects_undefined_forms() {
+    assert_pattern_boundary(RFC_3339_LABEL, &[], RFC_3339_REJECT);
+}
+
+#[test]
+fn rfc_3339_grades_offset_forms() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in [
+        "2024-01-01 10:00:00Z",
+        "2024-01-01 10:00:00.123+05:30",
+        "2024-01-01 10:00:00z",
+        "2024-01-01 10:00:00+05:30",
+    ] {
+        assert_eq!(
+            grade_value_for_label(value, RFC_3339_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    for value in ["2024-01-01 10:00:00 +0000", "2024-01-01 10:00:00+0530"] {
+        match grade_value_for_label(value, RFC_3339_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::Nonstandard, "{value}");
+                assert_eq!(note.detail, "RFC 3339 offset", "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
+        }
+    }
+}
+
+const ISO_8601_OFFSET_LABEL: &str = "datetime.timestamp.iso_8601_offset";
+// ISO 8601 writes the offset as a sign, two-digit hours and optional minutes,
+// with or without a colon; lower-case `t` is accepted.
+const ISO_8601_OFFSET_ACCEPT: &[&str] = &[
+    "2024-01-01T10:00:00+05:30",
+    "2024-01-01T10:00:00+0530",
+    "2024-01-01T10:00:00+05",
+    "2024-01-01t10:00:00+05:30",
+    "2024-01-01T10:00:00+5:30",
+    "2024-01-01T10:00:00-08:00",
+];
+const ISO_8601_OFFSET_REJECT: &[&str] = &[
+    "2024-01-01T10:00:00",
+    "2024-01-01T10:00:00Z",
+    "2024-01-01 10:00:00+05:30",
+    "2024-01-01T10:00:00+123:45",
+    "2024-01-01T10:00:00+05:3",
+];
+
+#[test]
+fn iso_8601_offset_accepts_source_forms() {
+    assert_pattern_boundary(ISO_8601_OFFSET_LABEL, ISO_8601_OFFSET_ACCEPT, &[]);
+}
+
+#[test]
+fn iso_8601_offset_rejects_undefined_forms() {
+    assert_pattern_boundary(ISO_8601_OFFSET_LABEL, &[], ISO_8601_OFFSET_REJECT);
+}
+
+#[test]
+fn iso_8601_offset_grades_one_digit_hour_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in [
+        "2024-01-01T10:00:00+05:30",
+        "2024-01-01T10:00:00+0530",
+        "2024-01-01T10:00:00+05",
+    ] {
+        assert_eq!(
+            grade_value_for_label(value, ISO_8601_OFFSET_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    match grade_value_for_label("2024-01-01T10:00:00+5:30", ISO_8601_OFFSET_LABEL, &tax) {
+        Grade::Noted(note) => {
+            assert_eq!(note.kind, NoteKind::Nonstandard);
+            assert_eq!(note.detail, "two-digit offset hour");
+        }
+        other => panic!("+5:30 should be noted, got {other:?}"),
+    }
+}
