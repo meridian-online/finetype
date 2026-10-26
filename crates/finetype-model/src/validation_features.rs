@@ -8,8 +8,11 @@
 //! (regex, length, enum) and numeric range checks (min/max) — no additional
 //! range-checking code is needed.
 
+use crate::inference::InferenceError;
+use finetype_core::validator::CompiledValidator;
+use finetype_core::validator_snapshot::ValidatorSnapshot;
 use finetype_core::Taxonomy;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Pre-compiled validators for all taxonomy types, with a stable type-to-index mapping.
 ///
@@ -21,6 +24,9 @@ pub struct ValidationFeatureExtractor {
     type_keys: Vec<String>,
     /// Reverse mapping: type key → index in the feature vector.
     type_index: BTreeMap<String, usize>,
+    /// Validators frozen from a model's snapshot. When present they replace the
+    /// live taxonomy's, and a key with no entry is a frozen "no rule".
+    pinned: Option<HashMap<String, CompiledValidator>>,
 }
 
 impl ValidationFeatureExtractor {
@@ -39,6 +45,7 @@ impl ValidationFeatureExtractor {
         Self {
             type_keys,
             type_index,
+            pinned: None,
         }
     }
 
@@ -56,7 +63,34 @@ impl ValidationFeatureExtractor {
         Self {
             type_keys,
             type_index,
+            pinned: None,
         }
+    }
+
+    /// Build an extractor that validates against a model's own snapshot.
+    ///
+    /// The snapshot must list exactly `type_keys`; a mismatch, or a rule that
+    /// does not compile, is an error rather than a silent drift.
+    pub fn with_snapshot(
+        type_keys: Vec<String>,
+        snapshot: &ValidatorSnapshot,
+    ) -> Result<Self, InferenceError> {
+        let wanted: HashSet<&String> = type_keys.iter().collect();
+        let listed: HashSet<&String> = snapshot.keys().collect();
+        if wanted != listed {
+            return Err(InferenceError::InvalidPath(format!(
+                "validation snapshot lists {} keys but the model has {} type_index_keys, \
+                 and the sets differ",
+                listed.len(),
+                wanted.len(),
+            )));
+        }
+        let pinned = snapshot
+            .compile()
+            .map_err(|e| InferenceError::InvalidPath(format!("Bad validation snapshot: {e}")))?;
+        let mut extractor = Self::from_type_keys(type_keys);
+        extractor.pinned = Some(pinned);
+        Ok(extractor)
     }
 
     /// Number of dimensions in the validation feature vector.
@@ -78,7 +112,8 @@ impl ValidationFeatureExtractor {
     ///
     /// For each type in the taxonomy (in index order), computes the fraction
     /// of `values` that pass that type's [`CompiledValidator::is_valid()`] check.
-    /// Types without a compiled validator get 0.0.
+    /// Types without a compiled validator get 0.0; when the extractor is pinned to a
+    /// snapshot the live taxonomy is never consulted.
     ///
     /// # Returns
     /// A `Vec<f32>` of length `self.dim()`, where each element is in [0.0, 1.0].
@@ -92,7 +127,11 @@ impl ValidationFeatureExtractor {
         self.type_keys
             .iter()
             .map(|type_key| {
-                match taxonomy.get_validator(type_key) {
+                let validator = match &self.pinned {
+                    Some(pinned) => pinned.get(type_key),
+                    None => taxonomy.get_validator(type_key),
+                };
+                match validator {
                     Some(validator) => {
                         let pass_count = values
                             .iter()
@@ -134,6 +173,95 @@ mod tests {
         let mut taxonomy = Taxonomy::from_directory(&labels_dir).unwrap();
         taxonomy.compile_validators();
         taxonomy
+    }
+
+    fn repr_yaml() -> String {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("labels/definitions_representation.yaml");
+        std::fs::read_to_string(path).unwrap()
+    }
+
+    const UUID_STRICT: &str =
+        r#"pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$""#;
+
+    #[test]
+    fn pinned_extractor_ignores_live_rule_change() {
+        let taxonomy = load_taxonomy();
+        let keys = taxonomy.labels().to_vec();
+        let snapshot = ValidatorSnapshot::from_taxonomy(&taxonomy, &keys);
+        let pinned = ValidationFeatureExtractor::with_snapshot(keys.clone(), &snapshot).unwrap();
+        let unpinned = ValidationFeatureExtractor::from_type_keys(keys);
+
+        // The live taxonomy's uuid rule is loosened to accept upper case.
+        let yaml = repr_yaml();
+        assert!(yaml.contains(UUID_STRICT));
+        let loosened_yaml = yaml.replace(
+            UUID_STRICT,
+            r#"pattern: "^(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$""#,
+        );
+        let mut loosened = Taxonomy::from_yaml(&loosened_yaml).unwrap();
+        loosened.compile_validators();
+
+        let values = ["550E8400-E29B-41D4-A716-446655440000"; 5];
+        let idx = pinned.index_of("representation.identifier.uuid").unwrap();
+        assert_eq!(pinned.extract(&values, &loosened)[idx], 0.0);
+        assert_eq!(unpinned.extract(&values, &loosened)[idx], 1.0);
+    }
+
+    #[test]
+    fn pinned_extractor_never_falls_back_for_a_ruleless_key() {
+        let taxonomy = load_taxonomy();
+        let mut keys = taxonomy.labels().to_vec();
+        keys.push("test.frozen.no_rule".to_string());
+        keys.sort();
+        let snapshot = ValidatorSnapshot::from_taxonomy(&taxonomy, &keys);
+        let pinned = ValidationFeatureExtractor::with_snapshot(keys, &snapshot).unwrap();
+
+        // The live taxonomy has a rule for this key; the snapshot has none.
+        let live = Taxonomy::from_yaml(
+            "test.frozen.no_rule:\n  validation:\n    type: string\n    pattern: \".*\"\n",
+        );
+        let mut live = live.unwrap();
+        live.compile_validators();
+        assert!(live.get_validator("test.frozen.no_rule").is_some());
+
+        let idx = pinned.index_of("test.frozen.no_rule").unwrap();
+        assert_eq!(pinned.extract(&["abc"], &live)[idx], 0.0);
+    }
+
+    #[test]
+    fn extractor_without_snapshot_matches_today() {
+        let taxonomy = load_taxonomy();
+        let keys = taxonomy.labels().to_vec();
+        let from_keys = ValidationFeatureExtractor::from_type_keys(keys);
+        let from_tax = ValidationFeatureExtractor::new(&taxonomy);
+        let values = [
+            "US",
+            "40.7",
+            "550e8400-e29b-41d4-a716-446655440000",
+            "a@b.com",
+        ];
+        let a = from_keys.extract(&values, &taxonomy);
+        let b = from_tax.extract(&values, &taxonomy);
+        assert_eq!(
+            a.iter().map(|f| f.to_bits()).collect::<Vec<_>>(),
+            b.iter().map(|f| f.to_bits()).collect::<Vec<_>>()
+        );
+        assert!(a.iter().any(|&f| f > 0.0));
+    }
+
+    #[test]
+    fn snapshot_key_mismatch_is_an_error() {
+        let taxonomy = load_taxonomy();
+        let keys = taxonomy.labels().to_vec();
+        let mut short = keys.clone();
+        short.pop();
+        let snapshot = ValidatorSnapshot::from_taxonomy(&taxonomy, &short);
+        assert!(ValidationFeatureExtractor::with_snapshot(keys, &snapshot).is_err());
     }
 
     #[test]
