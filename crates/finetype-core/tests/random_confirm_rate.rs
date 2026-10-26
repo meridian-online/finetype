@@ -16,7 +16,10 @@
 //! exists for the label. Labels with no validation are omitted.
 //!
 //! Gate: `discrimination_ascii` must not exceed 0.5, since numeric types accept
-//! digit strings by design and the digit population is informational. Labels
+//! digit strings by design and the digit and token populations are informational
+//! (recorded and compared against the committed TSV, with no limit of their own).
+//! For every label and population, `discrimination_*` must not exceed
+//! `published_*`: a detector is stricter than the published rule by design. Labels
 //! already above 0.5 when the test landed are listed in `BASELINE_EXCEPTIONS`
 //! with the rate then measured; a listed label fails if its rate rises.
 //!
@@ -89,6 +92,64 @@ fn digit_population() -> Vec<String> {
         .collect()
 }
 
+const WORDS: &[&str] = &[
+    "apple", "table", "river", "green", "orange", "paper", "street", "yes", "no", "name", "total",
+    "open", "closed", "pending", "active", "north", "london", "alpha", "sample", "value",
+];
+
+fn token_population() -> Vec<String> {
+    const HEX: &[u8] = b"0123456789abcdef";
+    const ALNUM: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    (0..POPULATION)
+        .map(|_| {
+            // The explicit integer types fix the random stream the TSV was generated from.
+            match rng.gen_range(0u32..6) {
+                0 => WORDS[rng.gen_range(0..WORDS.len())].to_string(),
+                1 => {
+                    let len = [8usize, 32, 40, 64][rng.gen_range(0..4usize)];
+                    (0..len)
+                        .map(|_| HEX[rng.gen_range(0..HEX.len())] as char)
+                        .collect()
+                }
+                2 => {
+                    let hex: String = (0..32)
+                        .map(|_| HEX[rng.gen_range(0..HEX.len())] as char)
+                        .collect();
+                    let uuid = format!(
+                        "{}-{}-{}-{}-{}",
+                        &hex[0..8],
+                        &hex[8..12],
+                        &hex[12..16],
+                        &hex[16..20],
+                        &hex[20..32]
+                    );
+                    if rng.gen_range(0u32..2) == 0 {
+                        uuid
+                    } else {
+                        uuid.to_uppercase()
+                    }
+                }
+                3 => {
+                    let len = rng.gen_range(6u32..=20);
+                    (0..len)
+                        .map(|_| ALNUM[rng.gen_range(0..ALNUM.len())] as char)
+                        .collect()
+                }
+                4 => (0..3)
+                    .map(|_| (b'A' + rng.gen_range(0..26u8)) as char)
+                    .collect(),
+                _ => {
+                    let len = if rng.gen_range(0u32..2) == 0 { 10 } else { 13 };
+                    (0..len)
+                        .map(|_| (b'0' + rng.gen_range(0..10u8)) as char)
+                        .collect()
+                }
+            }
+        })
+        .collect()
+}
+
 fn rate(population: &[String], pass: impl Fn(&str) -> bool) -> f64 {
     population.iter().filter(|v| pass(v)).count() as f64 / population.len() as f64
 }
@@ -99,6 +160,8 @@ struct Row {
     discrimination_ascii: f64,
     published_digits: f64,
     discrimination_digits: f64,
+    published_tokens: f64,
+    discrimination_tokens: f64,
 }
 
 #[test]
@@ -109,6 +172,7 @@ fn random_confirm_rate() {
 
     let ascii = ascii_population();
     let digits = digit_population();
+    let tokens = token_population();
 
     let mut labels: Vec<String> = tax.labels().to_vec();
     labels.sort();
@@ -127,20 +191,26 @@ fn random_confirm_rate() {
             discrimination_digits: rate(&digits, |v| {
                 value_passes_for_discrimination(v, label, &tax)
             }),
+            published_tokens: rate(&tokens, |v| rule.is_valid(v)),
+            discrimination_tokens: rate(&tokens, |v| {
+                value_passes_for_discrimination(v, label, &tax)
+            }),
         });
     }
 
     let mut tsv = String::from(
-        "label\tpublished_ascii\tdiscrimination_ascii\tpublished_digits\tdiscrimination_digits\n",
+        "label\tpublished_ascii\tdiscrimination_ascii\tpublished_digits\tdiscrimination_digits\tpublished_tokens\tdiscrimination_tokens\n",
     );
     for r in &rows {
         tsv.push_str(&format!(
-            "{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\n",
+            "{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\n",
             r.label,
             r.published_ascii,
             r.discrimination_ascii,
             r.published_digits,
-            r.discrimination_digits
+            r.discrimination_digits,
+            r.published_tokens,
+            r.discrimination_tokens
         ));
     }
 
@@ -152,6 +222,18 @@ fn random_confirm_rate() {
 
     let mut failures = Vec::new();
     for r in &rows {
+        for (population, published, discrimination) in [
+            ("ascii", r.published_ascii, r.discrimination_ascii),
+            ("digits", r.published_digits, r.discrimination_digits),
+            ("tokens", r.published_tokens, r.discrimination_tokens),
+        ] {
+            if discrimination > published {
+                failures.push(format!(
+                    "{}: discrimination {discrimination:.4} exceeds published {published:.4} on {population}",
+                    r.label
+                ));
+            }
+        }
         let rate = r.discrimination_ascii;
         match BASELINE_EXCEPTIONS.iter().find(|(l, _)| *l == r.label) {
             Some((_, recorded)) if rate > recorded + TOLERANCE => failures.push(format!(

@@ -944,6 +944,14 @@ jobs:
       - name: Download model from HuggingFace
         run: .github/scripts/download-model.sh
       - run: ./tests/smoke.sh
+      - name: The uppercase-UUID profile and the noted-values validate report
+        # Two promises a user meets that only a model and the duckdb CLI can
+        # check, so they are #[ignore]d in the default suite and run here by
+        # name: an uppercase UUID column profiles as a uuid, and `validate -o
+        # json` reports a noted value apart from the rejects.
+        run: |
+          cargo test -p finetype-cli --test cli_golden golden_profile_uppercase_uuid_column -- --ignored
+          cargo test -p finetype-cli --test validate_cli test_validate_json_reports_noted_values_apart_from_rejects -- --ignored
 
   label-stability:
     # THE JOB THAT TELLS A LABEL FIX FROM A LUCKY DRAW.
