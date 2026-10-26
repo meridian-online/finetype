@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.64] - 2026-10-26
+
 ### Changed
 
 - **Thirteen types' validation rules now agree with the sources that define them.** Each published rule accepts what its source allows and rejects what it does not define. Downstream tools that read `validate`, the JSON Schema output or `ft_validate_text` will see these changes:
