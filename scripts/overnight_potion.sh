@@ -164,9 +164,11 @@ PYGATE
   for S in "${SEEDS[@]}"; do
     OUT="models/${TAG}-s${S}"
     SAVED_CONFIG="$OUT/config.json"
+    TRAINED_NOW=false
     if [[ -f "$OUT/model.safetensors" ]]; then
       echo "skip training $OUT (exists)"
     else
+      TRAINED_NOW=true
       echo "[train] seed $S -> $OUT  ($(date))"
       VE_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && VE_ARG=(--value-encoder "$VALUE_ENCODER")
       "$BIN" train-multi-branch --data "$FTMB" --output "$OUT" --model-config "$CONFIG" \
@@ -191,8 +193,11 @@ print(f'Injected {len(c[\"type_index_keys\"])} type_index_keys')
 
     # Freeze the validation rules the training file was built under beside
     # config.json, so this model keeps them when labels/ later changes. The sidecar
-    # is copied whatever labels/ holds now, once its keys equal the model's.
-    if [[ -f "$OUT/model.safetensors" && ! -f "$OUT/validation_snapshot.json" ]] \
+    # is copied (to models trained in this run) whatever labels/ holds now, once its keys equal the model's.
+    if [[ "$TRAINED_NOW" != true && -f "$OUT/model.safetensors" && ! -f "$OUT/validation_snapshot.json" ]]; then
+      # Not trained in this run, so this run's sidecar need not describe it.
+      echo "WARN: $OUT has no validation_snapshot.json; write one from the labels of its training commit (release skill, step 2b)"
+    elif [[ -f "$OUT/model.safetensors" && ! -f "$OUT/validation_snapshot.json" ]] \
         && grep -q '"type_index_keys"' "$SAVED_CONFIG"; then
       if [[ -n "$SIDECAR" ]]; then
         cargo run -q -p finetype-build-tools --bin write_validation_snapshot -- "$OUT" --check-keys "$SIDECAR" \

@@ -130,8 +130,10 @@ if not os.path.isdir(header_dir):
     raise SystemExit(f"header encoder not found at {header_dir}; the root set needs model2vec/")
 ops += [CommitOperationAdd(path_in_repo=f"model2vec/{f}", path_or_fileobj=f"{header_dir}/{f}")
         for f in os.listdir(header_dir)]
-# A model with no snapshot must not leave an old root snapshot in place:
-if not os.path.exists(f"{model_dir}/validation_snapshot.json"):
+# A model with no snapshot must not leave an old root snapshot in place, but there
+# is only something to delete when the root has one:
+if (not os.path.exists(f"{model_dir}/validation_snapshot.json")
+        and api.file_exists("meridian-online/finetype-model", "validation_snapshot.json", repo_type="model")):
     ops.append(CommitOperationDelete(path_in_repo="validation_snapshot.json"))
 api.create_commit(repo_id="meridian-online/finetype-model", repo_type="model", operations=ops,
                   commit_message=f"Serve {model_name} at the root")
@@ -311,6 +313,18 @@ ask the user** — don't skip quietly:
 
 > The DuckDB community extension is on a separate channel, currently **{community_version}**
 > (this release is **{new_version}**). Refresh it now? [y/N]
+
+**Before any extension release, check the root snapshot.** Whenever the root `config.json` has
+`type_index_keys`, the root must also hold `validation_snapshot.json`, or the extension feeds that model
+the current rules rather than the ones it was trained under:
+```bash
+curl -sfL "https://huggingface.co/meridian-online/finetype-model/resolve/main/config.json" | grep -q type_index_keys \
+  && { curl -sfIL "https://huggingface.co/meridian-online/finetype-model/resolve/main/validation_snapshot.json" >/dev/null \
+       || echo "root snapshot missing: upload models/hf-root/validation_snapshot.json before releasing the extension"; }
+```
+For the root model served today, `models/hf-root/validation_snapshot.json` is the file to upload (built from
+the labels before the snapshot work, for that model's `config.json`, kept beside it); if the root model has
+changed, rebuild it as step 2b describes.
 
 Read `{community_version}` from the descriptor (or the last merged upstream PR):
 

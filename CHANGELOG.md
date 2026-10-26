@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **Validation reports a grade per value: conforms, conforms with a note, or fails.** `finetype validate` adds a `column_notes` section (per column, a count per kind of note and up to five examples); rejects are unchanged. JSON Schema column properties carry `x-finetype-canonical` and `x-finetype-historic`. `ft_validate_text`'s STRUCT appends `grade` (`conforms`, `noted` or `fails`) and `note`; the existing fields are unchanged, and `valid` still means "not a failure". `ft_validate_text` applies the fragment's JSON Schema keywords and note extensions only, not the checksum or case-folded enum checks `finetype validate` applies.
-- **A model can carry the validation rules it reads.** The default model carries `validation_snapshot.json`, embedded in the binary and fetched by the DuckDB extension and `download-model.sh`, so fixing a published rule no longer shifts the model's inputs. Its snapshot freezes the rules as of 0.6.63, so landing it changed no output. A model directory without one behaves as before.
+- **A model can carry the validation rules it reads.** The default model carries `validation_snapshot.json`, embedded in the binary and fetched by the DuckDB extension and `download-model.sh`, so fixing a published rule no longer shifts the model's inputs. Its snapshot freezes the rules as of 0.6.63, so landing it changed no output. A model without a snapshot reads the current published rules, which this release changes; the model the DuckDB extension serves gets its snapshot published before the extension release (`models/hf-root/validation_snapshot.json`).
 
 ### Library API
 
