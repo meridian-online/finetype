@@ -186,14 +186,14 @@ No code. This records the numbers every later task compares against.
 
 **Files:**
 - Create: `crates/finetype-core/src/discrimination.rs`
-- Modify: `crates/finetype-core/src/validation_veto.rs` (`evaluate_validation_veto`), `crates/finetype-model/src/column/value_sharpen.rs` (`schema_fail_demotion` :647), `crates/finetype-model/src/column/mod.rs` (`label_validates_sample` :490, used by `ceded_leaf_recovery`)
+- Modify: `crates/finetype-core/src/validation_veto.rs` (`evaluate_validation_veto`), `crates/finetype-model/src/column/value_sharpen.rs` (`schema_fail_demotion` :647), `crates/finetype-model/src/column/mod.rs` (`label_validates_sample` :461, used by `ceded_leaf_recovery`)
 - Create: `crates/finetype-core/tests/random_confirm_rate.rs`
 
 **Interfaces:**
 - Produces:
   - `pub fn detector_for(label: &str) -> Option<fn(&str) -> bool>`, a match over a static table that starts empty (Task 18 adds npi).
-  - `pub fn value_passes_for_discrimination(value: &str, label: &str, tax: &Taxonomy) -> bool`: the detector if one exists, else the compiled published rule. The veto, `schema_fail_demotion` and `label_validates_sample` call this in place of `get_validator(..).is_valid`.
-  - `random_confirm_rate.rs`: a test that generates 10,000 seeded random strings (`rand_chacha`, seed 42; lengths 1–40 over printable ASCII plus digit-only strings of lengths 1–20). It writes `tests/fixtures/random_confirm_rate.tsv` (`label, published_rate, discrimination_rate`), and fails if any label's `discrimination_rate` exceeds 0.5.
+  - `pub fn value_passes_for_discrimination(value: &str, label: &str, tax: &Taxonomy) -> bool`: the detector if one exists, else the published rule, resolved the way each call site resolves it today (the veto and `schema_fail_demotion` through their current validator lookup; `label_validates_sample` through `resolve_label_validator`, which compiles on a cache miss). Behaviour without a detector is unchanged at all three sites.
+  - `random_confirm_rate.rs`: a test over two seeded populations (`rand_chacha`, seed 42): 10,000 printable-ASCII strings of lengths 1–40, and 10,000 digit-only strings of lengths 1–20. It writes `tests/fixtures/random_confirm_rate.tsv` (`label, published_ascii, discrimination_ascii, published_digits, discrimination_digits`). Labels with no validation are omitted. The gate is `discrimination_ascii > 0.5`, on the ASCII population only, since numeric types accept digit strings by design. Labels already above 0.5 when the test lands are listed in the test as baseline exceptions, with their measured rate; the test fails for any other label above 0.5, or for a listed label whose rate rises.
 
 - [ ] **Step 1: Write the failing tests**
   - `no_detector_means_published_rule`: for uuid, the result equals the compiled rule on its samples.
@@ -224,7 +224,7 @@ ACCEPT: `550e8400-e29b-41d4-a716-446655440000`, `550E8400-E29B-41D4-A716-4466554
 Extra: an end-to-end `profile` golden test on 40 uppercase UUIDs expects `representation.identifier.uuid`.
 
 **Task 10: percentage** (SI Brochure; French, German and Turkish typography).
-Rule: the sign may be preceded by U+0020, U+00A0 or U+202F, or may lead the number (`%50`). Keep the sign optional, as today.
+Rule: the sign may be preceded by U+0020, U+00A0 or U+202F, or may lead the number (`%50`). Keep the sign optional, as today. Write the two non-ASCII spaces as YAML ` ` / ` ` escapes so the literal characters reach the published pattern.
 ACCEPT: `50%`, `50 %`, `50\u{00A0}%`, `50\u{202F}%`, `%50`, `-12.5%`, `12.5`. REJECT: `50%%`, `%50%`, `abc%`, `50 % %`.
 Transform: extract the number in all ACCEPT forms.
 
@@ -259,8 +259,8 @@ ACCEPT: `USD`, `EUR`, `XCG` (if list one has it). Noted: `HRK` (`withdrawn 2023-
 currency_code is a ceded leaf, so confirm `ceded_leaf_recovery` still promotes a list-one column.
 
 **Task 17: username and blood_type** (useradd(8); Rh nomenclature).
-- username: `^[a-zA-Z0-9_.][a-zA-Z0-9_.\-]{2,255}\$?$`, with `maxLength` 256. ACCEPT: `alice`, `bob.smith`, `svc$`, a 39-char GitHub name. REJECT: `ab`, `al ice`, `$alice`.
-- blood_type: `^(A|B|AB|O)[+\-\u{2212}]?$`. ACCEPT: `A+`, `O-`, `AB−` (U+2212). REJECT: `C+`, `A++`.
+- username: the disputes are the trailing `$` and the 256-character maximum, both from useradd(8). The character set and the 3-character minimum stay as today, which covers web-service names such as GitHub's (useradd's own lowercase-only default is stricter than the names analysts meet). Rule: `^[a-zA-Z0-9_.\-]{2,255}[a-zA-Z0-9_.\-$]$`, which allows `$` only as the last character, with `minLength` 3 and `maxLength` 256. Description cites useradd(8) for `$` and length. ACCEPT: `alice`, `bob.smith`, `svc$`, a 39-char GitHub name, a 256-char name. REJECT: `ab`, `al ice`, `$alice`, `a$b`, a 257-char name.
+- blood_type: in YAML, `"^(A|B|AB|O)[+\\-−]?$"` (the YAML `−` escape yields the literal minus sign, as elsewhere in the taxonomy). ACCEPT: `A+`, `O-`, `AB−` (U+2212). REJECT: `C+`, `A++`. Test that the emitted JSON Schema pattern contains the literal U+2212.
 - Extra: check username's published rate in `random_confirm_rate.tsv`. It was already high. If it now exceeds 0.5, stop and report it as a finding rather than adding a detector here.
 
 **Task 18: npi** (CMS NPI standard). This is the first detector.
@@ -283,6 +283,7 @@ No new code.
   - each gold column that moved, with its type and the source that explains it;
   - the cumulative gold delta, which must be ≤ 2 points or the run stops for Hugh;
   - repr and external deltas;
+  - the veto allowlist re-measured: re-run `scripts/false_veto_sweep.py`, regenerate `labels/veto_safe.txt` (commit it), and list every label that joins or leaves it;
   - each gate transition on a fixed type, with its adjudication;
   - gold labels proposed for re-label.
 - [ ] **Step 3:** Run the panel on the proposed re-labels. Flag the tracker issue `needs-human` for Hugh to ratify them and to rule on any gate NO-GO.
