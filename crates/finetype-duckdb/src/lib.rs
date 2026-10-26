@@ -451,7 +451,7 @@ impl VScalar for FineTypeInfer {
     }
 }
 
-/// `ft_validate_text(value VARCHAR, schema VARCHAR) → STRUCT{valid, constraint, message}`
+/// `ft_validate_text(value VARCHAR, schema VARCHAR) → STRUCT{valid, constraint, message, grade, note}`
 ///
 /// Validates a value (or a whole column, one row at a time) against a JSON
 /// Schema fragment, returning a STRUCT mirroring the CLI `reject_errors` shape
@@ -459,6 +459,8 @@ impl VScalar for FineTypeInfer {
 ///   - `valid` BOOLEAN
 ///   - `constraint` VARCHAR — `pattern` | `min_length` | … | `other` (NULL when valid)
 ///   - `message` VARCHAR — the `jsonschema` error text (NULL when valid)
+///   - `grade` VARCHAR — `conforms` | `noted` | `fails` (NULL for a skipped value)
+///   - `note` VARCHAR — `<kind>: <detail>` when the grade is `noted`
 ///
 /// Null semantics match `finetype validate`: an empty / `"null"` value is
 /// skipped (valid), and a NULL / empty / non-object schema means the column
@@ -480,21 +482,30 @@ impl VScalar for FineTypeValidateText {
         let mut valid_child = struct_vec.child(0, len);
         let mut constraint_child = struct_vec.child(1, len);
         let mut message_child = struct_vec.child(2, len);
+        let mut grade_child = struct_vec.child(3, len);
+        let mut note_child = struct_vec.child(4, len);
 
         for i in 0..len {
             let value = read_varchar(input, 0, i);
             let schema = read_varchar(input, 1, i);
-            let (valid, constraint, message) =
-                validate::validate_value_detail(value.as_deref(), schema.as_deref());
+            let detail = validate::validate_value_detail(value.as_deref(), schema.as_deref());
 
-            valid_child.as_mut_slice::<bool>()[i] = valid;
-            match constraint {
+            valid_child.as_mut_slice::<bool>()[i] = detail.valid;
+            match detail.constraint {
                 Some(c) => constraint_child.insert(i, c.as_str()),
                 None => constraint_child.set_null(i),
             }
-            match message {
+            match detail.message {
                 Some(m) => message_child.insert(i, m.as_str()),
                 None => message_child.set_null(i),
+            }
+            match detail.grade {
+                Some(g) => grade_child.insert(i, g),
+                None => grade_child.set_null(i),
+            }
+            match detail.note {
+                Some(n) => note_child.insert(i, n.as_str()),
+                None => note_child.set_null(i),
             }
         }
 
@@ -507,6 +518,8 @@ impl VScalar for FineTypeValidateText {
             ("valid", LogicalTypeHandle::from(LogicalTypeId::Boolean)),
             ("constraint", varchar()),
             ("message", varchar()),
+            ("grade", varchar()),
+            ("note", varchar()),
         ]);
         vec![ScalarFunctionSignature::exact(
             vec![varchar(), varchar()],
