@@ -655,16 +655,21 @@ pub(crate) fn schema_fail_demotion(
     }
     // Prefer the pre-compiled validator; fall back to compile-per-call when the
     // taxonomy cache isn't populated (mirrors disambiguate_attractor_demotion).
+    let detector = finetype_core::discrimination::detector_for(result_label);
     let fail_count = if let Some(compiled) = taxonomy.get_validator(result_label) {
-        non_empty.iter().filter(|v| !compiled.is_valid(v)).count()
+        non_empty
+            .iter()
+            .filter(|v| !detector.map_or_else(|| compiled.is_valid(v), |d| d(v)))
+            .count()
     } else {
         let validation = taxonomy.get(result_label)?.validation.as_ref()?;
         non_empty
             .iter()
-            .filter(|v| {
-                finetype_core::validate_value(v, validation)
+            .filter(|v| match detector {
+                Some(d) => !d(v),
+                None => finetype_core::validate_value(v, validation)
                     .map(|r| !r.is_valid)
-                    .unwrap_or(false)
+                    .unwrap_or(false),
             })
             .count()
     };

@@ -13,6 +13,7 @@ pub mod checksum;
 pub mod constraint_fit;
 pub mod datapackage;
 pub mod datetime_format;
+pub mod discrimination;
 pub mod enum_domain;
 pub mod fast_path;
 pub mod frictionless_vocabulary;

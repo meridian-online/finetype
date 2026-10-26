@@ -37,3 +37,4 @@ embedded-taxonomy = []
 
 [dev-dependencies]
 pretty_assertions = "1.4"
+rand_chacha = "0.3"
