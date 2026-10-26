@@ -68,6 +68,11 @@ const HF_REPO: &str = "meridian-online/finetype-model";
 /// Files required for the multi-branch model.
 const MODEL_FILES: &[&str] = &["model.safetensors", "label_map.json", "config.json"];
 
+/// The model's frozen validation rules. Optional: models published before the
+/// snapshot existed lack it, and `MultiBranchClassifier::load` then reads the
+/// live taxonomy as it always did.
+const VALIDATION_SNAPSHOT: &str = finetype_core::validator_snapshot::SNAPSHOT_FILE;
+
 /// Model2Vec files (embed + header branches) — fetched from the `model2vec/`
 /// subdirectory of the same HuggingFace repo.
 const M2V_TOKENIZER: &str = "model2vec/tokenizer.json";
@@ -125,7 +130,25 @@ fn resolve_model_dir() -> std::result::Result<PathBuf, Box<dyn Error>> {
     api.get(M2V_TOKENIZER)?;
     api.get(M2V_MODEL)?;
 
+    // Lands beside model.safetensors, where the loader looks for it.
+    fetch_optional_snapshot(|f| api.get(f));
+
     model_dir.ok_or_else(|| "Failed to determine model cache directory".into())
+}
+
+/// Fetch the model's validation snapshot, if the repo has one. A missing file
+/// (404) or any failed fetch means "no snapshot": the required files above have
+/// already been fetched, so the model loads against the live taxonomy as before.
+fn fetch_optional_snapshot<E: std::fmt::Display>(
+    get: impl FnOnce(&str) -> std::result::Result<PathBuf, E>,
+) -> Option<PathBuf> {
+    match get(VALIDATION_SNAPSHOT) {
+        Ok(path) => Some(path),
+        Err(e) => {
+            tracing::debug!("No validation snapshot fetched ({e}); using the live taxonomy");
+            None
+        }
+    }
 }
 
 /// Initialize or get the global column classifier backed by multi-branch model.
@@ -724,4 +747,25 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
         .expect("Failed to register ft_profile table macro");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extension_loads_snapshot_when_present() {
+        let dir = PathBuf::from("/cache/model");
+        let got = fetch_optional_snapshot(|f| {
+            assert_eq!(f, "validation_snapshot.json");
+            Ok::<_, String>(dir.join(f))
+        });
+        assert_eq!(got, Some(dir.join("validation_snapshot.json")));
+    }
+
+    #[test]
+    fn missing_snapshot_does_not_fail_the_load() {
+        let got = fetch_optional_snapshot(|_| Err::<PathBuf, _>("404 Not Found".to_string()));
+        assert_eq!(got, None);
+    }
 }
