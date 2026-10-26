@@ -267,28 +267,11 @@ impl MultiBranchClassifier {
         };
 
         // Build validation feature extractor from saved type_index_keys
-        let validation_extractor = if validation_branch.is_some()
-            && !config.type_index_keys.is_empty()
-        {
-            let keys = config.type_index_keys.clone();
-            Some(match snapshot {
-                Some(bytes) => {
-                    let snapshot =
-                        finetype_core::validator_snapshot::ValidatorSnapshot::from_json(bytes)
-                            .map_err(|e| {
-                                InferenceError::InvalidPath(format!("Bad validation snapshot: {e}"))
-                            })?;
-                    crate::validation_features::ValidationFeatureExtractor::with_snapshot(
-                        keys, &snapshot,
-                    )?
-                }
-                None => {
-                    crate::validation_features::ValidationFeatureExtractor::from_type_keys(keys)
-                }
-            })
-        } else {
-            None
-        };
+        let validation_extractor = build_validation_extractor(
+            validation_branch.is_some(),
+            &config.type_index_keys,
+            snapshot,
+        )?;
 
         let merged_dim = {
             let mut dim = config.char_hidden[1] + config.embed_hidden[1] + config.stats_hidden[1];
@@ -1034,3 +1017,39 @@ impl MultiBranchClassifier {
 
 #[cfg(test)]
 mod tests;
+
+/// Decide how the validation feature extractor is built.
+///
+/// With no snapshot the extractor reads the live taxonomy, as it always has.
+/// A snapshot is always parsed, and one that cannot be applied (no validation
+/// branch, or no pinned `type_index_keys`) is an error rather than ignored.
+fn build_validation_extractor(
+    has_validation_branch: bool,
+    type_index_keys: &[String],
+    snapshot: Option<&[u8]>,
+) -> Result<Option<crate::validation_features::ValidationFeatureExtractor>, InferenceError> {
+    use crate::validation_features::ValidationFeatureExtractor;
+    let parsed = snapshot
+        .map(|bytes| {
+            finetype_core::validator_snapshot::ValidatorSnapshot::from_json(bytes)
+                .map_err(|e| InferenceError::InvalidPath(format!("Bad validation snapshot: {e}")))
+        })
+        .transpose()?;
+    let usable = has_validation_branch && !type_index_keys.is_empty();
+    match (parsed, usable) {
+        (Some(snapshot), true) => Ok(Some(ValidationFeatureExtractor::with_snapshot(
+            type_index_keys.to_vec(),
+            &snapshot,
+        )?)),
+        (Some(_), false) => Err(InferenceError::InvalidPath(if has_validation_branch {
+            "validation snapshot supplied but config.json has no type_index_keys to pin it to"
+                .to_string()
+        } else {
+            "validation snapshot supplied but the model has no validation branch".to_string()
+        })),
+        (None, true) => Ok(Some(ValidationFeatureExtractor::from_type_keys(
+            type_index_keys.to_vec(),
+        ))),
+        (None, false) => Ok(None),
+    }
+}

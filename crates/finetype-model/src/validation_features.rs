@@ -78,11 +78,17 @@ impl ValidationFeatureExtractor {
         let wanted: HashSet<&String> = type_keys.iter().collect();
         let listed: HashSet<&String> = snapshot.keys().collect();
         if wanted != listed {
+            let first5 = |a: &HashSet<&String>, b: &HashSet<&String>| {
+                let mut v: Vec<&str> = a.difference(b).map(|k| k.as_str()).collect();
+                v.sort();
+                v.truncate(5);
+                v.join(", ")
+            };
             return Err(InferenceError::InvalidPath(format!(
-                "validation snapshot lists {} keys but the model has {} type_index_keys, \
-                 and the sets differ",
-                listed.len(),
-                wanted.len(),
+                "validation snapshot keys differ from the model's type_index_keys; \
+                 missing from snapshot: [{}]; missing from model: [{}]",
+                first5(&wanted, &listed),
+                first5(&listed, &wanted),
             )));
         }
         let pinned = snapshot

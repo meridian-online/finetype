@@ -220,3 +220,26 @@ fn ac06_config_deserialization_v13_validation_branch() {
     // v13 merged_dim: 450 + 300 + 96 + 96 + 128 = 1070
     assert_eq!(config.merged_dim(), 1070);
 }
+
+#[test]
+fn snapshot_is_resolved_or_refused() {
+    let keys = vec!["a.b.c".to_string()];
+    let good = br#"{"format":1,"keys":["a.b.c"],"validations":{}}"#;
+
+    assert!(build_validation_extractor(true, &keys, Some(b"not json")).is_err());
+    assert!(build_validation_extractor(false, &keys, Some(b"not json")).is_err());
+    assert!(build_validation_extractor(true, &[], Some(good)).is_err());
+    assert!(build_validation_extractor(false, &keys, Some(good)).is_err());
+    assert!(build_validation_extractor(true, &keys, Some(good))
+        .unwrap()
+        .is_some());
+    assert!(build_validation_extractor(true, &keys, None)
+        .unwrap()
+        .is_some());
+    assert!(build_validation_extractor(true, &[], None)
+        .unwrap()
+        .is_none());
+    assert!(build_validation_extractor(false, &keys, None)
+        .unwrap()
+        .is_none());
+}
