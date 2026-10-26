@@ -121,6 +121,32 @@ run_case "d_whitespace_is_unresolvable" \
   "1" "" "cannot resolve model" \
   FINETYPE_CI_MODEL="   "
 
+# Snapshot fetch: the checked-in validation_snapshot.json must survive a failed
+# remote fetch, and a missing one must not fail the download. curl is stubbed.
+SNAPSHOT_BLOCK=$(awk '/snapshot-fetch:begin/{f=1;next} /snapshot-fetch:end/{f=0} f' "${DOWNLOAD_SCRIPT}")
+run_snapshot_case() {
+  local name="$1" stub="$2" pre="$3" expect="$4"
+  local workdir; workdir=$(mktemp -d)
+  mkdir "${workdir}/bin"
+  printf '#!/bin/sh\n%s\n' "${stub}" >"${workdir}/bin/curl"
+  chmod +x "${workdir}/bin/curl"
+  [ -n "${pre}" ] && printf '%s' "${pre}" >"${workdir}/validation_snapshot.json"
+  local status=0
+  (cd "${workdir}" && PATH="${workdir}/bin:${PATH}" REPO=x MODEL_DIR=m bash -c "set -e; ${SNAPSHOT_BLOCK}") >/dev/null 2>&1 || status=$?
+  local got="<absent>"
+  [ -f "${workdir}/validation_snapshot.json" ] && got=$(cat "${workdir}/validation_snapshot.json")
+  if [ "${status}" = 0 ] && [ "${got}" = "${expect}" ] && [ ! -e "${workdir}/validation_snapshot.json.part" ]; then
+    echo "  [PASS] ${name}"; PASS=$((PASS + 1))
+  else
+    echo "  [FAIL] ${name}: status ${status}, file '${got}', expected '${expect}'"; FAIL=$((FAIL + 1))
+  fi
+  rm -rf "${workdir}"
+}
+run_snapshot_case "e_snapshot_kept_when_remote_404" 'exit 22' "checked-in" "checked-in"
+run_snapshot_case "f_snapshot_not_overwritten_by_remote" 'echo remote >"$5"; exit 0' "checked-in" "checked-in"
+run_snapshot_case "g_snapshot_absent_remote_404_ok" 'exit 22' "" "<absent>"
+run_snapshot_case "h_snapshot_fetched_when_absent" 'while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done; echo remote >"$out"' "" "remote"
+
 echo
 echo "Results: ${PASS} passed, ${FAIL} failed"
 if [ "${FAIL}" -ne 0 ]; then

@@ -139,3 +139,28 @@ fn test_ingest_values_are_trimmed() {
     // and is dropped as null-ish.
     assert_eq!(columns[0], vec!["spaced"]);
 }
+
+// ── Default model's validation snapshot ────────────────────────────────────
+
+#[cfg(feature = "embed-models")]
+#[test]
+fn default_model_ships_a_matching_snapshot() {
+    // The snapshot is a tracked file of the default model: build.rs embeds it, and
+    // the binary must apply exactly the rules that sit beside config.json.
+    assert!(embedded::HAS_MB_VALIDATION_SNAPSHOT);
+    let on_disk = std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../models/default")
+            .join(finetype_core::validator_snapshot::SNAPSHOT_FILE),
+    )
+    .expect("the default model ships a validation snapshot");
+    assert_eq!(embedded::MB_VALIDATION_SNAPSHOT, on_disk.as_slice());
+
+    let snapshot = finetype_core::validator_snapshot::ValidatorSnapshot::from_json(
+        embedded::MB_VALIDATION_SNAPSHOT,
+    )
+    .unwrap();
+    let config: serde_json::Value = serde_json::from_slice(embedded::MB_CONFIG).unwrap();
+    let expected: Vec<String> = serde_json::from_value(config["type_index_keys"].clone()).unwrap();
+    assert_eq!(snapshot.keys().cloned().collect::<Vec<_>>(), expected);
+}
