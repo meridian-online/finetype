@@ -184,14 +184,14 @@ fn gate_answer_matches_the_full_validation_result_it_replaced() {
     }
 }
 
-/// A column of one repeated, valid uppercase UUID is not vetoed or demoted:
+/// A column of one repeated upper-case UUID is not vetoed or demoted:
 /// RFC 9562 allows upper case, so the published rule accepts it.
 #[test]
 fn uuid_constant_column_keeps_type() {
     use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
     const UUID: &str = "representation.identifier.uuid";
     let tax = super::shipped_taxonomy();
-    let first = "550e8400-e29b-41d4-a716-446655440000";
+    let first = "550E8400-E29B-41D4-A716-446655440000";
     let values: Vec<String> = vec![first.to_string(); 40];
     let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
     let veto = evaluate_validation_veto(UUID, &refs, &tax, &audited_safe_labels());
