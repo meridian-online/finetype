@@ -151,6 +151,13 @@ print(f'Injected {len(c[\"type_index_keys\"])} type_index_keys')
 "
       fi
     fi
+
+    # Freeze the validation rules beside config.json (after the keys above exist),
+    # so this model keeps them when labels/ later changes. Refuses a rule that does
+    # not compile.
+    if grep -q '"type_index_keys"' "$SAVED_CONFIG"; then
+      cargo run -q -p finetype-build-tools --bin write_validation_snapshot -- "$OUT"
+    fi
   done
 fi
 

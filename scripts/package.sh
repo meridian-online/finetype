@@ -30,6 +30,7 @@ The archive contains:
   config.yaml         Model configuration
   labels.json         Label index
   manifest.json       Training provenance (if present)
+  validation_snapshot.json  Frozen validation rules (if present)
 
 Output:
   Prints file size and SHA256 checksum (useful for Homebrew tap updates).
@@ -76,7 +77,7 @@ MODEL_NAME="$(basename "$MODEL_DIR")"
 
 # Required files
 REQUIRED_FILES=(model.safetensors config.yaml labels.json)
-OPTIONAL_FILES=(manifest.json)
+OPTIONAL_FILES=(manifest.json validation_snapshot.json)
 
 for f in "${REQUIRED_FILES[@]}"; do
     if [[ ! -f "${MODEL_DIR}/${f}" ]]; then

@@ -51,6 +51,12 @@ else
     echo "  Downloading ${file}..."
     curl -sfLO --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused "${REPO}/${MODEL_DIR}/${file}"
   done
+  # Frozen validation rules. Optional: models published before the snapshot existed
+  # lack it, and a missing remote file must not fail the download.
+  if ! curl -sfL --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused \
+      "${REPO}/${MODEL_DIR}/validation_snapshot.json" -o validation_snapshot.json; then
+    rm -f validation_snapshot.json
+  fi
   # Dual-encoder: if config.json declares a co-located value-branch encoder
   # (value_embed_model, e.g. potion-8M for the value-aggregation branch), fetch
   # its files too. Header + semantic/entity/sense classifiers use the shared

@@ -243,3 +243,24 @@ fn snapshot_is_resolved_or_refused() {
         .unwrap()
         .is_none());
 }
+
+#[test]
+fn default_model_ships_a_matching_snapshot() {
+    // The bytes the CLI build embeds, taken from the same path build.rs reads.
+    const EMBEDDED: &[u8] = include_bytes!("../../../../models/default/validation_snapshot.json");
+    let default_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models/default");
+
+    let Ok(config_bytes) = std::fs::read(default_dir.join("config.json")) else {
+        eprintln!("models/default/config.json not present; skipping");
+        return;
+    };
+    let config: MultiBranchConfig = serde_json::from_slice(&config_bytes).unwrap();
+    let on_disk = std::fs::read(default_dir.join(finetype_core::validator_snapshot::SNAPSHOT_FILE))
+        .expect("the default model ships a validation snapshot");
+
+    let snapshot = finetype_core::validator_snapshot::ValidatorSnapshot::from_json(&on_disk)
+        .expect("the shipped snapshot parses");
+    let keys: Vec<String> = snapshot.keys().cloned().collect();
+    assert_eq!(keys, config.type_index_keys);
+    assert_eq!(EMBEDDED, on_disk.as_slice());
+}
