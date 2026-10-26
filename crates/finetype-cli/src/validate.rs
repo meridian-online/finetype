@@ -498,6 +498,9 @@ pub(crate) fn cmd_validate_table(
             }
             println!("  Grade:             {}", result.grade);
             println!("{}", "═".repeat(60));
+            for notes in &result.column_notes {
+                println!("{}", format_column_notes(notes));
+            }
         }
         OutputFormat::Json => {
             let report = json!({
@@ -516,6 +519,7 @@ pub(crate) fn cmd_validate_table(
                     "TRANSFORM_FAILED": transform_failed_count,
                 },
                 "grade": result.grade,
+                "column_notes": result.column_notes,
             });
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
@@ -531,6 +535,33 @@ pub(crate) fn cmd_validate_table(
     }
     // Zero rejects — always exit 0.
     Ok(())
+}
+
+/// One line for a column with noted values: `uuid: 1 non_canonical (e.g. 550E8400-…)`.
+/// Noted values are valid, so this sits apart from the reject counts.
+fn format_column_notes(notes: &finetype_core::ColumnNotes) -> String {
+    let counts: Vec<String> = notes
+        .counts
+        .iter()
+        .map(|(kind, n)| {
+            let kind = serde_json::to_value(kind)
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_string))
+                .unwrap_or_default();
+            format!("{n} {kind}")
+        })
+        .collect();
+    let mut line = format!("{}: {}", notes.column_name, counts.join(", "));
+    if let Some(first) = notes.examples.first() {
+        let shown: String = first.chars().take(12).collect();
+        let ellipsis = if first.chars().count() > 12 {
+            "…"
+        } else {
+            ""
+        };
+        line.push_str(&format!(" (e.g. {shown}{ellipsis})"));
+    }
+    line
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -624,4 +655,23 @@ pub(crate) fn resolve_veto_outcome(
         }
     }
     ("unknown".to_string(), Some(predicted.to_string()), None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finetype_core::grade::NoteKind;
+
+    #[test]
+    fn column_notes_line_is_short_and_names_kinds() {
+        let notes = finetype_core::ColumnNotes {
+            column_name: "uuid".into(),
+            counts: [(NoteKind::NonCanonical, 2), (NoteKind::Withdrawn, 1)].into(),
+            examples: vec!["550E8400-E29B-41D4".into()],
+        };
+        assert_eq!(
+            format_column_notes(&notes),
+            "uuid: 2 non_canonical, 1 withdrawn (e.g. 550E8400-E29…)"
+        );
+    }
 }

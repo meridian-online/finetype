@@ -45,8 +45,8 @@ pub use quality::{
     compute_column_quality, compute_file_grade, ColumnQualityScore, FileQualityGrade,
 };
 pub use table_validator::{
-    split_rows, validate_table, CellError, ColumnValidationStats, RowErrors, TableValidationResult,
-    TableValidatorError,
+    split_rows, validate_table, CellError, ColumnNotes, ColumnValidationStats, RowErrors,
+    TableValidationResult, TableValidatorError,
 };
 #[cfg(feature = "embedded-taxonomy")]
 pub use taxonomy::{frictionless_for, publication_for};

@@ -794,3 +794,55 @@ fn test_vrp_load_subcommand_removed() {
         "stderr should signal unknown subcommand mentioning 'load'; got: {stderr}"
     );
 }
+
+/// Noted values are reported apart from rejects: the upper-case UUID is valid,
+/// the existing report fields are unchanged, and `column_notes` names it.
+#[test]
+#[ignore]
+fn test_validate_json_reports_noted_values_apart_from_rejects() {
+    let tmp = tempfile::tempdir().unwrap();
+    let schema = write_schema(
+        tmp.path(),
+        r#"{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+      "x-finetype-canonical": {
+        "kind": "non_canonical", "name": "lowercase", "pattern": "^[^A-F]*$"
+      }
+    }
+  }
+}"#,
+    );
+    let csv = write_csv(
+        tmp.path(),
+        "in.csv",
+        "id\n550e8400-e29b-41d4-a716-446655440000\n550E8400-E29B-41D4-A716-446655440000\nbad\n",
+    );
+
+    let (code, stdout, stderr) = run_validate(&[
+        csv.to_str().unwrap(),
+        schema.to_str().unwrap(),
+        "-o",
+        "json",
+    ]);
+    assert_eq!(code, 1, "one reject expected: stderr={stderr}");
+    let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["total_rows"], 3);
+    assert_eq!(report["valid_rows"], 2);
+    assert_eq!(report["invalid_rows"], 1);
+    assert_eq!(report["rejects"], 1);
+    assert_eq!(report["column_notes"][0]["column_name"], "id");
+    assert_eq!(report["column_notes"][0]["counts"]["non_canonical"], 1);
+    assert_eq!(
+        report["column_notes"][0]["examples"][0],
+        "550E8400-E29B-41D4-A716-446655440000"
+    );
+
+    // Plain output keeps its report and adds one line per noted column.
+    let (_, plain, _) = run_validate(&[csv.to_str().unwrap(), schema.to_str().unwrap()]);
+    assert!(plain.contains("  Rejects:"));
+    assert!(plain.contains("id: 1 non_canonical (e.g. 550E8400-E29…)"));
+}
