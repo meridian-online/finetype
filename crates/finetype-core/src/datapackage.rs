@@ -218,6 +218,16 @@ fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold
         field.insert("format".into(), json!(fmt));
     }
 
+    // A boolean whose values are not the spec's defaults declares its own.
+    if ftype == "boolean" {
+        if let Some(t) = &published.true_values {
+            field.insert("trueValues".into(), json!(t));
+        }
+        if let Some(f) = &published.false_values {
+            field.insert("falseValues".into(), json!(f));
+        }
+    }
+
     let FieldConstraints { kept, off_type } =
         constraints_for(col.label, col.values, published, enum_threshold);
     if !kept.is_empty() {

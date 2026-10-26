@@ -1083,6 +1083,8 @@ representation.boolean.initials:
   broad_type: BOOLEAN
   frictionless:
     type: boolean
+    trueValues: ["T", "t", "Y", "y"]
+    falseValues: ["F", "f", "N", "n"]
   format_string: null
   transform: "CAST({col} AS BOOLEAN)"
   transform_ext: null

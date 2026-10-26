@@ -357,6 +357,23 @@ pub struct Frictionless {
     /// pattern, or the literal `any` for heuristic-parse leaves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
+    /// For a `boolean`: the strings that cast to true. The spec's defaults are
+    /// `true`/`True`/`TRUE`/`1`, so a type whose values are anything else must
+    /// declare them or they do not cast.
+    #[serde(
+        default,
+        rename = "trueValues",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub true_values: Option<Vec<String>>,
+    /// For a `boolean`: the strings that cast to false (defaults `false`/
+    /// `False`/`FALSE`/`0`).
+    #[serde(
+        default,
+        rename = "falseValues",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub false_values: Option<Vec<String>>,
 }
 
 /// The Frictionless v2 field-type vocabulary (Table Schema spec).
@@ -1359,6 +1376,10 @@ pub struct LabelPublication {
     pub ftype: String,
     /// The type-legal `format` variant, when the label declares one.
     pub format: Option<String>,
+    /// A boolean's `trueValues`, when the label declares them.
+    pub true_values: Option<Vec<String>>,
+    /// A boolean's `falseValues`, when the label declares them.
+    pub false_values: Option<Vec<String>>,
     /// Keywords legal beside `ftype`, ready to be the field's `constraints`.
     pub constraints: serde_json::Map<String, serde_json::Value>,
     /// Keywords true of the column that `ftype` has no place for.
@@ -1397,6 +1418,8 @@ fn publication_from_definition(
         .map(|f| f.ftype.clone())
         .unwrap_or_else(|| "string".into());
     let format = fx.and_then(|f| f.format.clone());
+    let true_values = fx.and_then(|f| f.true_values.clone());
+    let false_values = fx.and_then(|f| f.false_values.clone());
 
     let mut c = Map::new();
     if let Some(v) = def.and_then(|d| d.validation.as_ref()) {
@@ -1425,6 +1448,8 @@ fn publication_from_definition(
         return LabelPublication {
             ftype,
             format,
+            true_values,
+            false_values,
             constraints: c,
             unsupported_constraints: Map::new(),
         };
@@ -1442,6 +1467,8 @@ fn publication_from_definition(
     LabelPublication {
         ftype,
         format,
+        true_values,
+        false_values,
         constraints,
         unsupported_constraints,
     }
@@ -2062,6 +2089,8 @@ representation.discrete.categorical:
             let f = Frictionless {
                 ftype: ty.into(),
                 format: fmt.map(String::from),
+                true_values: None,
+                false_values: None,
             };
             assert!(f.validate().is_ok(), "{ty}/{fmt:?} should be legal");
         }
@@ -2075,6 +2104,8 @@ representation.discrete.categorical:
             let f = Frictionless {
                 ftype: ty.into(),
                 format: fmt.map(String::from),
+                true_values: None,
+                false_values: None,
             };
             assert!(f.validate().is_err(), "{ty}/{fmt:?} should be rejected");
         }
