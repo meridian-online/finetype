@@ -9,7 +9,10 @@
 //!
 //! Both emitters share the verbosity contract below — exactly two
 //! `x-finetype-*` extensions on emitted schemas (`x-finetype-label` and
-//! `x-finetype-pii`).
+//! `x-finetype-pii`). A table column whose type declares `validation_notes`
+//! also carries `x-finetype-canonical` (`{kind, name, pattern}`) and
+//! `x-finetype-historic` (`[{value, until}]`), so `finetype validate` can
+//! report noted values from a stored schema alone.
 //!
 //! The helpers live in `finetype-core` so a library consumer can emit the
 //! same schemas the CLI prints without depending on the CLI.
@@ -18,7 +21,10 @@
 //!
 //! Emitted JSON Schema documents carry exactly two `x-finetype-*`
 //! extensions on each column property: `x-finetype-label` and
-//! `x-finetype-pii`. The other extensions (broad-type, transform,
+//! `x-finetype-pii`. The one documented exception is a table column whose
+//! type declares `validation_notes`, which also carries
+//! `x-finetype-canonical` and `x-finetype-historic` (see above). The other
+//! extensions (broad-type, transform,
 //! transform-ext, format-string, domain, confidence) are derivable from
 //! the label + bundled taxonomy, and were dropped in PR #51 to keep the
 //! schema export contract tight. Do not re-introduce them in this card.
@@ -126,6 +132,17 @@ pub fn emit_table_schema(
             prop.insert("x-finetype-nominated".into(), json!(true));
         }
         prop.insert("x-finetype-pii".into(), json!(pii));
+        if let Some(notes) = taxonomy
+            .get(col.label)
+            .and_then(|d| d.validation_notes.as_ref())
+        {
+            if let Some(canonical) = &notes.canonical {
+                prop.insert("x-finetype-canonical".into(), json!(canonical));
+            }
+            if !notes.historic.is_empty() {
+                prop.insert("x-finetype-historic".into(), json!(notes.historic));
+            }
+        }
 
         // x-finetype-enum surfaces by DEFAULT (not gated on --stats): a bounded value
         // domain is a first-class analyst signal — a `level` / `status` column shows its
@@ -270,7 +287,9 @@ fn attach_enum_domain(prop: &mut serde_json::Map<String, Value>, col: &TableSche
 /// Verbosity contract (PR #51, extended to type-mode in card 0006): the
 /// returned schema carries exactly two `x-finetype-*` extensions —
 /// `x-finetype-label` (the canonical type key) and `x-finetype-pii`
-/// (boolean from the taxonomy). The pre-existing CLI emitter only
+/// (boolean from the taxonomy). (`x-finetype-canonical` and
+/// `x-finetype-historic` are the documented exception, and only on a table
+/// column schema; a per-type schema never carries them.) The pre-existing CLI emitter only
 /// surfaced `x-finetype-pii`; card 0006 adds `x-finetype-label` so both
 /// emitter surfaces match. Other extensions (broad-type, transform,
 /// transform-ext, format-string, domain, confidence) are derivable from
@@ -331,6 +350,51 @@ mod tests {
         // workspace root, then into `labels`.
         let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         manifest.parent().unwrap().parent().unwrap().join("labels")
+    }
+
+    #[test]
+    fn table_schema_carries_validation_notes_only_when_declared() {
+        let tax = Taxonomy::from_yaml(
+            r#"
+identity.test.uuid:
+  validation:
+    type: string
+    pattern: '^[0-9a-fA-F-]+$'
+  validation_notes:
+    canonical: { kind: non_canonical, name: lowercase, pattern: '^[^A-F]*$' }
+    historic:
+      - { value: ABC, until: "2023-01" }
+identity.test.plain:
+  validation:
+    type: string
+"#,
+        )
+        .unwrap();
+        let col = |name, label| TableSchemaColumn {
+            name,
+            label,
+            values: &[],
+            null_count: 0,
+            unknown_reason: None,
+            nominated: false,
+        };
+        let cols = [
+            col("a", "identity.test.uuid"),
+            col("b", "identity.test.plain"),
+        ];
+        let schema = emit_table_schema(&cols, "t", "t", &tax, false, 0);
+        let a = &schema["properties"]["a"];
+        assert_eq!(
+            a["x-finetype-canonical"],
+            json!({ "kind": "non_canonical", "name": "lowercase", "pattern": "^[^A-F]*$" })
+        );
+        assert_eq!(
+            a["x-finetype-historic"],
+            json!([{ "value": "ABC", "until": "2023-01" }])
+        );
+        let b = schema["properties"]["b"].as_object().unwrap();
+        assert!(!b.contains_key("x-finetype-canonical"));
+        assert!(!b.contains_key("x-finetype-historic"));
     }
 
     // ac-03 parity / behaviour guard (spec 2026-06-17-enum-domain-emission).

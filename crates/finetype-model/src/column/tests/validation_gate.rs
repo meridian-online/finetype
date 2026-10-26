@@ -183,3 +183,254 @@ fn gate_answer_matches_the_full_validation_result_it_replaced() {
         );
     }
 }
+
+/// A column of one repeated upper-case UUID is not vetoed or demoted:
+/// RFC 9562 allows upper case, so the published rule accepts it.
+#[test]
+fn uuid_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const UUID: &str = "representation.identifier.uuid";
+    let tax = super::shipped_taxonomy();
+    let first = "550E8400-E29B-41D4-A716-446655440000";
+    let values: Vec<String> = vec![first.to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(UUID, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, UUID, &tax).is_none());
+}
+
+/// A column of one repeated spaced percentage (`50 %`, which the old rule
+/// rejected) is not vetoed or demoted.
+#[test]
+fn percentage_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const PERCENTAGE: &str = "representation.numeric.percentage";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["50 %".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(PERCENTAGE, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, PERCENTAGE, &tax).is_none());
+}
+
+/// A column of one repeated IEC size (`4KiB`, which the old rule rejected) is
+/// not vetoed or demoted.
+#[test]
+fn file_size_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const FILE_SIZE: &str = "representation.file.file_size";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["4KiB".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(FILE_SIZE, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, FILE_SIZE, &tax).is_none());
+}
+
+/// A column of one repeated UN M.49 region tag (`es-419`, which the old rule
+/// rejected) is not vetoed or demoted.
+#[test]
+fn locale_code_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const LOCALE_CODE: &str = "technology.code.locale_code";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["es-419".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(LOCALE_CODE, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, LOCALE_CODE, &tax).is_none());
+}
+
+/// A column of one repeated `Sept 4, 2023` (the en-GB abbreviation, which the
+/// old rule rejected) is not vetoed or demoted.
+#[test]
+fn abbreviated_month_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const ABBREVIATED_MONTH: &str = "datetime.date.abbreviated_month";
+    let tax = super::shipped_taxonomy();
+    for value in ["Sept 4, 2023", "4 Feb 23"] {
+        let values: Vec<String> = vec![value.to_string(); 40];
+        let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+        let veto = evaluate_validation_veto(ABBREVIATED_MONTH, &refs, &tax, &audited_safe_labels());
+        assert!(!veto.vetoed, "{value}: vetoed: {veto:?}");
+        // Vacuous for this label (it is not in schema_fail_demotion's allowlist);
+        // the veto assertion above is the one that bites.
+        assert!(schema_fail_demotion(&values, ABBREVIATED_MONTH, &tax).is_none());
+    }
+}
+
+/// A column of one repeated RFC 3339 value with a fraction (or a lower-case
+/// `z`), which the old rule rejected, is not vetoed or demoted.
+#[test]
+fn rfc_3339_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const RFC_3339: &str = "datetime.timestamp.rfc_3339";
+    let tax = super::shipped_taxonomy();
+    for value in [
+        "2024-01-01 10:00:00.123+05:30",
+        "2024-01-01 10:00:00z",
+        "2024-01-01 10:00:00 Z",
+    ] {
+        let values: Vec<String> = vec![value.to_string(); 40];
+        let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+        let veto = evaluate_validation_veto(RFC_3339, &refs, &tax, &audited_safe_labels());
+        assert!(!veto.vetoed, "{value}: vetoed: {veto:?}");
+        assert!(schema_fail_demotion(&values, RFC_3339, &tax).is_none());
+    }
+}
+
+/// A column of one repeated `+05` offset (or lower-case `t`), which the old rule
+/// rejected, is not vetoed or demoted.
+#[test]
+fn iso_8601_offset_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const ISO_8601_OFFSET: &str = "datetime.timestamp.iso_8601_offset";
+    let tax = super::shipped_taxonomy();
+    for value in ["2024-01-01T10:00:00+05", "2024-01-01t10:00:00+05:30"] {
+        let values: Vec<String> = vec![value.to_string(); 40];
+        let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+        let veto = evaluate_validation_veto(ISO_8601_OFFSET, &refs, &tax, &audited_safe_labels());
+        assert!(!veto.vetoed, "{value}: vetoed: {veto:?}");
+        assert!(schema_fail_demotion(&values, ISO_8601_OFFSET, &tax).is_none());
+    }
+}
+
+/// A column of one repeated `XCG` (the Caribbean guilder, which the old
+/// enum lacked) is not vetoed or demoted.
+#[test]
+fn currency_code_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const CURRENCY_CODE: &str = "finance.currency.currency_code";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["XCG".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(CURRENCY_CODE, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, CURRENCY_CODE, &tax).is_none());
+}
+
+/// `rfc_3339` now accepts a fraction, so a column of microsecond-offset values
+/// validates under both `rfc_3339` and `sql_microseconds_offset`. Both are in
+/// `labels/ceded_leaves.txt` (the model's dropped head), but neither is in
+/// `CEDED_RECOVERY_LEAVES`: datetime formats belong to `datetime_format_refinement`,
+/// so `ceded_leaf_recovery` never weighs them and the double match costs no
+/// recall. Pinned so that adding either leaf to the recovery list is a visible
+/// decision (the exactly-one-match gate would then defer on such columns).
+#[test]
+fn microsecond_offset_double_match_does_not_reach_ceded_leaf_recovery() {
+    let tax = super::shipped_taxonomy();
+    let sample: Vec<String> = [
+        "2024-01-01 10:00:00.123456+05:30",
+        "2024-02-03 11:12:13.654321-08:00",
+        "2024-03-04 00:00:00.000001+00:00",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    assert!(super::super::label_validates_sample(
+        &tax,
+        "datetime.timestamp.rfc_3339",
+        &sample
+    ));
+    assert!(super::super::label_validates_sample(
+        &tax,
+        "datetime.timestamp.sql_microseconds_offset",
+        &sample
+    ));
+    for leaf in [
+        "datetime.timestamp.rfc_3339",
+        "datetime.timestamp.sql_microseconds_offset",
+    ] {
+        assert!(
+            !super::super::CEDED_RECOVERY_LEAVES.contains(&leaf),
+            "{leaf} entered CEDED_RECOVERY_LEAVES; the double match now defers recovery"
+        );
+    }
+}
+
+/// A column of one repeated `svc$` (a trailing dollar sign the old rule
+/// rejected) is not vetoed or demoted.
+#[test]
+fn username_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const USERNAME: &str = "identity.person.username";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["svc$".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(USERNAME, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, USERNAME, &tax).is_none());
+}
+
+/// A column of one repeated `AB−` (U+2212, which the old rule rejected) is not
+/// vetoed or demoted.
+#[test]
+fn blood_type_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const BLOOD_TYPE: &str = "identity.person.blood_type";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["AB\u{2212}".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(BLOOD_TYPE, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, BLOOD_TYPE, &tax).is_none());
+}
+
+/// Pins that a valid constant column (40 copies of the CMS worked example) is
+/// kept: not vetoed, not demoted. It cannot exercise the loosening: the value
+/// was accepted before, and a constant column of 3-start numbers is vetoed by
+/// design (see `npi_mixed_column_is_kept_by_the_guard_and_vetoed`).
+#[test]
+fn npi_valid_constant_column_is_kept() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const NPI: &str = "identity.medical.npi";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["1234567893".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(NPI, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, NPI, &tax).is_none());
+}
+
+/// A column of one repeated real TSID (13 Crockford characters, which the old
+/// 32-hex rule rejected) is not vetoed or demoted.
+#[test]
+fn tsid_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const TSID: &str = "technology.identifier.tsid";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["0JMVQ049NFN6K".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(TSID, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, TSID, &tax).is_none());
+}
+
+/// The model still predicts `tsid` for 32-hex columns (trained on the old
+/// samples). Such a column fails the new rule, is vetoed (tsid is on the
+/// allowlist), and the shape fallback lands it on alphanumeric_id.
+#[test]
+fn tsid_label_on_32_hex_column_is_vetoed_to_alphanumeric_id() {
+    use finetype_core::validation_veto::{
+        audited_safe_labels, evaluate_validation_veto, veto_shape_fallback,
+    };
+    const TSID: &str = "technology.identifier.tsid";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = (0..40u64)
+        .map(|i| {
+            format!(
+                "{:016x}{:016x}",
+                0x0190a1b2c3d4e5f6u64 + i * 7919,
+                0xa7b8c9d0e1f2a3b4u64 ^ (i * 104_729)
+            )
+        })
+        .collect();
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    assert!(audited_safe_labels().contains(TSID));
+    let veto = evaluate_validation_veto(TSID, &refs, &tax, &audited_safe_labels());
+    assert!(veto.vetoed, "not vetoed: {veto:?}");
+    assert_eq!(
+        veto_shape_fallback(&refs),
+        Some("representation.identifier.alphanumeric_id")
+    );
+}

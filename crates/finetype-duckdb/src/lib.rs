@@ -68,6 +68,11 @@ const HF_REPO: &str = "meridian-online/finetype-model";
 /// Files required for the multi-branch model.
 const MODEL_FILES: &[&str] = &["model.safetensors", "label_map.json", "config.json"];
 
+/// The model's frozen validation rules. Optional: models published before the
+/// snapshot existed lack it, and the model then validates against the
+/// extension's compiled-in rules.
+const VALIDATION_SNAPSHOT: &str = finetype_core::validator_snapshot::SNAPSHOT_FILE;
+
 /// Model2Vec files (embed + header branches) — fetched from the `model2vec/`
 /// subdirectory of the same HuggingFace repo.
 const M2V_TOKENIZER: &str = "model2vec/tokenizer.json";
@@ -107,6 +112,13 @@ fn resolve_model_dir() -> std::result::Result<PathBuf, Box<dyn Error>> {
     // Download all required files — hf_hub caches them automatically.
     // model.safetensors is first, and being a top-level file its parent is the
     // snapshot root we return as the model dir.
+    //
+    // The optional snapshot goes first. `get` serves a cached file from the
+    // cached revision but downloads a miss into the remote's current revision,
+    // so fetching the snapshot first makes the required files below resolve to
+    // that same revision. When a revision split still happens, it is detected
+    // and warned about below.
+    let snapshot = fetch_optional_snapshot(|f| api.get(f));
     let mut model_dir = None;
     for filename in MODEL_FILES {
         let path = api.get(filename)?;
@@ -125,7 +137,40 @@ fn resolve_model_dir() -> std::result::Result<PathBuf, Box<dyn Error>> {
     api.get(M2V_TOKENIZER)?;
     api.get(M2V_MODEL)?;
 
+    if let (Some(snapshot), Some(dir)) = (&snapshot, &model_dir) {
+        if !snapshot_in_use(snapshot, dir) {
+            tracing::warn!(
+                "Validation snapshot was fetched into a different model revision and is not \
+                 in use; the model validates against the extension's compiled-in rules"
+            );
+        }
+    }
+
     model_dir.ok_or_else(|| "Failed to determine model cache directory".into())
+}
+
+/// Whether the snapshot sits in the model directory, where the loader reads it.
+fn snapshot_in_use(snapshot: &std::path::Path, model_dir: &std::path::Path) -> bool {
+    snapshot.parent() == Some(model_dir)
+}
+
+/// Fetch the model's validation snapshot, if the repo has one. A missing file
+/// (404) or any failed fetch means "no snapshot": that is not a load failure, so
+/// the model loads against the extension's compiled-in rules as before, and the
+/// fallback is logged at `warn` so it is visible.
+fn fetch_optional_snapshot<E: std::fmt::Display>(
+    get: impl FnOnce(&str) -> std::result::Result<PathBuf, E>,
+) -> Option<PathBuf> {
+    match get(VALIDATION_SNAPSHOT) {
+        Ok(path) => Some(path),
+        Err(e) => {
+            tracing::warn!(
+                "No validation snapshot fetched ({e}); the model validates against the \
+                 extension's compiled-in rules"
+            );
+            None
+        }
+    }
 }
 
 /// Initialize or get the global column classifier backed by multi-branch model.
@@ -410,7 +455,7 @@ impl VScalar for FineTypeInfer {
     }
 }
 
-/// `ft_validate_text(value VARCHAR, schema VARCHAR) → STRUCT{valid, constraint, message}`
+/// `ft_validate_text(value VARCHAR, schema VARCHAR) → STRUCT{valid, constraint, message, grade, note}`
 ///
 /// Validates a value (or a whole column, one row at a time) against a JSON
 /// Schema fragment, returning a STRUCT mirroring the CLI `reject_errors` shape
@@ -418,6 +463,8 @@ impl VScalar for FineTypeInfer {
 ///   - `valid` BOOLEAN
 ///   - `constraint` VARCHAR — `pattern` | `min_length` | … | `other` (NULL when valid)
 ///   - `message` VARCHAR — the `jsonschema` error text (NULL when valid)
+///   - `grade` VARCHAR — `conforms` | `noted` | `fails` (NULL for a skipped value)
+///   - `note` VARCHAR — `<kind>: <detail>` when the grade is `noted`
 ///
 /// Null semantics match `finetype validate`: an empty / `"null"` value is
 /// skipped (valid), and a NULL / empty / non-object schema means the column
@@ -439,21 +486,30 @@ impl VScalar for FineTypeValidateText {
         let mut valid_child = struct_vec.child(0, len);
         let mut constraint_child = struct_vec.child(1, len);
         let mut message_child = struct_vec.child(2, len);
+        let mut grade_child = struct_vec.child(3, len);
+        let mut note_child = struct_vec.child(4, len);
 
         for i in 0..len {
             let value = read_varchar(input, 0, i);
             let schema = read_varchar(input, 1, i);
-            let (valid, constraint, message) =
-                validate::validate_value_detail(value.as_deref(), schema.as_deref());
+            let detail = validate::validate_value_detail(value.as_deref(), schema.as_deref());
 
-            valid_child.as_mut_slice::<bool>()[i] = valid;
-            match constraint {
+            valid_child.as_mut_slice::<bool>()[i] = detail.valid;
+            match detail.constraint {
                 Some(c) => constraint_child.insert(i, c.as_str()),
                 None => constraint_child.set_null(i),
             }
-            match message {
+            match detail.message {
                 Some(m) => message_child.insert(i, m.as_str()),
                 None => message_child.set_null(i),
+            }
+            match detail.grade {
+                Some(g) => grade_child.insert(i, g),
+                None => grade_child.set_null(i),
+            }
+            match detail.note {
+                Some(n) => note_child.insert(i, n.as_str()),
+                None => note_child.set_null(i),
             }
         }
 
@@ -466,6 +522,8 @@ impl VScalar for FineTypeValidateText {
             ("valid", LogicalTypeHandle::from(LogicalTypeId::Boolean)),
             ("constraint", varchar()),
             ("message", varchar()),
+            ("grade", varchar()),
+            ("note", varchar()),
         ]);
         vec![ScalarFunctionSignature::exact(
             vec![varchar(), varchar()],
@@ -724,4 +782,37 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
         .expect("Failed to register ft_profile table macro");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Load-time pinning is covered by the model crate's loader tests.
+    #[test]
+    fn snapshot_fetch_returns_path_when_present() {
+        let dir = PathBuf::from("/cache/model");
+        let got = fetch_optional_snapshot(|f| {
+            assert_eq!(f, "validation_snapshot.json");
+            Ok::<_, String>(dir.join(f))
+        });
+        assert_eq!(got, Some(dir.join("validation_snapshot.json")));
+    }
+
+    #[test]
+    fn missing_snapshot_does_not_fail_the_load() {
+        let got = fetch_optional_snapshot(|_| Err::<PathBuf, _>("404 Not Found".to_string()));
+        assert_eq!(got, None);
+    }
+
+    #[test]
+    fn snapshot_in_use_only_beside_the_model() {
+        let model = PathBuf::from("/cache/snapshots/new");
+        assert!(snapshot_in_use(
+            &model.join("validation_snapshot.json"),
+            &model
+        ));
+        let other = PathBuf::from("/cache/snapshots/old/validation_snapshot.json");
+        assert!(!snapshot_in_use(&other, &model));
+    }
 }

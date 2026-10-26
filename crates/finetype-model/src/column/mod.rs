@@ -462,6 +462,7 @@ fn label_validates_sample(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bool
     let Some(validator) = finetype_core::validator::resolve_label_validator(leaf, tax) else {
         return false;
     };
+    let detector = finetype_core::discrimination::detector_for(leaf);
     let mut checked = 0usize;
     let mut passed = 0usize;
     let mut remaining = sample.len();
@@ -472,7 +473,7 @@ fn label_validates_sample(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bool
             continue;
         }
         checked += 1;
-        if validator.is_valid(t) {
+        if finetype_core::discrimination::passes_detector_or_rule(detector, &validator, t) {
             passed += 1;
         }
         if ((passed + remaining) as f64) / ((checked + remaining) as f64) < 0.9 {

@@ -7,11 +7,12 @@
 //! This module is consumed by the CLI `validate` command and the DuckDB
 //! extension.
 
+use crate::grade::{NoteKind, NotesMatcher};
 use crate::quality::FileQualityGrade;
 use jsonschema::error::{TypeKind, ValidationErrorKind};
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use thiserror::Error;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -24,6 +25,8 @@ pub enum TableValidatorError {
     MissingProperties,
     #[error("Failed to compile schema for column '{column}': {detail}")]
     SchemaCompilation { column: String, detail: String },
+    #[error("Invalid validation notes for column '{column}': {detail}")]
+    InvalidNotes { column: String, detail: String },
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -123,7 +126,25 @@ pub struct TableValidationResult {
     /// Deterministically ordered by `(row_index, column_index)`
     /// ascending (ac-03).
     pub rejects: Vec<RejectRecord>,
+    /// Values that passed validation but carry a note (non-canonical, withdrawn,
+    /// nonstandard), per column. Apart from rejects: a noted value is valid and
+    /// stays in `valid_row_indices`. Columns with no noted values are omitted.
+    pub column_notes: Vec<ColumnNotes>,
 }
+
+/// Noted values in one column, read from the column schema's
+/// `x-finetype-canonical` / `x-finetype-historic` extensions.
+#[derive(Debug, Clone, Serialize)]
+pub struct ColumnNotes {
+    pub column_name: String,
+    /// How many values carry each kind of note; only kinds that occurred.
+    pub counts: BTreeMap<NoteKind, usize>,
+    /// Up to five noted values, in first-seen order.
+    pub examples: Vec<String>,
+}
+
+/// Most example values kept per column in `ColumnNotes`.
+const MAX_NOTE_EXAMPLES: usize = 5;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSTRAINT TOKEN MAPPING (ac-02)
@@ -341,26 +362,34 @@ pub fn validate_table(
         jsonschema::Validator,
         Option<EnumCheck>,
         Option<ChecksumCheck>,
+        Option<NotesMatcher>,
     )> = Vec::new();
     for (col_name, col_schema) in properties {
         if let Some(&col_idx) = header_index.get(col_name.as_str()) {
             let (validator, enum_check, checksum_check) =
                 build_column_validator(col_name, col_schema)?;
+            let notes_check = NotesMatcher::from_schema_property(col_schema).map_err(|e| {
+                TableValidatorError::InvalidNotes {
+                    column: col_name.clone(),
+                    detail: e.to_string(),
+                }
+            })?;
             validators.push((
                 col_idx,
                 col_name.clone(),
                 validator,
                 enum_check,
                 checksum_check,
+                notes_check,
             ));
         }
         // Columns in schema but not in data are tracked in missing_columns
     }
-    validators.sort_by_key(|(col_idx, _, _, _, _)| *col_idx);
+    validators.sort_by_key(|(col_idx, ..)| *col_idx);
 
     // Per-column counters
     let mut col_stats: HashMap<String, (usize, usize, usize)> = HashMap::new(); // (valid, invalid, null)
-    for (_, name, _, _, _) in &validators {
+    for (_, name, ..) in &validators {
         col_stats.insert(name.clone(), (0, 0, 0));
     }
 
@@ -368,11 +397,12 @@ pub fn validate_table(
     let mut valid_row_count: usize = 0;
     let mut valid_row_indices: Vec<usize> = Vec::new();
     let mut rejects: Vec<RejectRecord> = Vec::new();
+    let mut notes_by_col: HashMap<usize, ColumnNotes> = HashMap::new();
 
     for (row_idx, row) in rows.iter().enumerate() {
         let mut errors: Vec<CellError> = Vec::new();
 
-        for (col_idx, col_name, validator, enum_check, checksum_check) in &validators {
+        for (col_idx, col_name, validator, enum_check, checksum_check, notes_check) in &validators {
             let cell = row.get(*col_idx).unwrap_or(&None);
 
             if is_null(cell) {
@@ -482,6 +512,22 @@ pub fn validate_table(
                 if let Some(stats) = col_stats.get_mut(col_name) {
                     stats.0 += 1;
                 }
+                // A valid value can still carry a note; it stays valid.
+                if let Some(kind) = notes_check
+                    .as_ref()
+                    .and_then(|n| n.note(value_str))
+                    .map(|n| n.kind)
+                {
+                    let entry = notes_by_col.entry(*col_idx).or_insert_with(|| ColumnNotes {
+                        column_name: col_name.clone(),
+                        counts: BTreeMap::new(),
+                        examples: Vec::new(),
+                    });
+                    *entry.counts.entry(kind).or_insert(0) += 1;
+                    if entry.examples.len() < MAX_NOTE_EXAMPLES {
+                        entry.examples.push(value_str.to_string());
+                    }
+                }
             } else {
                 if let Some(stats) = col_stats.get_mut(col_name) {
                     stats.1 += 1;
@@ -519,7 +565,7 @@ pub fn validate_table(
     // Build column stats
     let columns: Vec<ColumnValidationStats> = validators
         .iter()
-        .map(|(_, name, _, _, _)| {
+        .map(|(_, name, ..)| {
             let (valid, invalid, null) = col_stats.get(name).copied().unwrap_or((0, 0, 0));
             let total = valid + invalid + null;
             let non_null = valid + invalid;
@@ -547,6 +593,12 @@ pub fn validate_table(
     };
     let grade = FileQualityGrade::from_score(valid_rate).to_string();
 
+    // Column order, like `columns`.
+    let column_notes: Vec<ColumnNotes> = validators
+        .iter()
+        .filter_map(|(col_idx, ..)| notes_by_col.remove(col_idx))
+        .collect();
+
     Ok(TableValidationResult {
         total_rows,
         valid_rows: valid_row_count,
@@ -557,6 +609,7 @@ pub fn validate_table(
         missing_columns,
         valid_row_indices,
         rejects,
+        column_notes,
     })
 }
 
@@ -630,6 +683,108 @@ mod tests {
                 }
             }
         })
+    }
+
+    #[test]
+    fn noted_values_are_not_rejects() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-fA-F-]{36}$",
+                    "x-finetype-canonical": {
+                        "kind": "non_canonical",
+                        "name": "lowercase",
+                        "pattern": "^[0-9a-f-]+$"
+                    }
+                },
+                "plain": { "type": "string" }
+            }
+        });
+        let headers = vec!["id".into(), "plain".into()];
+        let rows = vec![
+            vec![s("550e8400-e29b-41d4-a716-446655440000"), s("a")],
+            vec![s("550E8400-E29B-41D4-A716-446655440000"), s("b")],
+            vec![s("bad"), s("c")],
+        ];
+        let result = validate_table(&headers, &rows, &schema).unwrap();
+        assert_eq!(result.invalid_rows, 1);
+        assert_eq!(result.rejects.len(), 1);
+        assert_eq!(result.valid_row_indices, vec![0, 1]);
+        assert_eq!(result.column_notes.len(), 1);
+        let notes = &result.column_notes[0];
+        assert_eq!(notes.column_name, "id");
+        assert_eq!(notes.counts[&NoteKind::NonCanonical], 1);
+        assert_eq!(notes.counts.len(), 1);
+        assert_eq!(
+            notes.examples,
+            vec!["550E8400-E29B-41D4-A716-446655440000".to_string()]
+        );
+    }
+
+    #[test]
+    fn historic_values_note_before_canonical_and_fold_case() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "ccy": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "x-finetype-canonical": {
+                        "kind": "nonstandard", "name": "iso", "pattern": "^[A-Z]{3}$"
+                    },
+                    "x-finetype-historic": [{ "value": "DEM", "until": "2002-03" }]
+                }
+            }
+        });
+        let headers = vec!["ccy".into()];
+        let rows = vec![vec![s("DEM")], vec![s("USD")], vec![s("NULL")], vec![None]];
+        let result = validate_table(&headers, &rows, &schema).unwrap();
+        assert_eq!(result.invalid_rows, 0);
+        let notes = &result.column_notes[0];
+        assert_eq!(notes.counts[&NoteKind::Withdrawn], 1);
+        assert_eq!(notes.examples, vec!["DEM".to_string()]);
+    }
+
+    #[test]
+    fn malformed_note_extensions_are_errors() {
+        let bad = |prop: Value| {
+            let schema = json!({ "type": "object", "properties": { "c": prop } });
+            validate_table(&["c".into()], &[vec![s("x")]], &schema)
+        };
+        let bad_kind = bad(json!({
+            "type": "string",
+            "x-finetype-canonical": { "kind": "bogus", "name": "n", "pattern": "x" }
+        }));
+        assert!(matches!(
+            bad_kind,
+            Err(TableValidatorError::InvalidNotes { .. })
+        ));
+        let bad_pattern = bad(json!({
+            "type": "string",
+            "x-finetype-canonical": { "kind": "nonstandard", "name": "n", "pattern": "(" }
+        }));
+        assert!(matches!(
+            bad_pattern,
+            Err(TableValidatorError::InvalidNotes { .. })
+        ));
+        let bad_historic = bad(json!({
+            "type": "string",
+            "x-finetype-historic": [{ "value": "A" }]
+        }));
+        assert!(matches!(
+            bad_historic,
+            Err(TableValidatorError::InvalidNotes { .. })
+        ));
+    }
+
+    #[test]
+    fn columns_without_notes_are_omitted() {
+        let headers = vec!["name".into(), "age".into(), "email".into()];
+        let rows = vec![vec![s("Alice"), s("30"), s("alice@example.com")]];
+        let result = validate_table(&headers, &rows, &make_schema()).unwrap();
+        assert!(result.column_notes.is_empty());
     }
 
     #[test]

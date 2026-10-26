@@ -18,6 +18,7 @@
 
 use std::collections::HashSet;
 
+use crate::discrimination::detector_for;
 use crate::taxonomy::Taxonomy;
 use crate::validator::{validate_column_for_label, InvalidStrategy};
 
@@ -46,6 +47,12 @@ pub struct ValidationVeto {
     /// Fraction of non-null sample values passing the predicted type's
     /// validation. `None` when the label has no applicable validation (no
     /// evidence either way — never vetoed).
+    ///
+    /// This is the veto's evidence, surfaced as the profile JSON's
+    /// `validation_pass_rate`. For a type with a discrimination detector
+    /// (`username`, `npi`, `tsid`) it counts values by that detector, which is stricter
+    /// than the published rule, so it can differ from what `finetype validate`
+    /// reports for the same column.
     pub pass_rate: Option<f64>,
     /// HARD veto: pass-rate is below threshold AND the label is on the
     /// audited-safe allowlist. The caller NULLs the predicted label.
@@ -85,12 +92,23 @@ pub fn evaluate_validation_veto(
             Err(_) => return ValidationVeto::inert(),
         };
 
-    let checked = result.stats.valid_count + result.stats.invalid_count;
+    let (valid, checked) = match detector_for(label) {
+        // A stricter detector replaces the per-value test only; the published
+        // rule above still decides whether the label carries validation at all.
+        Some(detect) => {
+            let valid = values.iter().flatten().filter(|v| detect(v)).count();
+            (valid, result.stats.valid_count + result.stats.invalid_count)
+        }
+        None => (
+            result.stats.valid_count,
+            result.stats.valid_count + result.stats.invalid_count,
+        ),
+    };
     if checked == 0 {
         return ValidationVeto::inert();
     }
 
-    let pass_rate = result.stats.valid_count as f64 / checked as f64;
+    let pass_rate = valid as f64 / checked as f64;
     let below = pass_rate < VETO_THRESHOLD;
     let is_safe = safe.contains(label);
 

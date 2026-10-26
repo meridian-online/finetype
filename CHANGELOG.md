@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Thirteen types' validation rules now agree with the sources that define them.** Each published rule accepts what its source allows and rejects what it does not define. Downstream tools that read `validate`, the JSON Schema output or `ft_validate_text` will see these changes:
+  - `representation.identifier.uuid` (RFC 9562): upper- and mixed-case hex accepted; lowercase is the canonical form, so other cases are noted `non_canonical: lowercase`. A column of uppercase UUIDs now profiles as `uuid` rather than `alphanumeric_id`.
+  - `representation.numeric.percentage` (SI Brochure): a space, no-break space or narrow no-break space before `%`, and a leading `%` (`%50`), accepted; the transform extracts the number from every form.
+  - `representation.file.file_size` (NIST/IEC, GNU coreutils): units `B, kB, KB, MB, GB, TB, PB`, `KiB … PiB` and the bare letters `K, M, G, T, P`. **The transform changes:** B-suffixed units are decimal (`1 MB` = 1,000,000 bytes, was 1,048,576), `iB` units and bare letters are binary, TB/PB are added, and `2 TB` no longer casts to 2 bytes.
+  - `representation.boolean.initials` (Frictionless Table Schema): Data Package fields declare `trueValues` T/t/Y/y and `falseValues` F/f/N/n.
+  - `technology.code.locale_code` (RFC 5646): script, extended-language and UN M.49 numeric region subtags accepted (`zh-Hant-TW`, `zh-yue`, `es-419`); an underscore separator is accepted with a `nonstandard` note; variants, extensions and private-use tags stay out of scope.
+  - `datetime.date.abbreviated_month` (CLDR): a full stop after the month, `Sept`, a two-digit year in the day-first form, and accented Latin abbreviations (`févr.`, `déc.`) accepted. Non-English abbreviations are recognised but not castable by the English strptime transform.
+  - `datetime.timestamp.rfc_3339` (RFC 3339): fractional seconds and a lower-case `z` accepted; an offset without a colon (`+0000`) and a space before the offset or `Z` are accepted with a `nonstandard` note.
+  - `datetime.timestamp.iso_8601_offset` (ISO 8601): a lower-case `t` and an hour-only offset (`+05`) accepted; an offset without a colon (`+0530`) and a one-digit offset hour (`+5:30`) are accepted with a `nonstandard` note. Both timestamp transforms cast every accepted form.
+  - `finance.currency.currency_code` (ISO 4217 lists one and three): the enum is list one plus codes withdrawn since 1999-01-01 (163 → 243 codes, none removed). Withdrawn codes are noted `withdrawn <month>`, including ANG and CUC, which have left list one. `scripts/fetch_iso4217.py` regenerates both from SIX.
+  - `identity.person.username` (useradd(8)): a trailing `$` and up to 256 characters. Discrimination keeps the 3–32 shape, so ID columns the model mislabels `username` are still demoted.
+  - `identity.person.blood_type`: the U+2212 minus sign accepted, and decomposed to `-`.
+  - `identity.medical.npi` (CMS): the published rule is any 10 digits with a valid check digit; a first digit other than 1 or 2 is noted `non_canonical`. Discrimination keeps the issued range and the check digit.
+  - `technology.identifier.tsid` (tsid-creator): rewritten from 32-hex to its real form, 13 Crockford base32 characters with the first at most F. Columns of 32-hex values are no longer typed `tsid`.
+
+### Added
+
+- **Validation reports a grade per value: conforms, conforms with a note, or fails.** `finetype validate` adds a `column_notes` section (per column, a count per kind of note and up to five examples); rejects are unchanged. JSON Schema column properties carry `x-finetype-canonical` and `x-finetype-historic`. `ft_validate_text`'s STRUCT appends `grade` (`conforms`, `noted` or `fails`) and `note`; the existing fields are unchanged, and `valid` still means "not a failure". `ft_validate_text` applies the fragment's JSON Schema keywords and note extensions only, not the checksum or case-folded enum checks `finetype validate` applies.
+- **A model can carry the validation rules it reads.** The default model carries `validation_snapshot.json`, embedded in the binary and fetched by the DuckDB extension and `download-model.sh`, so fixing a published rule no longer shifts the model's inputs. Its snapshot freezes the rules as of 0.6.63, so landing it changed no output. A model without a snapshot reads the current published rules, which this release changes; the model the DuckDB extension serves gets its snapshot published before the extension release (`models/hf-root/validation_snapshot.json`).
+
+### Library API
+
+- `TableValidationResult` gains `column_notes`, and `MultiBranchClassifier::from_bytes` takes a trailing `snapshot: Option<&[u8]>`. Code that builds `TableValidationResult` with a struct literal, or calls `from_bytes`, needs updating.
+
 ## [0.6.63] - 2026-10-22
 
 ### Removed

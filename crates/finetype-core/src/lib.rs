@@ -13,10 +13,12 @@ pub mod checksum;
 pub mod constraint_fit;
 pub mod datapackage;
 pub mod datetime_format;
+pub mod discrimination;
 pub mod enum_domain;
 pub mod fast_path;
 pub mod frictionless_vocabulary;
 pub mod generator;
+pub mod grade;
 pub mod infer;
 pub mod json_reader;
 pub mod json_schema;
@@ -29,6 +31,7 @@ pub mod taxonomy;
 pub mod tokenizer;
 pub mod validation_veto;
 pub mod validator;
+pub mod validator_snapshot;
 
 pub use checker::{format_report, CheckReport, Checker};
 pub use constraint_fit::{fit_pattern_to_observed, PatternFit, MAX_OBSERVED_SHAPES};
@@ -37,13 +40,14 @@ pub use frictionless_vocabulary::{
     constraint_allowed, constraint_vocabulary, is_profile_field_type, PROFILE_FIELD_TYPES,
 };
 pub use generator::{Generator, Sample};
+pub use grade::{grade_value_for_label, Grade, Note, NoteKind, NotesError, NotesMatcher};
 pub use json_reader::{collect_json, collect_ndjson, JsonPathMap};
 pub use quality::{
     compute_column_quality, compute_file_grade, ColumnQualityScore, FileQualityGrade,
 };
 pub use table_validator::{
-    split_rows, validate_table, CellError, ColumnValidationStats, RowErrors, TableValidationResult,
-    TableValidatorError,
+    split_rows, validate_table, CellError, ColumnNotes, ColumnValidationStats, RowErrors,
+    TableValidationResult, TableValidatorError,
 };
 #[cfg(feature = "embedded-taxonomy")]
 pub use taxonomy::{frictionless_for, publication_for};

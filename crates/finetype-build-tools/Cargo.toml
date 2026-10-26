@@ -32,6 +32,12 @@ path = "src/bin/validate_samples.rs"
 name = "registry-expressions"
 path = "src/bin/registry_expressions.rs"
 
+# Freezes a model's validation rules beside its config.json; run when a model is
+# trained or when its snapshot is deliberately refreshed.
+[[bin]]
+name = "write_validation_snapshot"
+path = "src/bin/write_validation_snapshot.rs"
+
 [dependencies]
 clap = { workspace = true }
 finetype-core = { workspace = true }

@@ -277,12 +277,12 @@ SELECT * FROM ft_validate('people',
   '{"properties":{"email":{"type":"string","pattern":"^[^@]+@[^@]+\\.[^@]+$"}}}');
 ```
 
-`ft_validate_text` is the per-cell verb behind the macro — it returns a STRUCT naming which constraint failed (mirroring the CLI `reject_errors` shape), and applies the CLI null semantics (empty / `"null"` skip):
+`ft_validate_text` is the per-cell verb behind the macro — it returns a STRUCT naming which constraint failed (mirroring the CLI `reject_errors` shape) plus the value's `grade` (`conforms`, `noted` or `fails`) and, for a noted value, its `note`, and applies the CLI null semantics (empty / `"null"` skip). `valid` and `grade` follow the fragment's JSON Schema keywords and note extensions only: the checksum (`x-finetype-label`) and case-folded enum checks that `finetype validate` applies are not applied here, so a right-shape value with a bad check digit conforms. For example:
 
 ```sql
 SELECT ft_validate_text('not-an-email',
   '{"type":"string","pattern":"^[^@]+@[^@]+\\.[^@]+$"}');
--- {'valid': false, 'constraint': pattern, 'message': '"not-an-email" does not match …'}
+-- {'valid': false, 'constraint': pattern, 'message': '"not-an-email" does not match …', 'grade': fails, 'note': NULL}
 ```
 
 > **Note the JSON escaping.** A regex `\.` must be written `\\.` in the schema string — `\.` is invalid JSON. DuckDB single-quoted strings pass backslashes through literally, so `'…\\.[^@]…'` reaches the validator as valid JSON.

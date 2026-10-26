@@ -507,8 +507,16 @@ technology.code.doi:
 technology.code.locale_code:
   title: "Locale Code"
   description: >
-    Language-region code in IETF BCP 47 format (e.g., en-US, fr-FR, zh-Hans).
-    Allows for script subtags (e.g., zh-Hant) and extensions.
+    Language tag in the IETF BCP 47 form of RFC 5646: a language subtag, an
+    optional script subtag and an optional region subtag (e.g., en, en-US,
+    zh-Hant-TW, es-419). The language subtag is drawn from ISO 639, the script
+    subtag from ISO 15924, and the region subtag from ISO 3166-1 or the UN M.49
+    numeric codes; RFC 5646 gives es-419 as Spanish appropriate to the
+    UN-defined Latin America and Caribbean region. One extended language
+    subtag may follow the language (zh-yue); that slot is checked for shape
+    only, with membership left to the substance guard. An underscore separator (pt_BR),
+    the POSIX and Java locale form, is accepted with a note. Variants,
+    extensions, private-use and grandfathered tags are not accepted.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -519,10 +527,15 @@ technology.code.locale_code:
   transform_ext: null
   decompose:
     language: "REGEXP_EXTRACT(LOWER({col}), '^([a-z]{2,3})', 1)"
-    country: "REGEXP_EXTRACT(LOWER({col}), '-([a-z]{2})(?:$|-)', 1)"
+    country: "REGEXP_EXTRACT(LOWER({col}), '^[a-z]{2,3}(?:[-_][a-z]{3})?(?:[-_][a-z]{4})?[-_]([a-z]{2}|[0-9]{3})$', 1)"
   validation:
     type: string
-    pattern: "^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{2,4})*$"
+    pattern: "^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{3})?(?:[-_][a-zA-Z]{4})?(?:[-_](?:[a-zA-Z]{2}|[0-9]{3}))?$"
+  validation_notes:
+    canonical:
+      kind: nonstandard
+      name: hyphen separator
+      pattern: "^[a-zA-Z]{2,3}(?:-[a-zA-Z]{3})?(?:-[a-zA-Z]{4})?(?:-(?:[a-zA-Z]{2}|[0-9]{3}))?$"
   tier: [VARCHAR, code]
   aliases: [bcp47, language_tag]
   samples:
@@ -684,9 +697,13 @@ technology.identifier.ulid:
 technology.identifier.tsid:
   title: "TSID"
   description: >
-    Time-Sorted ID. 32 lowercase hexadecimal characters with an embedded
-    timestamp in the leading digits. Distinguished from UUID by having no
-    hyphens, and from cryptographic hashes by the timestamp constraint.
+    Time-Sorted ID, as defined by the tsid-creator reference implementation:
+    a 64-bit value (42 bits of milliseconds since 2020-01-01T00:00:00Z, 10 node
+    bits, 12 counter bits) written as 13 Crockford base32 characters. The first
+    character is at most F because the value is 64 bits. Crockford decoding is
+    case insensitive, so lower case is accepted. The published rule keeps to the
+    canonical alphabet; decoders may also map I and L to 1 and O to 0, which is
+    leniency in decoding, not part of the format.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -698,19 +715,19 @@ technology.identifier.tsid:
   decompose: null
   validation:
     type: string
-    pattern: "^[0-9a-f]{32}$"
+    pattern: "^[0-9A-Fa-f][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{12}$"
   tier: [VARCHAR, identifier]
   aliases: null
   samples:
-    - "0190a1b2c3d4e5f6a7b8c9d0e1f2a3b4"
-    - "018f47d5a6b70000000000000000abcd"
-    - "0191c8e4f2a30000fedcba9876543210"
+    - "0JMVQ049NFN6K"
+    - "0SFTS78GP0CQ7"
+    - "0T3WM4QFBK5NV"
   icon: id
   references: null
   notes: >
-    Leading 8-10 hex chars decode to a reasonable
-    timestamp (2010-2050). Disambiguation from hash/token_hex requires
-    header hints or timestamp validation.
+    The same 64-bit value can also be stored as an integer, which finetype
+    types as an integer rather than as a tsid. Distinguishing a tsid from
+    another 13-character alphanumeric ID needs a header or a timestamp check.
 
 technology.identifier.snowflake_id:
   title: "Snowflake ID"

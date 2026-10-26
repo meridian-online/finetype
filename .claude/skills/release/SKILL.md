@@ -41,6 +41,9 @@ Run these checks and **stop on any failure**:
    - `value_model2vec/` (required for dual-encoder models — the co-located value
      encoder; profile-time loading fails without it, an empty snapshot masquerades as
      a model failure)
+   - `validation_snapshot.json` (required for a model trained against the frozen
+     validation snapshot — the loader reads it beside `model.safetensors`; a model
+     published without it validates against whatever rules the reader compiled in)
    - `results.json` (optional — training metrics)
 
 2. **Tests pass** — `cargo test -p finetype-model` must pass with zero failures.
@@ -55,7 +58,7 @@ Present the pre-flight summary and wait for confirmation before proceeding.
 
 ### 2. Upload to HuggingFace
 
-Upload the three required files to `meridian-online/finetype-model`:
+Upload the required files to `meridian-online/finetype-model`:
 
 ```python
 from huggingface_hub import HfApi
@@ -76,6 +79,17 @@ for file in files:
         repo_type="model",
         commit_message=f"Add {model_name}/{file}"
     )
+
+# The model's frozen validation rules go beside its weights.
+snapshot = Path(model_dir) / "validation_snapshot.json"
+if snapshot.is_file():
+    api.upload_file(
+        path_or_fileobj=str(snapshot),
+        path_in_repo=f"{model_name}/validation_snapshot.json",
+        repo_id="meridian-online/finetype-model",
+        repo_type="model",
+        commit_message=f"Add {model_name}/validation_snapshot.json"
+    )
 ```
 
 Where `model_name` is the directory basename (e.g. `sherlock-v11`).
@@ -86,7 +100,59 @@ install time, not at release time):
 ```bash
 curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/{model_name}/model.safetensors"
 curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/{model_name}/value_model2vec/model.safetensors"  # dual-encoder only
+curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/{model_name}/validation_snapshot.json"   # download-model.sh reads this one
 ```
+A reader that cannot fetch the snapshot does not fail; it falls back to its compiled-in rules, so a missing
+upload only shows up as a model that disagrees with its training.
+
+#### 2b. Serve the model to the DuckDB extension (only when the extension should switch to it)
+
+The DuckDB extension reads the repo **root**: `model.safetensors`, `config.json`, `label_map.json`,
+`model2vec/` and `validation_snapshot.json`. It does not fetch `value_model2vec/`
+(`resolve_model_dir` in `crates/finetype-duckdb/src/lib.rs`), so a **dual-encoder model** (one whose
+`config.json` sets `value_embed_model`, as the current default does) cannot be served at the root until
+the extension fetches that directory; serve a single-encoder model, or change the extension first.
+
+Publish the root set as one set, from the same model, in one commit: a root snapshot paired with another
+model's weights validates that model against the wrong rules without any warning, and separate uploads
+leave a window where the root is mixed. Stage the files and commit them together:
+```python
+import os
+from huggingface_hub import HfApi, CommitOperationAdd, CommitOperationDelete
+api = HfApi()
+files = ["model.safetensors", "config.json", "label_map.json", "validation_snapshot.json"]
+ops = [CommitOperationAdd(path_in_repo=name, path_or_fileobj=f"{model_dir}/{name}")
+       for name in files if os.path.exists(f"{model_dir}/{name}")]
+# The header encoder is shared across models, at models/model2vec.
+header_dir = "models/model2vec"
+if not os.path.isdir(header_dir):
+    raise SystemExit(f"header encoder not found at {header_dir}; the root set needs model2vec/")
+ops += [CommitOperationAdd(path_in_repo=f"model2vec/{f}", path_or_fileobj=f"{header_dir}/{f}")
+        for f in os.listdir(header_dir)]
+# A model with no snapshot must not leave an old root snapshot in place, but there
+# is only something to delete when the root has one:
+if (not os.path.exists(f"{model_dir}/validation_snapshot.json")
+        and api.file_exists("meridian-online/finetype-model", "validation_snapshot.json", repo_type="model")):
+    ops.append(CommitOperationDelete(path_in_repo="validation_snapshot.json"))
+api.create_commit(repo_id="meridian-online/finetype-model", repo_type="model", operations=ops,
+                  commit_message=f"Serve {model_name} at the root")
+```
+(`upload_folder` from a directory holding just those files also commits once.)
+
+`models/hf-root/validation_snapshot.json` is the exception: it freezes the rules the extension served
+at 0.6.63, before validation snapshots existed, so publishing it changes no extension output. For any other model trained before
+snapshots existed, which has none, write its snapshot from the labels of **that
+model's training commit**, never from the current `labels/`, whose rules the model was not trained under:
+```bash
+git worktree add ../finetype-train-labels <training-commit>
+cargo run -q -p finetype-build-tools --bin write_validation_snapshot -- <model_dir> --labels ../finetype-train-labels/labels
+git worktree remove ../finetype-train-labels
+```
+Then check the root copy:
+```bash
+curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/validation_snapshot.json"
+```
+Release the extension afterwards; it logs a warning when it finds no snapshot.
 
 ### 3. Update Default Symlink
 
@@ -128,7 +194,8 @@ Report:
 Released {model_name} to HuggingFace.
 
   HF repo:  meridian-online/finetype-model
-  Files:    {model_name}/model.safetensors, config.json, label_map.json
+  Files:    {model_name}/model.safetensors, config.json, label_map.json, validation_snapshot.json
+  Root:     served to the DuckDB extension? (2b: model files + validation_snapshot.json as one set, or not changed)
   Default:  models/default → {model_name}
   Eval:     {score}/{total} ({pct}% label)
 
@@ -247,6 +314,25 @@ ask the user** — don't skip quietly:
 
 > The DuckDB community extension is on a separate channel, currently **{community_version}**
 > (this release is **{new_version}**). Refresh it now? [y/N]
+
+**Before any extension release, check the root snapshot.** Whenever the root `config.json` has
+`type_index_keys`, the root must also hold `validation_snapshot.json`, or the extension feeds that model
+the current rules rather than the ones it was trained under:
+```bash
+root=https://huggingface.co/meridian-online/finetype-model/resolve/main
+cfg=$(curl -sfL "$root/config.json") || { echo "cannot fetch the root config.json; stop"; return 1 2>/dev/null || false; }
+if grep -q type_index_keys <<<"$cfg"; then
+  curl -sfIL "$root/validation_snapshot.json" >/dev/null \
+    && echo "OK: root snapshot present" \
+    || echo "root snapshot missing: upload models/hf-root/validation_snapshot.json before releasing the extension"
+else
+  echo "OK: root model has no type_index_keys"
+fi
+```
+For the root model served today, `models/hf-root/validation_snapshot.json` is the file to upload. It freezes
+the rules the extension served at 0.6.63, before validation snapshots existed, so publishing it changes no extension output;
+that deliberately differs from the training-commit recipe in step 2b for other pre-snapshot models. If the
+root model has changed, rebuild its snapshot as step 2b describes.
 
 Read `{community_version}` from the descriptor (or the last merged upstream PR):
 

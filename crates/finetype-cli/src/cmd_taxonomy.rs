@@ -447,6 +447,19 @@ pub(crate) fn cmd_check(
         std::process::exit(1);
     }
 
+    // Notes and samples gate: validation_notes patterns compile, historic values
+    // and each type's own samples pass the published rule.
+    if let Err(problems) = taxonomy.validate() {
+        eprintln!(
+            "\nTaxonomy validation FAILED ({} problem(s)):",
+            problems.len()
+        );
+        for p in &problems {
+            eprintln!("  - {p}");
+        }
+        std::process::exit(1);
+    }
+
     // Exit non-zero if checks failed
     if !report.all_passed() {
         std::process::exit(1);

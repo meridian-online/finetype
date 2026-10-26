@@ -42,6 +42,8 @@ pub(crate) fn load_multi_branch_classifier(
                     embedded::MB_WEIGHTS,
                     m2v,
                     value_m2v,
+                    embedded::HAS_MB_VALIDATION_SNAPSHOT
+                        .then_some(embedded::MB_VALIDATION_SNAPSHOT),
                 )
                 .map_err(Into::into);
             }

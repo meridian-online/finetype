@@ -536,7 +536,8 @@ identity.person.username:
   description: >
     Online username or handle for a user account. Typically alphanumeric with
     underscores, hyphens, or dots. Case-insensitive storage. Locale-specific
-    due to character set restrictions.
+    due to character set restrictions. Following useradd(8), a name may end
+    with a dollar sign and may be up to 256 characters long.
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU]
   broad_type: VARCHAR
@@ -549,8 +550,8 @@ identity.person.username:
   validation:
     type: string
     minLength: 3
-    maxLength: 32
-    pattern: "^[a-zA-Z0-9_\\-.]{3,32}$"
+    maxLength: 256
+    pattern: "^[a-zA-Z0-9_.\\-]{2,255}[a-zA-Z0-9_.\\-$]$"
   tier: [VARCHAR, person]
   aliases: [handle, account_name]
   samples:
@@ -562,7 +563,11 @@ identity.person.username:
   references: null
   notes: >
     v1 migration: Was person.username. Transform lowercases for canonical form.
-    Typically 3-32 characters. Allows alphanumeric, underscore, hyphen, dot.
+    The published rule follows useradd(8): 3 to 256 characters, with a dollar
+    sign allowed only as the last character. Column discrimination keeps the
+    older 3 to 32 character shape (plus an optional trailing dollar sign), so
+    UUIDs and hashes are not mistaken for usernames. Allows alphanumeric,
+    underscore, hyphen, dot.
 
 identity.person.password:
   title: "Password"
@@ -696,7 +701,8 @@ identity.person.blood_type:
   title: "Blood Type"
   description: >
     ABO blood group system (A, B, AB, O) with optional Rh factor (±).
-    Format: "A+", "B-", "AB", "O+", etc.
+    Format: "A+", "B-", "AB", "O+", etc. The negative sign may be the ASCII
+    hyphen or the minus sign (U+2212) that Rh nomenclature uses.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -707,10 +713,10 @@ identity.person.blood_type:
   transform_ext: null
   decompose:
     blood_group: "REGEXP_EXTRACT(UPPER({col}), '^([ABO]+)', 1)"
-    rh_factor: "REGEXP_EXTRACT(UPPER({col}), '([+-])$', 1)"
+    rh_factor: "REPLACE(REGEXP_EXTRACT(UPPER({col}), '([+\u2212-])$', 1), '\u2212', '-')"
   validation:
     type: string
-    pattern: "^(A|B|AB|O)[+-]?$"
+    pattern: "^(A|B|AB|O)[+\\-\u2212]?$"
   tier: [VARCHAR, person]
   aliases: null
   samples:
@@ -722,7 +728,8 @@ identity.person.blood_type:
   references: null
   notes: >
     v1 migration: Was person.blood_type. Transform uppercases. Decompose
-    extracts blood group (A, B, AB, O) and Rh factor (+, -, or null).
+    extracts blood group (A, B, AB, O) and Rh factor (+, -, or null); the minus
+    sign U+2212 is normalised to the ASCII hyphen.
 
 identity.person.height:
   title: "Height"
@@ -1014,7 +1021,9 @@ identity.medical.npi:
   description: >
     10-digit numeric identifier for US healthcare providers, issued by CMS.
     Includes a Luhn check digit as the 10th digit. Required for HIPAA
-    transactions. Format: exactly 10 digits starting with 1 or 2.
+    transactions. Format: exactly 10 digits. NPIs are issued with a first
+    digit of 1 or 2; the CMS check-digit document reserves other first digits
+    for use coordinated with the standard health plan identifier.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -1026,9 +1035,11 @@ identity.medical.npi:
   decompose: null
   validation:
     type: string
-    pattern: "^[12]\\d{9}$"
+    pattern: "^\\d{10}$"
     minLength: 10
     maxLength: 10
+  validation_notes:
+    canonical: { kind: non_canonical, name: "issued range (first digit 1 or 2)", pattern: "^[12]\\d{9}$" }
   checksum: npi
   # WIRED 2026-07-07 (0.6.41). The Luhn guard demotes ~87% of the npi over-emission
   # (~42k 10-digit financial figures — ebit/marketCap/totalAssets — to integer_number) at

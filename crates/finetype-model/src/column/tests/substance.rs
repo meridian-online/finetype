@@ -543,6 +543,27 @@ representation.identifier.uuid:
 }
 
 #[test]
+fn ceded_leaf_recovery_promotes_a_list_one_currency_column() {
+    // currency_code is a ceded leaf: a column of ISO 4217 list-one codes
+    // (including XCG, new in the published rule) is promoted from a relocated label.
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(shipped_taxonomy());
+    let codes: Vec<String> = ["USD", "EUR", "XCG", "GBP", "JPY", "USD", "EUR", "XCG"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("ccy", &codes, "representation.text.word", 1.0)
+        .unwrap();
+    assert_eq!(r.label, "finance.currency.currency_code");
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("ceded_leaf_recovery")
+    );
+}
+
+#[test]
 fn ceded_leaf_recovery_declines_non_validating_values() {
     // Same eligible leaf (uuid), but the values are NOT uuids — recovery must NOT fire
     // (no over-emission onto non-matching columns).
@@ -2822,4 +2843,81 @@ fn naics_recovery_rejects_bare_code_header_for_sector_length_values() {
         .compose_from_sense("code", &vals, "representation.numeric.integer_number", 0.7)
         .unwrap();
     assert_ne!(r.label, "identity.industry.naics");
+}
+
+#[test]
+fn locale_guard_keeps_extlang_tags() {
+    // RFC 5646 extended language subtags pass the published rule, so the
+    // substance guard must not demote them at profile time.
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(shipped_taxonomy());
+    let values = vals(&["zh-yue", "zh-cmn-Hans-CN", "zh-yue-HK", "zh-cmn", "en-US"]);
+    let r = cc
+        .compose_from_sense("locale", &values, "technology.code.locale_code", 0.9)
+        .expect("composition produces a result");
+    assert_eq!(r.label, "technology.code.locale_code");
+}
+
+#[test]
+fn locale_guard_demotes_shape_only_lookalikes() {
+    // `foo-bar` and `en-USA` pass the published rule's shape-only extended
+    // language slot (the old rule accepted them too); the guard rejects them
+    // because `foo` is no ISO 639 language and `USA` is neither a region nor an
+    // extlang.
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(shipped_taxonomy());
+    let values = vals(&["foo-bar", "en-USA", "baz-qux", "abc-def"]);
+    let r = cc
+        .compose_from_sense("locale", &values, "technology.code.locale_code", 0.9)
+        .expect("composition produces a result");
+    assert_ne!(r.label, "technology.code.locale_code");
+}
+
+/// Intended change: the npi detector puts the check digit and the issued range
+/// (first digit 1 or 2) into the validation veto, which before checked only the
+/// pattern; Luhn was enforced only by `checksum_substance_guard`, which demotes
+/// at a majority-failure band. A column that is 40% check-digit-valid 1/2-start,
+/// 20% check-digit-valid 3-start and 40% 1/2-start with a bad check digit
+/// clears that guard (60% of its values pass Luhn) but the veto now rejects it
+/// (40% pass the detector, below the veto threshold).
+#[test]
+fn npi_mixed_column_is_kept_by_the_guard_and_vetoed() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const NPI: &str = "identity.medical.npi";
+    let with_check = |first: char, i: usize, valid: bool| -> String {
+        let base = format!("{first}{:08}", 1000 + i);
+        let digit = (0..10u8)
+            .map(|d| format!("{base}{d}"))
+            .find(|v| finetype_core::checksum::npi(v) == valid)
+            .expect("a check digit with the wanted outcome exists");
+        digit
+    };
+    let mut values = Vec::new();
+    for i in 0..16 {
+        values.push(with_check('1', i, true));
+    }
+    for i in 0..8 {
+        values.push(with_check('3', i, true));
+    }
+    for i in 0..16 {
+        values.push(with_check('2', i, false));
+    }
+
+    let tax = shipped_taxonomy();
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(NPI, &refs, &tax, &audited_safe_labels());
+    assert!(veto.vetoed, "not vetoed: {veto:?}");
+
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    let r = cc
+        .compose_from_sense("provider", &values, NPI, 0.9)
+        .expect("composition produces a result");
+    assert_eq!(
+        r.label, NPI,
+        "60% of the values pass the check digit, so the guard keeps the label"
+    );
 }

@@ -655,16 +655,22 @@ pub(crate) fn schema_fail_demotion(
     }
     // Prefer the pre-compiled validator; fall back to compile-per-call when the
     // taxonomy cache isn't populated (mirrors disambiguate_attractor_demotion).
+    let detector = finetype_core::discrimination::detector_for(result_label);
     let fail_count = if let Some(compiled) = taxonomy.get_validator(result_label) {
-        non_empty.iter().filter(|v| !compiled.is_valid(v)).count()
+        non_empty
+            .iter()
+            .filter(|v| {
+                !finetype_core::discrimination::passes_detector_or_rule(detector, compiled, v)
+            })
+            .count()
     } else {
         let validation = taxonomy.get(result_label)?.validation.as_ref()?;
         non_empty
             .iter()
             .filter(|v| {
-                finetype_core::validate_value(v, validation)
-                    .map(|r| !r.is_valid)
-                    .unwrap_or(false)
+                !finetype_core::discrimination::passes_detector_or_uncompiled_rule(
+                    detector, validation, v,
+                )
             })
             .count()
     };
@@ -753,16 +759,24 @@ pub(crate) fn sharpen_attractor_demotion(
             }
 
             if !locale_confirmed {
+                let detector = finetype_core::discrimination::detector_for(result_label);
                 let fail_count = if let Some(compiled) = taxonomy.get_validator(result_label) {
-                    non_empty.iter().filter(|v| !compiled.is_valid(v)).count()
+                    non_empty
+                        .iter()
+                        .filter(|v| {
+                            !finetype_core::discrimination::passes_detector_or_rule(
+                                detector, compiled, v,
+                            )
+                        })
+                        .count()
                 } else if let Some(def) = taxonomy.get(result_label) {
                     if let Some(validation) = &def.validation {
                         non_empty
                             .iter()
                             .filter(|v| {
-                                finetype_core::validate_value(v, validation)
-                                    .map(|r| !r.is_valid)
-                                    .unwrap_or(false)
+                                !finetype_core::discrimination::passes_detector_or_uncompiled_rule(
+                                    detector, validation, v,
+                                )
                             })
                             .count()
                     } else {
@@ -1078,18 +1092,26 @@ pub(crate) fn disambiguate_attractor_demotion(
 
             // If locale validators didn't confirm, fall through to universal validation.
             if !locale_confirmed {
+                let detector = finetype_core::discrimination::detector_for(top_label);
                 let fail_count = if let Some(compiled) = taxonomy.get_validator(top_label) {
                     // Fast path: pre-compiled validator (no per-value regex compilation)
-                    non_empty.iter().filter(|v| !compiled.is_valid(v)).count()
+                    non_empty
+                        .iter()
+                        .filter(|v| {
+                            !finetype_core::discrimination::passes_detector_or_rule(
+                                detector, compiled, v,
+                            )
+                        })
+                        .count()
                 } else if let Some(def) = taxonomy.get(top_label) {
                     if let Some(validation) = &def.validation {
                         // Fallback: compile per-call (shouldn't happen with cache populated)
                         non_empty
                             .iter()
                             .filter(|v| {
-                                finetype_core::validate_value(v, validation)
-                                    .map(|r| !r.is_valid)
-                                    .unwrap_or(false)
+                                !finetype_core::discrimination::passes_detector_or_uncompiled_rule(
+                                    detector, validation, v,
+                                )
                             })
                             .count()
                     } else {

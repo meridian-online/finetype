@@ -673,6 +673,12 @@ jobs:
         # in the `test` job.
         run: cargo test --release -p finetype-cli --test datetime_page_examples -- --include-ignored
 
+      - name: The percentage transform extracts the number from every accepted form
+        # Runs the published transform through the duckdb CLI installed above.
+        # The test is #[ignore]d in the default suite because the `test` job
+        # does not install the CLI.
+        run: cargo test --release -p finetype-cli --test build_transform_projection -- --include-ignored
+
   encoder-dtype:
     # Every step here is a proof rather than a check, and each is routed
     # separately: a diff that changes `scripts/encoder_dtype.py` alone does not
@@ -938,6 +944,14 @@ jobs:
       - name: Download model from HuggingFace
         run: .github/scripts/download-model.sh
       - run: ./tests/smoke.sh
+      - name: The uppercase-UUID profile and the noted-values validate report
+        # Two promises a user meets that only a model and the duckdb CLI can
+        # check, so they are #[ignore]d in the default suite and run here by
+        # name: an uppercase UUID column profiles as a uuid, and `validate -o
+        # json` reports a noted value apart from the rejects.
+        run: |
+          cargo test -p finetype-cli --test cli_golden golden_profile_uppercase_uuid_column -- --ignored
+          cargo test -p finetype-cli --test validate_cli test_validate_json_reports_noted_values_apart_from_rejects -- --ignored
 
   label-stability:
     # THE JOB THAT TELLS A LABEL FIX FROM A LUCKY DRAW.

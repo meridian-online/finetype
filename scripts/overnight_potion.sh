@@ -15,6 +15,17 @@
 #   ./scripts/overnight_potion.sh --potion minishlab/potion-base-4M --two-view minishlab/potion-base-32M \
 #        --config models/m2v-tv-4m32m-244-config.json --tag m2v-tv-4m32m
 #   ./scripts/overnight_potion.sh --score-only        # reuse models, just rescore
+#
+# Validation rules: the training file's validation features are computed under the
+# rules in labels/ when STEP 1 builds it, so STEP 1 also writes
+# "$FTMB.validation_snapshot.json" beside it, and each trained model gets a copy of
+# that file (its keys checked against the injected type_index_keys), not a fresh
+# snapshot taken after training. A reused $FTMB is refused when the sidecar is
+# missing or differs from a fresh snapshot of the live labels, since its features
+# were then computed under other rules. Set ALLOW_STALE_FTMB=1 to proceed anyway:
+# with a recorded sidecar, each model gets that sidecar and the keys in it (the
+# ones the file was built with); with none, each gets a snapshot of the live
+# labels, which its training features may not match.
 set -eo pipefail
 cd "$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -91,8 +102,34 @@ if [[ "$SCORE_ONLY" != "true" ]]; then
   echo "--- STEP 1: build training FTMB (potion embed, full width) ---"
   SV_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && SV_ARG=(--store-values "$STORE_VALUES")
   [[ "$STORE_VALUES" -gt 0 ]] && echo "  per-value attention: storing $STORE_VALUES values/record (FTMB v6)"
+  SNAP_BIN=(cargo run -q -p finetype-build-tools --bin write_validation_snapshot --)
+  SIDECAR="$FTMB.validation_snapshot.json"
+  KEYS_FILE="$FTMB.type_index_keys.json"
+  echo '["test"]' | "$BIN" extract-features --json --header "test" --validation 2>/dev/null | \
+    "$PY" -c "import json,sys; print(json.dumps(json.load(sys.stdin)['type_index_keys']))" > "$KEYS_FILE" \
+    || { echo "FAIL: cannot derive type_index_keys from $BIN"; exit 1; }
   if [[ ! -f "$FTMB" ]]; then
+    # Freeze the rules first (a rule that does not compile fails before the build),
+    # then refuse the build if labels/ changed while it ran.
+    "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --out "$SIDECAR"
     "$PY" scripts/build_ftmb_v5_potion.py --potion "$POTION" "${TV_ARG[@]}" "${SV_ARG[@]}" --output "$FTMB" --workers 8
+    "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --check "$SIDECAR" \
+      || { echo "FAIL: labels/ changed while $FTMB was being built, so its features and $SIDECAR disagree. Delete both and rerun."; exit 1; }
+  elif ! "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --check "$SIDECAR"; then
+    if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
+      if [[ -f "$SIDECAR" ]]; then
+        echo "WARN: $FTMB was built under other validation rules; ALLOW_STALE_FTMB=1, proceeding with its recorded snapshot $SIDECAR and the keys in it"
+        # The keys the FTMB was built with are the sidecar's, not the live binary's.
+        "$PY" -c "import json,sys; json.dump(json.load(open(sys.argv[1]))['keys'], open(sys.argv[2],'w'))" "$SIDECAR" "$KEYS_FILE"
+      else
+        echo "WARN: $FTMB has no recorded snapshot; ALLOW_STALE_FTMB=1, proceeding with a snapshot of the live labels, which its features may not match"
+        SIDECAR=""
+      fi
+    else
+      echo "FAIL: $FTMB has no validation snapshot matching the live labels, so its validation"
+      echo "      features come from other rules. Delete it to rebuild, or set ALLOW_STALE_FTMB=1."
+      exit 1
+    fi
   fi
   # GATE: dims + truncation. A misaligned binary doesn't crash training — it wastes the night.
   VERIFY_OUT=$("$PY" scripts/read_ftmb.py "$FTMB" --stats --verify 2>&1) || { echo "$VERIFY_OUT"; echo "FAIL: read_ftmb verify"; exit 1; }
@@ -126,29 +163,48 @@ PYGATE
   echo "--- STEP 2: 3-seed train ---"
   for S in "${SEEDS[@]}"; do
     OUT="models/${TAG}-s${S}"
-    [[ -f "$OUT/model.safetensors" ]] && { echo "skip $OUT (exists)"; continue; }
-    echo "[train] seed $S -> $OUT  ($(date))"
-    VE_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && VE_ARG=(--value-encoder "$VALUE_ENCODER")
-    "$BIN" train-multi-branch --data "$FTMB" --output "$OUT" --model-config "$CONFIG" \
-      --epochs "$EPOCHS" --batch-size 32 --lr 0.0001 --weight-decay 0.0001 --dropout 0.35 \
-      --seed "$S" --head flat --patience 15 "${VE_ARG[@]}"
-
-    # Post-train: inject type_index_keys (label-order contract for the validation
-    # branch at inference). WITHOUT this the native classifier feeds the validation
-    # branch zeros and mis-predicts — the bug that made potion-8M look like an 11pp
-    # gold regression. Mirrors overnight_m2v_244.sh. (finetype now also derives this
-    # from the live taxonomy as a fallback, but persisting pins the order.)
     SAVED_CONFIG="$OUT/config.json"
+    TRAINED_NOW=false
+    if [[ -f "$OUT/model.safetensors" ]]; then
+      echo "skip training $OUT (exists)"
+    else
+      TRAINED_NOW=true
+      echo "[train] seed $S -> $OUT  ($(date))"
+      VE_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && VE_ARG=(--value-encoder "$VALUE_ENCODER")
+      "$BIN" train-multi-branch --data "$FTMB" --output "$OUT" --model-config "$CONFIG" \
+        --epochs "$EPOCHS" --batch-size 32 --lr 0.0001 --weight-decay 0.0001 --dropout 0.35 \
+        --seed "$S" --head flat --patience 15 "${VE_ARG[@]}"
+    fi
+
+    # Post-train (also for an existing model that lacks them): inject type_index_keys
+    # (label-order contract for the validation branch at inference). WITHOUT this the
+    # native classifier feeds the validation branch zeros and mis-predicts — the bug
+    # that made potion-8M look like an 11pp gold regression. Mirrors
+    # overnight_m2v_244.sh. The keys are the ones the training file was built with
+    # ($KEYS_FILE), not a fresh derivation, so a labels/ edit mid-run cannot change them.
     if [[ -f "$SAVED_CONFIG" ]] && ! grep -q '"type_index_keys"' "$SAVED_CONFIG"; then
-      TYPE_KEYS=$(echo '["test"]' | "$BIN" extract-features --json --header "test" --validation 2>/dev/null | \
-        "$PY" -c "import json,sys; print(json.dumps(json.load(sys.stdin)['type_index_keys']))" 2>/dev/null)
-      if [[ -n "$TYPE_KEYS" && "$TYPE_KEYS" != "null" ]]; then
-        "$PY" -c "
-import json
-c=json.load(open('$SAVED_CONFIG')); c['type_index_keys']=json.loads('''$TYPE_KEYS''')
-json.dump(c,open('$SAVED_CONFIG','w'),indent=2); open('$SAVED_CONFIG','a').write('\n')
+      "$PY" -c "
+import json, sys
+c=json.load(open(sys.argv[1])); c['type_index_keys']=json.load(open(sys.argv[2]))
+json.dump(c,open(sys.argv[1],'w'),indent=2); open(sys.argv[1],'a').write('\n')
 print(f'Injected {len(c[\"type_index_keys\"])} type_index_keys')
-"
+" "$SAVED_CONFIG" "$KEYS_FILE"
+    fi
+
+    # Freeze the validation rules the training file was built under beside
+    # config.json, so this model keeps them when labels/ later changes. The sidecar
+    # is copied (to models trained in this run) whatever labels/ holds now, once its keys equal the model's.
+    if [[ "$TRAINED_NOW" != true && -f "$OUT/model.safetensors" && ! -f "$OUT/validation_snapshot.json" ]]; then
+      # Not trained in this run, so this run's sidecar need not describe it.
+      echo "WARN: $OUT has no validation_snapshot.json; write one from the labels of its training commit (release skill, step 2b)"
+    elif [[ -f "$OUT/model.safetensors" && ! -f "$OUT/validation_snapshot.json" ]] \
+        && grep -q '"type_index_keys"' "$SAVED_CONFIG"; then
+      if [[ -n "$SIDECAR" ]]; then
+        cargo run -q -p finetype-build-tools --bin write_validation_snapshot -- "$OUT" --check-keys "$SIDECAR" \
+          || { echo "FAIL: the keys in $SIDECAR differ from $OUT's type_index_keys"; exit 1; }
+        cp "$SIDECAR" "$OUT/validation_snapshot.json"
+      else
+        cargo run -q -p finetype-build-tools --bin write_validation_snapshot -- "$OUT"
       fi
     fi
   done
@@ -156,9 +212,56 @@ fi
 
 echo "--- STEP 3: build gold FTMB (potion embed) ---"
 SV_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && SV_ARG=(--store-values "$STORE_VALUES")
+# The gold FTMB's validation features come from the live labels too, so it carries
+# a rules record like the training FTMB and must match it.
+: "${SNAP_BIN=}"; [[ -n "$SNAP_BIN" ]] || SNAP_BIN=(cargo run -q -p finetype-build-tools --bin write_validation_snapshot --)
+: "${SIDECAR=$FTMB.validation_snapshot.json}"
+KEYS_FILE="${KEYS_FILE:-$FTMB.type_index_keys.json}"
+GOLD_SIDECAR="$GOLDFTMB.validation_snapshot.json"
 if [[ ! -f "$GOLDFTMB" ]]; then
+  if [[ ! -f "$KEYS_FILE" ]]; then
+    # --score-only on a tag trained before keys were recorded: take the keys from the
+    # first trained model that has them, else derive them from $BIN as STEP 1 does.
+    for S in "${SEEDS[@]}"; do
+      "$PY" -c "
+import json, sys
+k = json.load(open(sys.argv[1])).get('type_index_keys')
+if not k: sys.exit(1)
+json.dump(k, open(sys.argv[2], 'w'))
+" "models/${TAG}-s${S}/config.json" "$KEYS_FILE" 2>/dev/null && break
+    done
+    if [[ ! -f "$KEYS_FILE" ]]; then
+      echo '["test"]' | "$BIN" extract-features --json --header "test" --validation 2>/dev/null | \
+        "$PY" -c "import json,sys; print(json.dumps(json.load(sys.stdin)['type_index_keys']))" > "$KEYS_FILE" \
+        || { rm -f "$KEYS_FILE"; echo "FAIL: no model config under models/${TAG}-s* has type_index_keys and $BIN cannot derive them"; exit 1; }
+    fi
+  fi
+  "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --out "$GOLD_SIDECAR"
   "$PY" scripts/build_gold_ftmb_potion.py --gold "$GOLD" --columns "$COLS" --binary "$BIN" \
     --potion "$POTION" "${TV_ARG[@]}" "${SV_ARG[@]}" --out "$GOLDFTMB"
+  "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --check "$GOLD_SIDECAR" \
+    || { rm -f "$GOLDFTMB" "$GOLD_SIDECAR"; echo "FAIL: labels/ changed while $GOLDFTMB was being built; deleted it and its record. Rerun."; exit 1; }
+fi
+if [[ -z "$SIDECAR" || ! -f "$SIDECAR" ]]; then
+  # No training record to compare with (a tag trained before records existed).
+  if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
+    echo "WARN: no training rules record ($FTMB.validation_snapshot.json); ALLOW_STALE_FTMB=1, skipping the gold record check and scoring as before"
+  else
+    echo "FAIL: the training FTMB has no rules record ($FTMB.validation_snapshot.json), so $GOLDFTMB cannot be shown to match it."
+    echo "      ALLOW_STALE_FTMB=1 scores without that check; deleting both FTMBs and rerunning rebuilds them with records."
+    exit 1
+  fi
+elif ! "$PY" -c "
+import json, sys
+sys.exit(0 if json.load(open(sys.argv[1])) == json.load(open(sys.argv[2])) else 1)
+" "$GOLD_SIDECAR" "$SIDECAR" 2>/dev/null; then
+  if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
+    echo "WARN: $GOLDFTMB has no rules record, or one that differs from the training FTMB's; ALLOW_STALE_FTMB=1, scoring anyway"
+  else
+    echo "FAIL: $GOLDFTMB has no rules record ($GOLD_SIDECAR), or one that differs from $SIDECAR."
+    echo "      ALLOW_STALE_FTMB=1 scores anyway; deleting $GOLDFTMB rebuilds it with a record."
+    exit 1
+  fi
 fi
 
 echo "--- STEP 4: score each seed (Sense + composed) ---"

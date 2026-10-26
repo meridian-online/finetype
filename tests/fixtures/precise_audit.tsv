@@ -16,7 +16,7 @@ datetime.component.month_name	true		true
 datetime.component.periodicity	true		true
 datetime.component.year	false	^\d{4}(\.0+)?$	true
 datetime.date.abbrev_month_no_comma	false	^[A-Z][a-z]{2} [0-3]?\d \d{4}$	true
-datetime.date.abbreviated_month	false	^(?:[A-Za-z]{3,} \d{1,2},? \d{4}|\d{1,2}\.? [A-Za-z]{3,} \d{4})$	true
+datetime.date.abbreviated_month	false	^(?:[A-Za-zÀ-ÖØ-öø-ÿ]{3,}\.? \d{1,2},? \d{4}|\d{1,2}\.? [A-Za-zÀ-ÖØ-öø-ÿ]{3,}\.? (?:\d{4}|\d{2}))$	true
 datetime.date.chinese_ymd	false	^\d{4}年[1-9]\d?月[1-3]?\d日$	true
 datetime.date.compact_dmy	false	^(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])\d{4}$	true
 datetime.date.compact_mdy	false	^\d{8}$	false
@@ -81,7 +81,7 @@ datetime.timestamp.iso_8601_micros_offset	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\
 datetime.timestamp.iso_8601_microseconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$	true
 datetime.timestamp.iso_8601_millis_offset	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$	true
 datetime.timestamp.iso_8601_milliseconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$	true
-datetime.timestamp.iso_8601_offset	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{1,2}:\d{2}$	true
+datetime.timestamp.iso_8601_offset	false	^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}[+-](?:\d{2}(?::?\d{2})?|\d:\d{2})$	true
 datetime.timestamp.iso_microseconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}$	true
 datetime.timestamp.iso_milliseconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$	true
 datetime.timestamp.iso_minutes	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$	true
@@ -92,7 +92,7 @@ datetime.timestamp.mdy_24h	false	^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}$	true
 datetime.timestamp.pg_short_offset	false	^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}[+-]\d{2}$	true
 datetime.timestamp.rfc_2822	false	^[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} .+$	true
 datetime.timestamp.rfc_2822_ordinal	false	^\d{1,2}(?:st|nd|rd|th) [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}$	true
-datetime.timestamp.rfc_3339	false	^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} ?([+-]\d{2}:\d{2}|[+-]\d{4}|Z)$	true
+datetime.timestamp.rfc_3339	false	^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)? ?(?:[Zz]|[+-]\d{2}:?\d{2})$	true
 datetime.timestamp.slash_ymd_24h	false	^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}$	true
 datetime.timestamp.sql_microseconds	false	^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$	true
 datetime.timestamp.sql_microseconds_offset	false	^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}[+-]\d{2}:\d{2}$	true
@@ -173,8 +173,8 @@ identity.medical.hcpcs	false	^[A-V]\d{4}$	false
 identity.medical.icd10	false	^[A-TV-Z][0-9][0-9AB](\.[0-9A-TV-Z]{1,4})?$	true
 identity.medical.loinc	false	^\d{1,5}-\d$	true
 identity.medical.ndc	false	^\d{4}-\d{4}-\d{2}$|^\d{5}-\d{3}-\d{2}$|^\d{5}-\d{4}-\d{1}$|^\d{11}$	false
-identity.medical.npi	false	^[12]\d{9}$	false
-identity.person.blood_type	false	^(A|B|AB|O)[+-]?$	true
+identity.medical.npi	false	^\d{10}$	false
+identity.person.blood_type	false	^(A|B|AB|O)[+\-−]?$	true
 identity.person.email	false	^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$	true
 identity.person.email_display	false	^"?[^"<>]+"?\s*<[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}>$	true
 identity.person.first_name	false	^[\p{L}\s'\-]+$	false
@@ -186,7 +186,7 @@ identity.person.last_name	false	^[\p{L}\s'\-]+$	false
 identity.person.password	false		false
 identity.person.phone_e164	false	^\+[1-9]\d{6,14}$	true
 identity.person.phone_number	false	^[+]?[0-9\s()\-\./\u2013]+([\s]*(ext\.?|Ext\.?|x|#)[\s]*\d{1,5})?([\s]*(Work|Cell|Fax|Home|Office))?$	true
-identity.person.username	false	^[a-zA-Z0-9_\-.]{3,32}$	false
+identity.person.username	false	^[a-zA-Z0-9_.\-]{2,255}[a-zA-Z0-9_.\-$]$	false
 identity.person.weight	false	^[0-9]+(\.[0-9]+)?\s*(kg|lbs|lb|g|oz|stones)?$	true
 representation.boolean.binary	true		true
 representation.boolean.initials	true		true
@@ -194,7 +194,7 @@ representation.boolean.terms	true		true
 representation.discrete.ordinal	false		false
 representation.file.excel_format	false	^[#0.,;\[\]$€£¥%EeAaPpMm/dDyYhHsS ?:"\-+()<>=@*!\w]*$	false
 representation.file.extension	false	^\.?[a-zA-Z0-9]{1,10}$	true
-representation.file.file_size	false	^[0-9]+(\.[0-9]+)?\s*(B|KB|MB|GB|TB)?$	true
+representation.file.file_size	false	^[0-9]+(\.[0-9]+)?\s*(B|[kK]B|[MGTP]B|[KMGTP]iB|[KMGTP])?$	true
 representation.file.mime_type	false	^[a-zA-Z]+/[a-zA-Z0-9.+\-]+(;.*)?$	true
 representation.format.color_hex	false	^#?[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$	true
 representation.format.color_hsl	false	^hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*(,\s*[\d.]+\s*)?\)$	true
@@ -202,11 +202,11 @@ representation.format.color_rgb	false	^(?:rgb)?\(?([0-9]{1,3}),\s*([0-9]{1,3}),\
 representation.identifier.alphanumeric_id	false	^[A-Za-z][A-Za-z0-9 /_.#-]*[0-9][A-Za-z0-9 /_.#-]*$|^[0-9][A-Za-z0-9 /_.#-]*[A-Za-z][A-Za-z0-9 /_.#-]*$	false
 representation.identifier.increment	false	^[0-9]+$	false
 representation.identifier.numeric_code	false	^[0-9]+$	false
-representation.identifier.uuid	false	^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$	true
+representation.identifier.uuid	false	^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$	true
 representation.numeric.decimal_number	false	^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$	true
 representation.numeric.decimal_number_comma	false	^-?[0-9]{1,3}(\.[0-9]{3})*(,[0-9]+)?$|^-?[0-9]+,[0-9]+$	true
 representation.numeric.integer_number	false	^-?[0-9]+$	true
-representation.numeric.percentage	false	^-?[0-9]+(\.[0-9]+)?%?$	true
+representation.numeric.percentage	false	^(-?[0-9]+(\.[0-9]+)?([   ]?%)?|%-?[0-9]+(\.[0-9]+)?)$	true
 representation.numeric.scientific_notation	false	^-?[0-9]+(\.[0-9]+)?[eE][+-]?[0-9]+$	true
 representation.numeric.si_number	false	^[\$€£+-]?\d+\.?\d*[KkMmBbTt]$	true
 representation.scientific.cas_number	false	^\d{2,7}-\d{2}-\d$	true
@@ -224,7 +224,7 @@ technology.cloud.aws_arn	false	^arn:(aws|aws-cn|aws-us-gov):[a-zA-Z0-9\-]+:[a-z0
 technology.cloud.s3_uri	false	^s3://[a-z0-9][a-z0-9.\-]{1,61}[a-z0-9](/.*)?$	true
 technology.code.doi	false	^10\.[0-9]{4,9}/[^\s]+$	true
 technology.code.imei	false	^[0-9]{15}$	false
-technology.code.locale_code	false	^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{2,4})*$	false
+technology.code.locale_code	false	^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{3})?(?:[-_][a-zA-Z]{4})?(?:[-_](?:[a-zA-Z]{2}|[0-9]{3}))?$	false
 technology.code.qualified_name	false	^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){2,}$	true
 technology.cryptographic.hash	false	^[0-9a-f]{32}$|^[0-9a-f]{40}$|^[0-9a-f]{64}$|^[0-9a-f]{128}$	false
 technology.cryptographic.jwt	false	^[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}$	true
@@ -235,7 +235,7 @@ technology.development.version	false	^v?[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.]+)
 technology.filesystem.filename	false	^[^\\/\r\n\t]+\.[A-Za-z0-9]{1,8}$	true
 technology.filesystem.windows_path	false	^([A-Za-z]:\\|\\\\)[^\r\n]*$	true
 technology.identifier.snowflake_id	false	^\d{17,20}$	false
-technology.identifier.tsid	false	^[0-9a-f]{32}$	false
+technology.identifier.tsid	false	^[0-9A-Fa-f][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{12}$	false
 technology.identifier.ulid	false	^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$	false
 technology.internet.cidr	false	^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/([0-9]|[12]\d|3[0-2])$	true
 technology.internet.data_uri	false	^data:(?:[a-zA-Z0-9]+/[a-zA-Z0-9\-+.]+)?(?:;[a-zA-Z0-9\-]+=[^;,]*)*(?:;base64)?,.+$	true

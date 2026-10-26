@@ -10,6 +10,7 @@
 //! If the model says `datetime.date.us_slash`, that is a contract that
 //! `strptime(value, '%m/%d/%Y')::DATE` will succeed.
 
+use crate::grade::NoteKind;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -29,6 +30,23 @@ pub enum TaxonomyError {
     #[error("Glob pattern error: {0}")]
     GlobError(String),
 }
+
+/// Types whose own `samples` fail their published rule today. `validate()`
+/// skips the samples check for these so the check can be enforced for every
+/// other type; each entry is a rule or sample fix waiting to land, and removing
+/// it from this list is how that fix is confirmed.
+pub const SAMPLES_CHECK_EXCEPTIONS: &[&str] = &[
+    "datetime.date.dmy_space_full",
+    "datetime.date.full_month_no_comma",
+    "datetime.date.weekday_dmy_full",
+    "finance.crypto.bitcoin_address",
+    "finance.currency.amount_apostrophe",
+    "finance.currency.amount_code_prefix",
+    "geography.coordinate.plus_code",
+    "identity.person.weight",
+    "representation.format.color_rgb",
+    "technology.internet.ip_v6",
+];
 
 /// Whether `finetype generate` emits a leaf by default. See `Definition::generate`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -55,6 +73,40 @@ pub enum Designation {
     BroadWords,
     /// Broad category - objects/structured data
     BroadObject,
+}
+
+/// Notes layered over a type's published `validation` rule.
+///
+/// The published rule is always the full accepting set; notes only classify
+/// values it accepts, so they never change whether a value validates.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ValidationNotes {
+    /// The preferred form. An accepted value that fails `pattern` is noted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canonical: Option<CanonicalRule>,
+    /// Accepted values the source has since withdrawn.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub historic: Vec<HistoricValue>,
+}
+
+/// The preferred form of a type's values.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanonicalRule {
+    /// `non_canonical` for a form the source allows but does not prefer,
+    /// `nonstandard` for a real-world form the source does not define.
+    pub kind: NoteKind,
+    /// Short name of the preferred form, e.g. `lowercase`.
+    pub name: String,
+    /// Regex a canonical value matches (unanchored, like `validation.pattern`).
+    pub pattern: String,
+}
+
+/// A value the source has withdrawn but the published rule still accepts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoricValue {
+    pub value: String,
+    /// When the source withdrew it, e.g. `2023-01`.
+    pub until: String,
 }
 
 /// JSON Schema validation fragment.
@@ -305,6 +357,23 @@ pub struct Frictionless {
     /// pattern, or the literal `any` for heuristic-parse leaves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
+    /// For a `boolean`: the strings that cast to true. The spec's defaults are
+    /// `true`/`True`/`TRUE`/`1`, so a type whose values are anything else must
+    /// declare them or they do not cast.
+    #[serde(
+        default,
+        rename = "trueValues",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub true_values: Option<Vec<String>>,
+    /// For a `boolean`: the strings that cast to false (defaults `false`/
+    /// `False`/`FALSE`/`0`).
+    #[serde(
+        default,
+        rename = "falseValues",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub false_values: Option<Vec<String>>,
 }
 
 /// The Frictionless v2 field-type vocabulary (Table Schema spec).
@@ -399,6 +468,10 @@ pub struct Definition {
     pub decompose: Option<serde_yaml::Value>,
     /// JSON Schema fragment for data quality checks
     pub validation: Option<Validation>,
+    /// Notes on accepted values: a preferred form and withdrawn values.
+    /// Additive: the model and `validation` never read it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation_notes: Option<ValidationNotes>,
     /// Substance check-digit scheme for self-validating identifier types
     /// (Precision Principle). Names a function in [`crate::checksum`] (e.g.
     /// `isbn`). The model's `checksum_substance_guard` reads this directive to
@@ -579,6 +652,8 @@ pub struct Taxonomy {
     /// Populated via `compile_locale_validators()`. `None` until first call.
     compiled_locale_validators:
         Option<HashMap<String, HashMap<String, crate::validator::CompiledValidator>>>,
+    /// Compiled `validation_notes` keyed by label, filled by `compile_validators()`.
+    compiled_notes: Option<HashMap<String, crate::grade::NotesMatcher>>,
 }
 
 // Manual Debug: jsonschema::Validator doesn't implement Debug
@@ -615,6 +690,7 @@ impl Clone for Taxonomy {
             labels: self.labels.clone(),
             compiled_validators: None,
             compiled_locale_validators: None,
+            compiled_notes: None,
         }
     }
 }
@@ -656,7 +732,70 @@ impl Taxonomy {
             labels,
             compiled_validators: None,
             compiled_locale_validators: None,
+            compiled_notes: None,
         })
+    }
+
+    /// Check the taxonomy's own consistency, returning every problem found.
+    ///
+    /// Each `validation_notes.canonical.pattern` must compile, each historic
+    /// value must pass the published rule, and each type's own `samples` must
+    /// pass it too (bar [`SAMPLES_CHECK_EXCEPTIONS`]).
+    pub fn validate(&self) -> Result<(), Vec<String>> {
+        let mut problems = Vec::new();
+        let mut keys: Vec<&String> = self.definitions.keys().collect();
+        keys.sort();
+        for key in keys {
+            let def = &self.definitions[key];
+            let Some(validation) = &def.validation else {
+                if def.validation_notes.is_some() {
+                    problems.push(format!("{key}: validation_notes without a validation rule"));
+                }
+                continue;
+            };
+            let compiled = match crate::validator::CompiledValidator::new_for_label(validation, key)
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    problems.push(format!("{key}: validation does not compile: {e}"));
+                    continue;
+                }
+            };
+            if let Some(notes) = &def.validation_notes {
+                if let Some(c) = &notes.canonical {
+                    if let Err(e) = regex::Regex::new(&c.pattern) {
+                        problems.push(format!("{key}: canonical.pattern does not compile: {e}"));
+                    }
+                }
+                for h in &notes.historic {
+                    if !compiled.is_valid(&h.value) {
+                        problems.push(format!(
+                            "{key}: historic value `{}` is not accepted by the published rule",
+                            h.value
+                        ));
+                    }
+                }
+            }
+            if SAMPLES_CHECK_EXCEPTIONS.contains(&key.as_str()) {
+                continue;
+            }
+            for sample in &def.samples {
+                let text = match sample {
+                    serde_yaml::Value::String(s) => s.clone(),
+                    serde_yaml::Value::Number(n) => n.to_string(),
+                    serde_yaml::Value::Bool(b) => b.to_string(),
+                    _ => continue,
+                };
+                if !compiled.is_valid(&text) {
+                    problems.push(format!("{key}: sample `{text}` fails the published rule"));
+                }
+            }
+        }
+        if problems.is_empty() {
+            Ok(())
+        } else {
+            Err(problems)
+        }
     }
 
     /// Parse taxonomy from YAML string.
@@ -671,6 +810,7 @@ impl Taxonomy {
             labels,
             compiled_validators: None,
             compiled_locale_validators: None,
+            compiled_notes: None,
         })
     }
 
@@ -691,6 +831,7 @@ impl Taxonomy {
             labels,
             compiled_validators: None,
             compiled_locale_validators: None,
+            compiled_notes: None,
         })
     }
 
@@ -810,6 +951,22 @@ impl Taxonomy {
             }
         }
         self.compiled_validators = Some(cache);
+
+        let notes = self
+            .definitions
+            .iter()
+            .filter_map(|(label, def)| {
+                let m = crate::grade::NotesMatcher::compile(def.validation_notes.as_ref()?).ok()?;
+                Some((label.clone(), m))
+            })
+            .collect();
+        self.compiled_notes = Some(notes);
+    }
+
+    /// The compiled notes matcher for a label, once `compile_validators()` has
+    /// run. `None` if not compiled or the label has no notes.
+    pub fn get_notes_matcher(&self, label: &str) -> Option<&crate::grade::NotesMatcher> {
+        self.compiled_notes.as_ref().and_then(|c| c.get(label))
     }
 
     /// Get a pre-compiled validator for a label.
@@ -1219,6 +1376,10 @@ pub struct LabelPublication {
     pub ftype: String,
     /// The type-legal `format` variant, when the label declares one.
     pub format: Option<String>,
+    /// A boolean's `trueValues`, when the label declares them.
+    pub true_values: Option<Vec<String>>,
+    /// A boolean's `falseValues`, when the label declares them.
+    pub false_values: Option<Vec<String>>,
     /// Keywords legal beside `ftype`, ready to be the field's `constraints`.
     pub constraints: serde_json::Map<String, serde_json::Value>,
     /// Keywords true of the column that `ftype` has no place for.
@@ -1257,6 +1418,8 @@ fn publication_from_definition(
         .map(|f| f.ftype.clone())
         .unwrap_or_else(|| "string".into());
     let format = fx.and_then(|f| f.format.clone());
+    let true_values = fx.and_then(|f| f.true_values.clone());
+    let false_values = fx.and_then(|f| f.false_values.clone());
 
     let mut c = Map::new();
     if let Some(v) = def.and_then(|d| d.validation.as_ref()) {
@@ -1285,6 +1448,8 @@ fn publication_from_definition(
         return LabelPublication {
             ftype,
             format,
+            true_values,
+            false_values,
             constraints: c,
             unsupported_constraints: Map::new(),
         };
@@ -1302,6 +1467,8 @@ fn publication_from_definition(
     LabelPublication {
         ftype,
         format,
+        true_values,
+        false_values,
         constraints,
         unsupported_constraints,
     }
@@ -1922,6 +2089,8 @@ representation.discrete.categorical:
             let f = Frictionless {
                 ftype: ty.into(),
                 format: fmt.map(String::from),
+                true_values: None,
+                false_values: None,
             };
             assert!(f.validate().is_ok(), "{ty}/{fmt:?} should be legal");
         }
@@ -1935,6 +2104,8 @@ representation.discrete.categorical:
             let f = Frictionless {
                 ftype: ty.into(),
                 format: fmt.map(String::from),
+                true_values: None,
+                false_values: None,
             };
             assert!(f.validate().is_err(), "{ty}/{fmt:?} should be rejected");
         }
@@ -1973,6 +2144,20 @@ representation.discrete.categorical:
             "All {} definitions carry a valid frictionless mapping",
             taxonomy.len()
         );
+    }
+
+    #[test]
+    fn test_labels_pass_taxonomy_validate() {
+        let taxonomy = ["labels", "../../labels"]
+            .iter()
+            .find_map(|p| Taxonomy::from_directory(p).ok());
+        let Some(taxonomy) = taxonomy else {
+            eprintln!("Skipping taxonomy validate test (labels/ not found)");
+            return;
+        };
+        if let Err(problems) = taxonomy.validate() {
+            panic!("{}", problems.join("\n"));
+        }
     }
 
     // ── Locale validator cache tests ────────────────────────────────────

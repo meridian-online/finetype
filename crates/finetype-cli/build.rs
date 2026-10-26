@@ -384,6 +384,22 @@ fn generate_embedded_models(models_base: &Path, labels_base: &Path) {
         code.push_str("pub const MB_VALUE_MODEL: &[u8] = &[];\n");
     }
 
+    // Validation snapshot: the validation rules the model reads, frozen
+    // beside config.json (the default model's freezes the rules as of 0.6.63). Absent for older or hand-built model dirs → false stub,
+    // and the loader passes None so those models read the live taxonomy as before.
+    let snapshot = model_dir.join("validation_snapshot.json");
+    if snapshot.exists() {
+        println!("cargo:rerun-if-changed={}", snapshot.display());
+        let snapshot_path = portable_path(&snapshot);
+        code.push_str("\npub const HAS_MB_VALIDATION_SNAPSHOT: bool = true;\n");
+        code.push_str(&format!(
+            "pub const MB_VALIDATION_SNAPSHOT: &[u8] = include_bytes!(\"{snapshot_path}\");\n"
+        ));
+    } else {
+        code.push_str("\npub const HAS_MB_VALIDATION_SNAPSHOT: bool = false;\n");
+        code.push_str("pub const MB_VALIDATION_SNAPSHOT: &[u8] = &[];\n");
+    }
+
     // Embed taxonomy YAML files
     let mut yaml_paths: Vec<_> = fs::read_dir(labels_base)
         .expect("Failed to read labels directory")

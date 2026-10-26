@@ -414,3 +414,51 @@ fn a_descriptor_over_every_profile_typed_label_validates_against_the_vendored_pr
         errors.join("\n  ")
     );
 }
+
+/// Frictionless's default boolean values are `true`/`True`/`TRUE`/`1` and
+/// `false`/`False`/`FALSE`/`0`, so a column of `T`/`F`/`Y`/`N` does not cast
+/// unless the field declares its own. The type's enum is exactly those eight
+/// initials, and the descriptor still validates against the vendored profile.
+#[test]
+fn boolean_initials_declares_its_true_and_false_values() {
+    let taxonomy = Taxonomy::embedded().expect("embedded taxonomy");
+    let values: Vec<String> = ["T", "F", "y", "n"].iter().map(|s| s.to_string()).collect();
+    let cols = [DatapackageColumn {
+        name: "flag",
+        label: "representation.boolean.initials",
+        values: &values,
+        confidence: Some(0.9),
+        locale: None,
+        nominated: false,
+    }];
+    let descriptor = emit_datapackage(&cols, &meta(), &taxonomy, 32);
+    let field = &descriptor["resources"][0]["schema"]["fields"][0];
+    assert_eq!(field["type"], "boolean");
+    assert_eq!(field["trueValues"], serde_json::json!(["T", "t", "Y", "y"]));
+    assert_eq!(
+        field["falseValues"],
+        serde_json::json!(["F", "f", "N", "n"])
+    );
+
+    let schema = vendored_profile();
+    let validator = jsonschema::validator_for(&schema).expect("compile vendored profile");
+    let errors: Vec<String> = validator
+        .iter_errors(&descriptor)
+        .map(|e| format!("{} at {}", e, e.instance_path()))
+        .collect();
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+
+    // A boolean that keeps the spec's defaults declares nothing extra.
+    let bin: Vec<String> = vec!["0".into(), "1".into()];
+    let cols = [DatapackageColumn {
+        name: "b",
+        label: "representation.boolean.binary",
+        values: &bin,
+        confidence: Some(0.9),
+        locale: None,
+        nominated: false,
+    }];
+    let d = emit_datapackage(&cols, &meta(), &taxonomy, 32);
+    let f = &d["resources"][0]["schema"]["fields"][0];
+    assert!(f.get("trueValues").is_none() && f.get("falseValues").is_none());
+}

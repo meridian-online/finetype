@@ -378,3 +378,484 @@ fn pvc_finance_coverage_lei_validates() {
         invalid.first()
     );
 }
+
+const UUID_LABEL: &str = "representation.identifier.uuid";
+const UUID_ACCEPT: &[&str] = &[
+    "550e8400-e29b-41d4-a716-446655440000",
+    "550E8400-E29B-41D4-A716-446655440000",
+    "550e8400-E29B-41d4-a716-446655440000",
+];
+const UUID_REJECT: &[&str] = &[
+    "550e8400e29b41d4a716446655440000",
+    "550e8400-e29b-41d4-a716-44665544000g",
+];
+
+/// RFC 9562: the hex digits of the text form may be upper, lower or mixed case.
+#[test]
+fn uuid_accepts_source_forms() {
+    assert_pattern_boundary(UUID_LABEL, UUID_ACCEPT, &[]);
+}
+
+#[test]
+fn uuid_rejects_undefined_forms() {
+    assert_pattern_boundary(UUID_LABEL, &[], UUID_REJECT);
+}
+
+/// Lowercase is the preferred form; the other cases are accepted with a note.
+#[test]
+fn uuid_grades_uppercase_and_mixed_case_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    assert_eq!(
+        grade_value_for_label(UUID_ACCEPT[0], UUID_LABEL, &tax),
+        Grade::Conforms
+    );
+    for value in &UUID_ACCEPT[1..] {
+        match grade_value_for_label(value, UUID_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::NonCanonical, "{value}");
+                assert_eq!(note.detail, "lowercase", "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
+        }
+    }
+}
+
+const PERCENTAGE_LABEL: &str = "representation.numeric.percentage";
+const PERCENTAGE_ACCEPT: &[&str] = &[
+    "50%",
+    "50 %",
+    "50\u{00A0}%",
+    "50\u{202F}%",
+    "%50",
+    "-12.5%",
+    "12.5",
+    "%-12.5",
+    "-12.5 %",
+];
+const PERCENTAGE_REJECT: &[&str] = &["50%%", "%50%", "abc%", "50 % %"];
+
+/// SI Brochure, French, German and Turkish typography: a space (ordinary,
+/// no-break or narrow no-break) may precede the sign, or the sign may lead.
+#[test]
+fn percentage_accepts_source_forms() {
+    assert_pattern_boundary(PERCENTAGE_LABEL, PERCENTAGE_ACCEPT, &[]);
+}
+
+#[test]
+fn percentage_rejects_undefined_forms() {
+    assert_pattern_boundary(PERCENTAGE_LABEL, &[], PERCENTAGE_REJECT);
+}
+
+/// The two non-ASCII spaces reach the published JSON Schema as literal characters.
+#[test]
+fn percentage_json_schema_pattern_has_literal_spaces() {
+    let tax = load_taxonomy();
+    let def = tax.get(PERCENTAGE_LABEL).expect("percentage defined");
+    let schema = finetype_core::json_schema::emit_type_schema(PERCENTAGE_LABEL, def);
+    let pattern = schema["pattern"].as_str().expect("pattern in schema");
+    assert!(pattern.contains('\u{00A0}'), "{pattern:?}");
+    assert!(pattern.contains('\u{202F}'), "{pattern:?}");
+    assert!(!pattern.contains("\\u00A0"), "{pattern:?}");
+}
+
+const FILE_SIZE_LABEL: &str = "representation.file.file_size";
+const FILE_SIZE_ACCEPT: &[&str] = &[
+    "512", "1.5 kB", "1.5 KB", "2 TB", "3 PB", "4KiB", "3 GiB", "2 TiB", "1 PiB", "10M", "10 K",
+    "7G", "2T", "1P", "100 B",
+];
+const FILE_SIZE_REJECT: &[&str] = &["1.5 XB", "MB", "5 Mb", "5 mb", "3 gib", "1 KIB", "2 EB"];
+
+/// NIST/IEC and GNU coreutils: B-suffixed units, the `iB` units and the bare
+/// size letters are all defined, with an optional space after the number.
+#[test]
+fn file_size_accepts_source_forms() {
+    assert_pattern_boundary(FILE_SIZE_LABEL, FILE_SIZE_ACCEPT, &[]);
+}
+
+#[test]
+fn file_size_rejects_undefined_forms() {
+    assert_pattern_boundary(FILE_SIZE_LABEL, &[], FILE_SIZE_REJECT);
+}
+
+const LOCALE_CODE_LABEL: &str = "technology.code.locale_code";
+const LOCALE_CODE_ACCEPT: &[&str] = &[
+    "en",
+    "en-US",
+    "es-419",
+    "zh-Hant-TW",
+    "pt_BR",
+    "eng",
+    "zh-Hant",
+    "EN-us",
+    "zh-yue",
+    "zh-cmn-Hans-CN",
+];
+const LOCALE_CODE_REJECT: &[&str] = &[
+    "english",
+    "e",
+    "en-US-x",
+    "en-419-US",
+    "en-12",
+    "en-Latn-Latn",
+    "en-US-US",
+];
+/// Well-formed RFC 5646 variant subtags: variants are out of this type's scope.
+const LOCALE_CODE_OUT_OF_SCOPE: &[&str] = &["en-1234", "de-1996"];
+
+/// RFC 5646: a language subtag, an optional script subtag, an optional region
+/// subtag (two letters or the three-digit UN M.49 code), joined by hyphens.
+#[test]
+fn locale_code_accepts_source_forms() {
+    assert_pattern_boundary(LOCALE_CODE_LABEL, LOCALE_CODE_ACCEPT, &[]);
+}
+
+#[test]
+fn locale_code_rejects_undefined_forms() {
+    assert_pattern_boundary(LOCALE_CODE_LABEL, &[], LOCALE_CODE_REJECT);
+}
+
+/// The extended-language slot is checked for shape only, as the old rule's
+/// second subtag was: membership is the substance guard's job.
+#[test]
+fn locale_code_extlang_slot_is_shape_only() {
+    assert_pattern_boundary(LOCALE_CODE_LABEL, &["en-USA", "foo-bar"], &[]);
+}
+
+#[test]
+fn locale_code_rejects_variant_subtags_as_out_of_scope() {
+    assert_pattern_boundary(LOCALE_CODE_LABEL, &[], LOCALE_CODE_OUT_OF_SCOPE);
+}
+
+/// The hyphen is RFC 5646's separator; the underscore is the POSIX/Java form
+/// and is accepted with a note.
+#[test]
+fn locale_code_grades_underscore_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in ["en", "en-US", "es-419", "zh-Hant-TW"] {
+        assert_eq!(
+            grade_value_for_label(value, LOCALE_CODE_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    match grade_value_for_label("pt_BR", LOCALE_CODE_LABEL, &tax) {
+        Grade::Noted(note) => {
+            assert_eq!(note.kind, NoteKind::Nonstandard);
+            assert_eq!(note.detail, "hyphen separator");
+        }
+        other => panic!("pt_BR should be noted, got {other:?}"),
+    }
+}
+
+const ABBREVIATED_MONTH_LABEL: &str = "datetime.date.abbreviated_month";
+const ABBREVIATED_MONTH_ACCEPT: &[&str] = &[
+    "Feb 4, 2023",
+    "4 Feb 2023",
+    "4 Feb 23",
+    "Sept 4, 2023",
+    "Feb. 4, 2023",
+    "15 ene 2024",
+    "15 Mai 2024",
+    "4 janv. 2023",
+    "12 d\u{e9}c. 2023",
+    "4 f\u{e9}vr. 2023",
+    "4 ao\u{fb}t 2023",
+    "4 \u{d6}kt 2023",
+];
+// `Febr 4 2023` is not rejected: the month token stays letter-based so other
+// languages work, and a four-letter token (German `Juni`) cannot be told apart.
+// The multiplication and division signs sit inside Latin-1's letter block and are
+// not letters.
+const ABBREVIATED_MONTH_REJECT: &[&str] = &[
+    "4 February 23x",
+    "4 Fe 2023",
+    "Feb 32x",
+    "4 F\u{d7}b 2023",
+    "4 F\u{f7}b 2023",
+];
+/// Unicode CLDR en (Jan..Dec), en-GB (Sept), and the dotted AP-style form with a
+/// full stop after the month; a two-digit year in the day-first form.
+#[test]
+fn abbreviated_month_accepts_source_forms() {
+    assert_pattern_boundary(ABBREVIATED_MONTH_LABEL, ABBREVIATED_MONTH_ACCEPT, &[]);
+}
+
+#[test]
+fn abbreviated_month_rejects_undefined_forms() {
+    assert_pattern_boundary(ABBREVIATED_MONTH_LABEL, &[], ABBREVIATED_MONTH_REJECT);
+}
+
+const RFC_3339_LABEL: &str = "datetime.timestamp.rfc_3339";
+// RFC 3339 section 5.6: a numeric offset is a sign, two-digit hours, a colon and
+// two-digit minutes; the fraction of a second is optional; section 5.6 also
+// permits lower-case `t` and `z`.
+const RFC_3339_ACCEPT: &[&str] = &[
+    "2024-01-01 10:00:00Z",
+    "2024-01-01 10:00:00.123+05:30",
+    "2024-01-01 10:00:00z",
+    "2024-01-01 10:00:00+05:30",
+    "2024-01-01 10:00:00+0530",
+    "2024-01-01 10:00:00 +0000",
+    "2024-01-01 10:00:00 Z",
+];
+const RFC_3339_REJECT: &[&str] = &[
+    "2024-01-01 10:00:00+5:30",
+    "2024-01-01 10:00:00",
+    "2024-01-01T10:00:00Z",
+    "2024-01-01 10:00:00.+05:30",
+];
+
+#[test]
+fn rfc_3339_accepts_source_forms() {
+    assert_pattern_boundary(RFC_3339_LABEL, RFC_3339_ACCEPT, &[]);
+}
+
+#[test]
+fn rfc_3339_rejects_undefined_forms() {
+    assert_pattern_boundary(RFC_3339_LABEL, &[], RFC_3339_REJECT);
+}
+
+#[test]
+fn rfc_3339_grades_offset_forms() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in [
+        "2024-01-01 10:00:00Z",
+        "2024-01-01 10:00:00.123+05:30",
+        "2024-01-01 10:00:00z",
+        "2024-01-01 10:00:00+05:30",
+    ] {
+        assert_eq!(
+            grade_value_for_label(value, RFC_3339_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    for value in [
+        "2024-01-01 10:00:00 +0000",
+        "2024-01-01 10:00:00 Z",
+        "2024-01-01 10:00:00+0530",
+    ] {
+        match grade_value_for_label(value, RFC_3339_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::Nonstandard, "{value}");
+                assert_eq!(note.detail, "RFC 3339 offset", "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
+        }
+    }
+}
+
+const ISO_8601_OFFSET_LABEL: &str = "datetime.timestamp.iso_8601_offset";
+// ISO 8601 writes the offset as a sign, two-digit hours and optional minutes,
+// with or without a colon; lower-case `t` is accepted.
+const ISO_8601_OFFSET_ACCEPT: &[&str] = &[
+    "2024-01-01T10:00:00+05:30",
+    "2024-01-01T10:00:00+0530",
+    "2024-01-01T10:00:00+05",
+    "2024-01-01t10:00:00+05:30",
+    "2024-01-01T10:00:00+5:30",
+    "2024-01-01T10:00:00+0:53",
+    "2024-01-01T10:00:00-08:00",
+];
+const ISO_8601_OFFSET_REJECT: &[&str] = &[
+    "2024-01-01T10:00:00",
+    "2024-01-01T10:00:00Z",
+    "2024-01-01 10:00:00+05:30",
+    "2024-01-01T10:00:00+123:45",
+    "2024-01-01T10:00:00+05:3",
+    "2024-01-01T10:00:00+053",
+    "2024-01-01T10:00:00+530",
+    "2024-01-01T10:00:00+5",
+];
+
+#[test]
+fn iso_8601_offset_accepts_source_forms() {
+    assert_pattern_boundary(ISO_8601_OFFSET_LABEL, ISO_8601_OFFSET_ACCEPT, &[]);
+}
+
+#[test]
+fn iso_8601_offset_rejects_undefined_forms() {
+    assert_pattern_boundary(ISO_8601_OFFSET_LABEL, &[], ISO_8601_OFFSET_REJECT);
+}
+
+#[test]
+fn iso_8601_offset_grades_noncanonical_offsets_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in [
+        "2024-01-01T10:00:00+05:30",
+        "2024-01-01T10:00:00+05",
+        "2024-01-01t10:00:00-08:00",
+    ] {
+        assert_eq!(
+            grade_value_for_label(value, ISO_8601_OFFSET_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    for value in ["2024-01-01T10:00:00+5:30", "2024-01-01T10:00:00+0530"] {
+        match grade_value_for_label(value, ISO_8601_OFFSET_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::Nonstandard, "{value}");
+                assert_eq!(note.detail, "extended-format offset", "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
+        }
+    }
+}
+
+// ── finance.currency.currency_code (ISO 4217, SIX lists one and three) ──
+
+const CURRENCY_CODE_LABEL: &str = "finance.currency.currency_code";
+const CURRENCY_CODE_ACCEPT: &[&str] = &["USD", "EUR", "XCG", "HRK", "BGN", "ZWL", "DEM"];
+const CURRENCY_CODE_REJECT: &[&str] = &["ABC", "US", "USDD", "UDP", "TCP"];
+
+#[test]
+fn currency_code_accepts_source_forms() {
+    assert_pattern_boundary(CURRENCY_CODE_LABEL, CURRENCY_CODE_ACCEPT, &[]);
+}
+
+#[test]
+fn currency_code_rejects_undefined_forms() {
+    assert_pattern_boundary(CURRENCY_CODE_LABEL, &[], CURRENCY_CODE_REJECT);
+}
+
+/// List-one codes conform; withdrawn codes validate with a note carrying
+/// SIX's withdrawal month.
+#[test]
+fn currency_code_grades_withdrawn_codes_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in ["USD", "EUR", "XCG"] {
+        assert_eq!(
+            grade_value_for_label(value, CURRENCY_CODE_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    for (value, detail) in [
+        ("HRK", "withdrawn 2023-01"),
+        ("BGN", "withdrawn 2026-01"),
+        ("ZWL", "withdrawn 2024-09"),
+        ("DEM", "withdrawn 2002-03"),
+    ] {
+        match grade_value_for_label(value, CURRENCY_CODE_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::Withdrawn, "{value}");
+                assert_eq!(note.detail, detail, "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
+        }
+    }
+}
+
+const USERNAME_LABEL: &str = "identity.person.username";
+
+/// useradd(8): a name may end with `$` and may be up to 256 characters.
+#[test]
+fn username_accepts_source_forms() {
+    let github = "a".repeat(39);
+    let longest = "a".repeat(256);
+    assert_pattern_boundary(
+        USERNAME_LABEL,
+        &["alice", "bob.smith", "svc$", &github, &longest],
+        &[],
+    );
+}
+
+#[test]
+fn username_rejects_undefined_forms() {
+    let too_long = "a".repeat(257);
+    assert_pattern_boundary(
+        USERNAME_LABEL,
+        &[],
+        &["ab", "al ice", "$alice", "a$b", &too_long],
+    );
+}
+
+const BLOOD_TYPE_LABEL: &str = "identity.person.blood_type";
+
+/// Rh nomenclature writes the negative type with a minus sign (U+2212) as well
+/// as the ASCII hyphen.
+#[test]
+fn blood_type_accepts_source_forms() {
+    assert_pattern_boundary(
+        BLOOD_TYPE_LABEL,
+        &["A+", "O-", "AB\u{2212}", "B\u{2212}", "AB", "O+"],
+        &[],
+    );
+}
+
+#[test]
+fn blood_type_rejects_undefined_forms() {
+    assert_pattern_boundary(BLOOD_TYPE_LABEL, &[], &["C+", "A++", "A\u{2013}"]);
+}
+
+#[test]
+fn blood_type_json_schema_pattern_has_literal_minus_sign() {
+    let tax = load_taxonomy();
+    let def = tax.get(BLOOD_TYPE_LABEL).expect("blood_type defined");
+    let schema = finetype_core::json_schema::emit_type_schema(BLOOD_TYPE_LABEL, def);
+    let pattern = schema["pattern"].as_str().expect("pattern in schema");
+    assert!(pattern.contains('\u{2212}'), "{pattern:?}");
+    assert!(!pattern.contains("\\u2212"), "{pattern:?}");
+}
+
+const NPI_LABEL: &str = "identity.medical.npi";
+
+/// A 10-digit number starting with `3` whose check digit passes the CMS
+/// algorithm (Luhn over the 80840-prefixed number).
+fn npi_valid_starting_with_3() -> String {
+    (0..10)
+        .map(|d| format!("300000123{d}"))
+        .find(|v| finetype_core::checksum::npi(v))
+        .expect("one check digit completes the base")
+}
+
+/// The CMS check-digit document: the published rule is ten digits plus the
+/// check digit; first digits other than 1 or 2 are reserved for coordinated use.
+#[test]
+fn npi_accepts_source_forms() {
+    let other_first_digit = npi_valid_starting_with_3();
+    assert_pattern_boundary(NPI_LABEL, &["1234567893", &other_first_digit], &[]);
+}
+
+#[test]
+fn npi_rejects_undefined_forms() {
+    // `1234567890` has a bad check digit, which the checksum (not the pattern)
+    // rejects; the pattern-level reject is the wrong length.
+    assert_pattern_boundary(NPI_LABEL, &[], &["123456789", "12345678931", "12345678a3"]);
+}
+
+#[test]
+fn npi_grades_other_first_digits_as_noted_and_bad_check_digit_as_failing() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    assert_eq!(
+        grade_value_for_label("1234567893", NPI_LABEL, &tax),
+        Grade::Conforms
+    );
+    match grade_value_for_label(&npi_valid_starting_with_3(), NPI_LABEL, &tax) {
+        Grade::Noted(note) => {
+            assert_eq!(note.kind, NoteKind::NonCanonical);
+            assert_eq!(note.detail, "issued range (first digit 1 or 2)");
+        }
+        other => panic!("should be noted, got {other:?}"),
+    }
+    match grade_value_for_label("1234567890", NPI_LABEL, &tax) {
+        Grade::Fails { constraint, .. } => assert_eq!(constraint, "checksum"),
+        other => panic!("bad check digit should fail, got {other:?}"),
+    }
+}
+
+#[test]
+fn npi_detector_requires_issued_range_and_check_digit() {
+    let detect = finetype_core::discrimination::detector_for(NPI_LABEL).expect("npi detector");
+    assert!(detect("1234567893"));
+    assert!(!detect(&npi_valid_starting_with_3()));
+    assert!(!detect("1234567890"));
+    assert!(!detect("123456789"));
+}

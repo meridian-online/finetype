@@ -131,19 +131,40 @@ impl MultiBranchClassifier {
         // the model dir before from_bytes (which has no dir).
         let value_m2v = Self::load_value_model2vec(dir, &config_bytes)?;
 
-        Self::from_bytes(&config_bytes, &label_bytes, &model_bytes, m2v, value_m2v)
+        // Optional frozen validation rules. A snapshot that is present but
+        // unreadable is an error: falling back to the live taxonomy would let a
+        // rule edit move the model without anyone noticing.
+        let snapshot_path = dir.join(finetype_core::validator_snapshot::SNAPSHOT_FILE);
+        let snapshot_bytes = if snapshot_path.exists() {
+            Some(std::fs::read(&snapshot_path).map_err(|e| {
+                InferenceError::InvalidPath(format!("Failed to read validation snapshot: {e}"))
+            })?)
+        } else {
+            None
+        };
+
+        Self::from_bytes(
+            &config_bytes,
+            &label_bytes,
+            &model_bytes,
+            m2v,
+            value_m2v,
+            snapshot_bytes.as_deref(),
+        )
     }
 
     /// Construct a MultiBranchClassifier from raw byte slices.
     ///
     /// Used by the CLI to load from embedded model data (release binaries)
-    /// when the model directory doesn't exist on disk.
+    /// when the model directory doesn't exist on disk. `snapshot` is the model's
+    /// frozen validation rules; `None` reads them from the live taxonomy.
     pub fn from_bytes(
         config_bytes: &[u8],
         label_bytes: &[u8],
         model_bytes: &[u8],
         model2vec: Model2VecResources,
         value_model2vec: Option<Model2VecResources>,
+        snapshot: Option<&[u8]>,
     ) -> Result<Self, InferenceError> {
         let config: MultiBranchConfig = serde_json::from_slice(config_bytes).map_err(|e| {
             InferenceError::InvalidPath(format!("Failed to parse config.json: {e}"))
@@ -246,16 +267,11 @@ impl MultiBranchClassifier {
         };
 
         // Build validation feature extractor from saved type_index_keys
-        let validation_extractor =
-            if validation_branch.is_some() && !config.type_index_keys.is_empty() {
-                Some(
-                    crate::validation_features::ValidationFeatureExtractor::from_type_keys(
-                        config.type_index_keys.clone(),
-                    ),
-                )
-            } else {
-                None
-            };
+        let validation_extractor = build_validation_extractor(
+            validation_branch.is_some(),
+            &config.type_index_keys,
+            snapshot,
+        )?;
 
         let merged_dim = {
             let mut dim = config.char_hidden[1] + config.embed_hidden[1] + config.stats_hidden[1];
@@ -1001,3 +1017,39 @@ impl MultiBranchClassifier {
 
 #[cfg(test)]
 mod tests;
+
+/// Decide how the validation feature extractor is built.
+///
+/// With no snapshot the extractor reads the live taxonomy, as it always has.
+/// A snapshot is always parsed, and one that cannot be applied (no validation
+/// branch, or no pinned `type_index_keys`) is an error rather than ignored.
+fn build_validation_extractor(
+    has_validation_branch: bool,
+    type_index_keys: &[String],
+    snapshot: Option<&[u8]>,
+) -> Result<Option<crate::validation_features::ValidationFeatureExtractor>, InferenceError> {
+    use crate::validation_features::ValidationFeatureExtractor;
+    let parsed = snapshot
+        .map(|bytes| {
+            finetype_core::validator_snapshot::ValidatorSnapshot::from_json(bytes)
+                .map_err(|e| InferenceError::InvalidPath(format!("Bad validation snapshot: {e}")))
+        })
+        .transpose()?;
+    let usable = has_validation_branch && !type_index_keys.is_empty();
+    match (parsed, usable) {
+        (Some(snapshot), true) => Ok(Some(ValidationFeatureExtractor::with_snapshot(
+            type_index_keys.to_vec(),
+            &snapshot,
+        )?)),
+        (Some(_), false) => Err(InferenceError::InvalidPath(if has_validation_branch {
+            "validation snapshot supplied but config.json has no type_index_keys to pin it to"
+                .to_string()
+        } else {
+            "validation snapshot supplied but the model has no validation branch".to_string()
+        })),
+        (None, true) => Ok(Some(ValidationFeatureExtractor::from_type_keys(
+            type_index_keys.to_vec(),
+        ))),
+        (None, false) => Ok(None),
+    }
+}
