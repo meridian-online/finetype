@@ -344,3 +344,62 @@ fn locale_code_decompose_extracts_language_and_region() {
         assert_eq!(run("country", value), *country, "country of {value:?}");
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn abbreviated_month_transform_casts_every_accepted_form() {
+    // Runs the published transform through the external `duckdb` CLI.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let label = "datetime.date.abbreviated_month";
+    let transform = tax
+        .ddl_info(label)
+        .expect("abbreviated_month is a known label")
+        .transform
+        .clone()
+        .expect("abbreviated_month has a transform");
+    let cases: &[(&str, &str)] = &[
+        ("Feb 4, 2023", "2023-02-04"),
+        ("Feb. 4, 2023", "2023-02-04"),
+        ("4 Feb 2023", "2023-02-04"),
+        ("4 Feb. 2023", "2023-02-04"),
+        ("4 Feb 23", "2023-02-04"),
+        ("4 Feb. 23", "2023-02-04"),
+        ("Sept 4, 2023", "2023-09-04"),
+        ("Sept. 4, 2023", "2023-09-04"),
+        ("4 Sept 2023", "2023-09-04"),
+        ("4 Sept 23", "2023-09-04"),
+        ("Sep 4, 2023", "2023-09-04"),
+    ];
+    for (value, expected) in cases {
+        let sql = format!(
+            "SELECT {}",
+            transform.replace("{col}", &format!("'{}'", value))
+        );
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(
+            out.status.success(),
+            "duckdb failed on {value:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout).trim(),
+            *expected,
+            "{value:?}"
+        );
+    }
+
+    // A French value stays un-castable by the English-only strptime.
+    let sql = format!(
+        "SELECT TRY({}) IS NULL",
+        transform.replace("{col}", "'4 janv. 2023'")
+    );
+    let out = Command::new("duckdb")
+        .args(["-no-init", "-noheader", "-list", "-c", &sql])
+        .output()
+        .expect("run the duckdb CLI");
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "true");
+}

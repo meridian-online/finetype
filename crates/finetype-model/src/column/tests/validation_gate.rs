@@ -240,3 +240,19 @@ fn locale_code_constant_column_keeps_type() {
     assert!(!veto.vetoed, "vetoed: {veto:?}");
     assert!(schema_fail_demotion(&values, LOCALE_CODE, &tax).is_none());
 }
+
+/// A column of one repeated `Sept 4, 2023` (the en-GB abbreviation, which the
+/// old rule rejected) is not vetoed or demoted.
+#[test]
+fn abbreviated_month_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const ABBREVIATED_MONTH: &str = "datetime.date.abbreviated_month";
+    let tax = super::shipped_taxonomy();
+    for value in ["Sept 4, 2023", "4 Feb 23"] {
+        let values: Vec<String> = vec![value.to_string(); 40];
+        let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+        let veto = evaluate_validation_veto(ABBREVIATED_MONTH, &refs, &tax, &audited_safe_labels());
+        assert!(!veto.vetoed, "{value}: vetoed: {veto:?}");
+        assert!(schema_fail_demotion(&values, ABBREVIATED_MONTH, &tax).is_none());
+    }
+}
