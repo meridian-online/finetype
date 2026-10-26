@@ -488,8 +488,20 @@ const LOCALE_CODE_ACCEPT: &[&str] = &[
     "eng",
     "zh-Hant",
     "EN-us",
+    "zh-yue",
+    "zh-cmn-Hans-CN",
 ];
-const LOCALE_CODE_REJECT: &[&str] = &["english", "en-1234", "e", "en-US-x", "en-419-US"];
+const LOCALE_CODE_REJECT: &[&str] = &[
+    "english",
+    "e",
+    "en-US-x",
+    "en-419-US",
+    "en-12",
+    "en-Latn-Latn",
+    "en-US-US",
+];
+/// Well-formed RFC 5646 variant subtags: variants are out of this type's scope.
+const LOCALE_CODE_OUT_OF_SCOPE: &[&str] = &["en-1234", "de-1996"];
 
 /// RFC 5646: a language subtag, an optional script subtag, an optional region
 /// subtag (two letters or the three-digit UN M.49 code), joined by hyphens.
@@ -501,6 +513,11 @@ fn locale_code_accepts_source_forms() {
 #[test]
 fn locale_code_rejects_undefined_forms() {
     assert_pattern_boundary(LOCALE_CODE_LABEL, &[], LOCALE_CODE_REJECT);
+}
+
+#[test]
+fn locale_code_rejects_variant_subtags_as_out_of_scope() {
+    assert_pattern_boundary(LOCALE_CODE_LABEL, &[], LOCALE_CODE_OUT_OF_SCOPE);
 }
 
 /// The hyphen is RFC 5646's separator; the underscore is the POSIX/Java form

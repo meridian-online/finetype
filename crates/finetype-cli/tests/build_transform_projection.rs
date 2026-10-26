@@ -295,3 +295,52 @@ fn file_size_transform_gives_bytes_for_every_unit_family() {
         assert_eq!(got, *expected, "{value:?}");
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn locale_code_decompose_extracts_language_and_region() {
+    // Runs the published decompose expressions through the external `duckdb` CLI.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let decompose = tax
+        .ddl_info("technology.code.locale_code")
+        .expect("locale_code is a known label")
+        .decompose
+        .clone()
+        .expect("locale_code has decompose");
+    let expr = |part: &str| -> String {
+        decompose[part]
+            .as_str()
+            .unwrap_or_else(|| panic!("decompose part {part}"))
+            .to_string()
+    };
+    let run = |part: &str, value: &str| -> String {
+        let sql = format!(
+            "SELECT {}",
+            expr(part).replace("{col}", &format!("'{}'", value))
+        );
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(
+            out.status.success(),
+            "duckdb failed on {value:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    let cases: &[(&str, &str, &str)] = &[
+        ("en-US", "en", "us"),
+        ("pt_BR", "pt", "br"),
+        ("es-419", "es", "419"),
+        ("zh-Hant-TW", "zh", "tw"),
+        ("zh-cmn-Hans-CN", "zh", "cn"),
+        ("zh-Hant", "zh", ""),
+        ("en", "en", ""),
+    ];
+    for (value, language, country) in cases {
+        assert_eq!(run("language", value), *language, "language of {value:?}");
+        assert_eq!(run("country", value), *country, "country of {value:?}");
+    }
+}

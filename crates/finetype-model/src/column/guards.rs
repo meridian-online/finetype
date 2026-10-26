@@ -1018,7 +1018,8 @@ impl ColumnClassifier {
 
     /// `locale_code_substance_guard` (default ON). Demotes `technology.code.locale_code`
     /// to `unknown` when the column's values are not real locale codes. The taxonomy
-    /// pattern `^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{2,4})*$` accepts ANY 2–3 letter word,
+    /// pattern (language, optional extlang, script and region subtags) accepts ANY
+    /// 2–3 letter word,
     /// so the model over-emits `locale_code` (largest tier-3 live surface, ~1,933 of
     /// a stale 4,246) on text/code columns — survey fragments, dialogue-act tags,
     /// single words. A genuine locale leads with a real ISO 639 language and any

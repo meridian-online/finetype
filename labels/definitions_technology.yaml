@@ -512,8 +512,10 @@ technology.code.locale_code:
     zh-Hant-TW, es-419). The language subtag is drawn from ISO 639, the script
     subtag from ISO 15924, and the region subtag from ISO 3166-1 or the UN M.49
     numeric codes; RFC 5646 gives es-419 as Spanish appropriate to the
-    UN-defined Latin America and Caribbean region. An underscore separator
-    (pt_BR), the POSIX and Java locale form, is accepted with a note.
+    UN-defined Latin America and Caribbean region. One extended language
+    subtag may follow the language (zh-yue). An underscore separator (pt_BR),
+    the POSIX and Java locale form, is accepted with a note. Variants,
+    extensions, private-use and grandfathered tags are not accepted.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -524,15 +526,15 @@ technology.code.locale_code:
   transform_ext: null
   decompose:
     language: "REGEXP_EXTRACT(LOWER({col}), '^([a-z]{2,3})', 1)"
-    country: "REGEXP_EXTRACT(LOWER({col}), '-([a-z]{2})(?:$|-)', 1)"
+    country: "REGEXP_EXTRACT(LOWER({col}), '^[a-z]{2,3}(?:[-_][a-z]{3})?(?:[-_][a-z]{4})?[-_]([a-z]{2}|[0-9]{3})$', 1)"
   validation:
     type: string
-    pattern: "^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{4})?(?:[-_](?:[a-zA-Z]{2}|[0-9]{3}))?$"
+    pattern: "^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{3})?(?:[-_][a-zA-Z]{4})?(?:[-_](?:[a-zA-Z]{2}|[0-9]{3}))?$"
   validation_notes:
     canonical:
       kind: nonstandard
       name: hyphen separator
-      pattern: "^[a-zA-Z]{2,3}(?:-[a-zA-Z]{4})?(?:-(?:[a-zA-Z]{2}|[0-9]{3}))?$"
+      pattern: "^[a-zA-Z]{2,3}(?:-[a-zA-Z]{3})?(?:-[a-zA-Z]{4})?(?:-(?:[a-zA-Z]{2}|[0-9]{3}))?$"
   tier: [VARCHAR, code]
   aliases: [bcp47, language_tag]
   samples:

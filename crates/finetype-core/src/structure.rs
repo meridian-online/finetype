@@ -273,8 +273,8 @@ fn is_bcp47_tag(tag: &str) -> bool {
 /// True if `value` is a well-formed BCP-47 locale tag (or a delimited list of them).
 ///
 /// This is the substance check behind the `locale_code_substance_guard`. The
-/// taxonomy pattern `^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{2,4})*$` accepts ANY 2–3 letter
-/// word, so the model over-emits `locale_code` on text/code columns at corpus
+/// taxonomy pattern (language, optional extlang, script and region subtags) accepts
+/// ANY 2–3 letter word, so the model over-emits `locale_code` on text/code columns at corpus
 /// scale (survey fragments, dialogue-act tags, single words). The certainty the
 /// shape lacks is *closed-set* language membership: the primary subtag must be a
 /// real ISO 639 language, and any script/region subtag must be a real ISO 15924 /
