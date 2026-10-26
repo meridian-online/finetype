@@ -375,3 +375,18 @@ fn blood_type_constant_column_keeps_type() {
     assert!(!veto.vetoed, "vetoed: {veto:?}");
     assert!(schema_fail_demotion(&values, BLOOD_TYPE, &tax).is_none());
 }
+
+/// 40 copies of the CMS worked example are not vetoed or demoted. The published
+/// rule widens (any first digit), but this value was accepted before as well, so
+/// only the note and the detector are new here.
+#[test]
+fn npi_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const NPI: &str = "identity.medical.npi";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["1234567893".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(NPI, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, NPI, &tax).is_none());
+}

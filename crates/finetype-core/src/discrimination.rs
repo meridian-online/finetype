@@ -15,6 +15,7 @@ use crate::validator::resolve_label_validator;
 pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
     match label {
         "identity.person.username" => Some(is_username_shape),
+        "identity.medical.npi" => Some(is_issued_npi),
         _ => None,
     }
 }
@@ -30,6 +31,18 @@ fn is_username_shape(value: &str) -> bool {
         && body
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
+}
+
+/// `npi`: a number in the issued range (first digit 1 or 2) whose check digit
+/// passes. The published rule follows the CMS check-digit document, which leaves
+/// other first digits reserved rather than invalid, so it accepts any ten digits;
+/// this keeps column discrimination at the range NPIs are issued from.
+fn is_issued_npi(value: &str) -> bool {
+    let b = value.as_bytes();
+    b.len() == 10
+        && matches!(b[0], b'1' | b'2')
+        && b.iter().all(u8::is_ascii_digit)
+        && crate::checksum::npi(value)
 }
 
 /// Whether `value` passes for `label`: the detector when there is one, else the

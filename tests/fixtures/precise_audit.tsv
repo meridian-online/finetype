@@ -173,7 +173,7 @@ identity.medical.hcpcs	false	^[A-V]\d{4}$	false
 identity.medical.icd10	false	^[A-TV-Z][0-9][0-9AB](\.[0-9A-TV-Z]{1,4})?$	true
 identity.medical.loinc	false	^\d{1,5}-\d$	true
 identity.medical.ndc	false	^\d{4}-\d{4}-\d{2}$|^\d{5}-\d{3}-\d{2}$|^\d{5}-\d{4}-\d{1}$|^\d{11}$	false
-identity.medical.npi	false	^[12]\d{9}$	false
+identity.medical.npi	false	^\d{10}$	false
 identity.person.blood_type	false	^(A|B|AB|O)[+\-−]?$	true
 identity.person.email	false	^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$	true
 identity.person.email_display	false	^"?[^"<>]+"?\s*<[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}>$	true

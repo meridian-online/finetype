@@ -1350,3 +1350,27 @@ fn username_detector_keeps_vote_attractor_demotion() {
     let names: Vec<String> = (0..40).map(|i| format!("svc_{}$", i)).collect();
     assert!(disambiguate_attractor_demotion(&names, &votes, 40, Some(&tax)).is_none());
 }
+
+// npi: the published rule no longer limits the first digit, so a detector keeps
+// column discrimination at the issued range (first digit 1 or 2). npi is on the
+// veto allowlist but not in R32's closed-set list or the attractor lists, so
+// the veto is the site that acts on a column of check-digit-valid numbers
+// starting with 3; `schema_fail_demotion` consults the detector all the same.
+#[test]
+fn npi_detector_keeps_attractor_demotion() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const NPI: &str = "identity.medical.npi";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = (0..40)
+        .map(|i| {
+            (0..10)
+                .map(|d| format!("3{:08}{d}", 1000 + i))
+                .find(|v| finetype_core::checksum::npi(v))
+                .expect("a check digit completes the base")
+        })
+        .collect();
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(NPI, &refs, &tax, &audited_safe_labels());
+    assert!(veto.vetoed, "not vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, NPI, &tax).is_some());
+}

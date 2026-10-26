@@ -794,3 +794,59 @@ fn blood_type_json_schema_pattern_has_literal_minus_sign() {
     assert!(pattern.contains('\u{2212}'), "{pattern:?}");
     assert!(!pattern.contains("\\u2212"), "{pattern:?}");
 }
+
+const NPI_LABEL: &str = "identity.medical.npi";
+
+/// A 10-digit number starting with `3` whose check digit passes the CMS
+/// algorithm (Luhn over the 80840-prefixed number).
+fn npi_valid_starting_with_3() -> String {
+    (0..10)
+        .map(|d| format!("300000123{d}"))
+        .find(|v| finetype_core::checksum::npi(v))
+        .expect("one check digit completes the base")
+}
+
+/// The CMS check-digit document: the published rule is ten digits plus the
+/// check digit; first digits other than 1 or 2 are reserved for coordinated use.
+#[test]
+fn npi_accepts_source_forms() {
+    let other_first_digit = npi_valid_starting_with_3();
+    assert_pattern_boundary(NPI_LABEL, &["1234567893", &other_first_digit], &[]);
+}
+
+#[test]
+fn npi_rejects_undefined_forms() {
+    // `1234567890` has a bad check digit, which the checksum (not the pattern)
+    // rejects; the pattern-level reject is the wrong length.
+    assert_pattern_boundary(NPI_LABEL, &[], &["123456789", "12345678931", "12345678a3"]);
+}
+
+#[test]
+fn npi_grades_other_first_digits_as_noted_and_bad_check_digit_as_failing() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    assert_eq!(
+        grade_value_for_label("1234567893", NPI_LABEL, &tax),
+        Grade::Conforms
+    );
+    match grade_value_for_label(&npi_valid_starting_with_3(), NPI_LABEL, &tax) {
+        Grade::Noted(note) => {
+            assert_eq!(note.kind, NoteKind::NonCanonical);
+            assert_eq!(note.detail, "issued range (first digit 1 or 2)");
+        }
+        other => panic!("should be noted, got {other:?}"),
+    }
+    match grade_value_for_label("1234567890", NPI_LABEL, &tax) {
+        Grade::Fails { constraint, .. } => assert_eq!(constraint, "checksum"),
+        other => panic!("bad check digit should fail, got {other:?}"),
+    }
+}
+
+#[test]
+fn npi_detector_requires_issued_range_and_check_digit() {
+    let detect = finetype_core::discrimination::detector_for(NPI_LABEL).expect("npi detector");
+    assert!(detect("1234567893"));
+    assert!(!detect(&npi_valid_starting_with_3()));
+    assert!(!detect("1234567890"));
+    assert!(!detect("123456789"));
+}

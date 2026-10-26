@@ -1021,7 +1021,9 @@ identity.medical.npi:
   description: >
     10-digit numeric identifier for US healthcare providers, issued by CMS.
     Includes a Luhn check digit as the 10th digit. Required for HIPAA
-    transactions. Format: exactly 10 digits starting with 1 or 2.
+    transactions. Format: exactly 10 digits. NPIs are issued with a first
+    digit of 1 or 2; the CMS check-digit document reserves other first digits
+    for use coordinated with the standard health plan identifier.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -1033,9 +1035,11 @@ identity.medical.npi:
   decompose: null
   validation:
     type: string
-    pattern: "^[12]\\d{9}$"
+    pattern: "^\\d{10}$"
     minLength: 10
     maxLength: 10
+  validation_notes:
+    canonical: { kind: non_canonical, name: "issued range (first digit 1 or 2)", pattern: "^[12]\\d{9}$" }
   checksum: npi
   # WIRED 2026-07-07 (0.6.41). The Luhn guard demotes ~87% of the npi over-emission
   # (~42k 10-digit financial figures — ebit/marketCap/totalAssets — to integer_number) at
