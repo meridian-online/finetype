@@ -120,13 +120,14 @@ leave a window where the root is mixed. Stage the files and commit them together
 import os
 from huggingface_hub import HfApi, CommitOperationAdd, CommitOperationDelete
 api = HfApi()
+files = ["model.safetensors", "config.json", "label_map.json", "validation_snapshot.json"]
 ops = [CommitOperationAdd(path_in_repo=name, path_or_fileobj=f"{model_dir}/{name}")
-       for name in ("model.safetensors", "config.json", "label_map.json", "validation_snapshot.json")]
+       for name in files if os.path.exists(f"{model_dir}/{name}")]
 ops += [CommitOperationAdd(path_in_repo=f"model2vec/{f}", path_or_fileobj=f"{model_dir}/model2vec/{f}")
         for f in os.listdir(f"{model_dir}/model2vec")]
 # A model with no snapshot must not leave an old root snapshot in place:
-# ops = [o for o in ops if o.path_in_repo != "validation_snapshot.json"]
-# ops.append(CommitOperationDelete(path_in_repo="validation_snapshot.json"))
+if not os.path.exists(f"{model_dir}/validation_snapshot.json"):
+    ops.append(CommitOperationDelete(path_in_repo="validation_snapshot.json"))
 api.create_commit(repo_id="meridian-online/finetype-model", repo_type="model", operations=ops,
                   commit_message=f"Serve {model_name} at the root")
 ```

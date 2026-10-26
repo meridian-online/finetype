@@ -12,6 +12,7 @@
 //! write_validation_snapshot <model_dir> [--labels labels]
 //! write_validation_snapshot --keys-from <file> --out <path> [--labels labels]
 //! write_validation_snapshot (<model_dir> | --keys-from <file>) --check <path> [--labels labels]
+//! write_validation_snapshot (<model_dir> | --keys-from <file>) --check-keys <path>
 //! ```
 //!
 //! `--keys-from` reads the keys from a file instead of a model's `config.json`:
@@ -20,7 +21,8 @@
 //! exits non-zero unless the snapshot at that path equals a fresh snapshot of the
 //! live labels for the same keys. A training script uses these to freeze the
 //! rules when it builds its training data and to refuse data built under other
-//! rules.
+//! rules. `--check-keys` compares only the snapshot's `keys` with the given keys,
+//! reading no labels, for a model trained under rules that may since have changed.
 
 use finetype_core::validator_snapshot::{ValidatorSnapshot, SNAPSHOT_FILE};
 use finetype_core::Taxonomy;
@@ -55,6 +57,7 @@ fn main() {
     let mut keys_from: Option<PathBuf> = None;
     let mut out: Option<PathBuf> = None;
     let mut check: Option<PathBuf> = None;
+    let mut check_keys: Option<PathBuf> = None;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         let mut path_arg = |flag: &str| {
@@ -67,6 +70,7 @@ fn main() {
             "--keys-from" => keys_from = Some(path_arg("--keys-from")),
             "--out" => out = Some(path_arg("--out")),
             "--check" => check = Some(path_arg("--check")),
+            "--check-keys" => check_keys = Some(path_arg("--check-keys")),
             _ if model_dir.is_none() && !arg.starts_with("--") => {
                 model_dir = Some(PathBuf::from(arg));
             }
@@ -79,6 +83,21 @@ fn main() {
         (None, Some(dir)) => read_keys(&dir.join("config.json")),
         _ => fail(format!("give a model directory or --keys-from. {USAGE}")),
     };
+
+    if let Some(path) = check_keys {
+        let committed: serde_json::Value = std::fs::read(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|b| serde_json::from_slice(&b).map_err(|e| e.to_string()))
+            .unwrap_or_else(|e| fail(format!("cannot read {}: {e}", path.display())));
+        if committed.get("keys") != Some(&serde_json::json!(keys)) {
+            fail(format!(
+                "the keys in {} differ from the model's type_index_keys",
+                path.display()
+            ));
+        }
+        println!("{} holds the model's keys", path.display());
+        return;
+    }
 
     let taxonomy = Taxonomy::from_directory(&labels)
         .unwrap_or_else(|e| fail(format!("cannot load {}: {e}", labels.display())));
