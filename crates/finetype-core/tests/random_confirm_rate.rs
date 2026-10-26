@@ -2,12 +2,17 @@
 //!
 //! A type's published rule is meant to agree with its defining source, and a rule
 //! that does can still confirm a large share of random input. This test measures
-//! that over two seeded populations and records it in
+//! that over three seeded populations and records it in
 //! `tests/fixtures/random_confirm_rate.tsv` (columns `label`, `published_ascii`,
-//! `discrimination_ascii`, `published_digits`, `discrimination_digits`):
+//! `discrimination_ascii`, `published_digits`, `discrimination_digits`,
+//! `published_tokens`, `discrimination_tokens`):
 //!
 //! - ascii: 10,000 printable-ASCII strings of length 1-40
 //! - digits: 10,000 digit-only strings of length 1-20
+//! - tokens: 10,000 identifier-like strings, drawn in equal parts from common
+//!   words, hex strings of 8, 32, 40 or 64 characters, UUIDs in either case,
+//!   random alphanumeric strings of 6-20 characters, three uppercase letters,
+//!   and 10- or 13-digit numbers
 //!
 //! `published_*` is the share the type's published rule (pattern, length, numeric
 //! bounds and enum, as `CompiledValidator::is_valid` evaluates them; no checksum or
@@ -21,7 +26,9 @@
 //! For every label and population, `discrimination_*` must not exceed
 //! `published_*`: a detector is stricter than the published rule by design. Labels
 //! already above 0.5 when the test landed are listed in `BASELINE_EXCEPTIONS`
-//! with the rate then measured; a listed label fails if its rate rises.
+//! with the rate then measured. A listed label fails in three cases: its rate
+//! rises above the recorded one, its rate falls to 0.5 or below (remove it from
+//! the list), or it produces no row (remove it too).
 //!
 //! The test compares against the committed TSV and fails on any difference, so a
 //! rule change regenerates it on purpose:
