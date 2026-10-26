@@ -376,11 +376,12 @@ fn blood_type_constant_column_keeps_type() {
     assert!(schema_fail_demotion(&values, BLOOD_TYPE, &tax).is_none());
 }
 
-/// 40 copies of the CMS worked example are not vetoed or demoted. The published
-/// rule widens (any first digit), but this value was accepted before as well, so
-/// only the note and the detector are new here.
+/// Pins that a valid constant column (40 copies of the CMS worked example) is
+/// kept: not vetoed, not demoted. It cannot exercise the loosening: the value
+/// was accepted before, and a constant column of 3-start numbers is vetoed by
+/// design (see `npi_mixed_column_is_kept_by_the_guard_and_vetoed`).
 #[test]
-fn npi_constant_column_keeps_type() {
+fn npi_valid_constant_column_is_kept() {
     use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
     const NPI: &str = "identity.medical.npi";
     let tax = super::shipped_taxonomy();

@@ -2874,3 +2874,50 @@ fn locale_guard_demotes_shape_only_lookalikes() {
         .expect("composition produces a result");
     assert_ne!(r.label, "technology.code.locale_code");
 }
+
+/// Intended change: the npi detector puts the check digit and the issued range
+/// (first digit 1 or 2) into the validation veto, which before checked only the
+/// pattern; Luhn was enforced only by `checksum_substance_guard`, which demotes
+/// at a majority-failure band. A column that is 40% check-digit-valid 1/2-start,
+/// 20% check-digit-valid 3-start and 40% 1/2-start with a bad check digit
+/// clears that guard (60% of its values pass Luhn) but the veto now rejects it
+/// (40% pass the detector, below the veto threshold).
+#[test]
+fn npi_mixed_column_is_kept_by_the_guard_and_vetoed() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const NPI: &str = "identity.medical.npi";
+    let with_check = |first: char, i: usize, valid: bool| -> String {
+        let base = format!("{first}{:08}", 1000 + i);
+        let digit = (0..10u8)
+            .map(|d| format!("{base}{d}"))
+            .find(|v| finetype_core::checksum::npi(v) == valid)
+            .expect("a check digit with the wanted outcome exists");
+        digit
+    };
+    let mut values = Vec::new();
+    for i in 0..16 {
+        values.push(with_check('1', i, true));
+    }
+    for i in 0..8 {
+        values.push(with_check('3', i, true));
+    }
+    for i in 0..16 {
+        values.push(with_check('2', i, false));
+    }
+
+    let tax = shipped_taxonomy();
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(NPI, &refs, &tax, &audited_safe_labels());
+    assert!(veto.vetoed, "not vetoed: {veto:?}");
+
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    let r = cc
+        .compose_from_sense("provider", &values, NPI, 0.9)
+        .expect("composition produces a result");
+    assert_eq!(
+        r.label, NPI,
+        "60% of the values pass the check digit, so the guard keeps the label"
+    );
+}
