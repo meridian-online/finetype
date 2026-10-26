@@ -47,6 +47,12 @@ pub struct ValidationVeto {
     /// Fraction of non-null sample values passing the predicted type's
     /// validation. `None` when the label has no applicable validation (no
     /// evidence either way — never vetoed).
+    ///
+    /// This is the veto's evidence, surfaced as the profile JSON's
+    /// `validation_pass_rate`. For a type with a discrimination detector
+    /// (`username`, `npi`) it counts values by that detector, which is stricter
+    /// than the published rule, so it can differ from what `finetype validate`
+    /// reports for the same column.
     pub pass_rate: Option<f64>,
     /// HARD veto: pass-rate is below threshold AND the label is on the
     /// audited-safe allowlist. The caller NULLs the predicted label.

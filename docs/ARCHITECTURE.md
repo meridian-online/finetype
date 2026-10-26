@@ -76,6 +76,8 @@ flowchart TB
 | **Header hints** | Hardcoded header mappings (priority) + Model2Vec semantic similarity matching. Geography protection and measurement disambiguation guards. |
 | **Profile** | CSV/Parquet parsing with null detection, then column-mode inference on each column. |
 
+`profile` JSON reports the validation veto's evidence as `validation_pass_rate`. For a type with a discrimination detector (`username`, `npi`; `finetype_core::discrimination::detector_for`) that rate counts values by the detector, which is stricter than the type's published rule, so it can differ from what `finetype validate` reports for the same column.
+
 ### Why Sense→Sharpen?
 
 Column classification is a two-stage problem: first determine *what kind* of data a column contains (temporal, numeric, geographic, etc.), then identify the *specific type* within that category.

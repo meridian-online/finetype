@@ -38,7 +38,7 @@ use crate::taxonomy::Taxonomy;
 /// Datetime is handled separately (it routes through the format detector, which
 /// picks the precise ISO leaf). Keep this list conservative; every addition must
 /// clear the fast-path-vs-full-pipeline agreement test before it ships.
-const CONCLUSIVE_LEAVES: &[&str] = &[
+pub(crate) const CONCLUSIVE_LEAVES: &[&str] = &[
     "technology.filesystem.windows_path", // drive-letter `C:\` / UNC `\\host\share`
     "technology.internet.message_id",     // RFC 2822 `<local@domain>`
     "technology.internet.ip_v4",
@@ -94,6 +94,7 @@ fn validates(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bool {
     let Some(validator) = crate::validator::resolve_label_validator(leaf, tax) else {
         return false;
     };
+    let detector = crate::discrimination::detector_for(leaf);
     let mut checked = 0usize;
     let mut passed = 0usize;
     let mut remaining = sample.len();
@@ -104,7 +105,7 @@ fn validates(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bool {
             continue;
         }
         checked += 1;
-        if validator.is_valid(t) {
+        if crate::discrimination::passes_detector_or_rule(detector, &validator, t) {
             passed += 1;
         }
         if ((passed + remaining) as f64) / ((checked + remaining) as f64) < 0.9 {

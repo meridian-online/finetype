@@ -95,7 +95,10 @@ fn json_column_object(p: &ColProfile, verbose: bool) -> serde_json::Value {
     // ac-06: validation-as-veto signals. pass_rate is
     // emitted whenever the predicted type had an applicable
     // validation; the veto/advisory flags and the original
-    // label surface only when they fired.
+    // label surface only when they fired. `validation_pass_rate` is the
+    // veto's evidence: for a type with a discrimination detector (username,
+    // npi) it uses that detector rather than the published rule, so it can
+    // differ from `finetype validate`'s result on the same column.
     if let Some(rate) = p.validation_pass_rate {
         let r = (rate * 10000.0).round() / 10000.0;
         obj.insert("validation_pass_rate".to_string(), json!(r));

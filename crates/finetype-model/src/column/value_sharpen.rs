@@ -659,17 +659,18 @@ pub(crate) fn schema_fail_demotion(
     let fail_count = if let Some(compiled) = taxonomy.get_validator(result_label) {
         non_empty
             .iter()
-            .filter(|v| !detector.map_or_else(|| compiled.is_valid(v), |d| d(v)))
+            .filter(|v| {
+                !finetype_core::discrimination::passes_detector_or_rule(detector, compiled, v)
+            })
             .count()
     } else {
         let validation = taxonomy.get(result_label)?.validation.as_ref()?;
         non_empty
             .iter()
-            .filter(|v| match detector {
-                Some(d) => !d(v),
-                None => finetype_core::validate_value(v, validation)
-                    .map(|r| !r.is_valid)
-                    .unwrap_or(false),
+            .filter(|v| {
+                !finetype_core::discrimination::passes_detector_or_uncompiled_rule(
+                    detector, validation, v,
+                )
             })
             .count()
     };
@@ -762,17 +763,20 @@ pub(crate) fn sharpen_attractor_demotion(
                 let fail_count = if let Some(compiled) = taxonomy.get_validator(result_label) {
                     non_empty
                         .iter()
-                        .filter(|v| !detector.map_or_else(|| compiled.is_valid(v), |d| d(v)))
+                        .filter(|v| {
+                            !finetype_core::discrimination::passes_detector_or_rule(
+                                detector, compiled, v,
+                            )
+                        })
                         .count()
                 } else if let Some(def) = taxonomy.get(result_label) {
                     if let Some(validation) = &def.validation {
                         non_empty
                             .iter()
-                            .filter(|v| match detector {
-                                Some(d) => !d(v),
-                                None => finetype_core::validate_value(v, validation)
-                                    .map(|r| !r.is_valid)
-                                    .unwrap_or(false),
+                            .filter(|v| {
+                                !finetype_core::discrimination::passes_detector_or_uncompiled_rule(
+                                    detector, validation, v,
+                                )
                             })
                             .count()
                     } else {
@@ -1093,18 +1097,21 @@ pub(crate) fn disambiguate_attractor_demotion(
                     // Fast path: pre-compiled validator (no per-value regex compilation)
                     non_empty
                         .iter()
-                        .filter(|v| !detector.map_or_else(|| compiled.is_valid(v), |d| d(v)))
+                        .filter(|v| {
+                            !finetype_core::discrimination::passes_detector_or_rule(
+                                detector, compiled, v,
+                            )
+                        })
                         .count()
                 } else if let Some(def) = taxonomy.get(top_label) {
                     if let Some(validation) = &def.validation {
                         // Fallback: compile per-call (shouldn't happen with cache populated)
                         non_empty
                             .iter()
-                            .filter(|v| match detector {
-                                Some(d) => !d(v),
-                                None => finetype_core::validate_value(v, validation)
-                                    .map(|r| !r.is_valid)
-                                    .unwrap_or(false),
+                            .filter(|v| {
+                                !finetype_core::discrimination::passes_detector_or_uncompiled_rule(
+                                    detector, validation, v,
+                                )
                             })
                             .count()
                     } else {

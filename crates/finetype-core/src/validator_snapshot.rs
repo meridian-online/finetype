@@ -88,7 +88,6 @@ mod tests {
     use super::*;
 
     const UUID: &str = "representation.identifier.uuid";
-    const UPPER_UUID: &str = "550E8400-E29B-41D4-A716-446655440000";
 
     fn labels_dir() -> Option<&'static str> {
         ["labels", "../../labels"]
@@ -180,20 +179,21 @@ mod tests {
 
     #[test]
     fn snapshot_ignores_later_taxonomy_edits() {
-        let tax = live_taxonomy();
+        // A small synthetic taxonomy, so a future edit to a published rule
+        // cannot break what this proves.
+        const KEY: &str = "test.frozen.hex_code";
+        let rule = |class: &str| {
+            format!("{KEY}:\n  validation:\n    type: string\n    pattern: \"^[{class}]{{4}}$\"\n")
+        };
+        let mut tax = Taxonomy::from_yaml(&rule("0-9a-fA-F")).unwrap();
+        tax.compile_validators();
         let snapshot = ValidatorSnapshot::from_taxonomy(&tax, tax.labels());
 
-        let dir = labels_dir().unwrap();
-        let yaml =
-            std::fs::read_to_string(format!("{dir}/definitions_representation.yaml")).unwrap();
-        let old = r#"pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$""#;
-        assert!(yaml.contains(old), "uuid pattern moved; update this test");
         // The live rule is later tightened to lower case only.
-        let edited = yaml.replace(old, &old.replace("0-9a-fA-F", "0-9a-f"));
-        let mut edited_tax = Taxonomy::from_yaml(&edited).unwrap();
+        let mut edited_tax = Taxonomy::from_yaml(&rule("0-9a-f")).unwrap();
         edited_tax.compile_validators();
 
-        assert!(!edited_tax.get_validator(UUID).unwrap().is_valid(UPPER_UUID));
-        assert!(snapshot.compile().unwrap()[UUID].is_valid(UPPER_UUID));
+        assert!(!edited_tax.get_validator(KEY).unwrap().is_valid("ABCD"));
+        assert!(snapshot.compile().unwrap()[KEY].is_valid("ABCD"));
     }
 }

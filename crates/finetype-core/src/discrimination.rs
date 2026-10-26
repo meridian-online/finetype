@@ -8,8 +8,8 @@
 //!
 //! A label with no detector falls through to its published rule.
 
-use crate::taxonomy::Taxonomy;
-use crate::validator::resolve_label_validator;
+use crate::taxonomy::{Taxonomy, Validation};
+use crate::validator::{resolve_label_validator, validate_value, CompiledValidator};
 
 /// The detector for `label`, when one exists. Stricter than the published rule.
 pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
@@ -18,6 +18,35 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "identity.medical.npi" => Some(is_issued_npi),
         _ => None,
     }
+}
+
+/// Whether `value` passes: the detector when there is one, else the compiled
+/// published rule. The one per-value form every discrimination site shares, so a
+/// site cannot grow its own reading of "detector else rule".
+pub fn passes_detector_or_rule(
+    detector: Option<fn(&str) -> bool>,
+    rule: &CompiledValidator,
+    value: &str,
+) -> bool {
+    detector.map_or_else(|| rule.is_valid(value), |d| d(value))
+}
+
+/// As [`passes_detector_or_rule`], for a site whose taxonomy has no compiled
+/// cache: the published rule is compiled per call. A rule that fails to compile
+/// counts the value as passing, as `validate_value`'s callers have always read it.
+pub fn passes_detector_or_uncompiled_rule(
+    detector: Option<fn(&str) -> bool>,
+    rule: &Validation,
+    value: &str,
+) -> bool {
+    detector.map_or_else(
+        || {
+            validate_value(value, rule)
+                .map(|r| r.is_valid)
+                .unwrap_or(true)
+        },
+        |d| d(value),
+    )
 }
 
 /// `username`: 3 to 32 characters of `[a-zA-Z0-9_.-]`, optionally followed by a
@@ -57,10 +86,7 @@ pub fn value_passes_for_discrimination(value: &str, label: &str, tax: &Taxonomy)
     let Some(rule) = resolve_label_validator(label, tax) else {
         return false;
     };
-    match detector_for(label) {
-        Some(detect) => detect(value),
-        None => rule.is_valid(value),
-    }
+    passes_detector_or_rule(detector_for(label), &rule, value)
 }
 
 #[cfg(test)]
@@ -96,6 +122,36 @@ mod tests {
             &"a".repeat(33),
         ] {
             assert!(!detect(bad), "{bad}");
+        }
+    }
+
+    /// The locale branches of the attractor sites and the fast path consult only
+    /// the published rule, so a detector label must never reach them.
+    #[test]
+    fn detector_labels_have_no_locale_rules_and_are_not_fast_path_leaves() {
+        let tax = taxonomy(false);
+        let labels = ["identity.person.username", "identity.medical.npi"];
+        for label in labels {
+            assert!(detector_for(label).is_some(), "{label} has a detector");
+            let def = tax.get(label).expect("label in taxonomy");
+            assert!(
+                def.validation_by_locale.is_none()
+                    || def
+                        .validation_by_locale
+                        .as_ref()
+                        .is_some_and(|m| m.is_empty()),
+                "{label} has validation_by_locale"
+            );
+            assert!(
+                !crate::fast_path::CONCLUSIVE_LEAVES.contains(&label),
+                "{label} is a fast-path leaf"
+            );
+        }
+        // Every registered detector is covered by the list above.
+        for (id, _) in tax.definitions() {
+            if detector_for(id).is_some() {
+                assert!(labels.contains(&id.as_str()), "{id} not listed");
+            }
         }
     }
 

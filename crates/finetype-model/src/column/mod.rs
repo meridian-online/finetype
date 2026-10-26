@@ -473,7 +473,7 @@ fn label_validates_sample(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bool
             continue;
         }
         checked += 1;
-        if detector.map_or_else(|| validator.is_valid(t), |d| d(t)) {
+        if finetype_core::discrimination::passes_detector_or_rule(detector, &validator, t) {
             passed += 1;
         }
         if ((passed + remaining) as f64) / ((checked + remaining) as f64) < 0.9 {

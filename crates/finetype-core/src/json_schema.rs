@@ -21,7 +21,10 @@
 //!
 //! Emitted JSON Schema documents carry exactly two `x-finetype-*`
 //! extensions on each column property: `x-finetype-label` and
-//! `x-finetype-pii`. The other extensions (broad-type, transform,
+//! `x-finetype-pii`. The one documented exception is a table column whose
+//! type declares `validation_notes`, which also carries
+//! `x-finetype-canonical` and `x-finetype-historic` (see above). The other
+//! extensions (broad-type, transform,
 //! transform-ext, format-string, domain, confidence) are derivable from
 //! the label + bundled taxonomy, and were dropped in PR #51 to keep the
 //! schema export contract tight. Do not re-introduce them in this card.
@@ -284,7 +287,9 @@ fn attach_enum_domain(prop: &mut serde_json::Map<String, Value>, col: &TableSche
 /// Verbosity contract (PR #51, extended to type-mode in card 0006): the
 /// returned schema carries exactly two `x-finetype-*` extensions —
 /// `x-finetype-label` (the canonical type key) and `x-finetype-pii`
-/// (boolean from the taxonomy). The pre-existing CLI emitter only
+/// (boolean from the taxonomy). (`x-finetype-canonical` and
+/// `x-finetype-historic` are the documented exception, and only on a table
+/// column schema; a per-type schema never carries them.) The pre-existing CLI emitter only
 /// surfaced `x-finetype-pii`; card 0006 adds `x-finetype-label` so both
 /// emitter surfaces match. Other extensions (broad-type, transform,
 /// transform-ext, format-string, domain, confidence) are derivable from
