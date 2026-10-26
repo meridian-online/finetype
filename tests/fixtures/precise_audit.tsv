@@ -174,7 +174,7 @@ identity.medical.icd10	false	^[A-TV-Z][0-9][0-9AB](\.[0-9A-TV-Z]{1,4})?$	true
 identity.medical.loinc	false	^\d{1,5}-\d$	true
 identity.medical.ndc	false	^\d{4}-\d{4}-\d{2}$|^\d{5}-\d{3}-\d{2}$|^\d{5}-\d{4}-\d{1}$|^\d{11}$	false
 identity.medical.npi	false	^[12]\d{9}$	false
-identity.person.blood_type	false	^(A|B|AB|O)[+-]?$	true
+identity.person.blood_type	false	^(A|B|AB|O)[+\-−]?$	true
 identity.person.email	false	^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$	true
 identity.person.email_display	false	^"?[^"<>]+"?\s*<[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}>$	true
 identity.person.first_name	false	^[\p{L}\s'\-]+$	false
@@ -186,7 +186,7 @@ identity.person.last_name	false	^[\p{L}\s'\-]+$	false
 identity.person.password	false		false
 identity.person.phone_e164	false	^\+[1-9]\d{6,14}$	true
 identity.person.phone_number	false	^[+]?[0-9\s()\-\./\u2013]+([\s]*(ext\.?|Ext\.?|x|#)[\s]*\d{1,5})?([\s]*(Work|Cell|Fax|Home|Office))?$	true
-identity.person.username	false	^[a-zA-Z0-9_\-.]{3,32}$	false
+identity.person.username	false	^[a-zA-Z0-9_.\-]{2,255}[a-zA-Z0-9_.\-$]$	false
 identity.person.weight	false	^[0-9]+(\.[0-9]+)?\s*(kg|lbs|lb|g|oz|stones)?$	true
 representation.boolean.binary	true		true
 representation.boolean.initials	true		true

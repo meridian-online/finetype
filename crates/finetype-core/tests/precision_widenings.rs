@@ -742,3 +742,55 @@ fn currency_code_grades_withdrawn_codes_as_noted() {
         }
     }
 }
+
+const USERNAME_LABEL: &str = "identity.person.username";
+
+/// useradd(8): a name may end with `$` and may be up to 256 characters.
+#[test]
+fn username_accepts_source_forms() {
+    let github = "a".repeat(39);
+    let longest = "a".repeat(256);
+    assert_pattern_boundary(
+        USERNAME_LABEL,
+        &["alice", "bob.smith", "svc$", &github, &longest],
+        &[],
+    );
+}
+
+#[test]
+fn username_rejects_undefined_forms() {
+    let too_long = "a".repeat(257);
+    assert_pattern_boundary(
+        USERNAME_LABEL,
+        &[],
+        &["ab", "al ice", "$alice", "a$b", &too_long],
+    );
+}
+
+const BLOOD_TYPE_LABEL: &str = "identity.person.blood_type";
+
+/// Rh nomenclature writes the negative type with a minus sign (U+2212) as well
+/// as the ASCII hyphen.
+#[test]
+fn blood_type_accepts_source_forms() {
+    assert_pattern_boundary(
+        BLOOD_TYPE_LABEL,
+        &["A+", "O-", "AB\u{2212}", "B\u{2212}", "AB", "O+"],
+        &[],
+    );
+}
+
+#[test]
+fn blood_type_rejects_undefined_forms() {
+    assert_pattern_boundary(BLOOD_TYPE_LABEL, &[], &["C+", "A++", "A\u{2013}"]);
+}
+
+#[test]
+fn blood_type_json_schema_pattern_has_literal_minus_sign() {
+    let tax = load_taxonomy();
+    let def = tax.get(BLOOD_TYPE_LABEL).expect("blood_type defined");
+    let schema = finetype_core::json_schema::emit_type_schema(BLOOD_TYPE_LABEL, def);
+    let pattern = schema["pattern"].as_str().expect("pattern in schema");
+    assert!(pattern.contains('\u{2212}'), "{pattern:?}");
+    assert!(!pattern.contains("\\u2212"), "{pattern:?}");
+}

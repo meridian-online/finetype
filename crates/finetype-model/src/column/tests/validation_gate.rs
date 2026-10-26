@@ -347,3 +347,31 @@ fn microsecond_offset_double_match_does_not_reach_ceded_leaf_recovery() {
         );
     }
 }
+
+/// A column of one repeated `svc$` (a trailing dollar sign the old rule
+/// rejected) is not vetoed or demoted.
+#[test]
+fn username_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const USERNAME: &str = "identity.person.username";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["svc$".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(USERNAME, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, USERNAME, &tax).is_none());
+}
+
+/// A column of one repeated `AB−` (U+2212, which the old rule rejected) is not
+/// vetoed or demoted.
+#[test]
+fn blood_type_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const BLOOD_TYPE: &str = "identity.person.blood_type";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["AB\u{2212}".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(BLOOD_TYPE, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, BLOOD_TYPE, &tax).is_none());
+}

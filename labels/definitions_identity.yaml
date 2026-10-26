@@ -536,7 +536,8 @@ identity.person.username:
   description: >
     Online username or handle for a user account. Typically alphanumeric with
     underscores, hyphens, or dots. Case-insensitive storage. Locale-specific
-    due to character set restrictions.
+    due to character set restrictions. Following useradd(8), a name may end
+    with a dollar sign and may be up to 256 characters long.
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU]
   broad_type: VARCHAR
@@ -549,8 +550,8 @@ identity.person.username:
   validation:
     type: string
     minLength: 3
-    maxLength: 32
-    pattern: "^[a-zA-Z0-9_\\-.]{3,32}$"
+    maxLength: 256
+    pattern: "^[a-zA-Z0-9_.\\-]{2,255}[a-zA-Z0-9_.\\-$]$"
   tier: [VARCHAR, person]
   aliases: [handle, account_name]
   samples:
@@ -696,7 +697,8 @@ identity.person.blood_type:
   title: "Blood Type"
   description: >
     ABO blood group system (A, B, AB, O) with optional Rh factor (±).
-    Format: "A+", "B-", "AB", "O+", etc.
+    Format: "A+", "B-", "AB", "O+", etc. The negative sign may be the ASCII
+    hyphen or the minus sign (U+2212) that Rh nomenclature uses.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -707,10 +709,10 @@ identity.person.blood_type:
   transform_ext: null
   decompose:
     blood_group: "REGEXP_EXTRACT(UPPER({col}), '^([ABO]+)', 1)"
-    rh_factor: "REGEXP_EXTRACT(UPPER({col}), '([+-])$', 1)"
+    rh_factor: "REGEXP_EXTRACT(UPPER({col}), '([+\u2212-])$', 1)"
   validation:
     type: string
-    pattern: "^(A|B|AB|O)[+-]?$"
+    pattern: "^(A|B|AB|O)[+\\-\u2212]?$"
   tier: [VARCHAR, person]
   aliases: null
   samples:
