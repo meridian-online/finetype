@@ -155,6 +155,31 @@ datetime.timestamp.iso_8601:
 
 Key fields: `broad_type` (target DuckDB type), `transform` (DuckDB SQL expression using `{col}` placeholder), `validation` (JSON Schema fragment for data quality).
 
+### The four roles of a type's rule
+
+A type's rule used to serve four roles at once, so a change made for one moved the other three. They are now separate:
+
+| Role | What reads it | Where it lives |
+|---|---|---|
+| Model input | the multi-branch model's validation branch (per-type pass rates as features) | the model's frozen `validation_snapshot.json` |
+| Published conformance | JSON Schema output, `finetype validate`, `ft_validate_text`, the type's grade | the taxonomy's `validation` block, which follows the type's defining source |
+| Discrimination | the validation veto, `schema_fail_demotion`, ceded-leaf recovery, the two text-attractor demotions, the `infer` fast path | the published rule, or the type's detector where one is registered |
+| Transform | `validate` materialisation, `ft_cast` | the taxonomy's `transform` |
+
+**The model reads a frozen snapshot.** `finetype_core::validator_snapshot::ValidatorSnapshot` holds the `validation` block of every type in the model's `type_index_keys`, written beside `config.json` by `write_validation_snapshot` (the overnight training script runs it after it records the keys). The CLI embeds the default model's snapshot (`build.rs`, `MB_VALIDATION_SNAPSHOT`), `MultiBranchClassifier::load` reads it from a model directory, and the DuckDB extension fetches it from Hugging Face before the model files. A model directory without a snapshot reads the live taxonomy, as before. A snapshot whose keys disagree with the model's, that fails to parse, or that cannot be applied is a load error, never a silent fallback. A listed key with no rule is a frozen "no rule". So fixing a published rule does not move a shipped model; a retrain adopts new rules on purpose. The default model's snapshot is the rules as they stood when it was frozen (0.6.63), so landing it changed no output.
+
+**Values get a grade.** `finetype_core::grade_value_for_label` returns `Skipped` (empty or null), `Conforms`, `Noted(Note)` or `Fails { constraint, message }`. Notes come from an optional `validation_notes` block beside `validation`:
+
+```yaml
+validation_notes:
+  canonical: { kind: non_canonical, name: lowercase, pattern: "^…$" }   # accepted, but not the source's preferred form
+  historic: [ { value: HRK, until: "2023-01" } ]                       # once valid, now withdrawn
+```
+
+The published rule is always the full accepting set; notes only classify accepted values. `kind` is `non_canonical` (a form the source allows but does not prefer) or `nonstandard` (a real-world form the source does not define, kept because no other type accepts it); a historic value is noted `withdrawn <until>`. One `NotesMatcher` implements the rule for the taxonomy, for `finetype validate` and for DuckDB. JSON Schema column properties carry it as `x-finetype-canonical` and `x-finetype-historic`. `finetype validate` reports noted values in an additive `column_notes` section; reject records, quarantine and the valid rows are unchanged, so a value with a note is never a failure. `ft_validate_text`'s STRUCT gains `grade` and `note`. `taxonomy check` refuses a historic value the rule does not accept, a canonical pattern that does not compile, and a type whose own samples fail its rule.
+
+**Detectors keep discrimination precise.** Where a source-conformant rule is too broad to tell a type from its neighbours, the type registers a detector in `finetype_core::discrimination::detector_for`, stricter than the published rule, and every discrimination site uses it in place of the published rule's per-value step. `username` keeps its 3–32 character shape (the published rule follows useradd(8), up to 256, so UUIDs and hashes would otherwise pass as usernames). `npi` requires the issued range (first digit 1 or 2) and the check digit. A detector never accepts what the published rule rejects. `crates/finetype-core/tests/random_confirm_rate.rs` measures every type's published and discrimination rates on seeded random printable text, digit strings and ID-shaped tokens (`tests/fixtures/random_confirm_rate.tsv`): no type may confirm more than half of random text except the recorded baseline exceptions, which may not rise, and no detector may be looser than its rule.
+
 ## Decision Register
 
 Architectural decisions (MADR format) live in the team's private planning repo, not in this
