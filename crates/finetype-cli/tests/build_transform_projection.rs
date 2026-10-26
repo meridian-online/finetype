@@ -189,3 +189,50 @@ fn epoch_nanoseconds_transform_does_not_bind_error_on_varchar() {
         proj
     );
 }
+
+#[test]
+fn percentage_transform_extracts_the_number_from_every_accepted_form() {
+    // Runs the published transform through the external `duckdb` CLI (a hard
+    // runtime dependency of `profile`/`validate`); skipped when it is absent.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let label = "representation.numeric.percentage";
+    let transform = tax
+        .ddl_info(label)
+        .expect("percentage is a known label")
+        .transform
+        .clone()
+        .expect("percentage has a transform");
+    let cases: &[(&str, f64)] = &[
+        ("50%", 50.0),
+        ("50 %", 50.0),
+        ("50\u{00A0}%", 50.0),
+        ("50\u{202F}%", 50.0),
+        ("%50", 50.0),
+        ("-12.5%", -12.5),
+        ("12.5", 12.5),
+    ];
+    for (value, expected) in cases {
+        let sql = format!(
+            "SELECT {}",
+            transform.replace("{col}", &format!("'{}'", value))
+        );
+        let out = match Command::new("duckdb")
+            .args(["-noheader", "-list", "-c", &sql])
+            .output()
+        {
+            Ok(o) => o,
+            Err(_) => return,
+        };
+        assert!(
+            out.status.success(),
+            "duckdb failed on {value:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let got: f64 = String::from_utf8_lossy(&out.stdout)
+            .trim()
+            .parse()
+            .unwrap_or_else(|_| panic!("non-numeric result for {value:?}"));
+        assert_eq!(got, *expected, "{value:?}");
+    }
+}

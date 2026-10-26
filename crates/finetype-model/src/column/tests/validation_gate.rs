@@ -198,3 +198,17 @@ fn uuid_constant_column_keeps_type() {
     assert!(!veto.vetoed, "vetoed: {veto:?}");
     assert!(schema_fail_demotion(&values, UUID, &tax).is_none());
 }
+
+/// A column of one repeated spaced percentage (`50 %`, which the old rule
+/// rejected) is not vetoed or demoted.
+#[test]
+fn percentage_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const PERCENTAGE: &str = "representation.numeric.percentage";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["50 %".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(PERCENTAGE, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, PERCENTAGE, &tax).is_none());
+}

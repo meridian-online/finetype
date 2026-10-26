@@ -183,20 +183,24 @@ representation.numeric.percentage:
   description: >
     Number as a percentage (e.g., 50%, 99.99%, 0.5%).
     May include % symbol or decimal representation. Transforms to DOUBLE (0-100).
+    The SI Brochure puts a space between number and symbol (50 %); French
+    typography uses a no-break space (U+00A0) or narrow no-break space (U+202F),
+    German (DIN 5008) a space, and Turkish puts the sign first (%50). All of
+    these are accepted, as is the unspaced 50%.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DOUBLE
   frictionless:
     type: number
   format_string: null
-  transform: "CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(\\.[0-9]+)?)', 1) AS DOUBLE)"
+  transform: "CAST(REGEXP_EXTRACT({col}, '(-?[0-9]+(\\.[0-9]+)?)', 1) AS DOUBLE)"
   transform_ext: null
   decompose:
-    percent_value: "CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(\\.[0-9]+)?)', 1) AS DOUBLE)"
+    percent_value: "CAST(REGEXP_EXTRACT({col}, '(-?[0-9]+(\\.[0-9]+)?)', 1) AS DOUBLE)"
     has_symbol: "contains({col}, '%')"
   validation:
     type: string
-    pattern: "^-?[0-9]+(\\.[0-9]+)?%?$"
+    pattern: "^(-?[0-9]+(\\.[0-9]+)?([ \u00A0\u202F]?%)?|%-?[0-9]+(\\.[0-9]+)?)$"
   tier: [DOUBLE, numeric]
   aliases: [percent]
   samples:

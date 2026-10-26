@@ -420,3 +420,39 @@ fn uuid_grades_uppercase_and_mixed_case_as_noted() {
         }
     }
 }
+
+const PERCENTAGE_LABEL: &str = "representation.numeric.percentage";
+const PERCENTAGE_ACCEPT: &[&str] = &[
+    "50%",
+    "50 %",
+    "50\u{00A0}%",
+    "50\u{202F}%",
+    "%50",
+    "-12.5%",
+    "12.5",
+];
+const PERCENTAGE_REJECT: &[&str] = &["50%%", "%50%", "abc%", "50 % %"];
+
+/// SI Brochure, French, German and Turkish typography: a space (ordinary,
+/// no-break or narrow no-break) may precede the sign, or the sign may lead.
+#[test]
+fn percentage_accepts_source_forms() {
+    assert_pattern_boundary(PERCENTAGE_LABEL, PERCENTAGE_ACCEPT, &[]);
+}
+
+#[test]
+fn percentage_rejects_undefined_forms() {
+    assert_pattern_boundary(PERCENTAGE_LABEL, &[], PERCENTAGE_REJECT);
+}
+
+/// The two non-ASCII spaces reach the published JSON Schema as literal characters.
+#[test]
+fn percentage_json_schema_pattern_has_literal_spaces() {
+    let tax = load_taxonomy();
+    let def = tax.get(PERCENTAGE_LABEL).expect("percentage defined");
+    let schema = finetype_core::json_schema::emit_type_schema(PERCENTAGE_LABEL, def);
+    let pattern = schema["pattern"].as_str().expect("pattern in schema");
+    assert!(pattern.contains('\u{00A0}'), "{pattern:?}");
+    assert!(pattern.contains('\u{202F}'), "{pattern:?}");
+    assert!(!pattern.contains("\\u00A0"), "{pattern:?}");
+}
