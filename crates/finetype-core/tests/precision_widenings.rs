@@ -562,10 +562,19 @@ const ABBREVIATED_MONTH_ACCEPT: &[&str] = &[
     "12 d\u{e9}c. 2023",
     "4 f\u{e9}vr. 2023",
     "4 ao\u{fb}t 2023",
+    "4 \u{d6}kt 2023",
 ];
 // `Febr 4 2023` is not rejected: the month token stays letter-based so other
 // languages work, and a four-letter token (German `Juni`) cannot be told apart.
-const ABBREVIATED_MONTH_REJECT: &[&str] = &["4 February 23x", "4 Fe 2023", "Feb 32x"];
+// The multiplication and division signs sit inside Latin-1's letter block and are
+// not letters.
+const ABBREVIATED_MONTH_REJECT: &[&str] = &[
+    "4 February 23x",
+    "4 Fe 2023",
+    "Feb 32x",
+    "4 F\u{d7}b 2023",
+    "4 F\u{f7}b 2023",
+];
 /// Unicode CLDR en (Jan..Dec), en-GB (Sept), and the US military form with a
 /// full stop after the month; a two-digit year in the day-first form.
 #[test]

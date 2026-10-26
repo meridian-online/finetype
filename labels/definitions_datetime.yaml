@@ -967,7 +967,7 @@ datetime.date.abbreviated_month:
   decompose: null
   validation:
     type: string
-    pattern: "^(?:[A-Za-z\u00c0-\u00ff]{3,}\\.? \\d{1,2},? \\d{4}|\\d{1,2}\\.? [A-Za-z\u00c0-\u00ff]{3,}\\.? (?:\\d{4}|\\d{2}))$"
+    pattern: "^(?:[A-Za-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u00ff]{3,}\\.? \\d{1,2},? \\d{4}|\\d{1,2}\\.? [A-Za-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u00ff]{3,}\\.? (?:\\d{4}|\\d{2}))$"
   tier: [DATE, date]
   aliases: []
   samples:
