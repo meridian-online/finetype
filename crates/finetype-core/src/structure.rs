@@ -242,6 +242,20 @@ const ISO15924: &[&str] = &[
     "Knda", "Mlym", "Sinh", "Mymr", "Khmr", "Laoo", "Tibt", "Mong",
 ];
 
+/// RFC 5646 extended language subtags that real locale data carries: the
+/// Chinese (prefix `zh`) and Arabic (prefix `ar`) macrolanguage members from the
+/// IANA registry (`zh-yue`, `zh-cmn-Hans-CN`, `ar-arb`). An extlang is only valid
+/// after its own prefix, so membership is checked per primary language.
+const EXTLANG_ZH: &[&str] = &[
+    "cdo", "cjy", "cmn", "cpx", "czh", "czo", "gan", "hak", "hsn", "lzh", "mnp", "nan", "wuu",
+    "yue",
+];
+const EXTLANG_AR: &[&str] = &[
+    "aao", "abh", "abv", "acm", "acq", "acw", "acx", "acy", "adf", "aeb", "aec", "afb", "ajp",
+    "apc", "apd", "arb", "arq", "ars", "ary", "arz", "auz", "avl", "ayh", "ayl", "ayn", "ayp",
+    "bbz", "pga", "shu", "ssh",
+];
+
 fn in_set(set: &[&str], s: &str) -> bool {
     set.iter().any(|k| k.eq_ignore_ascii_case(s))
 }
@@ -261,7 +275,21 @@ fn is_bcp47_tag(tag: &str) -> bool {
     if !lang_ok {
         return false;
     }
-    subs.all(|sub| {
+    let mut rest: Vec<&str> = subs.collect();
+    // One optional extended language subtag, only directly after its prefix language.
+    if let Some(first) = rest.first() {
+        let ext_set: &[&str] = if prim.eq_ignore_ascii_case("zh") {
+            EXTLANG_ZH
+        } else if prim.eq_ignore_ascii_case("ar") {
+            EXTLANG_AR
+        } else {
+            &[]
+        };
+        if first.len() == 3 && in_set(ext_set, first) {
+            rest.remove(0);
+        }
+    }
+    rest.iter().all(|sub| {
         (sub.len() == 4 && in_set(ISO15924, sub))                            // script
             || (sub.len() == 2 && in_set(ISO3166_1, sub))                    // region (alpha-2)
             || (sub.len() == 3 && sub.bytes().all(|b| b.is_ascii_digit()))   // region (M.49)
@@ -906,6 +934,8 @@ mod tests {
             "en_US",
             "pt_br", // underscore separator, mixed case — BCP-47 is case-insensitive
             "EN-US",
+            "zh-yue",                  // extlang after its prefix language
+            "zh-cmn-Hans-CN",          // extlang + script + region
             "es-419",                  // M.49 numeric region (Latin America)
             "en_US:es_ES:es_MX:pt_BR", // subtitle_locales: a delimited list of locales
             "de-DE;fr-FR;it-IT",       // semicolon list
@@ -929,6 +959,10 @@ mod tests {
             "pt-en",
             "of",             // 2-letter word that is NOT ISO 639-1
             "recipes/quiche", // slash is not a locale separator
+            "en-yue",         // extlang only follows its own prefix
+            "zh-yue-yue",     // at most one extlang
+            "foo-bar",        // `foo` is not an ISO 639 language
+            "en-USA",         // `USA` is neither a region nor an extlang
             "en-",            // trailing empty subtag
             "e",              // single letter
             "",

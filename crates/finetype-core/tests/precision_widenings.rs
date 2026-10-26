@@ -515,6 +515,13 @@ fn locale_code_rejects_undefined_forms() {
     assert_pattern_boundary(LOCALE_CODE_LABEL, &[], LOCALE_CODE_REJECT);
 }
 
+/// The extended-language slot is checked for shape only, as the old rule's
+/// second subtag was: membership is the substance guard's job.
+#[test]
+fn locale_code_extlang_slot_is_shape_only() {
+    assert_pattern_boundary(LOCALE_CODE_LABEL, &["en-USA", "foo-bar"], &[]);
+}
+
 #[test]
 fn locale_code_rejects_variant_subtags_as_out_of_scope() {
     assert_pattern_boundary(LOCALE_CODE_LABEL, &[], LOCALE_CODE_OUT_OF_SCOPE);

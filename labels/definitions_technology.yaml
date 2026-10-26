@@ -513,7 +513,8 @@ technology.code.locale_code:
     subtag from ISO 15924, and the region subtag from ISO 3166-1 or the UN M.49
     numeric codes; RFC 5646 gives es-419 as Spanish appropriate to the
     UN-defined Latin America and Caribbean region. One extended language
-    subtag may follow the language (zh-yue). An underscore separator (pt_BR),
+    subtag may follow the language (zh-yue); that slot is checked for shape
+    only, with membership left to the substance guard. An underscore separator (pt_BR),
     the POSIX and Java locale form, is accepted with a note. Variants,
     extensions, private-use and grandfathered tags are not accepted.
   designation: universal

@@ -2823,3 +2823,33 @@ fn naics_recovery_rejects_bare_code_header_for_sector_length_values() {
         .unwrap();
     assert_ne!(r.label, "identity.industry.naics");
 }
+
+#[test]
+fn locale_guard_keeps_extlang_tags() {
+    // RFC 5646 extended language subtags pass the published rule, so the
+    // substance guard must not demote them at profile time.
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(shipped_taxonomy());
+    let values = vals(&["zh-yue", "zh-cmn-Hans-CN", "zh-yue-HK", "zh-cmn", "en-US"]);
+    let r = cc
+        .compose_from_sense("locale", &values, "technology.code.locale_code", 0.9)
+        .expect("composition produces a result");
+    assert_eq!(r.label, "technology.code.locale_code");
+}
+
+#[test]
+fn locale_guard_demotes_shape_only_lookalikes() {
+    // `foo-bar` and `en-USA` pass the published rule's shape-only extended
+    // language slot (the old rule accepted them too); the guard rejects them
+    // because `foo` is no ISO 639 language and `USA` is neither a region nor an
+    // extlang.
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(shipped_taxonomy());
+    let values = vals(&["foo-bar", "en-USA", "baz-qux", "abc-def"]);
+    let r = cc
+        .compose_from_sense("locale", &values, "technology.code.locale_code", 0.9)
+        .expect("composition produces a result");
+    assert_ne!(r.label, "technology.code.locale_code");
+}
