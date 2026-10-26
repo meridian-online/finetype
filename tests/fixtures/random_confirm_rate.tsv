@@ -235,7 +235,7 @@ technology.development.version	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 technology.filesystem.filename	0.0110	0.0110	0.0000	0.0000	0.0000	0.0000
 technology.filesystem.windows_path	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 technology.identifier.snowflake_id	0.0000	0.0000	0.2048	0.2048	0.0000	0.0000
-technology.identifier.tsid	0.0000	0.0000	0.0495	0.0495	0.0834	0.0834
+technology.identifier.tsid	0.0000	0.0000	0.0495	0.0000	0.0834	0.0012
 technology.identifier.ulid	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 technology.internet.cidr	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 technology.internet.data_uri	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000

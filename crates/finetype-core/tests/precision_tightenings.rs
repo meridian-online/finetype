@@ -881,3 +881,48 @@ fn tsid_generator_and_samples_pass_the_rule() {
         );
     }
 }
+
+/// The published rule is source-shaped and accepts any 13-digit number starting
+/// 0 or 1, so a Unix-millisecond timestamp passes it; discrimination, which reads
+/// the tsid detector (the rule plus at least one letter), does not.
+#[test]
+fn tsid_discrimination_rejects_epoch_milliseconds_the_rule_accepts() {
+    use finetype_core::discrimination::value_passes_for_discrimination;
+    let tax = load_taxonomy();
+    let value = "1700000000000";
+    assert!(
+        validate_value_for_label(value, TSID_LABEL, &tax)
+            .unwrap()
+            .is_valid,
+        "the published rule stays source-shaped"
+    );
+    assert!(!value_passes_for_discrimination(value, TSID_LABEL, &tax));
+    for ok in TSID_ACCEPT {
+        assert!(
+            value_passes_for_discrimination(ok, TSID_LABEL, &tax),
+            "{ok}"
+        );
+    }
+}
+
+/// A column of 40 epoch-millisecond values labelled tsid is hard-vetoed (tsid is
+/// on the veto allowlist), and the shape fallback reads the epoch band, as it
+/// did before the tsid rule was rewritten.
+#[test]
+fn a_column_of_epoch_milliseconds_labelled_tsid_is_vetoed_and_falls_back_to_unix_milliseconds() {
+    use finetype_core::validation_veto::{
+        audited_safe_labels, evaluate_validation_veto, veto_shape_fallback,
+    };
+    let tax = load_taxonomy();
+    let owned: Vec<String> = (0..40)
+        .map(|i| (1_700_000_000_000u64 + i * 86_400_017).to_string())
+        .collect();
+    let values: Vec<Option<&str>> = owned.iter().map(|v| Some(v.as_str())).collect();
+    let veto = evaluate_validation_veto(TSID_LABEL, &values, &tax, &audited_safe_labels());
+    assert_eq!(veto.pass_rate, Some(0.0));
+    assert!(veto.vetoed);
+    assert_eq!(
+        veto_shape_fallback(&values),
+        Some("datetime.epoch.unix_milliseconds")
+    );
+}

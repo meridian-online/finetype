@@ -16,6 +16,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
     match label {
         "identity.person.username" => Some(is_username_shape),
         "identity.medical.npi" => Some(is_issued_npi),
+        "technology.identifier.tsid" => Some(is_tsid_shape),
         _ => None,
     }
 }
@@ -60,6 +61,23 @@ fn is_username_shape(value: &str) -> bool {
         && body
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
+}
+
+/// `tsid`: the published rule (13 Crockford base32 characters, first character
+/// at most F) and at least one letter. The published rule is source-shaped, so it
+/// accepts every 13-digit number starting 0 or 1, which is every Unix-millisecond
+/// timestamp from 2001 to 2286; a real TSID is all digits about one time in a
+/// million, so requiring a letter keeps column discrimination off those.
+fn is_tsid_shape(value: &str) -> bool {
+    let b = value.as_bytes();
+    b.len() == 13
+        && b[0].is_ascii_hexdigit()
+        && b[1..].iter().all(|c| {
+            c.is_ascii_digit()
+                || (c.is_ascii_alphabetic()
+                    && !matches!(c.to_ascii_uppercase(), b'I' | b'L' | b'O' | b'U'))
+        })
+        && b.iter().any(u8::is_ascii_alphabetic)
 }
 
 /// `npi`: a number in the issued range (first digit 1 or 2) whose check digit
@@ -130,7 +148,11 @@ mod tests {
     #[test]
     fn detector_labels_have_no_locale_rules_and_are_not_fast_path_leaves() {
         let tax = taxonomy(false);
-        let labels = ["identity.person.username", "identity.medical.npi"];
+        let labels = [
+            "identity.person.username",
+            "identity.medical.npi",
+            "technology.identifier.tsid",
+        ];
         for label in labels {
             assert!(detector_for(label).is_some(), "{label} has a detector");
             let def = tax.get(label).expect("label in taxonomy");
@@ -152,6 +174,35 @@ mod tests {
             if detector_for(id).is_some() {
                 assert!(labels.contains(&id.as_str()), "{id} not listed");
             }
+        }
+    }
+
+    #[test]
+    fn tsid_detector_is_the_published_rule_plus_a_letter() {
+        let tax = taxonomy(true);
+        let detect = detector_for("technology.identifier.tsid").expect("tsid detector");
+        for ok in ["0JMVQ049NFN6K", "0jmvq049nfn6k", "000000000000A"] {
+            assert!(detect(ok), "{ok}");
+        }
+        for bad in [
+            "1700000000000",
+            "0000000000000",
+            "GAWE5HZP3SKTK",
+            "0AWE5HZP3SKTU",
+            "0JMVQ049NFN6",
+            "0190a1b2c3d4e5f6a7b8c9d0e1f2a3b4",
+        ] {
+            assert!(!detect(bad), "{bad}");
+        }
+        // A detector never accepts what the published rule rejects.
+        let rule = resolve_label_validator("technology.identifier.tsid", &tax).expect("rule");
+        for v in [
+            "GAWE5HZP3SKTK",
+            "0AWE5HZP3SKTU",
+            "0JMVQ049NFN6",
+            "0JMVQ049NFN6KK",
+        ] {
+            assert!(!detect(v) && !rule.is_valid(v), "{v}");
         }
     }
 
