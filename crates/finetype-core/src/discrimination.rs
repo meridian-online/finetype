@@ -65,9 +65,10 @@ fn is_username_shape(value: &str) -> bool {
 
 /// `tsid`: the published rule (13 Crockford base32 characters, first character
 /// at most F) and at least one letter. The published rule is source-shaped, so it
-/// accepts every 13-digit number starting 0 or 1, which is every Unix-millisecond
-/// timestamp from 2001 to 2286; a real TSID is all digits about one time in a
-/// million, so requiring a letter keeps column discrimination off those.
+/// accepts every 13-digit number (the first character may be any hex digit),
+/// which covers every 13-digit Unix-millisecond timestamp, 2001 to 2286; a real
+/// TSID is all digits about one time in a million, so requiring a letter keeps
+/// column discrimination off those.
 fn is_tsid_shape(value: &str) -> bool {
     let b = value.as_bytes();
     b.len() == 13

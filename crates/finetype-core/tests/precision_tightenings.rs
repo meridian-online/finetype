@@ -882,8 +882,8 @@ fn tsid_generator_and_samples_pass_the_rule() {
     }
 }
 
-/// The published rule is source-shaped and accepts any 13-digit number starting
-/// 0 or 1, so a Unix-millisecond timestamp passes it; discrimination, which reads
+/// The published rule is source-shaped and accepts every 13-digit number, so
+/// any 13-digit Unix-millisecond timestamp passes it; discrimination, which reads
 /// the tsid detector (the rule plus at least one letter), does not.
 #[test]
 fn tsid_discrimination_rejects_epoch_milliseconds_the_rule_accepts() {

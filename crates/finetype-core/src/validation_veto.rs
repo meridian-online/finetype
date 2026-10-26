@@ -50,7 +50,7 @@ pub struct ValidationVeto {
     ///
     /// This is the veto's evidence, surfaced as the profile JSON's
     /// `validation_pass_rate`. For a type with a discrimination detector
-    /// (`username`, `npi`) it counts values by that detector, which is stricter
+    /// (`username`, `npi`, `tsid`) it counts values by that detector, which is stricter
     /// than the published rule, so it can differ from what `finetype validate`
     /// reports for the same column.
     pub pass_rate: Option<f64>,

@@ -97,7 +97,7 @@ fn json_column_object(p: &ColProfile, verbose: bool) -> serde_json::Value {
     // validation; the veto/advisory flags and the original
     // label surface only when they fired. `validation_pass_rate` is the
     // veto's evidence: for a type with a discrimination detector (username,
-    // npi) it uses that detector rather than the published rule, so it can
+    // npi, tsid) it uses that detector rather than the published rule, so it can
     // differ from `finetype validate`'s result on the same column.
     if let Some(rate) = p.validation_pass_rate {
         let r = (rate * 10000.0).round() / 10000.0;
