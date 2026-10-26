@@ -112,6 +112,13 @@ fn resolve_model_dir() -> std::result::Result<PathBuf, Box<dyn Error>> {
     // Download all required files — hf_hub caches them automatically.
     // model.safetensors is first, and being a top-level file its parent is the
     // snapshot root we return as the model dir.
+    //
+    // The optional snapshot goes first. `get` serves a cached file from the
+    // cached revision but downloads a miss into the remote's current revision,
+    // so fetching the snapshot first makes the required files below resolve to
+    // that same revision. When a revision split still happens, it is detected
+    // and warned about below.
+    let snapshot = fetch_optional_snapshot(|f| api.get(f));
     let mut model_dir = None;
     for filename in MODEL_FILES {
         let path = api.get(filename)?;
@@ -130,10 +137,21 @@ fn resolve_model_dir() -> std::result::Result<PathBuf, Box<dyn Error>> {
     api.get(M2V_TOKENIZER)?;
     api.get(M2V_MODEL)?;
 
-    // Lands beside model.safetensors, where the loader looks for it.
-    fetch_optional_snapshot(|f| api.get(f));
+    if let (Some(snapshot), Some(dir)) = (&snapshot, &model_dir) {
+        if !snapshot_in_use(snapshot, dir) {
+            tracing::warn!(
+                "Validation snapshot was fetched into a different model revision and is not \
+                 in use; the model validates against the live taxonomy"
+            );
+        }
+    }
 
     model_dir.ok_or_else(|| "Failed to determine model cache directory".into())
+}
+
+/// Whether the snapshot sits in the model directory, where the loader reads it.
+fn snapshot_in_use(snapshot: &std::path::Path, model_dir: &std::path::Path) -> bool {
+    snapshot.parent() == Some(model_dir)
 }
 
 /// Fetch the model's validation snapshot, if the repo has one. A missing file
@@ -753,8 +771,9 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
 mod tests {
     use super::*;
 
+    // Load-time pinning is covered by the model crate's loader tests.
     #[test]
-    fn extension_loads_snapshot_when_present() {
+    fn snapshot_fetch_returns_path_when_present() {
         let dir = PathBuf::from("/cache/model");
         let got = fetch_optional_snapshot(|f| {
             assert_eq!(f, "validation_snapshot.json");
@@ -767,5 +786,16 @@ mod tests {
     fn missing_snapshot_does_not_fail_the_load() {
         let got = fetch_optional_snapshot(|_| Err::<PathBuf, _>("404 Not Found".to_string()));
         assert_eq!(got, None);
+    }
+
+    #[test]
+    fn snapshot_in_use_only_beside_the_model() {
+        let model = PathBuf::from("/cache/snapshots/new");
+        assert!(snapshot_in_use(
+            &model.join("validation_snapshot.json"),
+            &model
+        ));
+        let other = PathBuf::from("/cache/snapshots/old/validation_snapshot.json");
+        assert!(!snapshot_in_use(&other, &model));
     }
 }
