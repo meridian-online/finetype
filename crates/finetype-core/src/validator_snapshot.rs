@@ -17,6 +17,8 @@ const SNAPSHOT_FORMAT: u32 = 1;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidatorSnapshot {
     pub format: u32,
+    /// Every label key the snapshot covers, in the order given.
+    pub keys: Vec<String>,
     /// Validation block per label key. A type with no validation is absent.
     pub validations: BTreeMap<String, Validation>,
 }
@@ -33,6 +35,7 @@ impl ValidatorSnapshot {
             .collect();
         Self {
             format: SNAPSHOT_FORMAT,
+            keys: keys.to_vec(),
             validations,
         }
     }
@@ -56,9 +59,9 @@ impl ValidatorSnapshot {
             .collect()
     }
 
-    /// The labels that have a frozen rule.
+    /// Every label the snapshot covers, including those with no rule.
     pub fn keys(&self) -> impl Iterator<Item = &String> {
-        self.validations.keys()
+        self.keys.iter()
     }
 }
 
@@ -117,6 +120,20 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn snapshot_keeps_keys_without_a_rule() {
+        let tax = live_taxonomy();
+        // Every live type has a rule, so a key the taxonomy lacks stands in for one.
+        let keyless = "test.no.rule".to_string();
+        let mut keys = tax.labels().to_vec();
+        keys.push(keyless.clone());
+        let snapshot = ValidatorSnapshot::from_taxonomy(&tax, &keys);
+        let snapshot = ValidatorSnapshot::from_json(snapshot.to_json_pretty().as_bytes()).unwrap();
+        assert!(snapshot.keys().any(|k| *k == keyless));
+        assert!(!snapshot.validations.contains_key(&keyless));
+        assert_eq!(snapshot.keys, keys);
     }
 
     #[test]
