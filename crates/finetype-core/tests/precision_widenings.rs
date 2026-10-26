@@ -378,3 +378,45 @@ fn pvc_finance_coverage_lei_validates() {
         invalid.first()
     );
 }
+
+const UUID_LABEL: &str = "representation.identifier.uuid";
+const UUID_ACCEPT: &[&str] = &[
+    "550e8400-e29b-41d4-a716-446655440000",
+    "550E8400-E29B-41D4-A716-446655440000",
+    "550e8400-E29B-41d4-a716-446655440000",
+];
+const UUID_REJECT: &[&str] = &[
+    "550e8400e29b41d4a716446655440000",
+    "550e8400-e29b-41d4-a716-44665544000g",
+];
+
+/// RFC 9562: the hex digits of the text form may be upper, lower or mixed case.
+#[test]
+fn uuid_accepts_source_forms() {
+    assert_pattern_boundary(UUID_LABEL, UUID_ACCEPT, &[]);
+}
+
+#[test]
+fn uuid_rejects_undefined_forms() {
+    assert_pattern_boundary(UUID_LABEL, &[], UUID_REJECT);
+}
+
+/// Lowercase is the preferred form; the other cases are accepted with a note.
+#[test]
+fn uuid_grades_uppercase_and_mixed_case_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    assert_eq!(
+        grade_value_for_label(UUID_ACCEPT[0], UUID_LABEL, &tax),
+        Grade::Conforms
+    );
+    for value in &UUID_ACCEPT[1..] {
+        match grade_value_for_label(value, UUID_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::NonCanonical, "{value}");
+                assert_eq!(note.detail, "lowercase", "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
+        }
+    }
+}

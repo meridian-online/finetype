@@ -1133,9 +1133,11 @@ representation.boolean.terms:
 representation.identifier.uuid:
   title: "UUID"
   description: >
-    Universally Unique Identifier (RFC 4122). Standard formats include
-    UUID v1 (timestamp-based), v4 (random), and v5 (name-based).
-    Canonical format: 8-4-4-4-12 hex groups with hyphens.
+    Universally Unique Identifier (RFC 9562, which obsoletes RFC 4122).
+    Versions include v1 (timestamp-based), v4 (random), v5 (name-based),
+    and v6, v7 and v8 (time-ordered and custom layouts).
+    Text form: 8-4-4-4-12 hex groups with hyphens; the hex digits may be
+    upper, lower or mixed case, and lowercase is preferred.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: UUID
@@ -1148,7 +1150,12 @@ representation.identifier.uuid:
   decompose: null
   validation:
     type: string
-    pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+  validation_notes:
+    canonical:
+      kind: non_canonical
+      name: lowercase
+      pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
   tier: [UUID, identifier]
   aliases: [guid]
   samples:

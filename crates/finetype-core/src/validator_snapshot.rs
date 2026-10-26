@@ -186,13 +186,14 @@ mod tests {
         let dir = labels_dir().unwrap();
         let yaml =
             std::fs::read_to_string(format!("{dir}/definitions_representation.yaml")).unwrap();
-        let old = r#"pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$""#;
+        let old = r#"pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$""#;
         assert!(yaml.contains(old), "uuid pattern moved; update this test");
-        let edited = yaml.replace(old, &old.replace("0-9a-f", "0-9a-fA-F"));
+        // The live rule is later tightened to lower case only.
+        let edited = yaml.replace(old, &old.replace("0-9a-fA-F", "0-9a-f"));
         let mut edited_tax = Taxonomy::from_yaml(&edited).unwrap();
         edited_tax.compile_validators();
 
-        assert!(edited_tax.get_validator(UUID).unwrap().is_valid(UPPER_UUID));
-        assert!(!snapshot.compile().unwrap()[UUID].is_valid(UPPER_UUID));
+        assert!(!edited_tax.get_validator(UUID).unwrap().is_valid(UPPER_UUID));
+        assert!(snapshot.compile().unwrap()[UUID].is_valid(UPPER_UUID));
     }
 }

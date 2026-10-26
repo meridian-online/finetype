@@ -191,8 +191,7 @@ mod tests {
         std::fs::read_to_string(path).unwrap()
     }
 
-    const UUID_STRICT: &str =
-        r#"pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$""#;
+    const UUID_PUBLISHED: &str = r#"pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$""#;
 
     #[test]
     fn pinned_extractor_ignores_live_rule_change() {
@@ -202,20 +201,20 @@ mod tests {
         let pinned = ValidationFeatureExtractor::with_snapshot(keys.clone(), &snapshot).unwrap();
         let unpinned = ValidationFeatureExtractor::from_type_keys(keys);
 
-        // The live taxonomy's uuid rule is loosened to accept upper case.
+        // The live taxonomy's uuid rule is later tightened to lower case only.
         let yaml = repr_yaml();
-        assert!(yaml.contains(UUID_STRICT));
-        let loosened_yaml = yaml.replace(
-            UUID_STRICT,
-            r#"pattern: "^(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$""#,
+        assert!(yaml.contains(UUID_PUBLISHED));
+        let tightened_yaml = yaml.replace(
+            UUID_PUBLISHED,
+            r#"pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$""#,
         );
-        let mut loosened = Taxonomy::from_yaml(&loosened_yaml).unwrap();
-        loosened.compile_validators();
+        let mut tightened = Taxonomy::from_yaml(&tightened_yaml).unwrap();
+        tightened.compile_validators();
 
         let values = ["550E8400-E29B-41D4-A716-446655440000"; 5];
         let idx = pinned.index_of("representation.identifier.uuid").unwrap();
-        assert_eq!(pinned.extract(&values, &loosened)[idx], 0.0);
-        assert_eq!(unpinned.extract(&values, &loosened)[idx], 1.0);
+        assert_eq!(pinned.extract(&values, &tightened)[idx], 1.0);
+        assert_eq!(unpinned.extract(&values, &tightened)[idx], 0.0);
     }
 
     #[test]

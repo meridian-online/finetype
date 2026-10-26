@@ -1672,3 +1672,38 @@ fn golden_profile_compact_dmy_change_leaves_genuine_day_first_dates_alone() {
          with 1865-1872 values.",
     );
 }
+
+/// RFC 9562 allows upper-case hex in a UUID. A column of 40 distinct upper-case
+/// UUIDs must profile as a uuid, not be vetoed down to an alphanumeric id.
+#[test]
+#[ignore]
+fn golden_profile_uppercase_uuid_column() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let path = tmp.path().join("uuids.csv");
+    let mut csv = String::from("id\n");
+    let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+    for _ in 0..40 {
+        let mut hex = String::new();
+        while hex.len() < 32 {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            hex.push_str(&format!("{:016X}", state));
+        }
+        // Version 4, variant 1.
+        let b = format!("{}4{}A{}", &hex[0..12], &hex[13..16], &hex[17..32]);
+        csv.push_str(&format!(
+            "{}-{}-{}-{}-{}\n",
+            &b[0..8],
+            &b[8..12],
+            &b[12..16],
+            &b[16..20],
+            &b[20..32]
+        ));
+    }
+    std::fs::write(&path, csv).unwrap();
+
+    let profile = run_profile_json(&path);
+    let cols = extract_columns(&profile);
+    assert_column_type(&cols, "id", "representation.identifier.uuid");
+}
