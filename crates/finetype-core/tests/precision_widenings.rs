@@ -477,3 +477,50 @@ fn file_size_accepts_source_forms() {
 fn file_size_rejects_undefined_forms() {
     assert_pattern_boundary(FILE_SIZE_LABEL, &[], FILE_SIZE_REJECT);
 }
+
+const LOCALE_CODE_LABEL: &str = "technology.code.locale_code";
+const LOCALE_CODE_ACCEPT: &[&str] = &[
+    "en",
+    "en-US",
+    "es-419",
+    "zh-Hant-TW",
+    "pt_BR",
+    "eng",
+    "zh-Hant",
+    "EN-us",
+];
+const LOCALE_CODE_REJECT: &[&str] = &["english", "en-1234", "e", "en-US-x", "en-419-US"];
+
+/// RFC 5646: a language subtag, an optional script subtag, an optional region
+/// subtag (two letters or the three-digit UN M.49 code), joined by hyphens.
+#[test]
+fn locale_code_accepts_source_forms() {
+    assert_pattern_boundary(LOCALE_CODE_LABEL, LOCALE_CODE_ACCEPT, &[]);
+}
+
+#[test]
+fn locale_code_rejects_undefined_forms() {
+    assert_pattern_boundary(LOCALE_CODE_LABEL, &[], LOCALE_CODE_REJECT);
+}
+
+/// The hyphen is RFC 5646's separator; the underscore is the POSIX/Java form
+/// and is accepted with a note.
+#[test]
+fn locale_code_grades_underscore_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in ["en", "en-US", "es-419", "zh-Hant-TW"] {
+        assert_eq!(
+            grade_value_for_label(value, LOCALE_CODE_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    match grade_value_for_label("pt_BR", LOCALE_CODE_LABEL, &tax) {
+        Grade::Noted(note) => {
+            assert_eq!(note.kind, NoteKind::Nonstandard);
+            assert_eq!(note.detail, "hyphen separator");
+        }
+        other => panic!("pt_BR should be noted, got {other:?}"),
+    }
+}

@@ -226,3 +226,17 @@ fn file_size_constant_column_keeps_type() {
     assert!(!veto.vetoed, "vetoed: {veto:?}");
     assert!(schema_fail_demotion(&values, FILE_SIZE, &tax).is_none());
 }
+
+/// A column of one repeated UN M.49 region tag (`es-419`, which the old rule
+/// rejected) is not vetoed or demoted.
+#[test]
+fn locale_code_constant_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    const LOCALE_CODE: &str = "technology.code.locale_code";
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["es-419".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(LOCALE_CODE, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, LOCALE_CODE, &tax).is_none());
+}
