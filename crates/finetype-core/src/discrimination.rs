@@ -21,18 +21,21 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
 }
 
 /// Whether `value` passes for `label`: the detector when there is one, else the
-/// published rule, resolved from the taxonomy's compiled cache or compiled on a
+/// published rule. A label with no published rule (or an unknown one) never
+/// passes, detector or not, matching the veto. The rule is resolved from the taxonomy's compiled cache or compiled on a
 /// miss (the same resolution `resolve_label_validator` gives `ceded_leaf_recovery`).
 ///
 /// The profile call sites keep their own validator lookup and call
 /// `detector_for` directly, so a failed lookup behaves at each as it did before;
-/// this form serves callers with no lookup of their own. A label with no
-/// published rule, or an unknown one, does not pass.
+/// this form serves callers with no lookup of their own.
 pub fn value_passes_for_discrimination(value: &str, label: &str, tax: &Taxonomy) -> bool {
-    if let Some(detect) = detector_for(label) {
-        return detect(value);
+    let Some(rule) = resolve_label_validator(label, tax) else {
+        return false;
+    };
+    match detector_for(label) {
+        Some(detect) => detect(value),
+        None => rule.is_valid(value),
     }
-    resolve_label_validator(label, tax).is_some_and(|v| v.is_valid(value))
 }
 
 #[cfg(test)]

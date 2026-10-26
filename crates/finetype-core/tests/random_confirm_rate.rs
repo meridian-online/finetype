@@ -67,7 +67,8 @@ fn ascii_population() -> Vec<String> {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     (0..POPULATION)
         .map(|_| {
-            let len = rng.gen_range(1..=40);
+            // The explicit integer type fixes the random stream the TSV was generated from.
+            let len = rng.gen_range(1u32..=40);
             (0..len)
                 .map(|_| rng.gen_range(0x20u8..=0x7e) as char)
                 .collect()
@@ -79,7 +80,8 @@ fn digit_population() -> Vec<String> {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     (0..POPULATION)
         .map(|_| {
-            let len = rng.gen_range(1..=20);
+            // The explicit integer type fixes the random stream the TSV was generated from.
+            let len = rng.gen_range(1u32..=20);
             (0..len)
                 .map(|_| (b'0' + rng.gen_range(0..10u8)) as char)
                 .collect()
@@ -159,6 +161,18 @@ fn random_confirm_rate() {
             None if rate > 0.5 => failures.push(format!(
                 "{}: confirms {rate:.4} of random printable ASCII (limit 0.5); add a detector",
                 r.label
+            )),
+            _ => {}
+        }
+    }
+    for (label, recorded) in BASELINE_EXCEPTIONS {
+        match rows.iter().find(|r| r.label == *label) {
+            None => failures.push(format!(
+                "{label}: listed in BASELINE_EXCEPTIONS but produced no row; remove it"
+            )),
+            Some(r) if r.discrimination_ascii <= 0.5 => failures.push(format!(
+                "{label}: now {:.4} (recorded {recorded:.4}), at or below 0.5; remove it from BASELINE_EXCEPTIONS",
+                r.discrimination_ascii
             )),
             _ => {}
         }
