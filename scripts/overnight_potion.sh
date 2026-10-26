@@ -219,20 +219,47 @@ SV_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && SV_ARG=(--store-values "$STORE_VALUES"
 KEYS_FILE="${KEYS_FILE:-$FTMB.type_index_keys.json}"
 GOLD_SIDECAR="$GOLDFTMB.validation_snapshot.json"
 if [[ ! -f "$GOLDFTMB" ]]; then
-  [[ -f "$KEYS_FILE" ]] || { echo "FAIL: $KEYS_FILE missing; cannot record the gold FTMB's rules"; exit 1; }
+  if [[ ! -f "$KEYS_FILE" ]]; then
+    # --score-only on a tag trained before keys were recorded: take the keys from the
+    # first trained model that has them, else derive them from $BIN as STEP 1 does.
+    for S in "${SEEDS[@]}"; do
+      "$PY" -c "
+import json, sys
+k = json.load(open(sys.argv[1])).get('type_index_keys')
+if not k: sys.exit(1)
+json.dump(k, open(sys.argv[2], 'w'))
+" "models/${TAG}-s${S}/config.json" "$KEYS_FILE" 2>/dev/null && break
+    done
+    if [[ ! -f "$KEYS_FILE" ]]; then
+      echo '["test"]' | "$BIN" extract-features --json --header "test" --validation 2>/dev/null | \
+        "$PY" -c "import json,sys; print(json.dumps(json.load(sys.stdin)['type_index_keys']))" > "$KEYS_FILE" \
+        || { rm -f "$KEYS_FILE"; echo "FAIL: no model config under models/${TAG}-s* has type_index_keys and $BIN cannot derive them"; exit 1; }
+    fi
+  fi
   "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --out "$GOLD_SIDECAR"
   "$PY" scripts/build_gold_ftmb_potion.py --gold "$GOLD" --columns "$COLS" --binary "$BIN" \
     --potion "$POTION" "${TV_ARG[@]}" "${SV_ARG[@]}" --out "$GOLDFTMB"
+  "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --check "$GOLD_SIDECAR" \
+    || { rm -f "$GOLDFTMB" "$GOLD_SIDECAR"; echo "FAIL: labels/ changed while $GOLDFTMB was being built; deleted it and its record. Rerun."; exit 1; }
 fi
-if [[ -z "$SIDECAR" ]] || ! "$PY" -c "
+if [[ -z "$SIDECAR" || ! -f "$SIDECAR" ]]; then
+  # No training record to compare with (a tag trained before records existed).
+  if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
+    echo "WARN: no training rules record ($FTMB.validation_snapshot.json); ALLOW_STALE_FTMB=1, skipping the gold record check and scoring as before"
+  else
+    echo "FAIL: the training FTMB has no rules record ($FTMB.validation_snapshot.json), so $GOLDFTMB cannot be shown to match it."
+    echo "      ALLOW_STALE_FTMB=1 scores without that check; deleting both FTMBs and rerunning rebuilds them with records."
+    exit 1
+  fi
+elif ! "$PY" -c "
 import json, sys
 sys.exit(0 if json.load(open(sys.argv[1])) == json.load(open(sys.argv[2])) else 1)
 " "$GOLD_SIDECAR" "$SIDECAR" 2>/dev/null; then
   if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
-    echo "WARN: $GOLDFTMB has no rules record matching the training FTMB's; ALLOW_STALE_FTMB=1, scoring anyway"
+    echo "WARN: $GOLDFTMB has no rules record, or one that differs from the training FTMB's; ALLOW_STALE_FTMB=1, scoring anyway"
   else
-    echo "FAIL: $GOLDFTMB was built under other validation rules than the training file (or has no record)."
-    echo "      Delete it to rebuild, or set ALLOW_STALE_FTMB=1."
+    echo "FAIL: $GOLDFTMB has no rules record ($GOLD_SIDECAR), or one that differs from $SIDECAR."
+    echo "      ALLOW_STALE_FTMB=1 scores anyway; deleting $GOLDFTMB rebuilds it with a record."
     exit 1
   fi
 fi
