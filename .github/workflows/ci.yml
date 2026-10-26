@@ -673,6 +673,12 @@ jobs:
         # in the `test` job.
         run: cargo test --release -p finetype-cli --test datetime_page_examples -- --include-ignored
 
+      - name: The percentage transform extracts the number from every accepted form
+        # Runs the published transform through the duckdb CLI installed above.
+        # The test is #[ignore]d in the default suite because the `test` job
+        # does not install the CLI.
+        run: cargo test --release -p finetype-cli --test build_transform_projection -- --include-ignored
+
   encoder-dtype:
     # Every step here is a proof rather than a check, and each is routed
     # separately: a diff that changes `scripts/encoder_dtype.py` alone does not

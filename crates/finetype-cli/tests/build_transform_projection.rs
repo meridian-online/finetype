@@ -191,9 +191,9 @@ fn epoch_nanoseconds_transform_does_not_bind_error_on_varchar() {
 }
 
 #[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
 fn percentage_transform_extracts_the_number_from_every_accepted_form() {
-    // Runs the published transform through the external `duckdb` CLI (a hard
-    // runtime dependency of `profile`/`validate`); skipped when it is absent.
+    // Runs the published transform through the external `duckdb` CLI.
     use std::process::Command;
     let tax = test_taxonomy();
     let label = "representation.numeric.percentage";
@@ -211,19 +211,18 @@ fn percentage_transform_extracts_the_number_from_every_accepted_form() {
         ("%50", 50.0),
         ("-12.5%", -12.5),
         ("12.5", 12.5),
+        ("%-12.5", -12.5),
+        ("-12.5 %", -12.5),
     ];
     for (value, expected) in cases {
         let sql = format!(
             "SELECT {}",
             transform.replace("{col}", &format!("'{}'", value))
         );
-        let out = match Command::new("duckdb")
-            .args(["-noheader", "-list", "-c", &sql])
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
             .output()
-        {
-            Ok(o) => o,
-            Err(_) => return,
-        };
+            .expect("run the duckdb CLI");
         assert!(
             out.status.success(),
             "duckdb failed on {value:?}: {}",
@@ -235,4 +234,15 @@ fn percentage_transform_extracts_the_number_from_every_accepted_form() {
             .unwrap_or_else(|_| panic!("non-numeric result for {value:?}"));
         assert_eq!(got, *expected, "{value:?}");
     }
+
+    // A value the rule rejects extracts nothing (TRY-wrapped, as validate does).
+    let sql = format!(
+        "SELECT TRY({}) IS NULL",
+        transform.replace("{col}", "'abc 12'")
+    );
+    let out = Command::new("duckdb")
+        .args(["-no-init", "-noheader", "-list", "-c", &sql])
+        .output()
+        .expect("run the duckdb CLI");
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "true");
 }

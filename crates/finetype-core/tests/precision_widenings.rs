@@ -430,6 +430,8 @@ const PERCENTAGE_ACCEPT: &[&str] = &[
     "%50",
     "-12.5%",
     "12.5",
+    "%-12.5",
+    "-12.5 %",
 ];
 const PERCENTAGE_REJECT: &[&str] = &["50%%", "%50%", "abc%", "50 % %"];
 
