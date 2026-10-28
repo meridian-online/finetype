@@ -1395,3 +1395,11 @@ fn calver_does_not_recover_decimal_columns() {
         }
     }
 }
+
+/// A column of one repeated sha512-pinned image (which the old rule rejected)
+/// keeps its type. The 128 hex digits are built in code.
+#[test]
+fn docker_ref_constant_column_keeps_type() {
+    let value = format!("app@sha512:{}", "a".repeat(128));
+    assert_constant_column_kept("technology.development.docker_ref", &value);
+}

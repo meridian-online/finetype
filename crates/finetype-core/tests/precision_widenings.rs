@@ -2158,3 +2158,49 @@ fn calver_detector_keeps_out_decimals() {
         assert!(rule.is_valid(decimal), "{decimal:?} conforms");
     }
 }
+
+const DOCKER_REF_LABEL: &str = "technology.development.docker_ref";
+
+/// OCI distribution spec: a tag is `[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}`. OCI image
+/// spec: a digest algorithm is `sha256`, `sha512` or `blake3`.
+#[test]
+fn docker_ref_accepts_source_forms() {
+    let sha512 = format!("app@sha512:{}", "a".repeat(128));
+    let blake3 = format!("app@blake3:{}", "b".repeat(64));
+    let sha256_upper = format!("app@sha256:{}", "ABCDEF01".repeat(8));
+    let tag_128 = format!("app:{}", "a".repeat(128));
+    let with_tag_and_digest = format!("ghcr.io/org/app:v1@sha512:{}", "0".repeat(128));
+    assert_pattern_boundary(
+        DOCKER_REF_LABEL,
+        &[
+            "app:_dev",
+            &sha512,
+            &blake3,
+            &sha256_upper,
+            &tag_128,
+            &with_tag_and_digest,
+            "nginx:latest",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn docker_ref_rejects_undefined_forms() {
+    let tag_129 = format!("app:{}", "a".repeat(129));
+    let md5 = format!("app@md5:{}", "a".repeat(32));
+    let short_sha512 = format!("app@sha512:{}", "a".repeat(64));
+    let long_blake3 = format!("app@blake3:{}", "a".repeat(128));
+    assert_pattern_boundary(
+        DOCKER_REF_LABEL,
+        &[],
+        &[
+            "app:.dev",
+            "app:-dev",
+            &tag_129,
+            &md5,
+            &short_sha512,
+            &long_blake3,
+        ],
+    );
+}

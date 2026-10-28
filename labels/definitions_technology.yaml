@@ -655,7 +655,9 @@ technology.development.docker_ref:
   title: "Docker/OCI Image Reference"
   description: >
     OCI container image reference in the form [registry/]repository[:tag][@digest].
-    Used in Dockerfiles, Kubernetes manifests, and CI/CD pipelines.
+    The tag is at most 128 characters and does not start with a period or a
+    hyphen; the digest algorithm is sha256, sha512 or blake3. Used in
+    Dockerfiles, Kubernetes manifests, and CI/CD pipelines.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -668,10 +670,10 @@ technology.development.docker_ref:
     registry: "REGEXP_EXTRACT({col}, '^(?:([a-zA-Z0-9.\\-]+(?::\\d+)?)/)', 1)"
     repository: "REGEXP_EXTRACT({col}, '(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?([a-z0-9._\\-/]+?)(?::|@|$)', 1)"
     tag: "REGEXP_EXTRACT({col}, '^[^@]*:([a-zA-Z0-9_.\\-]+)(?:@|$)', 1)"
-    digest: "REGEXP_EXTRACT({col}, '@(sha256:[a-fA-F0-9]{64})', 1)"
+    digest: "REGEXP_EXTRACT({col}, '@((?:sha256:[a-fA-F0-9]{64}|sha512:[a-fA-F0-9]{128}|blake3:[a-fA-F0-9]{64}))$', 1)"
   validation:
     type: string
-    pattern: "^(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?(?:[a-z0-9._\\-/]+)(?::[a-zA-Z0-9_.\\-]+)?(?:@sha256:[a-fA-F0-9]{64})?$"
+    pattern: "^(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?(?:[a-z0-9._\\-/]+)(?::[a-zA-Z0-9_][a-zA-Z0-9._\\-]{0,127})?(?:@(?:sha256:[a-fA-F0-9]{64}|sha512:[a-fA-F0-9]{128}|blake3:[a-fA-F0-9]{64}))?$"
   tier: [VARCHAR, development]
   aliases: [oci_image_ref, container_image]
   samples:
@@ -679,11 +681,15 @@ technology.development.docker_ref:
     - "ghcr.io/myorg/myapp:v1.2.3"
     - "docker.io/library/postgres:16-alpine"
     - "gcr.io/project/service@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+    - "app:_dev"
+    - "app@blake3:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
   icon: bookmark
   references: null
   notes: >
     OCI image reference format. Includes optional registry,
-    repository path, tag, and digest components.
+    repository path, tag, and digest components (OCI distribution and image
+    specifications). `digest` returns the algorithm and the hex, for example
+    `sha512:...`.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: identifier

@@ -855,3 +855,35 @@ fn calver_decompose_day_is_null_without_a_day() {
         assert_eq!(run("day", value), *day, "day of {value:?}");
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn docker_ref_parts_read_every_digest_algorithm() {
+    let tax = test_taxonomy();
+    let label = "technology.development.docker_ref";
+    let sha256 = format!("sha256:{}", "a".repeat(64));
+    let sha512 = format!("sha512:{}", "b".repeat(128));
+    let blake3 = format!("blake3:{}", "c".repeat(64));
+    for (value, tag, digest) in [
+        ("app:_dev".to_string(), "_dev".to_string(), String::new()),
+        (format!("app@{sha256}"), String::new(), sha256.clone()),
+        (format!("app@{sha512}"), String::new(), sha512.clone()),
+        (format!("app:v1@{blake3}"), "v1".to_string(), blake3.clone()),
+        (
+            format!("ghcr.io/org/app:1.2@{sha512}"),
+            "1.2".to_string(),
+            sha512.clone(),
+        ),
+    ] {
+        assert_eq!(
+            run_color_part(&tax, label, "tag", &value),
+            tag,
+            "tag of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "digest", &value),
+            digest,
+            "digest of {value:?}"
+        );
+    }
+}
