@@ -1480,13 +1480,15 @@ datetime.offset.iana:
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Z][a-zA-Z]+/[A-Za-z_]+(/[A-Za-z_]+)?$"
+    pattern: "^(?:Etc/GMT(?:\\+(?:[0-9]|1[0-2])|-(?:[0-9]|1[0-4]))|[A-Z][a-zA-Z]+/[A-Za-z_][A-Za-z_.-]*(?:/[A-Za-z_][A-Za-z_.-]*)?)$"
   tier: [VARCHAR, offset]
   aliases: [timezone]
   samples:
     - "America/New_York"
     - "Europe/London"
     - "Asia/Tokyo"
+    - "America/Port-au-Prince"
+    - "Etc/GMT+4"
   icon: world
   canonical: "https://www.iana.org/time-zones"
   references:
@@ -1496,8 +1498,11 @@ datetime.offset.iana:
     v1 name: datetime.timezone. Validation is pattern-only: the tz database
     has 500+ zones and ships several releases a year, so any hardcoded enum
     goes stale and silently rejects newly-added zones. The Region/City pattern
-    is the stable structural invariant. Add an enum only if generated from
-    tzdata at build time, never hand-maintained.
+    is the stable structural invariant. Name components may hold letters,
+    '.', '-' and '_' (America/Port-au-Prince, America/Argentina/Buenos_Aires).
+    The one place digits appear is the fixed-offset zones of the etcetera
+    file: Etc/GMT+N for N 0 to 12 and Etc/GMT-N for N 0 to 14. Add an enum
+    only if generated from tzdata at build time, never hand-maintained.
 
 datetime.offset.timezone_abbreviation:
   title: Timezone Abbreviation

@@ -2521,3 +2521,56 @@ fn chinese_ymd_rejects_undefined_forms() {
         ],
     );
 }
+
+const IANA_LABEL: &str = "datetime.offset.iana";
+
+/// The tz database names locations with hyphens (`Port-au-Prince`), and
+/// `etcetera` defines `Etc/GMT+N` for N 0 to 12 and `Etc/GMT-N` for N 0 to 14.
+#[test]
+fn iana_accepts_source_forms() {
+    assert_pattern_boundary(
+        IANA_LABEL,
+        &[
+            "America/Port-au-Prince",
+            "Etc/GMT+4",
+            "Etc/GMT-14",
+            "America/Argentina/Buenos_Aires",
+            "America/New_York",
+            "America/Blanc-Sablon",
+            "Asia/Ust-Nera",
+            "Etc/GMT+0",
+            "Etc/GMT+12",
+            "Etc/GMT-0",
+            "Etc/GMT-1",
+            "Etc/GMT+1",
+            "America/North_Dakota/New_Salem",
+            "Etc/UTC",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn iana_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        IANA_LABEL,
+        &[],
+        &[
+            "Etc/GMT+13",
+            "Etc/GMT-15",
+            "Etc/GMT+14",
+            "Etc/GMT+",
+            "Etc/GMT+04",
+            "America/New York",
+            "GMT+4",
+            "America",
+            "America/",
+            "America/-",
+            "America/..",
+            "america/New_York",
+            "Europe/London/Soho/Street",
+            "America/New_York/",
+            "Etc/GMT+4x",
+        ],
+    );
+}

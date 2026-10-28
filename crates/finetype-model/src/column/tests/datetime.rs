@@ -1432,6 +1432,13 @@ fn iana_zone_shape_takes_tz_areas_only() {
         "America/Argentina/Buenos_Aires",
         "Etc/UTC",
         "Antarctica/DumontDUrville",
+        "America/Port-au-Prince",
+        "America/Blanc-Sablon",
+        "Asia/Ust-Nera",
+        "Etc/GMT+4",
+        "Etc/GMT+12",
+        "Etc/GMT-14",
+        "Etc/GMT-0",
     ] {
         assert!(is_iana_zone_name(ok), "{ok} is a zone name");
     }
@@ -1442,7 +1449,14 @@ fn iana_zone_shape_takes_tz_areas_only() {
         "America/new_york",
         "America/New York",
         "Europe/London/Soho/Street",
-        "Etc/GMT+5",
+        "Etc/GMT+13",
+        "Etc/GMT-15",
+        "Etc/GMT+04",
+        "GMT+4",
+        "Sales/North-East",
+        "Sales/North.South",
+        "America/Port-au-Prince/",
+        "Asia/-Tokyo",
     ] {
         assert!(!is_iana_zone_name(bad), "{bad} is not a zone name");
     }

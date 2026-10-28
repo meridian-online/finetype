@@ -1586,3 +1586,96 @@ fn chinese_ymd_constant_column_keeps_type() {
         "2024\u{5E74}01\u{6708}11\u{65E5}",
     );
 }
+
+/// A column of one repeated hyphenated zone (which the old rule rejected) keeps
+/// its type.
+#[test]
+fn iana_constant_column_keeps_type() {
+    assert_constant_column_kept("datetime.offset.iana", "America/Port-au-Prince");
+}
+
+/// So does one repeated fixed-offset zone.
+#[test]
+fn iana_etc_gmt_constant_column_keeps_type() {
+    assert_constant_column_kept("datetime.offset.iana", "Etc/GMT+4");
+}
+
+/// Hyphens and dots in a location widen the shape, so columns of other
+/// `Word/Word` paths and `A-B/C_D` code names must not be recovered as `iana`,
+/// from any label the model might give them.
+#[test]
+fn iana_does_not_recover_path_or_code_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let columns: [Vec<String>; 4] = [
+        [
+            "Sales/North",
+            "Sales/South-East",
+            "Marketing/Emea",
+            "Ops/Core.Net",
+        ]
+        .iter()
+        .cycle()
+        .take(40)
+        .map(|s| s.to_string())
+        .collect(),
+        ["AB-12/C_D", "XY-9/P_Q", "Part-A/Code_B", "Lot-7/Bin_3"]
+            .iter()
+            .cycle()
+            .take(40)
+            .map(|s| s.to_string())
+            .collect(),
+        [
+            "Users/hugh-cameron",
+            "Users/jane.doe",
+            "Home/john-smith",
+            "Home/ann_lee",
+        ]
+        .iter()
+        .cycle()
+        .take(40)
+        .map(|s| s.to_string())
+        .collect(),
+        ["GMT+4", "GMT-5", "UTC+1", "GMT+10"]
+            .iter()
+            .cycle()
+            .take(40)
+            .map(|s| s.to_string())
+            .collect(),
+    ];
+    for values in &columns {
+        for label in [
+            "representation.text.word",
+            "representation.text.plain_text",
+            "representation.text.entity_name",
+            "unknown",
+        ] {
+            let r = cc.compose_from_sense("name", values, label, 1.0).unwrap();
+            assert_ne!(r.label, "datetime.offset.iana", "from {label}: {values:?}");
+        }
+    }
+}
+
+/// A column of real zone names the model read as a place is still recovered.
+#[test]
+fn iana_recovers_hyphenated_and_etc_zones() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let values: Vec<String> = [
+        "America/Port-au-Prince",
+        "Etc/GMT+4",
+        "Etc/GMT-14",
+        "America/Argentina/Buenos_Aires",
+    ]
+    .iter()
+    .cycle()
+    .take(40)
+    .map(|s| s.to_string())
+    .collect();
+    let r = cc
+        .compose_from_sense("name", &values, "geography.location.continent", 0.9)
+        .unwrap();
+    assert_eq!(r.label, "datetime.offset.iana");
+}
