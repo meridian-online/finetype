@@ -957,8 +957,10 @@ fn xml_rejects_forms_the_source_forbids() {
         XML_LABEL,
         &[],
         &[
-            "<!doctype html><a/>",
-            "<![CDATA[x]]>",
+            "<!doctype note><a>1</a>",
+            "<![CDATA[x]]><a>1</a>",
+            // U+10000 in a name: rejected by the ECMA-262 ruling (no supplementary-plane name characters).
+            "<a\u{10000}>1</a\u{10000}>",
             "<a>x</a b>",
             "<a>x</ a>",
             "<>x</>",
