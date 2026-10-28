@@ -1502,3 +1502,16 @@ fn pg_short_offset_constant_column_keeps_type() {
         "2022-01-06 18:00:00+03",
     );
 }
+
+/// A column of one repeated ISO 8601 duration with a decimal comma (which the old
+/// rule rejected) keeps its type.
+#[test]
+fn iso_duration_constant_column_keeps_type() {
+    assert_constant_column_kept("datetime.duration.iso_8601", "P0,5Y");
+}
+
+/// So does one repeated alternative-format duration.
+#[test]
+fn iso_duration_alternative_format_constant_column_keeps_type() {
+    assert_constant_column_kept("datetime.duration.iso_8601", "P0003-06-04T12:30:05");
+}

@@ -381,21 +381,43 @@ fn shape_holds(values: &[String], is_shape: impl Fn(&str) -> bool) -> bool {
 }
 
 /// An ISO 8601 duration under the strict grammar
-/// `[-]P[nY][nM][nW|nD][T[nH][nM][n[.n]S]]`: at least one component, and a `T`
-/// only when a time component follows it. Strictly inside the
-/// `datetime.duration.iso_8601` validator (which also admits a bare trailing `T`).
+/// `[-]P[nY][nM][nW|nD][T[nH][nM][nS]]`, where the smallest component present may
+/// carry a decimal fraction (`PT0,5S`, `P0.5Y`), or the alternative format
+/// `PYYYY-MM-DDThh:mm:ss`. At least one component, and a `T` only when a time
+/// component follows it. Strictly inside the `datetime.duration.iso_8601`
+/// validator (which also admits a bare trailing `T`).
 pub(crate) fn is_iso_8601_duration(v: &str) -> bool {
     use std::sync::OnceLock;
     static RE: OnceLock<regex::Regex> = OnceLock::new();
+    static ALT: OnceLock<regex::Regex> = OnceLock::new();
     let re = RE.get_or_init(|| {
         regex::Regex::new(
-            r"^-?P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)[WD])?(T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$",
+            r"^-?P(?:(\d+(?:[.,]\d+)?)Y)?(?:(\d+(?:[.,]\d+)?)M)?(?:(\d+(?:[.,]\d+)?)[WD])?(T(?:(\d+(?:[.,]\d+)?)H)?(?:(\d+(?:[.,]\d+)?)M)?(?:(\d+(?:[.,]\d+)?)S)?)?$",
         )
         .expect("iso 8601 duration regex")
     });
+    let alt = ALT.get_or_init(|| {
+        regex::Regex::new(
+            r"^P\d{4}-(?:0\d|1[0-2])-(?:[0-2]\d|30)T(?:[01]\d|2[0-4]):[0-5]\d:[0-5]\d$",
+        )
+        .expect("iso 8601 alternative duration regex")
+    });
+    if alt.is_match(v) {
+        return true;
+    }
     let Some(c) = re.captures(v) else {
         return false;
     };
+    let present: Vec<&str> = [1, 2, 3, 5, 6, 7]
+        .iter()
+        .filter_map(|&i| c.get(i).map(|m| m.as_str()))
+        .collect();
+    // Only the smallest component present may carry a fraction.
+    if let Some((_, earlier)) = present.split_last() {
+        if earlier.iter().any(|p| p.contains(['.', ','])) {
+            return false;
+        }
+    }
     let has_date = (1..=3).any(|i| c.get(i).is_some());
     let has_time = (5..=7).any(|i| c.get(i).is_some());
     // A `T` with no time component after it is not a duration.

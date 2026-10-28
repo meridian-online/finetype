@@ -55,7 +55,7 @@ datetime.date.weekday_full_month	false	^[A-Za-z]+[, ]+(?:[A-Za-z]+ \d{1,2},? \d{
 datetime.date.year_month	false	^\d{4}-\d{2}$	true
 datetime.date.ymd_dot	false	^\d{4}\.\d{2}\.\d{2}$	true
 datetime.date.ymd_slash	false	^\d{4}/\d{2}/\d{2}$	true
-datetime.duration.iso_8601	false	^-?P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)[DW])?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$	true
+datetime.duration.iso_8601	false	^(?:-?P(?=\d|T\d)(?!.*[.,]\d+[A-Z]T?\d)(?:(\d+(?:[.,]\d+)?)Y)?(?:(\d+(?:[.,]\d+)?)M)?(?:(\d+(?:[.,]\d+)?)[DW])?(?:T(?:(\d+(?:[.,]\d+)?)H)?(?:(\d+(?:[.,]\d+)?)M)?(?:(\d+(?:[.,]\d+)?)S)?)?|P\d{4}-(?:0\d|1[0-2])-(?:[0-2]\d|30)T(?:[01]\d|2[0-4]):[0-5]\d:[0-5]\d)$	true
 datetime.epoch.unix_microseconds	false	^\d{16}$	false
 datetime.epoch.unix_milliseconds	false	^\d{13}$	false
 datetime.epoch.unix_seconds	false	^\d{10}$	false

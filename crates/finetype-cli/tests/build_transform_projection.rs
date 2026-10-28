@@ -982,3 +982,23 @@ fn pg_short_offset_transform_parses_with_and_without_a_fraction() {
         "NULL"
     );
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn iso_duration_transform_casts_fractions_and_the_alternative_format() {
+    let tax = test_taxonomy();
+    let label = "datetime.duration.iso_8601";
+    for (value, expect) in [
+        ("PT30M", "00:30:00"),
+        ("P2W", "14 days"),
+        ("P0,5Y", "6 months"),
+        ("P0.5Y", "6 months"),
+        ("PT0.5S", "00:00:00.5"),
+        ("PT1H30,5M", "01:30:30"),
+        ("P1DT1.5H", "1 day 01:30:00"),
+        ("P1Y2,5M", "1 year 2 months 15 days"),
+        ("P0003-06-04T12:30:05", "3 years 6 months 4 days 12:30:05"),
+    ] {
+        assert_eq!(run_transform(&tax, label, value, ""), expect, "{value:?}");
+    }
+}

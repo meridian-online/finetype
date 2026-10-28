@@ -1399,11 +1399,25 @@ fn iso_8601_duration_shape_is_the_strict_grammar() {
         "PT0.5S",
         "-P3D",
         "P1M",
+        "P0,5Y",
+        "PT1H30,5M",
+        "P0003-06-04T12:30:05",
     ] {
         assert!(is_iso_8601_duration(ok), "{ok} is a duration");
     }
     for bad in [
-        "P", "PT", "P1DT", "P1", "PD1TH0M0", "PT30", "P1H", "XPT30M", "pt30m",
+        "P",
+        "PT",
+        "P1DT",
+        "P1",
+        "PD1TH0M0",
+        "PT30",
+        "P1H",
+        "XPT30M",
+        "pt30m",
+        "P0.5Y1M",
+        "PT1.5H30M",
+        "P0003-13-04T12:30:05",
     ] {
         assert!(!is_iso_8601_duration(bad), "{bad} is not a duration");
     }

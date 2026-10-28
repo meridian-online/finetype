@@ -1569,7 +1569,9 @@ datetime.duration.iso_8601:
   description: >
     Duration in ISO 8601 format (PnYnMnDTnHnMnS or PnW for weeks). Used in
     iCalendar, XML Schema, YouTube API, Google Calendar, and many APIs.
-    Covers both compact (PT30M) and verbose (P1Y2M3DT4H5M6S) forms.
+    Covers both compact (PT30M) and verbose (P1Y2M3DT4H5M6S) forms, a decimal
+    fraction (full stop or comma) on the smallest component (PT0,5S), and the
+    alternative format PYYYY-MM-DDThh:mm:ss.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: INTERVAL
@@ -1577,20 +1579,25 @@ datetime.duration.iso_8601:
     type: duration
   format_string: null
   transform: >
-    CAST(
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)Y', 1), '') || ' years ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, 'P[^T]*?(\d+)M', 1), '') || ' months ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)W', 1), '') || ' weeks ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)D', 1), '') || ' days ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)H', 1), '') || ' hours ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, 'T.*?(\d+)M', 1), '') || ' minutes ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+(?:\.\d+)?)S', 1), '') || ' seconds', '0 seconds')
-    AS INTERVAL)
+    CAST(CASE WHEN REGEXP_MATCHES({col}, '^P\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$') THEN
+      REGEXP_EXTRACT({col}, '^P(\d{4})-', 1) || ' years ' ||
+      REGEXP_EXTRACT({col}, '^P\d{4}-(\d{2})-', 1) || ' months ' ||
+      REGEXP_EXTRACT({col}, '^P\d{4}-\d{2}-(\d{2})T', 1) || ' days ' ||
+      REGEXP_EXTRACT({col}, 'T(\d{2}:\d{2}:\d{2})$', 1)
+    ELSE
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '([\d.,]+)Y', 1), ',', '.'), '') || ' years ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '^-?P(?:[\d.,]+Y)?([\d.,]+)M', 1), ',', '.'), '') || ' months ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '([\d.,]+)W', 1), ',', '.'), '') || ' weeks ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '([\d.,]+)D', 1), ',', '.'), '') || ' days ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '([\d.,]+)H', 1), ',', '.'), '') || ' hours ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, 'T(?:[\d.,]+H)?([\d.,]+)M', 1), ',', '.'), '') || ' minutes ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '([\d.,]+)S', 1), ',', '.'), '') || ' seconds', '0 seconds')
+    END AS INTERVAL)
   transform_ext: null
   decompose: null
   validation:
     type: string
-    pattern: "^-?P(?=\\d|T\\d)(?:(\\d+)Y)?(?:(\\d+)M)?(?:(\\d+)[DW])?(?:T(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+(?:\\.\\d+)?)S)?)?$"
+    pattern: "^(?:-?P(?=\\d|T\\d)(?!.*[.,]\\d+[A-Z]T?\\d)(?:(\\d+(?:[.,]\\d+)?)Y)?(?:(\\d+(?:[.,]\\d+)?)M)?(?:(\\d+(?:[.,]\\d+)?)[DW])?(?:T(?:(\\d+(?:[.,]\\d+)?)H)?(?:(\\d+(?:[.,]\\d+)?)M)?(?:(\\d+(?:[.,]\\d+)?)S)?)?|P\\d{4}-(?:0\\d|1[0-2])-(?:[0-2]\\d|30)T(?:[01]\\d|2[0-4]):[0-5]\\d:[0-5]\\d)$"
   tier: [INTERVAL, duration]
   aliases: [duration, iso_8601_verbose]
   samples:
@@ -1600,6 +1607,10 @@ datetime.duration.iso_8601:
     - "P1Y6M"
     - "P2W"
     - "P1Y2M3DT4H5M6S"
+    - "PT0.5S"
+    - "PT1H30,5M"
+    - "P0,5Y"
+    - "P0003-06-04T12:30:05"
   icon: hourglass
   canonical: "https://www.iso.org/standard/70907.html"
   references:
@@ -1610,6 +1621,13 @@ datetime.duration.iso_8601:
     duration spec including weeks (PnW), negative durations (-P...), and
     fractional seconds (PT1.5S). Alias iso_8601_verbose added — no separate
     type needed since same regex covers both compact and verbose forms.
+    ISO 8601-1 allows a decimal fraction (comma preferred, full stop accepted)
+    on the smallest component only, so P0.5Y1M is rejected. The alternative
+    format PYYYY-MM-DDThh:mm:ss (months up to 12, days up to 30, hours up to 24)
+    is accepted and the transform reads it as years, months, days and a time
+    of day. A negative duration (-P...) is accepted but the transform does
+    not carry the sign. A fractional year or month converts at DuckDB's
+    interval rates (a month is 30 days); a W component converts to 7 days each.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: component

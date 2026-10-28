@@ -2317,3 +2317,55 @@ fn pg_short_offset_rejects_undefined_forms() {
         ],
     );
 }
+
+const ISO_DURATION_LABEL: &str = "datetime.duration.iso_8601";
+
+/// ISO 8601-1 section 5.5.2.3: the smallest component may carry a decimal
+/// fraction, with a comma (preferred) or a full stop; section 5.5.2.4 gives the
+/// alternative format `PYYYY-MM-DDThh:mm:ss`.
+#[test]
+fn iso_duration_accepts_source_forms() {
+    assert_pattern_boundary(
+        ISO_DURATION_LABEL,
+        &[
+            "P0,5Y",
+            "PT0.5S",
+            "PT1H30,5M",
+            "P0003-06-04T12:30:05",
+            "P2W",
+            "P0.5Y",
+            "P1Y2,5M",
+            "P1DT1.5H",
+            "-P1,5D",
+            "PT30M",
+            "P1Y2M3DT4H5M6.5S",
+            "P0001-12-30T24:59:59",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn iso_duration_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        ISO_DURATION_LABEL,
+        &[],
+        &[
+            "P0.5Y1M",
+            "P1,5Y2M",
+            "PT1.5H30M",
+            "PT1.5H2.5M",
+            "P0.5YT1H",
+            "P",
+            "PT",
+            "P.5Y",
+            "P1.Y",
+            "PT0,S",
+            "P0003-13-04T12:30:05",
+            "P0003-06-31T12:30:05",
+            "P0003-06-04T12:60:05",
+            "P0003-06-04T12:30",
+            "P0003-06-04",
+        ],
+    );
+}
