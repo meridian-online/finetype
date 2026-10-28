@@ -270,21 +270,44 @@ mod state_code_copy {
     }
 }
 
-/// What `wkt` counts for discrimination: a geometry keyword in any letter case,
-/// an optional `Z`/`M`/`ZM`, then `EMPTY` or a `(` followed, somewhere inside,
-/// by a coordinate pair (a number, white space, a number).
-const WKT_DETECTOR_SHAPE: &str = "(?is)^(?:point|linestring|polygon|multipoint|multilinestring|multipolygon|geometrycollection|triangle|polyhedralsurface|tin)\\s*(?:zm|z|m)?\\s*(?:empty|\\(.*?[-+]?\\d+(?:\\.\\d+)?\\s+[-+]?[.\\d])";
+/// The published `geography.format.wkt` rule. A copy, because the library cannot
+/// read `labels/` when built from the crates.io package; the test
+/// `wkt_rule_copy_matches_the_taxonomy` keeps it equal to the taxonomy's.
+const WKT_RULE: &str = "^(?:[Pp][Oo][Ii][Nn][Tt]|[Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii][Nn][Gg]|[Pp][Oo][Ll][Yy][Gg][Oo][Nn]|[Mm][Uu][Ll][Tt][Ii][Pp][Oo][Ii][Nn][Tt]|[Mm][Uu][Ll][Tt][Ii][Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii][Nn][Gg]|[Mm][Uu][Ll][Tt][Ii][Pp][Oo][Ll][Yy][Gg][Oo][Nn]|[Gg][Ee][Oo][Mm][Ee][Tt][Rr][Yy][Cc][Oo][Ll][Ll][Ee][Cc][Tt][Ii][Oo][Nn]|[Tt][Rr][Ii][Aa][Nn][Gg][Ll][Ee]|[Pp][Oo][Ll][Yy][Hh][Ee][Dd][Rr][Aa][Ll][Ss][Uu][Rr][Ff][Aa][Cc][Ee]|[Tt][Ii][Nn])\\s*(?:[Zz][Mm]|[Zz]|[Mm])?\\s*(?:\\(|[Ee][Mm][Pp][Tt][Yy])";
 
-/// `wkt`: a keyword in any case followed by `EMPTY` or a body holding at least one
-/// coordinate pair. The published rule stops at the opening parenthesis, so
-/// `Triangle (1999)` and `Point (of sale)` conform; with no coordinate pair they
-/// do not count for discrimination or for a ceded recovery. Every value counted
-/// here also passes the published rule.
+/// What `wkt` counts beyond the published rule (which fixes the keyword, ASCII
+/// only): `EMPTY` straight after the keyword, or a `(` followed, before the first
+/// `)`, by a coordinate pair (a number, white space, a number) or `EMPTY`. The
+/// case-insensitive part is ASCII-only (`(?i-u:...)`).
+const WKT_BODY: &str = "(?s)^(?:[A-Za-z]+\\s*[ZMzm]{0,2}\\s*(?i-u:empty)|[^(]*\\([^)]*?(?:[-+]?[0-9]+(?:\\.[0-9]+)?\\s+[-+]?[.0-9]|(?i-u:\\bempty\\b)))";
+
+/// `wkt`: the published rule and a body that is `EMPTY` or holds a coordinate pair
+/// or `EMPTY` inside the parentheses. The published rule stops at the opening
+/// parenthesis, so `Triangle (1999)` and `Point (of sale)` conform; with no
+/// coordinate pair they do not count for discrimination or for a ceded recovery.
 fn is_wkt_discrimination_shape(value: &str) -> bool {
-    static SHAPE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
-    SHAPE
-        .get_or_init(|| regex::Regex::new(WKT_DETECTOR_SHAPE).expect("wkt detector shape"))
-        .is_match(value)
+    static RULES: std::sync::OnceLock<(regex::Regex, regex::Regex)> = std::sync::OnceLock::new();
+    let (rule, body) = RULES.get_or_init(|| {
+        (
+            regex::Regex::new(WKT_RULE).expect("wkt published rule"),
+            regex::Regex::new(WKT_BODY).expect("wkt detector body"),
+        )
+    });
+    rule.is_match(value) && body.is_match(value)
+}
+
+#[cfg(test)]
+mod wkt_rule_copy {
+    #[test]
+    fn wkt_rule_copy_matches_the_taxonomy() {
+        let doc: serde_yaml::Value =
+            serde_yaml::from_str(include_str!("../../../labels/definitions_geography.yaml"))
+                .expect("parse geography definitions");
+        let published = doc["geography.format.wkt"]["validation"]["pattern"]
+            .as_str()
+            .expect("wkt pattern");
+        assert_eq!(super::WKT_RULE, published);
+    }
 }
 
 /// `tsid`: the published rule (13 Crockford base32 characters, first character

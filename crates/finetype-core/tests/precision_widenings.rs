@@ -1231,15 +1231,26 @@ fn wkt_detector_needs_a_coordinate_pair_or_empty() {
         "TIN Z (((0 0 0, 0 1 0, 1 0 0, 0 0 0)))",
         "TRIANGLE ((0 0, 0 1, 1 0, 0 0))",
         "Polygon empty",
+        "GEOMETRYCOLLECTION (POINT (1 2))",
+        "GEOMETRYCOLLECTION (POINT EMPTY)",
     ] {
         assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
     }
+    // The long s (U+017F) folds to `s` in a Unicode case-insensitive match; the
+    // published rule rejects it, so the detector must too.
+    assert!(!rule.is_valid("LINE\u{17f}TRING (1 2)"));
+    assert!(!passes_detector_or_rule(
+        detector,
+        &rule,
+        "LINE\u{17f}TRING (1 2)"
+    ));
     for bad in [
         "Triangle (equilateral)",
         "Triangle (1999)",
         "Point (of sale)",
         "Tin (2 cans)",
         "Polygon (regular)",
+        "Tin (small) 250 2pk",
     ] {
         assert!(rule.is_valid(bad), "{bad:?} conforms");
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
