@@ -1277,36 +1277,40 @@ geography.coordinate.longitude:
 geography.coordinate.coordinates:
   title: "Coordinate Pair (Lat, Lon)"
   description: >
-    Latitude and longitude as a pair, formatted as "lat,lon" or "lat lon".
-    May include degree/minute/second notation or decimal degrees.
-    Transforms to POINT geometry (requires spatial extension).
+    Latitude and longitude as a pair of decimal degrees, formatted as
+    "lat,lon", "lat, lon" or "lat lon". Transforms to POINT geometry
+    (requires spatial extension).
   designation: universal
   locales: [UNIVERSAL]
   broad_type: POINT
   frictionless:
-    type: geopoint
+    type: string
   format_string: null
-  transform: "STRUCT_PACK(lat := CAST(REGEXP_EXTRACT({col}, '^([^, ]+)', 1) AS DOUBLE), lon := CAST(REGEXP_EXTRACT({col}, '[, ]([^, ]+)$', 1) AS DOUBLE))"
-  transform_ext: "ST_Point(CAST(SPLIT_PART({col}, ',', 1) AS DOUBLE), CAST(SPLIT_PART({col}, ',', 2) AS DOUBLE))"
+  transform: "STRUCT_PACK(lat := CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(?:\\.[0-9]+)?)', 1) AS DOUBLE), lon := CAST(REGEXP_EXTRACT({col}, '(-?[0-9]+(?:\\.[0-9]+)?)$', 1) AS DOUBLE))"
+  transform_ext: "ST_Point(CAST(REGEXP_EXTRACT({col}, '(-?[0-9]+(?:\\.[0-9]+)?)$', 1) AS DOUBLE), CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(?:\\.[0-9]+)?)', 1) AS DOUBLE))"
   decompose:
-    latitude: "CAST(REGEXP_EXTRACT({col}, '^([^, ]+)', 1) AS DOUBLE)"
-    longitude: "CAST(REGEXP_EXTRACT({col}, '[, ]([^, ]+)$', 1) AS DOUBLE)"
+    latitude: "CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(?:\\.[0-9]+)?)', 1) AS DOUBLE)"
+    longitude: "CAST(REGEXP_EXTRACT({col}, '(-?[0-9]+(?:\\.[0-9]+)?)$', 1) AS DOUBLE)"
   validation:
     type: string
-    pattern: "^-?[0-9]+(\\.[0-9]+)?[, ]-?[0-9]+(\\.[0-9]+)?$"
+    pattern: "^-?[0-9]+(\\.[0-9]+)?(?:\\s*,\\s*|\\s+)-?[0-9]+(\\.[0-9]+)?$"
   tier: [POINT, coordinate]
   aliases: [lat_lon, location]
   samples:
     - "40.7128,-74.0060"
     - "51.5074,-0.1278"
     - "35.6762 139.6917"
+    - "48.8761373390584, 2.3680844979417"
   icon: current-location
   canonical: "https://www.iso.org/standard/75147.html"
   references: null
   notes: >
     v1 migration: Was address.coordinates. Spatial extension required for
     POINT type (DuckDB spatial). Decompose extracts lat and lon separately.
-    Format: "lat,lon" or "lat lon".
+    Format: "lat,lon", "lat, lon" or "lat lon" (decimal degrees; degree/minute/
+    second notation is geography.coordinate.dms). The latitude comes first;
+    transform_ext puts the longitude first, as ST_Point(x, y) takes it. Frictionless
+    has no type for a comma-separated pair, so it maps to string.
 
 geography.coordinate.geohash:
   title: "Geohash"

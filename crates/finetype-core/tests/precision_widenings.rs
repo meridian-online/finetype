@@ -1457,3 +1457,39 @@ fn geohash_detector_keeps_short_tokens_out() {
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
     }
 }
+
+const COORDINATES_LABEL: &str = "geography.coordinate.coordinates";
+
+/// DuckDB spatial and Frictionless Table Schema: a latitude and a longitude
+/// separated by a comma (with optional spaces) or by whitespace.
+#[test]
+fn coordinates_accepts_source_forms() {
+    assert_pattern_boundary(
+        COORDINATES_LABEL,
+        &[
+            "48.8761373390584, 2.3680844979417",
+            "40.7128,-74.0060",
+            "35.6762 139.6917",
+            "40.7128 ,-74.0060",
+            "40.7128 , -74.0060",
+            "35.6762  139.6917",
+            "35.6762\t139.6917",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn coordinates_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        COORDINATES_LABEL,
+        &[],
+        &[
+            "40.7128,,-74.0060",
+            "N40 44.0 W73 59.0",
+            "40.7128",
+            "40.7128,",
+            "40.7128;-74.0060",
+        ],
+    );
+}

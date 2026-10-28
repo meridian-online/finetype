@@ -797,3 +797,13 @@ fn geohash_short_column_is_demoted() {
         Some("representation.text.word")
     );
 }
+
+/// A column of one repeated comma-and-space pair, which the old rule rejected,
+/// keeps its type (coordinates has no detector, so conforming is counting).
+#[test]
+fn coordinates_constant_column_keeps_type() {
+    assert_constant_column_kept(
+        "geography.coordinate.coordinates",
+        "48.8761373390584, 2.3680844979417",
+    );
+}

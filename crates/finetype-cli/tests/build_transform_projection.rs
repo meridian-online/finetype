@@ -502,3 +502,63 @@ fn blood_type_decompose_normalises_the_minus_sign() {
         assert_eq!(run("rh_factor", value), rh, "rh of {value:?}");
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn coordinates_transform_and_parts_read_every_accepted_form() {
+    // Runs the published transform and decompose parts through the external `duckdb` CLI.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let label = "geography.coordinate.coordinates";
+    let info = tax.ddl_info(label).expect("coordinates is a known label");
+    let transform = info.transform.clone().expect("coordinates has a transform");
+    let decompose = info
+        .decompose
+        .clone()
+        .expect("coordinates has decompose parts");
+    let cases: &[(&str, f64, f64)] = &[
+        ("48.8761, 2.3681", 48.8761, 2.3681),
+        (
+            "48.8761373390584, 2.3680844979417",
+            48.8761373390584,
+            2.3680844979417,
+        ),
+        ("40.7128,-74.0060", 40.7128, -74.006),
+        ("35.6762 139.6917", 35.6762, 139.6917),
+        ("35.6762  139.6917", 35.6762, 139.6917),
+        ("35.6762\t139.6917", 35.6762, 139.6917),
+        ("-33.8688 , 151.2093", -33.8688, 151.2093),
+        ("5,10", 5.0, 10.0),
+    ];
+    let run = |sql: &str, what: &str| -> String {
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(
+            out.status.success(),
+            "duckdb failed on {what}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    for (value, lat, lon) in cases {
+        let quoted = format!("'{}'", value);
+        // The transform returns a struct; read each field as a number.
+        for (field, expected) in [("lat", lat), ("lon", lon)] {
+            let sql = format!("SELECT ({}).{field}", transform.replace("{col}", &quoted));
+            let got: f64 = run(&sql, &format!("transform {value:?}"))
+                .parse()
+                .unwrap_or_else(|_| panic!("non-numeric {field} for {value:?}"));
+            assert_eq!(got, *expected, "transform {field} of {value:?}");
+        }
+        for (part, expected) in [("latitude", lat), ("longitude", lon)] {
+            let expr = decompose[part].as_str().expect("decompose part");
+            let sql = format!("SELECT {}", expr.replace("{col}", &quoted));
+            let got: f64 = run(&sql, &format!("{part} of {value:?}"))
+                .parse()
+                .unwrap_or_else(|_| panic!("non-numeric {part} for {value:?}"));
+            assert_eq!(got, *expected, "{part} of {value:?}");
+        }
+    }
+}
