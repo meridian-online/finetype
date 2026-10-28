@@ -1155,8 +1155,10 @@ geography.format.wkt:
 geography.index.h3:
   title: "H3 Hex Index"
   description: >
-    Uber H3 hierarchical hexagonal spatial index. A 15-character lowercase
-    hexadecimal string encoding resolution (0-15) and cell position.
+    Uber H3 hierarchical hexagonal spatial index. A 15-character hexadecimal
+    string encoding resolution (0-15) and cell position; the canonical form is
+    lowercase and upper case is accepted. The 15-character form is a cell
+    index (mode 1); directed-edge and vertex indexes are not this type.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -1168,7 +1170,12 @@ geography.index.h3:
   decompose: null
   validation:
     type: string
-    pattern: "^[0-9a-f]{15}$"
+    pattern: "^[0-9a-fA-F]{15}$"
+  validation_notes:
+    canonical:
+      kind: non_canonical
+      name: lowercase
+      pattern: "^[0-9a-f]{15}$"
   tier: [VARCHAR, index]
   aliases: [h3_index, h3_cell]
   samples:

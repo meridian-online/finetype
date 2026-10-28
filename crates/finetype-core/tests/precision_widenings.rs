@@ -1167,3 +1167,17 @@ fn state_code_detector_keeps_three_letter_codes_out() {
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
     }
 }
+
+const H3_LABEL: &str = "geography.index.h3";
+
+/// H3 docs and Snowflake output: a cell index is 15 hexadecimal digits, and
+/// Snowflake writes it in upper case.
+#[test]
+fn h3_accepts_source_forms() {
+    assert_pattern_boundary(H3_LABEL, &["881F1D4887FFFFF", "8928308280fffff"], &[]);
+}
+
+#[test]
+fn h3_rejects_undefined_forms() {
+    assert_pattern_boundary(H3_LABEL, &[], &["8928308280ffff", "8928308280fffffg"]);
+}

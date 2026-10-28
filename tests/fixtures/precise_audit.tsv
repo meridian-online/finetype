@@ -142,7 +142,7 @@ geography.coordinate.longitude	false		false
 geography.coordinate.mgrs	false	^\d{1,2}[C-X][A-HJ-NP-Z]{2}\d{2,10}$	false
 geography.coordinate.plus_code	false	^[23456789CFGHJMPQRVWX]{8}\+[23456789CFGHJMPQRVWX]{2,}$	true
 geography.format.wkt	false	^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\s*(Z|M|ZM)?\s*(\(|EMPTY)	false
-geography.index.h3	false	^[0-9a-f]{15}$	false
+geography.index.h3	false	^[0-9a-fA-F]{15}$	false
 geography.location.city	false		false
 geography.location.continent	true		true
 geography.location.country	false		false

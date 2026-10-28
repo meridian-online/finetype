@@ -629,3 +629,10 @@ fn xml_does_not_recover_html_fragment_column() {
 fn state_code_constant_column_keeps_type() {
     assert_constant_column_kept("geography.location.state_code", "NSW");
 }
+
+/// A column of one repeated upper-case cell index, which the old lower-case
+/// rule rejected, keeps its type.
+#[test]
+fn h3_constant_column_keeps_type() {
+    assert_constant_column_kept("geography.index.h3", "881F1D4887FFFFF");
+}
