@@ -1036,6 +1036,7 @@ mod tests {
             "identity.government.ein",
             "identity.medical.ndc",
             "identity.person.gender_code",
+            "finance.currency.currency_code",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the
