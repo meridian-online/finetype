@@ -776,3 +776,24 @@ fn mgrs_does_not_recover_product_code_column() {
         );
     }
 }
+
+/// A column of one repeated 20-character geohash, which the old rule rejected,
+/// keeps its type: the detector counts six to twenty characters.
+#[test]
+fn geohash_constant_column_keeps_type() {
+    assert_constant_column_kept("geography.coordinate.geohash", "9q8yyk8yuvrs4kz5qqvz");
+}
+
+/// A column of one repeated short geohash, which the old rule rejected,
+/// conforms but does not count (the detector needs six characters), so it is
+/// demoted by `schema_fail_demotion` as on 0.6.64.
+#[test]
+fn geohash_short_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["dr5r".to_string(); 40];
+    let demoted = schema_fail_demotion(&values, "geography.coordinate.geohash", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
+    );
+}

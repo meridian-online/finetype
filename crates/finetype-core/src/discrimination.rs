@@ -25,6 +25,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "geography.format.wkt" => Some(is_wkt_discrimination_shape),
         "geography.coordinate.plus_code" => Some(is_plus_code_discrimination_shape),
         "geography.coordinate.mgrs" => Some(is_mgrs_discrimination_shape),
+        "geography.coordinate.geohash" => Some(is_geohash_discrimination_shape),
         _ => None,
     }
 }
@@ -304,6 +305,17 @@ fn is_mgrs_discrimination_shape(value: &str) -> bool {
     rule.is_match(value) && old_shape.is_match(value)
 }
 
+/// `geohash`: six to twenty characters of the geohash alphabet. The published
+/// rule follows PostGIS and BigQuery (one to twenty), which would confirm short
+/// lowercase words and codes; the type's first definition required six. Every such
+/// value also passes the published rule.
+fn is_geohash_discrimination_shape(value: &str) -> bool {
+    (6..=20).contains(&value.len())
+        && value.bytes().all(
+            |b| matches!(b, b'0'..=b'9' | b'b'..=b'h' | b'j' | b'k' | b'm' | b'n' | b'p'..=b'z'),
+        )
+}
+
 #[cfg(test)]
 mod coordinate_rule_copies {
     fn published(label: &str) -> String {
@@ -506,6 +518,7 @@ mod tests {
             "geography.format.wkt",
             "geography.coordinate.plus_code",
             "geography.coordinate.mgrs",
+            "geography.coordinate.geohash",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

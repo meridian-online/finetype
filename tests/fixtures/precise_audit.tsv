@@ -136,7 +136,7 @@ geography.address.street_suffix	true		true
 geography.contact.calling_code	false	^\+?[0-9]{1,4}$	true
 geography.coordinate.coordinates	false	^-?[0-9]+(\.[0-9]+)?[, ]-?[0-9]+(\.[0-9]+)?$	true
 geography.coordinate.dms	false	^\d{1,3}°\d{1,2}'\d{1,2}(\.\d+)?"[NS]\s+\d{1,3}°\d{1,2}'\d{1,2}(\.\d+)?"[EW]$	true
-geography.coordinate.geohash	false	^[0-9b-hjkmnp-z]{6,12}$	false
+geography.coordinate.geohash	false	^[0-9b-hjkmnp-z]{1,20}$	false
 geography.coordinate.latitude	false	^-?([0-8]?\d(\.\d+)?|90(\.0+)?)$	true
 geography.coordinate.longitude	false		false
 geography.coordinate.mgrs	false	^(?:\d{1,2}[C-HJ-NP-X]|[ABYZ])[A-HJ-NP-Z]{2}(?:\d\d){1,8}$	false

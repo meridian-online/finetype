@@ -1405,3 +1405,55 @@ fn mgrs_detector_counts_the_first_defined_form() {
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
     }
 }
+
+const GEOHASH_LABEL: &str = "geography.coordinate.geohash";
+
+/// PostGIS ST_GeoHash and BigQuery ST_GEOHASH: one to twenty characters of the
+/// geohash alphabet.
+#[test]
+fn geohash_accepts_source_forms() {
+    assert_pattern_boundary(
+        GEOHASH_LABEL,
+        &["dr5r", "9q8yyk8yuvrs4kz5qqvz", "9", "ezs42e"],
+        &[],
+    );
+}
+
+#[test]
+fn geohash_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        GEOHASH_LABEL,
+        &[],
+        &["9q8yyk8yuvrs4kz5qqvzq", "dr5a", "", "DR5R"],
+    );
+}
+
+/// The detector counts six to twenty characters of the alphabet, so a short
+/// token such as a three-letter word does not count for discrimination.
+#[test]
+fn geohash_detector_keeps_short_tokens_out() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(GEOHASH_LABEL, &tax).expect("geohash rule");
+    let detector = detector_for(GEOHASH_LABEL);
+    assert!(detector.is_some());
+    for ok in [
+        "9q8yyk8yuv",
+        "ezs42e",
+        "dr5ru7c02wnm",
+        "9q8yyk8yuvrs4kz5qqvz",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for short in ["dr5r", "bed", "9", "ezs42"] {
+        assert!(rule.is_valid(short), "{short:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, short),
+            "{short:?}"
+        );
+    }
+    for bad in ["9q8yyk8yuvrs4kz5qqvzq", "dr5a00", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
