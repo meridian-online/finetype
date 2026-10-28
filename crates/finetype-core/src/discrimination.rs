@@ -305,15 +305,36 @@ fn is_mgrs_discrimination_shape(value: &str) -> bool {
     rule.is_match(value) && old_shape.is_match(value)
 }
 
-/// `geohash`: six to twenty characters of the geohash alphabet. The published
-/// rule follows PostGIS and BigQuery (one to twenty), which would confirm short
-/// lowercase words and codes; the type's first definition required six. Every such
-/// value also passes the published rule.
+/// The published `geohash` rule, copied for the same reason as [`PLUS_CODE_RULE`];
+/// `geohash_rule_copy_matches_the_taxonomy` keeps it equal to the taxonomy's.
+const GEOHASH_RULE: &str = r"^[0-9b-hjkmnp-z]{1,20}$";
+
+/// The rule the type was first defined by: six to twelve characters.
+const GEOHASH_OLD_SHAPE: &str = r"^[0-9b-hjkmnp-z]{6,12}$";
+
+fn geohash_regexes() -> Option<&'static (regex::Regex, regex::Regex)> {
+    static RULES: std::sync::OnceLock<Option<(regex::Regex, regex::Regex)>> =
+        std::sync::OnceLock::new();
+    RULES
+        .get_or_init(|| {
+            Some((
+                regex::Regex::new(GEOHASH_RULE).ok()?,
+                regex::Regex::new(GEOHASH_OLD_SHAPE).ok()?,
+            ))
+        })
+        .as_ref()
+}
+
+/// `geohash`: the published rule and the rule the type was first defined by (six
+/// to twelve characters). The published rule follows PostGIS and BigQuery (one to
+/// twenty), which would confirm short lowercase words and 13- to 20-digit
+/// numbers (epoch milliseconds, card numbers); those conform but are not counted
+/// for discrimination.
 fn is_geohash_discrimination_shape(value: &str) -> bool {
-    (6..=20).contains(&value.len())
-        && value.bytes().all(
-            |b| matches!(b, b'0'..=b'9' | b'b'..=b'h' | b'j' | b'k' | b'm' | b'n' | b'p'..=b'z'),
-        )
+    let Some((rule, old_shape)) = geohash_regexes() else {
+        return false;
+    };
+    rule.is_match(value) && old_shape.is_match(value)
 }
 
 #[cfg(test)]
@@ -339,6 +360,14 @@ mod coordinate_rule_copies {
     #[test]
     fn mgrs_rule_copy_matches_the_taxonomy() {
         assert_eq!(super::MGRS_RULE, published("geography.coordinate.mgrs"));
+    }
+
+    #[test]
+    fn geohash_rule_copy_matches_the_taxonomy() {
+        assert_eq!(
+            super::GEOHASH_RULE,
+            published("geography.coordinate.geohash")
+        );
     }
 }
 

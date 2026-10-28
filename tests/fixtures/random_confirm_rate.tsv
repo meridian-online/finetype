@@ -136,7 +136,7 @@ geography.address.street_suffix	0.0001	0.0001	0.0000	0.0000	0.0095	0.0095
 geography.contact.calling_code	0.0022	0.0022	0.1977	0.1977	0.0000	0.0000
 geography.coordinate.coordinates	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 geography.coordinate.dms	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
-geography.coordinate.geohash	0.0123	0.0000	1.0000	0.7519	0.2165	0.1992
+geography.coordinate.geohash	0.0123	0.0000	1.0000	0.3458	0.2165	0.1170
 geography.coordinate.latitude	0.0021	0.0021	0.0910	0.0910	0.0000	0.0000
 geography.coordinate.longitude	0.9999	0.9999	0.1051	0.1051	0.8331	0.8331
 geography.coordinate.mgrs	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000

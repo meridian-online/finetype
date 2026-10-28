@@ -677,9 +677,9 @@ pub(crate) fn schema_fail_demotion(
     let fail_rate = fail_count as f32 / non_empty.len() as f32;
     // Demote only on majority failure (>50%). The instinct for a closed type is a
     // tight bar — a real geohash or SI-unit column "should" validate ~100%. But the
-    // shipped definitions don't: the geohash pattern's v13 min-length-6 deliberately
-    // rejects valid 4-5 char geohashes (~23% of a genuine column — see the geohash
-    // `notes`), and the measurement_unit enum lists only 30 SI units, so real unit
+    // shipped definitions don't: the geohash detector (six to twelve characters)
+    // deliberately does not count valid 1-5 and 13-20 char geohashes (~23% of a
+    // genuine column — see the geohash `notes`), and the measurement_unit enum lists only 30 SI units, so real unit
     // columns fail ~44%. A tighter bar would demote those genuine columns. >50% fires
     // only when the column is overwhelmingly not the type (network codes that are
     // 100% non-units), which is the over-emit this rule targets. Precision Principle.

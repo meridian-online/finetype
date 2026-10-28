@@ -777,16 +777,18 @@ fn mgrs_does_not_recover_product_code_column() {
     }
 }
 
-/// A column of one repeated 20-character geohash, which the old rule rejected,
-/// keeps its type: the detector counts six to twenty characters.
+/// A column of one repeated geohash keeps its type. Every form the old rule
+/// rejected (1 to 5 and 13 to 20 characters) conforms but does not count for
+/// discrimination (the detector keeps the old rule), so this is the first
+/// accepted value, which the old rule also took.
 #[test]
 fn geohash_constant_column_keeps_type() {
-    assert_constant_column_kept("geography.coordinate.geohash", "9q8yyk8yuvrs4kz5qqvz");
+    assert_constant_column_kept("geography.coordinate.geohash", "9q8yyk8yuv");
 }
 
 /// A column of one repeated short geohash, which the old rule rejected,
-/// conforms but does not count (the detector needs six characters), so it is
-/// demoted by `schema_fail_demotion` as on 0.6.64.
+/// conforms but does not count (the detector needs six to twelve characters), so
+/// it is demoted by `schema_fail_demotion` as on 0.6.64.
 #[test]
 fn geohash_short_column_is_demoted() {
     let tax = super::shipped_taxonomy();
@@ -805,5 +807,18 @@ fn coordinates_constant_column_keeps_type() {
     assert_constant_column_kept(
         "geography.coordinate.coordinates",
         "48.8761373390584, 2.3680844979417",
+    );
+}
+
+/// A column of one repeated 20-character geohash conforms but is demoted too,
+/// as on 0.6.64.
+#[test]
+fn geohash_long_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["9q8yyk8yuvrs4kz5qqvz".to_string(); 40];
+    let demoted = schema_fail_demotion(&values, "geography.coordinate.geohash", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
     );
 }

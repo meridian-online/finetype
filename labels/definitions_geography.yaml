@@ -1339,15 +1339,16 @@ geography.coordinate.geohash:
     - "dr5ru7c02wnm"
     - "gbsuv7ztq"
     - "ezs42e"
-    - "9q8yyk8yuvrs4kz5qqvz"
   icon: current-location
   references: null
   notes: >
     Invented by Gustavo Niemeyer. Public-domain algorithm. Each additional
     character divides the cell into 32 sub-cells. The rule accepts 1 to 20
     characters (PostGIS, BigQuery); for discrimination a value counts only at
-    6 to 20 characters, so short lowercase tokens (words, short IDs) are not
-    mistaken for a geohash. Shorter geohashes conform but are not counted.
+    6 to 12 characters, so short lowercase tokens (words, short IDs) and long
+    digit strings (epoch milliseconds, card numbers) are not mistaken for a
+    geohash. Geohashes of 1 to 5 and of 13 to 20 characters conform but are not
+    counted.
 
 geography.coordinate.plus_code:
   title: "Plus Code (Open Location Code)"
