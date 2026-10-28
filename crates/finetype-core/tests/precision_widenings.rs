@@ -1723,3 +1723,50 @@ fn color_rgb_rejects_undefined_forms() {
         ],
     );
 }
+
+const COLOR_HSL_LABEL: &str = "representation.format.color_hsl";
+
+/// CSS Color 4 (MDN): the modern space-separated syntax with optional
+/// `/ alpha`, `deg`, bare-number saturation and lightness, decimals and `none`;
+/// the legacy comma syntax keeps percentages.
+#[test]
+fn color_hsl_accepts_source_forms() {
+    assert_pattern_boundary(
+        COLOR_HSL_LABEL,
+        &[
+            "hsl(120deg 75% 25% / 60%)",
+            "hsl(540 0 0)",
+            "hsl(120.5, 100%, 50%)",
+            "hsl(none 100% 50%)",
+            "hsl(120 none none / none)",
+            "hsla(240, 100%, 50%, 0.5)",
+            "hsla(240, 100%, 50%, 50%)",
+            "hsl(120 75% 25%)",
+            "hsl(120, 100%, 50%)",
+            "hsl( 120 , 100% , 50% )",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn color_hsl_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        COLOR_HSL_LABEL,
+        &[],
+        &[
+            "hsl(120 75%)",
+            "hsl(120, 75% 25%)",
+            "hsl(120, 75, 25)",
+            "hsl(120, none, 50%)",
+            "hsl(120, 75%, 25% / 0.5)",
+            "hsl(120 75% 25%, 0.5)",
+            "hsl(120 75% 25% 0.5)",
+            "hsl(120 75% 25% /)",
+            "hsl(120 75% 25% 60%)",
+            "hsla(120, 50%, 50%, 1.)",
+            "hsl(deg 75% 25%)",
+            "",
+        ],
+    );
+}

@@ -1000,3 +1000,52 @@ fn protein_sequence_does_not_recover_uppercase_words() {
 fn color_rgb_constant_column_keeps_type() {
     assert_constant_column_kept("representation.format.color_rgb", "rgba(0, 0, 255, 0.5)");
 }
+
+/// A column of one repeated modern-syntax `hsl(120deg 75% 25% / 60%)` (the old
+/// rule took only comma-separated percentages) keeps its type.
+#[test]
+fn color_hsl_constant_column_keeps_type() {
+    assert_constant_column_kept(
+        "representation.format.color_hsl",
+        "hsl(120deg 75% 25% / 60%)",
+    );
+}
+
+/// `color_hsl` is a ceded-recovery leaf and now takes the space-separated
+/// syntax, but the rule is anchored by `hsl(` / `hsla(`, so a neighbouring
+/// colour function (rgb, or hsl with a component missing) is not promoted.
+#[test]
+fn color_hsl_does_not_recover_neighbouring_colour_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let columns: [(&str, [&str; 3]); 3] = [
+        (
+            "fill",
+            ["rgb(255 0 0)", "rgb(0 128 0 / 50%)", "rgb(10 20 30)"],
+        ),
+        ("tint", ["hsl(120 75%)", "hsl(240 50%)", "hsl(0 100%)"]),
+        (
+            "shade",
+            ["hwb(120 10% 20%)", "lab(50% 40 59)", "oklch(60% 0.2 30)"],
+        ),
+    ];
+    for (header, codes) in columns {
+        let values: Vec<String> = codes
+            .iter()
+            .cycle()
+            .take(42)
+            .map(|s| s.to_string())
+            .collect();
+        for label in [
+            "representation.text.word",
+            "representation.identifier.alphanumeric_id",
+        ] {
+            let r = cc.compose_from_sense(header, &values, label, 1.0).unwrap();
+            assert_ne!(
+                r.label, "representation.format.color_hsl",
+                "{header} from {label}"
+            );
+        }
+    }
+}

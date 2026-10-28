@@ -674,3 +674,28 @@ fn color_rgb_parts_read_the_modern_forms() {
         }
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn color_hsl_parts_read_the_modern_forms() {
+    let tax = test_taxonomy();
+    let hsl = "representation.format.color_hsl";
+    // A `none` component, which has no number, reads as NULL (the CLI prints it
+    // as the text NULL with -noheader -list).
+    for (value, expect) in [
+        ("hsl(120deg 75% 25% / 60%)", ["120", "75", "25"]),
+        ("hsl(540 0 0)", ["540", "0", "0"]),
+        ("hsl(120.5, 100%, 50%)", ["121", "100", "50"]),
+        ("hsl(none 100% 50%)", ["NULL", "100", "50"]),
+        ("hsl(120 none none / none)", ["120", "NULL", "NULL"]),
+        ("hsla(240, 100%, 50%, 0.5)", ["240", "100", "50"]),
+    ] {
+        for (part, want) in ["hue", "saturation", "lightness"].iter().zip(expect) {
+            assert_eq!(
+                run_color_part(&tax, hsl, part, value),
+                want,
+                "{part} of {value:?}"
+            );
+        }
+    }
+}

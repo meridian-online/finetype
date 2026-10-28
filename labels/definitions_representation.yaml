@@ -417,9 +417,13 @@ representation.format.color_rgb:
 representation.format.color_hsl:
   title: "Color (HSL)"
   description: >
-    Color in HSL (Hue, Saturation, Lightness) or HSLA (with alpha) CSS notation.
-    Hue is 0-360 degrees, saturation and lightness are percentages (0-100%),
-    optional alpha is 0-1 decimal. CSS3/CSS4 standard colour representation.
+    Color in HSL (Hue, Saturation, Lightness) or HSLA (with alpha) CSS notation,
+    in the legacy comma syntax ("hsl(120, 100%, 50%)", "hsla(240, 100%, 50%, 0.5)")
+    or the CSS Color 4 space-separated syntax with an optional slash alpha
+    ("hsl(120deg 75% 25% / 60%)"). Hue is a number or an angle in degrees,
+    saturation and lightness are percentages (numbers are also accepted in the
+    space-separated syntax), alpha is a number or a percentage, and a component
+    may be "none" in the space-separated syntax.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -429,12 +433,12 @@ representation.format.color_hsl:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    hue: "CAST(REGEXP_EXTRACT({col}, 'hsla?\\(\\s*(\\d+)', 1) AS SMALLINT)"
-    saturation: "CAST(REGEXP_EXTRACT({col}, ',\\s*(\\d+)%', 1) AS SMALLINT)"
-    lightness: "CAST(REGEXP_EXTRACT({col}, ',\\s*\\d+%\\s*,\\s*(\\d+)%', 1) AS SMALLINT)"
+    hue: "TRY_CAST(ROUND(TRY_CAST(REGEXP_EXTRACT({col}, '^hsla?\\(\\s*([0-9]+(?:\\.[0-9]+)?)', 1) AS DOUBLE)) AS SMALLINT)"
+    saturation: "TRY_CAST(ROUND(TRY_CAST(REGEXP_EXTRACT({col}, '^hsla?\\(\\s*(?:none|[0-9]+(?:\\.[0-9]+)?(?:deg)?)[\\s,]+([0-9]+(?:\\.[0-9]+)?)', 1) AS DOUBLE)) AS SMALLINT)"
+    lightness: "TRY_CAST(ROUND(TRY_CAST(REGEXP_EXTRACT({col}, '^hsla?\\(\\s*(?:none|[0-9]+(?:\\.[0-9]+)?(?:deg)?)[\\s,]+(?:none|[0-9]+(?:\\.[0-9]+)?)%?[\\s,]+([0-9]+(?:\\.[0-9]+)?)', 1) AS DOUBLE)) AS SMALLINT)"
   validation:
     type: string
-    pattern: "^hsla?\\(\\s*\\d{1,3}\\s*,\\s*\\d{1,3}%\\s*,\\s*\\d{1,3}%\\s*(,\\s*[\\d.]+\\s*)?\\)$"
+    pattern: "^hsla?\\(\\s*(?:[0-9]{1,3}(?:\\.[0-9]+)?(?:deg)?\\s*,\\s*[0-9]{1,3}(?:\\.[0-9]+)?%\\s*,\\s*[0-9]{1,3}(?:\\.[0-9]+)?%(?:\\s*,\\s*(?:[0-9]*\\.?[0-9]+%?))?|(?:none|[0-9]{1,3}(?:\\.[0-9]+)?(?:deg)?)\\s+(?:none|[0-9]{1,3}(?:\\.[0-9]+)?%?)\\s+(?:none|[0-9]{1,3}(?:\\.[0-9]+)?%?)(?:\\s*/\\s*(?:none|[0-9]*\\.?[0-9]+%?))?)\\s*\\)$"
   tier: [VARCHAR, text]
   aliases: [hsl_color, hsla_color]
   samples:
@@ -444,6 +448,8 @@ representation.format.color_hsl:
     - "hsla(240, 100%, 50%, 0.5)"
     - "hsl(60, 75%, 60%)"
     - "hsla(300, 50%, 50%, 0.8)"
+    - "hsl(120deg 75% 25% / 60%)"
+    - "hsl(120.5 100% 50%)"
   icon: palette
   canonical: "https://www.w3.org/TR/css-color-4/"
   references: null
@@ -452,6 +458,12 @@ representation.format.color_hsl:
     representation family alongside hex and RGB. HSL is arguably more intuitive
     for designers (hue = colour wheel position, saturation = intensity,
     lightness = brightness). HSLA adds an alpha transparency channel.
+    CSS Color 4 (MDN) lets hsl() and hsla() take the same arguments, comma-
+    separated with percentage saturation and lightness (legacy) or space-
+    separated with an optional slash alpha, where saturation and lightness may
+    be percentages or numbers and any component may be none. The hue, saturation
+    and lightness parts read the first three numbers and round them to whole
+    numbers; a none component gives NULL.
 
 representation.text.emoji:
   title: "Emoji"
