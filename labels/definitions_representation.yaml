@@ -1177,6 +1177,10 @@ representation.boolean.terms:
   broad_type: BOOLEAN
   frictionless:
     type: boolean
+    trueValues: ["true", "yes", "on", "True", "Yes", "On", "TRUE", "YES", "ON",
+                 "enabled", "Enabled", "ENABLED", "active", "Active", "ACTIVE"]
+    falseValues: ["false", "no", "off", "False", "No", "Off", "FALSE", "NO", "OFF",
+                  "disabled", "Disabled", "DISABLED", "inactive", "Inactive", "INACTIVE"]
   format_string: null
   transform: "CAST(CASE WHEN lower({col}) IN ('on', 'enabled', 'active') THEN 'true' WHEN lower({col}) IN ('off', 'disabled', 'inactive') THEN 'false' ELSE {col} END AS BOOLEAN)"
   transform_ext: null

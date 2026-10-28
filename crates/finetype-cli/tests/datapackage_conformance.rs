@@ -462,3 +462,62 @@ fn boolean_initials_declares_its_true_and_false_values() {
     let f = &d["resources"][0]["schema"]["fields"][0];
     assert!(f.get("trueValues").is_none() && f.get("falseValues").is_none());
 }
+
+/// `representation.boolean.terms` accepts yes/no, on/off, enabled/disabled and
+/// active/inactive as well as true/false, none of which Frictionless's default
+/// boolean values cover. The field declares the true and false terms, they
+/// partition the type's enum exactly, and the descriptor still validates.
+#[test]
+fn boolean_terms_declares_its_true_and_false_values() {
+    let taxonomy = Taxonomy::embedded().expect("embedded taxonomy");
+    let values: Vec<String> = ["yes", "No", "ON", "off"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    let cols = [DatapackageColumn {
+        name: "flag",
+        label: "representation.boolean.terms",
+        values: &values,
+        confidence: Some(0.9),
+        locale: None,
+        nominated: false,
+    }];
+    let descriptor = emit_datapackage(&cols, &meta(), &taxonomy, 32);
+    let field = &descriptor["resources"][0]["schema"]["fields"][0];
+    assert_eq!(field["type"], "boolean");
+    let strs = |v: &serde_json::Value| -> Vec<String> {
+        v.as_array()
+            .expect("array")
+            .iter()
+            .map(|x| x.as_str().unwrap().to_string())
+            .collect()
+    };
+    let t = strs(&field["trueValues"]);
+    let f = strs(&field["falseValues"]);
+    for want in ["yes", "on", "enabled", "active", "true"] {
+        assert!(t.iter().any(|x| x == want), "trueValues lacks {want}");
+    }
+    for want in ["no", "off", "disabled", "inactive", "false"] {
+        assert!(f.iter().any(|x| x == want), "falseValues lacks {want}");
+    }
+    assert!(t.iter().all(|x| !f.contains(x)), "a term is in both lists");
+
+    let def = taxonomy.get("representation.boolean.terms").expect("def");
+    let mut union: Vec<String> = t.iter().chain(f.iter()).cloned().collect();
+    union.sort();
+    let mut en: Vec<String> = def
+        .validation
+        .as_ref()
+        .and_then(|v| v.enum_values.clone())
+        .expect("enum");
+    en.sort();
+    assert_eq!(union, en, "true+false terms must equal the enum exactly");
+
+    let schema = vendored_profile();
+    let validator = jsonschema::validator_for(&schema).expect("compile vendored profile");
+    let errors: Vec<String> = validator
+        .iter_errors(&descriptor)
+        .map(|e| format!("{} at {}", e, e.instance_path()))
+        .collect();
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+}
