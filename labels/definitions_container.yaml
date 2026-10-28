@@ -147,8 +147,6 @@ container.object.xml:
   samples:
     - '<root><name>John</name><age>30</age></root>'
     - '<user id="123"><email>john@example.com</email></user>'
-    - '<root/>'
-    - "<?xml version=\"1.0\"?>\n<a>\n  <b>1</b>\n</a>"
   icon: package
   canonical: "https://www.w3.org/TR/xml/"
   references: null
@@ -240,8 +238,6 @@ container.object.yaml:
   samples:
     - "name: John\nage: 30\nactive: true"
     - "user:\n  id: 123\n  email: john@example.com"
-    - "---\nname: John\nage: 30"
-    - "- a\n- b"
   icon: package
   canonical: "https://yaml.org/spec/1.2.2/"
   references: null
@@ -253,7 +249,9 @@ container.object.yaml:
     A document may open with a `---` marker, comment lines, or a top-level
     sequence over several lines. A single line of plain text is also valid
     YAML, but only a `key:` line or a multi-line sequence is taken as a
-    document here.
+    document here. A detector counts only a `key:` first line, so
+    conforming-only forms (a `---` marker, comments, sequences) are not counted
+    for discrimination.
 
 container.object.csv:
   title: "CSV Record"

@@ -1141,8 +1141,6 @@ geography.format.wkt:
     - "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))"
     - "MULTIPOINT ((10 40), (40 30), (20 20), (30 10))"
     - "POINT EMPTY"
-    - "TRIANGLE ((0 0, 0 1, 1 0, 0 0))"
-    - "TIN Z (((0 0 0, 0 1 0, 1 0 0, 0 0 0)))"
   icon: map
   references: null
   notes: >

@@ -893,6 +893,7 @@ fn xml_accepts_source_forms() {
             "<br />",
             "<?xml version=\"1.0\"?><a>1</a>",
             "<a>\n  <b>1</b>\n</a>",
+            "<?xml version=\"1.0\"?>\n<a>\n  <b>1</b>\n</a>",
             "<gr\u{f6}\u{df}e>1</gr\u{f6}\u{df}e>",
             "<!DOCTYPE note><note>x</note>",
             "<!DOCTYPE note [<!ENTITY e \"v\">]>\n<note>&e;</note>",
