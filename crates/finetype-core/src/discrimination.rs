@@ -18,6 +18,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "identity.medical.npi" => Some(is_issued_npi),
         "technology.identifier.tsid" => Some(is_tsid_shape),
         "container.object.csv" => Some(is_csv_discrimination_shape),
+        "container.object.yaml" => Some(is_yaml_discrimination_shape),
         _ => None,
     }
 }
@@ -106,6 +107,21 @@ fn is_csv_record(value: &str) -> bool {
 /// column discrimination at the rate it had.
 fn is_csv_discrimination_shape(value: &str) -> bool {
     is_csv_record(value) && (value.contains('"') || value.split(',').all(|f| !f.is_empty()))
+}
+
+/// `yaml`: a first line of the form `key:` with a key of letters, digits and
+/// underscores, the shape the type was first defined by. Every such value also
+/// passes the published rule, which additionally takes `---`-opened and
+/// comment-led documents and multi-line sequences; those conform but are not
+/// counted for discrimination.
+fn is_yaml_discrimination_shape(value: &str) -> bool {
+    let mut chars = value.chars();
+    if !matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_') {
+        return false;
+    }
+    chars
+        .find(|c| !(c.is_ascii_alphanumeric() || *c == '_'))
+        .is_some_and(|c| c == ':')
 }
 
 /// `tsid`: the published rule (13 Crockford base32 characters, first character
@@ -199,6 +215,7 @@ mod tests {
             "identity.medical.npi",
             "technology.identifier.tsid",
             "container.object.csv",
+            "container.object.yaml",
         ];
         for label in labels {
             assert!(detector_for(label).is_some(), "{label} has a detector");
