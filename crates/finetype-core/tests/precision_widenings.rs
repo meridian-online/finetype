@@ -901,3 +901,31 @@ fn xml_accepts_source_forms() {
 fn xml_rejects_undefined_forms() {
     assert_pattern_boundary(XML_LABEL, &[], &["<a>1", "a <b/>", "<>", "<1a/>"]);
 }
+
+const YAML_LABEL: &str = "container.object.yaml";
+
+/// YAML 1.2.2: a document may open with `---`, a comment line, or a top-level
+/// sequence; keys may contain `-` and `.`.
+#[test]
+fn yaml_accepts_source_forms() {
+    assert_pattern_boundary(
+        YAML_LABEL,
+        &[
+            "---\nname: x",
+            "# c\nname: x",
+            "- a\n- b",
+            "my-key.v2: 1",
+            "name: John\nage: 30",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn yaml_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        YAML_LABEL,
+        &[],
+        &["#hashtag", "- just a bullet", "hello world", ": x"],
+    );
+}

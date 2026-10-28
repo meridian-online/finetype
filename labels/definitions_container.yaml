@@ -226,20 +226,26 @@ container.object.yaml:
   decompose: null
   validation:
     type: string
-    pattern: "^[a-zA-Z_][a-zA-Z0-9_]*:\\s*.*"
+    pattern: "^(---[ \\t]*\\r?\\n)?(#[^\\n]*\\n)*([A-Za-z_][A-Za-z0-9_.-]*:\\s*.*|-[ \\t]+[^\\n]+\\r?\\n([ \\t]+[^\\n]*\\n)*[ \\t]*-[ \\t]+[\\s\\S]*)"
   tier: [VARCHAR, object]
   aliases: [yaml]
   samples:
     - "name: John\nage: 30\nactive: true"
     - "user:\n  id: 123\n  email: john@example.com"
+    - "---\nname: John\nage: 30"
+    - "- a\n- b"
   icon: package
   canonical: "https://yaml.org/spec/1.2.2/"
   references: null
   notes: >
     v1 migration: New for v2. YAML is common in configuration files
     but less common in analytics data.
-    DuckDB does not have native YAML support; parsing requires
-    external crates and is slower than JSON.
+    DuckDB core does not read YAML; the `yaml` community extension adds a
+    YAML type and extraction functions.
+    A document may open with a `---` marker, comment lines, or a top-level
+    sequence over several lines. A single line of plain text is also valid
+    YAML, but only a `key:` line or a multi-line sequence is taken as a
+    document here.
 
 container.object.csv:
   title: "CSV Record"

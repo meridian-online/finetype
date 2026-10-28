@@ -459,3 +459,10 @@ fn json_constant_column_keeps_type() {
 fn xml_constant_column_keeps_type() {
     assert_constant_column_kept("container.object.xml", "<root/>");
 }
+
+/// A column of one repeated `---`-opened document (which the old rule rejected)
+/// keeps its type.
+#[test]
+fn yaml_constant_column_keeps_type() {
+    assert_constant_column_kept("container.object.yaml", "---\nname: x");
+}

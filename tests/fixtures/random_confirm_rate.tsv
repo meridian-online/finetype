@@ -10,7 +10,7 @@ container.object.json	0.0001	0.0001	0.0000	0.0000	0.0000	0.0000
 container.object.json_array	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 container.object.s_expression	0.0002	0.0002	0.0000	0.0000	0.0000	0.0000
 container.object.xml	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
-container.object.yaml	0.0166	0.0166	0.0000	0.0000	0.0000	0.0000
+container.object.yaml	0.0177	0.0177	0.0000	0.0000	0.0000	0.0000
 datetime.component.day_of_week	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 datetime.component.month_name	0.0000	0.0000	0.0000	0.0000	0.0001	0.0001
 datetime.component.periodicity	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
