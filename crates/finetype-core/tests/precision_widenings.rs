@@ -880,8 +880,10 @@ fn json_rejects_undefined_forms() {
 
 const XML_LABEL: &str = "container.object.xml";
 
-/// XML 1.0: an optional declaration, then an empty-element tag or a start tag
-/// through its end tag, across lines.
+/// XML 1.0: an optional declaration, Misc (comments, processing instructions,
+/// whitespace), an optional DOCTYPE with an internal subset, one root element
+/// (an empty-element tag, or a start tag through its end tag, across lines),
+/// then trailing Misc.
 #[test]
 fn xml_accepts_source_forms() {
     assert_pattern_boundary(
@@ -906,6 +908,23 @@ fn xml_accepts_source_forms() {
 #[test]
 fn xml_rejects_undefined_forms() {
     assert_pattern_boundary(XML_LABEL, &[], &["<a>1", "a <b/>", "<>", "<1a/>"]);
+}
+
+/// The detector keeps HTML documents out of discrimination: they conform to
+/// the XML rule (XHTML is XML) but must not count as xml.
+#[test]
+fn xml_detector_keeps_out_html() {
+    let detect = finetype_core::discrimination::detector_for(XML_LABEL).expect("xml detector");
+    for bad in [
+        "<!DOCTYPE html><html><body>x</body></html>",
+        "<html>\n<body>x</body>\n</html>",
+        "<!doctype HTML>\n<HTML lang=\"en\"><body>x</body></HTML>",
+    ] {
+        assert!(!detect(bad), "{bad:?}");
+    }
+    for ok in ["<a>1</a>", "<?xml version=\"1.0\"?><!-- c --><a/>"] {
+        assert!(detect(ok), "{ok:?}");
+    }
 }
 
 const YAML_LABEL: &str = "container.object.yaml";

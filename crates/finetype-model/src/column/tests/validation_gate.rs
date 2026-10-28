@@ -542,3 +542,27 @@ fn query_string_does_not_recover_expression_column() {
         Some("ceded_leaf_recovery")
     );
 }
+
+/// A column of HTML pages labelled `html` is not relabelled xml by ceded-leaf
+/// recovery: the pages conform to the XML rule (XHTML is XML), but the xml
+/// detector keeps them out of discrimination.
+#[test]
+fn xml_does_not_recover_html_column() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let pages: Vec<String> = [
+        "<!DOCTYPE html>\n<html><body><p>one</p></body></html>",
+        "<!DOCTYPE html>\n<html><head><title>two</title></head><body><div>x</div></body></html>",
+        "<!DOCTYPE html>\n<html lang=\"en\"><body><a href=\"/c\">three</a></body></html>",
+    ]
+    .iter()
+    .cycle()
+    .take(42)
+    .map(|s| s.to_string())
+    .collect();
+    let r = cc
+        .compose_from_sense("page", &pages, "container.object.html", 1.0)
+        .unwrap();
+    assert_ne!(r.label, "container.object.xml");
+}

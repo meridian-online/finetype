@@ -19,6 +19,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "technology.identifier.tsid" => Some(is_tsid_shape),
         "container.object.csv" => Some(is_csv_discrimination_shape),
         "container.object.yaml" => Some(is_yaml_discrimination_shape),
+        "container.object.xml" => Some(is_xml_discrimination_shape),
         "container.key_value.query_string" => Some(is_query_string_discrimination_shape),
         _ => None,
     }
@@ -108,6 +109,66 @@ fn is_csv_record(value: &str) -> bool {
 /// column discrimination at the rate it had.
 fn is_csv_discrimination_shape(value: &str) -> bool {
     is_csv_record(value) && (value.contains('"') || value.split(',').all(|f| !f.is_empty()))
+}
+
+/// The published `container.object.xml` rule, compiled once from the embedded
+/// taxonomy so the detector can never drift from it.
+fn xml_rule() -> Option<&'static regex::Regex> {
+    static RULE: std::sync::OnceLock<Option<regex::Regex>> = std::sync::OnceLock::new();
+    RULE.get_or_init(|| {
+        let doc: serde_yaml::Value =
+            serde_yaml::from_str(include_str!("../../../labels/definitions_container.yaml"))
+                .ok()?;
+        let pattern = doc
+            .get("container.object.xml")?
+            .get("validation")?
+            .get("pattern")?
+            .as_str()?;
+        regex::Regex::new(pattern).ok()
+    })
+    .as_ref()
+}
+
+/// The name of the root element: the first tag after any declaration,
+/// processing instructions, comments and DOCTYPE.
+fn xml_root_name(value: &str) -> Option<&str> {
+    let mut rest = value.trim_start();
+    loop {
+        let skip = if rest.starts_with("<?") {
+            "?>"
+        } else if rest.starts_with("<!--") {
+            "-->"
+        } else if rest.starts_with("<!") {
+            ">"
+        } else {
+            break;
+        };
+        let end = rest.find(skip)?;
+        rest = rest[end + skip.len()..].trim_start();
+    }
+    let rest = rest.strip_prefix('<')?;
+    let end = rest
+        .find(|c: char| c.is_whitespace() || c == '/' || c == '>')
+        .unwrap_or(rest.len());
+    Some(&rest[..end])
+}
+
+/// `xml`: the published rule, and neither an `html` root element (in any
+/// case) nor a `<!DOCTYPE html` declaration. The published rule is shaped by
+/// XML 1.0, so it also accepts XHTML and any multi-line `<html>` page; the type
+/// is a ceded leaf, so without this a column of HTML pages could be relabelled
+/// xml. XHTML still conforms; it is not counted for discrimination.
+fn is_xml_discrimination_shape(value: &str) -> bool {
+    let Some(rule) = xml_rule() else {
+        return false;
+    };
+    rule.is_match(value)
+        && !value
+            .get(..value.len().min(2048))
+            .unwrap_or(value)
+            .to_ascii_lowercase()
+            .contains("<!doctype html")
+        && !xml_root_name(value).is_some_and(|n| n.eq_ignore_ascii_case("html"))
 }
 
 /// `yaml`: a first line of the form `key:` with a key of letters, digits and
@@ -230,6 +291,7 @@ mod tests {
             "container.object.csv",
             "container.object.yaml",
             "container.key_value.query_string",
+            "container.object.xml",
         ];
         for label in labels {
             assert!(detector_for(label).is_some(), "{label} has a detector");

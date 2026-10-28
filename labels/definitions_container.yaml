@@ -157,9 +157,12 @@ container.object.xml:
     and adoption is decreasing.
     DuckDB has limited native XML support (xmlparse requires extension).
     Recursive inference may be partial.
-    The rule checks the XML 1.0 shape (an optional declaration, then an
-    empty-element tag or a start tag through an end tag), not that the
-    element names match or that the document is well-formed.
+    The rule checks the XML 1.0 shape (an optional declaration, Misc such as
+    comments, processing instructions and whitespace, an optional DOCTYPE
+    with an internal subset, one root element, then trailing Misc), not that
+    the element names match or that the document is well-formed. XHTML
+    conforms, but a detector keeps HTML documents (an html root or a
+    DOCTYPE html) out of discrimination.
 
 container.object.html:
   title: "HTML Content"
