@@ -2030,3 +2030,37 @@ fn isbn_header_recovery_reads_space_separated_codes() {
         r.disambiguation_rule
     );
 }
+
+/// checksum::isbn strips spaces, but the header-gated recovery counts a spaced
+/// value only when the published rule accepts it: doubled spaces, mixed
+/// separators and single-digit groups with valid check digits are not promoted,
+/// while well-formed spaced values still are.
+#[test]
+fn isbn_header_recovery_declines_spaced_values_the_rule_rejects() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let bad = [
+        "978  0 13 110362 7",
+        "978-0 13-110362-7",
+        "9 7 8 0 1 3 1 1 0 3 6 2 7",
+        "0131 103628",
+    ];
+    for v in bad {
+        assert!(finetype_core::checksum::isbn(v), "{v}");
+    }
+    let values: Vec<String> = bad.iter().cycle().take(56).map(|s| s.to_string()).collect();
+    let r = cc
+        .compose_from_sense(
+            "isbn",
+            &values,
+            "representation.identifier.alphanumeric_id",
+            0.9,
+        )
+        .unwrap();
+    assert_ne!(
+        r.label, "identity.commerce.isbn",
+        "{:?}",
+        r.disambiguation_rule
+    );
+}

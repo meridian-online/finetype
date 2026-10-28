@@ -24,8 +24,8 @@
 //!
 //! Each function is a total `fn(&str) -> bool`: `true` when the value carries a
 //! valid check digit for that scheme, `false` otherwise (including malformed
-//! input). They are deliberately lenient about surrounding format — hyphens are
-//! stripped — because the caller's `pattern` has already constrained shape; the
+//! input). They are deliberately lenient about surrounding format — hyphens (and
+//! spaces, for `isbn`) are stripped — because the caller's `pattern` has already constrained shape; the
 //! checksum adds the substance check on top. `table_validator` enforces that
 //! order explicitly: it asks for the check digit only after the column's shape
 //! constraints have passed.

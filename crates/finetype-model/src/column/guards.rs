@@ -1181,9 +1181,20 @@ impl ColumnClassifier {
         if non_empty.len() < 3 {
             return;
         }
+        // checksum::isbn strips spaces as well as hyphens, so a spaced value counts
+        // only when the published rule accepts it too (one single-space separator
+        // kind); nothing validates the column after this guard. Hyphen and bare
+        // values are counted as before.
+        let rule = self
+            .taxonomy
+            .as_ref()
+            .and_then(|t| finetype_core::validator::resolve_label_validator(LEAF, t));
         let valid = non_empty
             .iter()
-            .filter(|v| finetype_core::checksum::isbn(v))
+            .filter(|v| {
+                finetype_core::checksum::isbn(v)
+                    && (!v.contains(' ') || rule.as_ref().is_some_and(|r| r.is_valid(v)))
+            })
             .count();
         // >=90% pass the ISBN check digit (valid*10 >= len*9).
         if valid * 10 < non_empty.len() * 9 {
