@@ -136,12 +136,6 @@ PUBLISHED_CONTRADICTIONS: tuple[tuple[str, str, str], ...] = (
         "`\\.` only",
     ),
     (
-        "geography.coordinate.plus_code",
-        "7FG49W00+2V",
-        "`0` is the Open Location Code padding character and is not in the "
-        "pattern's 20-character alphabet",
-    ),
-    (
         "identity.person.weight",
         "170 pounds",
         "the pattern's unit alternation is `kg|lbs|lb|g|oz|stones` and does not "
