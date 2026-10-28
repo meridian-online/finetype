@@ -26,6 +26,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "geography.coordinate.plus_code" => Some(is_plus_code_discrimination_shape),
         "geography.coordinate.mgrs" => Some(is_mgrs_discrimination_shape),
         "geography.coordinate.geohash" => Some(is_geohash_discrimination_shape),
+        "geography.address.street_suffix" => Some(is_street_suffix_discrimination_shape),
         _ => None,
     }
 }
@@ -371,6 +372,94 @@ mod coordinate_rule_copies {
     }
 }
 
+/// What `street_suffix` counts for discrimination: the English forms the type was
+/// first defined with, plus the full words added from the national sheets. A copy,
+/// because the library cannot read `labels/` when built from the crates.io package;
+/// `street_suffix_counted_words_match_the_taxonomy` keeps it inside the taxonomy's
+/// enum and the remainder equal to the abbreviations left out on purpose.
+const STREET_SUFFIX_COUNTED: [&str; 23] = [
+    "Street",
+    "St",
+    "Avenue",
+    "Ave",
+    "Boulevard",
+    "Blvd",
+    "Road",
+    "Rd",
+    "Lane",
+    "Ln",
+    "Way",
+    "Court",
+    "Ct",
+    "Drive",
+    "Dr",
+    "Circle",
+    "Place",
+    "Plaza",
+    "Square",
+    "Rue",
+    "Crescent",
+    "Terrace",
+    "Close",
+];
+
+/// The published entries that conform but are not counted: two- to four-letter
+/// national abbreviations that are also country, currency and airport codes, and
+/// the German `str` and `Str.`.
+#[cfg(test)]
+const STREET_SUFFIX_NOT_COUNTED: [&str; 7] = ["CRT", "AV", "BOUL", "BVD", "BD", "str", "Str."];
+
+/// `street_suffix`: the English suffix words and abbreviations, `Rue`, `Crescent`,
+/// `Terrace` and `Close`, in any ASCII case. The published rule also takes the
+/// national abbreviations (`BD`, `AV`, `CRT`, `BVD`, `BOUL`) and `str` / `Str.`,
+/// which would confirm country, currency and airport codes; those conform but are
+/// not counted for discrimination. Every counted word is in the published enum.
+fn is_street_suffix_discrimination_shape(value: &str) -> bool {
+    STREET_SUFFIX_COUNTED
+        .iter()
+        .any(|w| w.eq_ignore_ascii_case(value))
+}
+
+#[cfg(test)]
+mod street_suffix_copy {
+    #[test]
+    fn street_suffix_counted_words_match_the_taxonomy() {
+        let doc: serde_yaml::Value =
+            serde_yaml::from_str(include_str!("../../../labels/definitions_geography.yaml"))
+                .expect("parse geography definitions");
+        let published: Vec<String> = doc["geography.address.street_suffix"]["validation"]["enum"]
+            .as_sequence()
+            .expect("street_suffix enum")
+            .iter()
+            .map(|v| v.as_str().expect("enum string").to_lowercase())
+            .collect();
+        for w in super::STREET_SUFFIX_COUNTED {
+            assert!(published.contains(&w.to_lowercase()), "{w} is published");
+        }
+        for w in super::STREET_SUFFIX_NOT_COUNTED {
+            assert!(published.contains(&w.to_lowercase()), "{w} is published");
+            assert!(
+                !super::is_street_suffix_discrimination_shape(w),
+                "{w} is not counted"
+            );
+        }
+        // Every published entry is either counted or deliberately left out
+        // (LANE is the case-folded twin of Lane).
+        for p in &published {
+            let counted = super::STREET_SUFFIX_COUNTED
+                .iter()
+                .any(|w| w.to_lowercase() == *p);
+            let left_out = super::STREET_SUFFIX_NOT_COUNTED
+                .iter()
+                .any(|w| w.to_lowercase() == *p);
+            assert!(
+                counted || left_out,
+                "{p} is neither counted nor listed as left out"
+            );
+        }
+    }
+}
+
 /// The three-letter `EN_AU` state and territory codes of `state_code`'s
 /// `validation_by_locale`. A copy, because the library cannot read `labels/`
 /// when built from the crates.io package; the test
@@ -548,6 +637,7 @@ mod tests {
             "geography.coordinate.plus_code",
             "geography.coordinate.mgrs",
             "geography.coordinate.geohash",
+            "geography.address.street_suffix",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

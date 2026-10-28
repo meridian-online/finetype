@@ -694,6 +694,18 @@ geography.address.street_suffix:
       - Place
       - Plaza
       - Square
+      - CRT
+      - LANE
+      - RUE
+      - AV
+      - BOUL
+      - BVD
+      - BD
+      - str
+      - "Str."
+      - Crescent
+      - Terrace
+      - Close
   tier: [VARCHAR, address]
   aliases: [street_type]
   samples:
@@ -701,11 +713,22 @@ geography.address.street_suffix:
     - "Avenue"
     - "Boulevard"
     - "Road"
+    - "Crescent"
   icon: home
   references: null
   notes: >
     v1 migration: Was address.street_suffix. Locale-specific for suffix naming
-    and abbreviation conventions.
+    and abbreviation conventions. The enum lists the English forms plus the
+    national forms of the listed locales that the UPU country sheets and Canada
+    Post's street-type abbreviations use: CRT (Canada, court), BOUL (Canada,
+    boulevard), BVD (Australia, boulevard), BD and AV (France), RUE (French
+    names in Canada and France), str and Str. (Germany), and Crescent, Terrace
+    and Close. Matching is case-insensitive, so LANE is the same entry as Lane.
+    The UPU sheets give examples (RUE, Str.), not a full table of suffixes, so no
+    further forms are listed. Column discrimination counts only the full English
+    words and Rue; the two- and three-letter abbreviations (BD, AV, CRT, BVD, ...)
+    and str / Str. conform but do not count, because they collide with country,
+    currency and airport codes.
 
 geography.address.postal_code:
   title: "Postal Code"

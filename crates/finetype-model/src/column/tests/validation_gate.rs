@@ -800,6 +800,68 @@ fn geohash_short_column_is_demoted() {
     );
 }
 
+/// A column of one repeated `Crescent`, which the old enum rejected, keeps its
+/// type: the detector counts the added full words. The national abbreviations
+/// (`CRT`, `BVD`, ...) conform but do not count, so a column of them is demoted.
+#[test]
+fn street_suffix_constant_column_keeps_type() {
+    assert_constant_column_kept("geography.address.street_suffix", "Crescent");
+}
+
+/// A column of one repeated `CRT`, which the old enum rejected, conforms but
+/// does not count (it is also an airport code), so it is demoted by
+/// `schema_fail_demotion` as on 0.6.64.
+#[test]
+fn street_suffix_abbreviation_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["CRT".to_string(); 40];
+    let demoted = schema_fail_demotion(&values, "geography.address.street_suffix", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
+    );
+}
+
+/// `street_suffix` is a ceded leaf and now takes `BD`, `AV`, `CRT`, `BVD`, so
+/// columns of country, currency and airport codes must not be promoted to it.
+/// (A Sense assertion of `street_suffix` on such a column is not vetoed, as on
+/// 0.6.64, and is not tested here.)
+#[test]
+fn street_suffix_does_not_recover_code_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let columns: [(&str, [&str; 6]); 4] = [
+        ("code", ["BD", "AV", "CRT", "BVD", "BOUL", "BD"]),
+        ("country", ["BD", "FR", "DE", "CA", "AU", "BD"]),
+        ("currency", ["BDT", "AUD", "CAD", "EUR", "BVD", "CRT"]),
+        ("airport", ["CRT", "AVL", "BOU", "BVD", "AVP", "CRT"]),
+    ];
+    for (header, codes) in columns {
+        let values: Vec<String> = codes
+            .iter()
+            .cycle()
+            .take(42)
+            .map(|s| s.to_string())
+            .collect();
+        for label in [
+            "representation.text.word",
+            "representation.identifier.alphanumeric_id",
+        ] {
+            let r = cc.compose_from_sense(header, &values, label, 1.0).unwrap();
+            assert_ne!(
+                r.label, "geography.address.street_suffix",
+                "{header} from {label}"
+            );
+            assert_ne!(
+                r.disambiguation_rule.as_deref(),
+                Some("ceded_leaf_recovery"),
+                "{header} from {label}"
+            );
+        }
+    }
+}
+
 /// A column of one repeated comma-and-space pair, which the old rule rejected,
 /// keeps its type (coordinates has no detector, so conforming is counting).
 #[test]

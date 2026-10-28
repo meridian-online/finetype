@@ -1461,6 +1461,59 @@ fn geohash_detector_counts_the_first_defined_form() {
     }
 }
 
+const STREET_SUFFIX_LABEL: &str = "geography.address.street_suffix";
+
+/// UPU country sheets and Canada Post street-type abbreviations: the national
+/// forms of the listed locales join the English enum.
+#[test]
+fn street_suffix_accepts_source_forms() {
+    assert_pattern_boundary(
+        STREET_SUFFIX_LABEL,
+        &[
+            "CRT", "LANE", "RUE", "AV", "BOUL", "BVD", "BD", "str", "Str.", "Crescent", "Terrace",
+            "Close", "Street", "St", "Lane", "crt", "STR.",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn street_suffix_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        STREET_SUFFIX_LABEL,
+        &[],
+        &["Strasse Nord", "XYZ", "", "Str.."],
+    );
+}
+
+/// The detector keeps the English enum and the added full words, so the national
+/// abbreviations, which are also country, currency and airport codes, conform
+/// without counting.
+#[test]
+fn street_suffix_detector_keeps_out_abbreviations() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(STREET_SUFFIX_LABEL, &tax).expect("street_suffix rule");
+    let detector = detector_for(STREET_SUFFIX_LABEL);
+    assert!(detector.is_some());
+    for ok in [
+        "Street", "St", "ave", "BLVD", "Crescent", "Terrace", "Close", "Rue", "LANE",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for conforming in ["BD", "AV", "CRT", "BVD", "BOUL", "str", "Str."] {
+        assert!(rule.is_valid(conforming), "{conforming:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, conforming),
+            "{conforming:?}"
+        );
+    }
+    for bad in ["Strasse Nord", "XYZ", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
 const COORDINATES_LABEL: &str = "geography.coordinate.coordinates";
 
 /// DuckDB spatial and Frictionless Table Schema: a latitude and a longitude

@@ -132,7 +132,7 @@ finance.securities.ticker	0.0073	0.0073	0.0000	0.0000	0.1668	0.1668
 geography.address.full_address	0.7765	0.7765	0.5498	0.5498	0.5810	0.5810
 geography.address.postal_code	0.2033	0.2033	0.1578	0.1578	0.4233	0.4233
 geography.address.street_name	0.9773	0.9773	0.9530	0.9530	1.0000	1.0000
-geography.address.street_suffix	0.0001	0.0001	0.0000	0.0000	0.0095	0.0095
+geography.address.street_suffix	0.0001	0.0001	0.0000	0.0000	0.0096	0.0095
 geography.contact.calling_code	0.0022	0.0022	0.1977	0.1977	0.0000	0.0000
 geography.coordinate.coordinates	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 geography.coordinate.dms	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
