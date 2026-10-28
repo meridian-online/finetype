@@ -24,6 +24,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "geography.location.state_code" => Some(is_state_code_discrimination_shape),
         "geography.format.wkt" => Some(is_wkt_discrimination_shape),
         "geography.coordinate.plus_code" => Some(is_plus_code_discrimination_shape),
+        "geography.coordinate.mgrs" => Some(is_mgrs_discrimination_shape),
         _ => None,
     }
 }
@@ -269,6 +270,40 @@ fn is_plus_code_discrimination_shape(value: &str) -> bool {
     rule.is_match(value) && old_shape.is_match(value)
 }
 
+/// The published `mgrs` rule, copied for the same reason as [`PLUS_CODE_RULE`];
+/// `mgrs_rule_copy_matches_the_taxonomy` keeps it equal to the taxonomy's.
+const MGRS_RULE: &str = r"^(?:\d{1,2}[C-HJ-NP-X]|[ABYZ])[A-HJ-NP-Z]{2}(?:\d\d){1,8}$";
+
+/// The shape `mgrs` was first defined by: a zone number, a band letter and two to
+/// ten digits.
+const MGRS_OLD_SHAPE: &str = r"^\d{1,2}[C-X][A-HJ-NP-Z]{2}\d{2,10}$";
+
+fn mgrs_regexes() -> Option<&'static (regex::Regex, regex::Regex)> {
+    static RULES: std::sync::OnceLock<Option<(regex::Regex, regex::Regex)>> =
+        std::sync::OnceLock::new();
+    RULES
+        .get_or_init(|| {
+            Some((
+                regex::Regex::new(MGRS_RULE).ok()?,
+                regex::Regex::new(MGRS_OLD_SHAPE).ok()?,
+            ))
+        })
+        .as_ref()
+}
+
+/// `mgrs`: the published rule and the shape the type was first defined by (a
+/// zone number, and two to ten digits). The published rule also takes polar UPS
+/// references, which have no zone number, and twelve to sixteen digits; those
+/// conform but are not counted for discrimination, because the type is a ceded
+/// leaf and a UPS reference's shape (a letter, two letters, digits) is also that
+/// of a product code such as `ABC1234`.
+fn is_mgrs_discrimination_shape(value: &str) -> bool {
+    let Some((rule, old_shape)) = mgrs_regexes() else {
+        return false;
+    };
+    rule.is_match(value) && old_shape.is_match(value)
+}
+
 #[cfg(test)]
 mod coordinate_rule_copies {
     fn published(label: &str) -> String {
@@ -287,6 +322,11 @@ mod coordinate_rule_copies {
             super::PLUS_CODE_RULE,
             published("geography.coordinate.plus_code")
         );
+    }
+
+    #[test]
+    fn mgrs_rule_copy_matches_the_taxonomy() {
+        assert_eq!(super::MGRS_RULE, published("geography.coordinate.mgrs"));
     }
 }
 
@@ -465,6 +505,7 @@ mod tests {
             "geography.location.state_code",
             "geography.format.wkt",
             "geography.coordinate.plus_code",
+            "geography.coordinate.mgrs",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

@@ -1429,8 +1429,9 @@ geography.coordinate.mgrs:
   description: >
     NATO Military Grid Reference System coordinate. Composed of grid zone
     designator (1-2 digit zone number + latitude band letter C-X excluding
-    I and O), 100km grid square (2 letters), and easting/northing digits
-    (2-10 digits, equal halves).
+    I and O; polar UPS references use A, B, Y or Z with no zone number),
+    100km grid square (2 letters), and easting/northing digits (an even
+    count of 2-16 digits, equal halves).
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -1442,7 +1443,7 @@ geography.coordinate.mgrs:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{1,2}[C-X][A-HJ-NP-Z]{2}\\d{2,10}$"
+    pattern: "^(?:\\d{1,2}[C-HJ-NP-X]|[ABYZ])[A-HJ-NP-Z]{2}(?:\\d\\d){1,8}$"
   tier: [VARCHAR, coordinate]
   aliases: null
   samples:
@@ -1456,7 +1457,11 @@ geography.coordinate.mgrs:
   notes: >
     Based on UTM and UPS grids. Used by NATO military forces. Zone 1-60,
     latitude band C-X (excluding I and O), grid square AA-ZZ (excluding
-    I and O), precision 1m (10 digits) to 10km (2 digits).
+    I and O), precision usually 1 m (10 digits); special applications go to
+    1 mm (16 digits; FGDC-STD-011-2001 gives such an example). Digits come in
+    equal easting and northing halves, so an odd count is not a reference. For
+    discrimination a value counts only with a zone number and 2 to 10 digits;
+    UPS references and 12 to 16 digits conform but are not counted.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: transportation

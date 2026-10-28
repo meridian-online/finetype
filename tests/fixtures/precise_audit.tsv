@@ -139,7 +139,7 @@ geography.coordinate.dms	false	^\d{1,3}Â°\d{1,2}'\d{1,2}(\.\d+)?"[NS]\s+\d{1,3}Â
 geography.coordinate.geohash	false	^[0-9b-hjkmnp-z]{6,12}$	false
 geography.coordinate.latitude	false	^-?([0-8]?\d(\.\d+)?|90(\.0+)?)$	true
 geography.coordinate.longitude	false		false
-geography.coordinate.mgrs	false	^\d{1,2}[C-X][A-HJ-NP-Z]{2}\d{2,10}$	false
+geography.coordinate.mgrs	false	^(?:\d{1,2}[C-HJ-NP-X]|[ABYZ])[A-HJ-NP-Z]{2}(?:\d\d){1,8}$	false
 geography.coordinate.plus_code	false	^[2-9Cc][2-9CcFfGgHhJjMmPpQqRrVv](?:[23456789CFGHJMPQRVWXcfghjmpqrvwx]{6}\+(?:[23456789CFGHJMPQRVWXcfghjmpqrvwx]{2,7})?|[23456789CFGHJMPQRVWXcfghjmpqrvwx]{4}00\+|[23456789CFGHJMPQRVWXcfghjmpqrvwx]{2}0{4}\+|0{6}\+)$	true
 geography.format.wkt	false	^(?:[Pp][Oo][Ii][Nn][Tt]|[Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii][Nn][Gg]|[Pp][Oo][Ll][Yy][Gg][Oo][Nn]|[Mm][Uu][Ll][Tt][Ii][Pp][Oo][Ii][Nn][Tt]|[Mm][Uu][Ll][Tt][Ii][Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii][Nn][Gg]|[Mm][Uu][Ll][Tt][Ii][Pp][Oo][Ll][Yy][Gg][Oo][Nn]|[Gg][Ee][Oo][Mm][Ee][Tt][Rr][Yy][Cc][Oo][Ll][Ll][Ee][Cc][Tt][Ii][Oo][Nn]|[Tt][Rr][Ii][Aa][Nn][Gg][Ll][Ee]|[Pp][Oo][Ll][Yy][Hh][Ee][Dd][Rr][Aa][Ll][Ss][Uu][Rr][Ff][Aa][Cc][Ee]|[Tt][Ii][Nn])\s*(?:[Zz][Mm]|[Zz]|[Mm])?\s*(?:\(|[Ee][Mm][Pp][Tt][Yy])	false
 geography.index.h3	false	^[0-9a-fA-F]{15}$	false

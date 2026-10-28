@@ -1332,3 +1332,76 @@ fn plus_code_detector_counts_the_first_defined_form() {
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
     }
 }
+
+const MGRS_LABEL: &str = "geography.coordinate.mgrs";
+
+/// FGDC-STD-011-2001: a grid zone designator (or a UPS band letter), a 100 km
+/// square, and an equal-halved even count of digits, up to 16 (1 mm).
+#[test]
+fn mgrs_accepts_source_forms() {
+    assert_pattern_boundary(
+        MGRS_LABEL,
+        &[
+            "18SUJ2348306479",
+            "18SUJ2348316806479498",
+            "ZAH1234567890",
+            "4QFJ1234567890",
+            "18SUJ2306",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn mgrs_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        MGRS_LABEL,
+        &[],
+        &[
+            // odd digit count: easting and northing cannot be equal halves
+            "18SUJ234",
+            "18SUJ2348306",
+            // no digits at all
+            "18SUJ",
+            // I and O are not band letters
+            "18IUJ2348306479",
+            "18OUJ2348306479",
+            // 18 digits: past the 1 mm special application
+            "18SUJ123456789012345678",
+            // a UPS reference has no zone number
+            "1ZAH1234567890",
+        ],
+    );
+}
+
+/// The detector counts a grid zone designator with a band letter and 2 to 10
+/// digits, as the type was first defined, so UPS references and 12- to 16-digit
+/// references conform but do not count; neither do code-like tokens that share
+/// a UPS reference's letters.
+#[test]
+fn mgrs_detector_counts_the_first_defined_form() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(MGRS_LABEL, &tax).expect("mgrs rule");
+    let detector = detector_for(MGRS_LABEL);
+    assert!(detector.is_some());
+    for ok in [
+        "18SUJ2348306479",
+        "33UUP0490171890",
+        "4QFJ1234567890",
+        "18SUJ23",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for conforming in ["ZAH1234567890", "18SUJ2348316806479498", "ABC1234", "BMW20"] {
+        assert!(rule.is_valid(conforming), "{conforming:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, conforming),
+            "{conforming:?}"
+        );
+    }
+    for bad in ["18SUJ234", "18IUJ2348306479", "18SUJ", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}

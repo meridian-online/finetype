@@ -727,3 +727,52 @@ fn plus_code_does_not_recover_plus_suffixed_figures() {
         );
     }
 }
+
+/// A column of one repeated ordinary grid reference keeps its type (the value
+/// the old rule also took; a 16-digit or UPS reference conforms but does not
+/// count, so a column of it is demoted by design).
+#[test]
+fn mgrs_constant_column_keeps_type() {
+    assert_constant_column_kept("geography.coordinate.mgrs", "18SUJ2348306479");
+}
+
+/// A column of one repeated 16-digit reference, which the old rule rejected, is
+/// demoted by `schema_fail_demotion` as on 0.6.64.
+#[test]
+fn mgrs_sixteen_digit_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["18SUJ2348316806479498".to_string(); 40];
+    let demoted = schema_fail_demotion(&values, "geography.coordinate.mgrs", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
+    );
+}
+
+/// `mgrs` is a ceded leaf and now takes a UPS reference (a letter, two letters
+/// and digits), so a column of product codes shaped `ABC1234` must not be
+/// promoted to it.
+#[test]
+fn mgrs_does_not_recover_product_code_column() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let codes: Vec<String> = ["ABC1234", "BCD5678", "AHK0042", "BMW2020", "ZAH1234567890"]
+        .iter()
+        .cycle()
+        .take(42)
+        .map(|s| s.to_string())
+        .collect();
+    for label in [
+        "representation.text.word",
+        "representation.identifier.alphanumeric_id",
+    ] {
+        let r = cc.compose_from_sense("sku", &codes, label, 1.0).unwrap();
+        assert_ne!(r.label, "geography.coordinate.mgrs", "from {label}");
+        assert_ne!(
+            r.disambiguation_rule.as_deref(),
+            Some("ceded_leaf_recovery"),
+            "from {label}"
+        );
+    }
+}
