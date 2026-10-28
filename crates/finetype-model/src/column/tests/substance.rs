@@ -2971,7 +2971,9 @@ fn cusip_checksum_recovery_promotes_private_placement_numbers() {
 #[test]
 fn cusip_checksum_recovery_declines_reserved_characters_without_a_check_digit() {
     // Codes like `ABC*12345` fit the widened shape but fail the check digit, so
-    // they are not promoted from any attractor label.
+    // they are not promoted from any attractor label. The >=90% check-digit bar
+    // alone rejects them (the guard's shape gate counts a placement number only
+    // with a valid check digit), so this passes on the old guard as well.
     let values: Vec<String> = ["ABC*1234", "XYZ@5678", "QRS#9012", "LMN*3456", "TUV@7890"]
         .iter()
         .map(|b| cusip_body_with(b, false))

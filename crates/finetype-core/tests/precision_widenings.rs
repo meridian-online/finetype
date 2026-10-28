@@ -846,7 +846,7 @@ fn npi_grades_other_first_digits_as_noted_and_bad_check_digit_as_failing() {
         other => panic!("should be noted, got {other:?}"),
     }
     match grade_value_for_label("1234567890", NPI_LABEL, &tax) {
-        Grade::Fails { constraint, .. } => assert_eq!(constraint, "checksum"),
+        finetype_core::Grade::Fails { constraint, .. } => assert_eq!(constraint, "checksum"),
         other => panic!("bad check digit should fail, got {other:?}"),
     }
 }
@@ -2729,11 +2729,14 @@ fn cusip_accepts_private_placement_forms() {
 /// the alphabet. A wrong check digit is the checksum's to reject.
 #[test]
 fn cusip_rejects_undefined_forms() {
-    // A pattern cannot compute a check digit, so a wrong one is rejected by the
-    // checksum (`checksum: cusip`), not by the rule; see the column tests in
-    // finetype-model.
+    // A pattern cannot compute a check digit, so a wrong one is graded by the
+    // `checksum: cusip` directive, not by the rule.
     let wrong = cusip_with_wrong_check_digit("12345*10");
-    assert!(!finetype_core::checksum::cusip(&wrong));
+    let tax = load_taxonomy();
+    match finetype_core::grade_value_for_label(&wrong, CUSIP_LABEL, &tax) {
+        finetype_core::Grade::Fails { constraint, .. } => assert_eq!(constraint, "checksum"),
+        other => panic!("{wrong:?}: expected a checksum failure, got {other:?}"),
+    }
     assert_pattern_boundary(
         CUSIP_LABEL,
         &[],

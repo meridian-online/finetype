@@ -123,7 +123,8 @@ fn alnum_value(c: char) -> Option<u32> {
 /// the first 8 is converted to a value (digits 0–9, A–Z = 10–35); values at even
 /// 1-based positions are doubled; the digits of each result are summed; the
 /// check digit is `(10 − sum mod 10) mod 10`. The taxonomy pattern checks shape
-/// (`^[A-Z0-9]{8}[0-9]$`) but not the check digit.
+/// (`^[A-Z0-9*@#]{8}[0-9]$`, the private-placement characters `*`, `@` and `#`
+/// included) but not the check digit.
 pub fn cusip(value: &str) -> bool {
     let chars: Vec<char> = value.trim().chars().collect();
     if chars.len() != 9 {

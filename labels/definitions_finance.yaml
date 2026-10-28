@@ -626,9 +626,10 @@ finance.securities.ticker:
     (AAPL, MSFT, BRK-B). 1-7 uppercase letters, optionally with a class-share
     suffix (BRK-B, BF.B), or 1-6 digits for the numeric tickers of the Hong Kong,
     Tokyo and Shanghai exchanges (0005, 7203, 600519). No check digit, and the
-    shape confirms every short
-    uppercase token (a US state code, a currency, an arbitrary code all clear
-    it), so the published listed-symbol set is the substance (Precision
+    shape confirms every short uppercase token (a US state code, a currency, an
+    arbitrary code all clear it) and now every 1-6-digit integer, which is why a
+    detector keeps the alphabetic shape for discrimination. The published
+    listed-symbol set is the substance (Precision
     Principle). US-listed for now (SEC company_tickers.json); other venues
     compose additively behind this same type.
   designation: universal
@@ -1106,10 +1107,10 @@ finance.currency.amount_multisym:
   title: "Currency Amount (Multi-Character Symbol)"
   description: >
     Currency amounts with multi-character symbols: R$ (Brazilian Real),
-    HK$ (Hong Kong Dollar), kr and kr. (Nordic Krone), K\u010d (Czech Koruna),
-    z\u0142 (Polish Zloty). The symbol comes before the amount, or after it for
-    Czech, Polish and Danish, as CLDR writes them (1 234,56 K\u010d,
-    1 234,56 z\u0142, 1.234,56 kr.), with a space, a no-break space (U+00A0) or a
+    HK$ (Hong Kong Dollar), kr and kr. (Nordic Krone), Kč (Czech Koruna),
+    zł (Polish Zloty). The symbol comes before the amount, or after it for
+    Czech, Polish and Danish, as CLDR writes them (1 234,56 Kč,
+    1 234,56 zł, 1.234,56 kr.), with a space, a no-break space (U+00A0) or a
     narrow no-break space (U+202F) between the digit groups and before the
     symbol. Separator conventions follow local standard.
   designation: universal
@@ -1139,8 +1140,9 @@ finance.currency.amount_multisym:
     New in format coverage expansion. Multi-character symbols generalize
     locale-specific parsing. Transform strips a leading or trailing symbol and
     every space, including U+00A0 and U+202F, and normalizes separators.
-    Source: CLDR (cs, pl, da currency patterns). A trailing symbol is taken for
-    kr, kr., K\u010d and z\u0142 only; the other symbols are prefixes.
+    Source: CLDR (cs, pl, da currency patterns). U+202F is spelled out in the
+    pattern so every regex engine accepts it. A trailing symbol is taken for
+    kr, kr., Kč and zł only; the other symbols are prefixes.
 
 finance.currency.amount_neg_trailing:
   title: "Currency Amount (Trailing Negative)"

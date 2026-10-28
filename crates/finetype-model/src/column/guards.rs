@@ -1378,7 +1378,7 @@ impl ColumnClassifier {
     /// `cusip_checksum_recovery` (default ON). The 244-dim model cannot predict
     /// `finance.securities.cusip` (a 9-char security id: 8 issuer/issue chars + a
     /// check digit), so real CUSIP columns land on the word / alphanumeric_id /
-    /// integer_number attractor. The taxonomy shape `^[A-Z0-9]{8}[0-9]$` also
+    /// integer_number attractor. The taxonomy shape `^[A-Z0-9*@#]{8}[0-9]$` also
     /// matches any 9-char alnum id (SKUs, 9-digit account numbers), so shape alone
     /// is not enough. The CUSIP mod-10 check digit (`finetype_core::checksum::cusip`)
     /// is the discriminator the attractor cannot satisfy: a non-CUSIP id's 9th char
@@ -1397,7 +1397,8 @@ impl ColumnClassifier {
         let Some(tax) = self.taxonomy.as_ref() else {
             return;
         };
-        // Shape gate: `^[A-Z0-9]{8}[0-9]$`. Mirrors isin_checksum_recovery's use of
+        // Shape gate: `^[A-Z0-9*@#]{8}[0-9]$` (private-placement characters
+        // counted only with a valid check digit, by the cusip detector). Mirrors isin_checksum_recovery's use of
         // the leaf's own taxonomy validator before the check-digit test.
         if !label_validates_sample(tax, LEAF, sample) {
             return;
