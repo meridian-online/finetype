@@ -1718,8 +1718,9 @@ impl ColumnClassifier {
     /// `color_rgb_recovery` (default ON). Recovers `representation.format.color_rgb`
     /// (not in the 244-dim softmax) from VALUES. A value counts when it starts
     /// with `rgb(`/`rgba(` and passes the published rule, so the CSS Color 4 space
-    /// syntax is recovered as well as the comma syntax. The taxonomy validator
-    /// `^(?:rgb)?\(?(\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)?$` is PERMISSIVE — `rgb`,
+    /// syntax is recovered as well as the comma syntax. Channels above 255 count:
+    /// CSS Color 4 clamps them, so `rgb(300, 0, 0)` is valid CSS. The rule's bare
+    /// alternative `^(?:rgb)?\(?(\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)?$` is PERMISSIVE — `rgb`,
     /// `(` and `)` are all optional, so a bare comma triple `255,0,0` (a coordinate, a
     /// comma_separated array, or the `word` attractor) passes; that is why color_rgb was
     /// excluded from `ceded_leaf_recovery`. This PROMOTE guard restores recall precisely

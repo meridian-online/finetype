@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Forty-two more published validation rules agree with the source that defines their type.** No gold, representative or external-band column changed type. Newly accepted forms:
+  - containers: JSON and XML across lines with surrounding whitespace, XML empty-element roots, prologs and DOCTYPEs, YAML documents opening with `---`, a comment or a sequence, CSV empty and quoted fields, and query strings with bare names beside a pair;
+  - geography: USPS possession and military state codes (`FM`, `MH`, `PW`, `AA`, `AE`, `AP`) and Australian three-letter codes, upper-case H3 cells, case-insensitive WKT keywords plus `TRIANGLE`, `POLYHEDRALSURFACE` and `TIN`, case-insensitive and padded Plus Codes, UPS MGRS references and 16-digit MGRS, 1–20-character geohashes, coordinates separated by a comma with spaces or by spaces, and the national street suffixes (`CRT`, `RUE`, `BOUL`, `BVD`, `BD`, `AV`, `str`, `Str.`, `Crescent`, `Terrace`, `Close`);
+  - text and science: emoji keycaps, the SMILES wildcard `*` and quadruple bond `$`, and the IUPAC protein codes `B`, `Z`, `U`, `O` and the gap `-`;
+  - colours: CSS Color 4's `rgb()`/`hsl()` space syntax with `/ alpha`, decimals, `none` and mixed components, and `#` hex with 4 or 8 digits;
+  - internet and development: `::`-compressed and IPv4-mixed IPv6, a hostname's trailing full stop, empty data URIs and any-case `base64`, S3 access-point ARNs, SemVer hyphenated identifiers, one- or two-digit CalVer months and days, OCI tags up to 128 characters and sha512 and blake3 digests, and unsecured JWS and JWE compact JWTs;
+  - dates and times: PostgreSQL short-offset timestamps with or without a 1–6-digit fraction, ISO 8601 duration fractions and the alternative `PYYYY-MM-DDThh:mm:ss` format, upper-case and `Sept`/`June`/`July` month-year values, one-digit ISO weeks, zero-padded Chinese dates, and IANA names with `.` and `-` and the `Etc/GMT±N` zones;
+  - finance and identity: CLDR's trailing `Kč`/`zł` and `kr.`, a space after `₹`, 1–6-digit numeric tickers, private-placement CUSIPs, the MRZ gender filler `<`, 6-digit-labeler NDCs, NAICS Canada sectors 41 and 91, unhyphenated EINs (graded non-canonical), and space-separated ISBNs.
+- **Newly rejected, because the source requires it:** MGRS with an odd digit count or an `I`/`O` band, invalid Plus Codes, ISO weeks 00 and 54–99, Chinese months above 12 and days 0 or above 31, SemVer empty identifiers, OCI tags starting with `.` or `-` or longer than 128 characters, HSL alphas that are not numbers (`1.`), non-month three-letter words in month-year values, and malformed XML closing tags.
+- **A discrimination detector now always applies on top of the published rule**, so the rule's length bounds hold at every site, including the validation veto. Detectors keep newly accepted forms that would confirm neighbouring types (bare 9-digit numbers as EINs, decimals like `2024.1` as CalVer, uppercase words as proteins) from counting toward the choice of type; see `docs/ARCHITECTURE.md`.
+- `representation.boolean.terms` declares Frictionless `trueValues` and `falseValues`.
 - **`ft_validate_text` applies the same per-value check as `finetype validate`.** A value whose enum member differs only in letter-case now conforms, and a right-shape value with a bad check digit fails with constraint `checksum`. The STRUCT's fields and the `constraint` vocabulary are unchanged apart from the new `checksum` token.
 
 ## [0.6.64] - 2026-10-26
