@@ -1062,6 +1062,12 @@ fn color_hex_constant_column_keeps_type() {
 /// with a `#`, so a column of 4-digit years is not promoted to it.
 #[test]
 fn color_hex_does_not_recover_year_column() {
+    // It is only safe off the recovery list because its rule is anchored on
+    // `#` for the 4- and 8-digit forms; adding it there needs a detector.
+    assert!(
+        !CEDED_RECOVERY_LEAVES.contains(&"representation.format.color_hex"),
+        "color_hex is on CEDED_RECOVERY_LEAVES: add a detector first"
+    );
     let mut cc =
         ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
     cc.set_taxonomy(super::shipped_taxonomy());
