@@ -2752,6 +2752,7 @@ fn cusip_rejects_undefined_forms() {
         ],
     );
 }
+
 const GENDER_CODE_LABEL: &str = "identity.person.gender_code";
 
 /// ICAO Doc 9303 part 4 writes an unspecified sex as the filler `<` in the
@@ -2886,6 +2887,44 @@ fn ein_detector_keeps_out_the_bare_form() {
             "{bare} is not counted"
         );
     }
+}
+
+const ISBN_LABEL: &str = "identity.commerce.isbn";
+
+/// The ISBN Users' Manual (7th edition) separates the parts of an ISBN with
+/// hyphens or spaces.
+#[test]
+fn isbn_accepts_source_forms() {
+    assert_pattern_boundary(
+        ISBN_LABEL,
+        &[
+            "978 0 13 110362 7",
+            "0 13 110362 8",
+            "978-0-13-110362-7",
+            "0-13-110362-8",
+            "9780131103627",
+            "013110362X",
+            "0 13 110362 X",
+        ],
+        &[],
+    );
+}
+
+/// One kind of separator per value, and one separator between parts.
+#[test]
+fn isbn_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        ISBN_LABEL,
+        &[],
+        &[
+            "978-0 13-110362-7",
+            "978  0 13 110362 7",
+            "978 0-13 110362 7",
+            "978 0 13 110362 7 ",
+            " 978 0 13 110362 7",
+            "978 0 13 110362",
+        ],
+    );
 }
 
 /// The ICAO filler `<` conforms to gender_code but is not counted for

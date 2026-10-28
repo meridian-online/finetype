@@ -879,7 +879,9 @@ identity.commerce.isbn:
   title: "ISBN"
   description: >
     International Standard Book Number. ISBN-10 (10 digits with check digit)
-    or ISBN-13 (13 digits with check digit). Also accepts with hyphens.
+    or ISBN-13 (13 digits with check digit). Also accepts with hyphens or
+    spaces between the parts, one kind of separator per value (ISBN Users'
+    Manual, 7th edition).
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -889,10 +891,10 @@ identity.commerce.isbn:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    isbn_version: "CASE WHEN LENGTH(REGEXP_REPLACE({col}, '-', '', 'g')) = 10 THEN 'ISBN-10' ELSE 'ISBN-13' END"
+    isbn_version: "CASE WHEN LENGTH(REGEXP_REPLACE({col}, '[- ]', '', 'g')) = 10 THEN 'ISBN-10' ELSE 'ISBN-13' END"
   validation:
     type: string
-    pattern: "^(?:97[89]-)?[0-9]{1,5}-[0-9]+-[0-9]+-[0-9X]$|^[0-9]{9}[0-9X]$|^[0-9]{13}$"
+    pattern: "^(?:97[89]-)?[0-9]{1,5}-[0-9]+-[0-9]+-[0-9X]$|^(?:97[89] )?[0-9]{1,5} [0-9]+ [0-9]+ [0-9X]$|^[0-9]{9}[0-9X]$|^[0-9]{13}$"
   checksum: isbn
   tier: [VARCHAR, code]
   aliases: null
@@ -900,12 +902,16 @@ identity.commerce.isbn:
     - "978-0-13-110362-7"
     - "0-13-110362-8"
     - "9780131103627"
+    - "978 0 13 110362 7"
   icon: tag
   canonical: "https://www.iso.org/standard/65483.html"
   references: null
   notes: >
-    v1 migration: Was code.isbn. Pattern accepts ISBN-10 and ISBN-13 with or
-    without hyphens. Decompose infers version based on length. The `checksum:
+    v1 migration: Was code.isbn. Pattern accepts ISBN-10 and ISBN-13 with
+    hyphens, with single spaces, or without separators; a value holds one
+    kind of separator (ISBN Users' Manual, 7th edition). Decompose infers
+    version based on length, ignoring hyphens and spaces; the checksum
+    function strips both too. The `checksum:
     isbn` directive drives the model's checksum_substance_guard, which demotes a
     column of same-length integers that fail the ISBN check digit (e.g. a
     financial figure like marketCap) off the isbn label.

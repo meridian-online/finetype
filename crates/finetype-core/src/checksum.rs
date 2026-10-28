@@ -34,15 +34,16 @@
 ///
 /// ISBN-10: weighted sum `Σ (i+1)·dᵢ` (i = 0..9, final digit may be `X` = 10)
 /// is divisible by 11. ISBN-13: weighted sum with alternating 1/3 weights is
-/// divisible by 10. Hyphens are stripped; a leading sign disqualifies (ISBNs
-/// are never signed). Any other length, or a non-digit where a digit is
-/// required, fails.
+/// divisible by 10. Hyphens and spaces are stripped, the two separators the
+/// ISBN Users' Manual names (the caller's pattern holds a value to one kind);
+/// a leading sign disqualifies (ISBNs are never signed). Any other length, or
+/// a non-digit where a digit is required, fails.
 pub fn isbn(value: &str) -> bool {
     let t = value.trim();
     if t.starts_with('-') || t.starts_with('+') {
         return false;
     }
-    let digits: Vec<char> = t.chars().filter(|c| *c != '-').collect();
+    let digits: Vec<char> = t.chars().filter(|c| !matches!(*c, '-' | ' ')).collect();
     match digits.len() {
         10 => {
             let mut sum = 0u32;
@@ -695,6 +696,18 @@ mod tests {
         ] {
             assert!(isbn(v), "should be a valid ISBN: {v}");
         }
+    }
+
+    #[test]
+    fn isbn_reads_space_separated_forms() {
+        // The ISBN Users' Manual separates the parts with hyphens or spaces,
+        // and the published rule accepts both.
+        for v in ["978 0 13 110362 7", "0 13 110362 8", "0 306 40615 2"] {
+            assert!(isbn(v), "should be a valid ISBN: {v}");
+        }
+        // The check digit still decides.
+        assert!(!isbn("978 0 13 110362 8"));
+        assert!(!isbn("0 13 110362 9"));
     }
 
     #[test]

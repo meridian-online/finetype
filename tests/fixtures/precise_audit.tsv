@@ -156,7 +156,7 @@ geography.transportation.iso6346	false	^[A-Z]{3}[UJZ]\d{7}$	false
 geography.transportation.unlocode	false	^[A-Z]{2}[A-Z2-9]{3}$	false
 identity.academic.orcid	false	^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$	true
 identity.commerce.ean	false	^[0-9]{8}$|^[0-9]{13}$	false
-identity.commerce.isbn	false	^(?:97[89]-)?[0-9]{1,5}-[0-9]+-[0-9]+-[0-9X]$|^[0-9]{9}[0-9X]$|^[0-9]{13}$	false
+identity.commerce.isbn	false	^(?:97[89]-)?[0-9]{1,5}-[0-9]+-[0-9]+-[0-9X]$|^(?:97[89] )?[0-9]{1,5} [0-9]+ [0-9]+ [0-9X]$|^[0-9]{9}[0-9X]$|^[0-9]{13}$	false
 identity.commerce.isrc	false	^[A-Z]{2}[A-Z0-9]{3}\d{7}$	false
 identity.commerce.issn	false	^[0-9]{4}-[0-9]{3}[0-9X]$	true
 identity.commerce.upc	false	^\d{12}$	false

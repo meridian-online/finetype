@@ -1817,6 +1817,7 @@ fn cusip_does_not_keep_reserved_character_codes_without_a_check_digit() {
         r.disambiguation_rule
     );
 }
+
 /// A column of one repeated `M` keeps its type. `<`, which the old rule rejected,
 /// conforms to the rule but the detector does not count it, so a column of it is
 /// demoted by design (see `gender_code_filler_constant_column_is_demoted`).
@@ -1973,3 +1974,59 @@ fn ein_bare_digit_column_is_demoted() {
     }
 }
 
+/// A column of one repeated space-separated ISBN (which the old rule rejected)
+/// keeps its type.
+#[test]
+fn isbn_constant_column_keeps_type() {
+    assert_constant_column_kept("identity.commerce.isbn", "978 0 13 110362 7");
+}
+
+/// A column of space-grouped numbers that fail the check digit is not kept as
+/// isbn by the checksum guard, so the widened rule does not open isbn to them.
+#[test]
+fn isbn_space_separated_with_wrong_check_digit_is_not_kept() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let values: Vec<String> = (0..40)
+        .map(|i| format!("978 0 13 {:06} {}", 110_000 + i * 13, 4))
+        .filter(|v| !finetype_core::checksum::isbn(v))
+        .collect();
+    assert!(values.len() >= 30);
+    let r = cc
+        .compose_from_sense("isbn", &values, "identity.commerce.isbn", 0.9)
+        .unwrap();
+    assert_ne!(
+        r.label, "identity.commerce.isbn",
+        "{:?}",
+        r.disambiguation_rule
+    );
+}
+
+/// A genuine space-separated ISBN column is recovered by the header guard, which
+/// reads the check digit through `checksum::isbn`.
+#[test]
+fn isbn_header_recovery_reads_space_separated_codes() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let values: Vec<String> = ["978 0 13 110362 7", "0 13 110362 8", "978 3 16 148410 0"]
+        .iter()
+        .cycle()
+        .take(30)
+        .map(|s| s.to_string())
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "isbn",
+            &values,
+            "representation.identifier.alphanumeric_id",
+            0.9,
+        )
+        .unwrap();
+    assert_eq!(
+        r.label, "identity.commerce.isbn",
+        "{:?}",
+        r.disambiguation_rule
+    );
+}
