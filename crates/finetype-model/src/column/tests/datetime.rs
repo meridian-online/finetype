@@ -1650,7 +1650,6 @@ fn pg_short_offset_forms_route_to_the_leaf() {
 /// its own reading.
 #[test]
 fn pg_short_offset_does_not_capture_neighbouring_timestamps() {
-    const PG: &str = "datetime.timestamp.pg_short_offset";
     let cases: [(&str, Vec<&str>); 8] = [
         (
             "datetime.timestamp.rfc_3339",
@@ -1687,7 +1686,7 @@ fn pg_short_offset_does_not_capture_neighbouring_timestamps() {
     ];
     for (expect, column) in cases {
         let got = refine_to(expect, &column);
-        assert_ne!(got, PG, "{column:?}");
+        assert_eq!(got, expect, "{column:?}");
     }
     // A mixed column holds no single voice, so nothing is asserted.
     assert_eq!(
