@@ -1181,3 +1181,67 @@ fn h3_accepts_source_forms() {
 fn h3_rejects_undefined_forms() {
     assert_pattern_boundary(H3_LABEL, &[], &["8928308280ffff", "8928308280fffffg"]);
 }
+
+const WKT_LABEL: &str = "geography.format.wkt";
+
+/// OGC 06-103r4, 7.2.1 and 7.2.2: keywords are case-insensitive, and the
+/// triangle, polyhedral-surface and TIN keywords are geometry types.
+#[test]
+fn wkt_accepts_source_forms() {
+    assert_pattern_boundary(
+        WKT_LABEL,
+        &[
+            "Point (10 10)",
+            "point(1 2)",
+            "TIN Z (((0 0 0, 0 1 0, 1 0 0, 0 0 0)))",
+            "TRIANGLE ((0 0, 0 1, 1 0, 0 0))",
+            "POLYGON EMPTY",
+            "POLYHEDRALSURFACE Z (((0 0 0, 0 1 0, 1 1 0, 0 0 0)))",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn wkt_rejects_undefined_forms() {
+    assert_pattern_boundary(WKT_LABEL, &[], &["POINTS (1 2)", "circle(1 2)"]);
+}
+
+/// The detector keeps the old upper-case, seven-keyword shape, so text such as
+/// `Triangle (equilateral)` conforms in grading but does not count for
+/// discrimination or confirm a ceded recovery.
+#[test]
+fn wkt_detector_keeps_old_shape() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(WKT_LABEL, &tax).expect("wkt rule");
+    let detector = detector_for(WKT_LABEL);
+    assert!(detector.is_some());
+    for old_form in [
+        "POINT (30 10)",
+        "POINT(30 10)",
+        "POINT EMPTY",
+        "POINT ZM (1 2 3 4)",
+        "MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)))",
+        "GEOMETRYCOLLECTION EMPTY",
+    ] {
+        assert!(
+            passes_detector_or_rule(detector, &rule, old_form),
+            "{old_form:?}"
+        );
+    }
+    for new_form in [
+        "Point (10 10)",
+        "point(1 2)",
+        "Triangle (equilateral)",
+        "TIN Z (((0 0 0, 0 1 0, 1 0 0, 0 0 0)))",
+        "TRIANGLE ((0 0, 0 1, 1 0, 0 0))",
+    ] {
+        assert!(rule.is_valid(new_form), "{new_form:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, new_form),
+            "{new_form:?}"
+        );
+    }
+}

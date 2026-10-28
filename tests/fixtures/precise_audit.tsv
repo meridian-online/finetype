@@ -141,7 +141,7 @@ geography.coordinate.latitude	false	^-?([0-8]?\d(\.\d+)?|90(\.0+)?)$	true
 geography.coordinate.longitude	false		false
 geography.coordinate.mgrs	false	^\d{1,2}[C-X][A-HJ-NP-Z]{2}\d{2,10}$	false
 geography.coordinate.plus_code	false	^[23456789CFGHJMPQRVWX]{8}\+[23456789CFGHJMPQRVWX]{2,}$	true
-geography.format.wkt	false	^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\s*(Z|M|ZM)?\s*(\(|EMPTY)	false
+geography.format.wkt	false	^(?:[Pp][Oo][Ii][Nn][Tt]|[Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii][Nn][Gg]|[Pp][Oo][Ll][Yy][Gg][Oo][Nn]|[Mm][Uu][Ll][Tt][Ii][Pp][Oo][Ii][Nn][Tt]|[Mm][Uu][Ll][Tt][Ii][Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii][Nn][Gg]|[Mm][Uu][Ll][Tt][Ii][Pp][Oo][Ll][Yy][Gg][Oo][Nn]|[Gg][Ee][Oo][Mm][Ee][Tt][Rr][Yy][Cc][Oo][Ll][Ll][Ee][Cc][Tt][Ii][Oo][Nn]|[Tt][Rr][Ii][Aa][Nn][Gg][Ll][Ee]|[Pp][Oo][Ll][Yy][Hh][Ee][Dd][Rr][Aa][Ll][Ss][Uu][Rr][Ff][Aa][Cc][Ee]|[Tt][Ii][Nn])\s*(?:[Zz][Mm]|[Zz]|[Mm])?\s*(?:\(|[Ee][Mm][Pp][Tt][Yy])	false
 geography.index.h3	false	^[0-9a-fA-F]{15}$	false
 geography.location.city	false		false
 geography.location.continent	true		true

@@ -22,6 +22,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "container.object.xml" => Some(is_xml_discrimination_shape),
         "container.key_value.query_string" => Some(is_query_string_discrimination_shape),
         "geography.location.state_code" => Some(is_state_code_discrimination_shape),
+        "geography.format.wkt" => Some(is_wkt_discrimination_shape),
         _ => None,
     }
 }
@@ -269,6 +270,22 @@ mod state_code_copy {
     }
 }
 
+/// The shape `wkt` had before the rule followed OGC 06-103r4: upper-case
+/// keyword from the first seven, then an optional dimension letter and `(` or
+/// `EMPTY`.
+const WKT_OLD_SHAPE: &str = "^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\\s*(Z|M|ZM)?\\s*(\\(|EMPTY)";
+
+/// `wkt`: the shape the type was first defined by, an upper-case keyword. The
+/// published rule takes keywords in any letter case, so `Triangle (equilateral)`
+/// and `Point (of sale)` conform; they do not count for discrimination or for a
+/// ceded recovery. Every such value also passes the published rule.
+fn is_wkt_discrimination_shape(value: &str) -> bool {
+    static OLD: std::sync::OnceLock<Option<regex::Regex>> = std::sync::OnceLock::new();
+    OLD.get_or_init(|| regex::Regex::new(WKT_OLD_SHAPE).ok())
+        .as_ref()
+        .is_some_and(|re| re.is_match(value))
+}
+
 /// `tsid`: the published rule (13 Crockford base32 characters, first character
 /// at most F) and at least one letter. The published rule is source-shaped, so it
 /// accepts every 13-digit number (the first character may be any hex digit),
@@ -364,6 +381,7 @@ mod tests {
             "container.key_value.query_string",
             "container.object.xml",
             "geography.location.state_code",
+            "geography.format.wkt",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the
@@ -392,8 +410,8 @@ mod tests {
                         .is_some_and(|m| m.is_empty()),
                 "{label} has validation_by_locale"
             );
-            // The fast path reads `detector_for` (xml is a fast-path
-            // leaf), so only the locale branches need the check above.
+            // The fast path reads `detector_for` (xml and wkt are fast-path
+            // leaves), so only the locale branches need the check above.
         }
         // Every registered detector is covered by the list above.
         for (id, _) in tax.definitions() {

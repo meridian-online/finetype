@@ -1117,8 +1117,9 @@ geography.format.wkt:
   title: "Well-Known Text Geometry"
   description: >
     OGC Well-Known Text (WKT) representation of geometry objects.
-    Strings begin with a geometry type keyword (POINT, LINESTRING, POLYGON,
-    MULTIPOINT, MULTILINESTRING, MULTIPOLYGON, GEOMETRYCOLLECTION) optionally
+    Strings begin with a geometry type keyword, in any letter case (POINT,
+    LINESTRING, POLYGON, MULTIPOINT, MULTILINESTRING, MULTIPOLYGON,
+    GEOMETRYCOLLECTION, TRIANGLE, POLYHEDRALSURFACE, TIN) optionally
     followed by Z/M/ZM dimension suffix.
   designation: universal
   locales: [UNIVERSAL]
@@ -1131,7 +1132,7 @@ geography.format.wkt:
   decompose: null
   validation:
     type: string
-    pattern: "^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\\s*(Z|M|ZM)?\\s*(\\(|EMPTY)"
+    pattern: "^(?:[Pp][Oo][Ii][Nn][Tt]|[Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii][Nn][Gg]|[Pp][Oo][Ll][Yy][Gg][Oo][Nn]|[Mm][Uu][Ll][Tt][Ii][Pp][Oo][Ii][Nn][Tt]|[Mm][Uu][Ll][Tt][Ii][Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii][Nn][Gg]|[Mm][Uu][Ll][Tt][Ii][Pp][Oo][Ll][Yy][Gg][Oo][Nn]|[Gg][Ee][Oo][Mm][Ee][Tt][Rr][Yy][Cc][Oo][Ll][Ll][Ee][Cc][Tt][Ii][Oo][Nn]|[Tt][Rr][Ii][Aa][Nn][Gg][Ll][Ee]|[Pp][Oo][Ll][Yy][Hh][Ee][Dd][Rr][Aa][Ll][Ss][Uu][Rr][Ff][Aa][Cc][Ee]|[Tt][Ii][Nn])\\s*(?:[Zz][Mm]|[Zz]|[Mm])?\\s*(?:\\(|[Ee][Mm][Pp][Tt][Yy])"
   tier: [VARCHAR, format]
   aliases: [well_known_text]
   samples:
@@ -1140,11 +1141,19 @@ geography.format.wkt:
     - "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))"
     - "MULTIPOINT ((10 40), (40 30), (20 20), (30 10))"
     - "POINT EMPTY"
+    - "TRIANGLE ((0 0, 0 1, 1 0, 0 0))"
+    - "TIN Z (((0 0 0, 0 1 0, 1 0 0, 0 0 0)))"
   icon: map
   references: null
   notes: >
-    OGC Simple Features standard (ISO 19125). DuckDB spatial extension
-    provides ST_GeomFromText for parsing.
+    OGC Simple Features standard (ISO 19125; OGC 06-103r4, 7.2.1 and 7.2.2):
+    keywords are case-insensitive. DuckDB spatial extension provides
+    ST_GeomFromText for parsing; it reads any letter case, but not TRIANGLE,
+    TIN or POLYHEDRALSURFACE (transform_ext raises an error on those, so they
+    conform to the type but have no geometry value in DuckDB). For
+    discrimination a value counts only with an upper-case POINT, LINESTRING,
+    POLYGON, MULTI*, or GEOMETRYCOLLECTION keyword, so text such as "Triangle
+    (equilateral)" does not; other forms conform but are not counted.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: index

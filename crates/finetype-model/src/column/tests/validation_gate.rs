@@ -636,3 +636,50 @@ fn state_code_constant_column_keeps_type() {
 fn h3_constant_column_keeps_type() {
     assert_constant_column_kept("geography.index.h3", "881F1D4887FFFFF");
 }
+
+/// A column of one repeated mixed-case point, which the old upper-case rule
+/// rejected, conforms but does not count for discrimination (the detector keeps
+/// the old shape), so a column of it is demoted by design; the constant column
+/// that is kept holds an upper-case `POINT`, which the old rule accepted too
+/// (no new form keeps its type here).
+#[test]
+fn wkt_constant_column_keeps_type() {
+    assert_constant_column_kept("geography.format.wkt", "POINT (10 10)");
+}
+
+/// A column of one repeated `Point (10 10)` is demoted to `word`, as on 0.6.64,
+/// where the old rule rejected it too.
+#[test]
+fn wkt_mixed_case_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["Point (10 10)".to_string(); 40];
+    let demoted = schema_fail_demotion(&values, "geography.format.wkt", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
+    );
+}
+
+/// `wkt` is a ceded leaf and now accepts mixed-case keywords, so a column of
+/// parenthesised film or product titles must not be promoted to it.
+#[test]
+fn wkt_does_not_recover_title_column() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let titles: Vec<String> = [
+        "Triangle (1999)",
+        "Point (of sale)",
+        "Polygon (regular)",
+        "Tin (small)",
+    ]
+    .iter()
+    .cycle()
+    .take(42)
+    .map(|s| s.to_string())
+    .collect();
+    for label in ["representation.text.word", "representation.text.plain_text"] {
+        let r = cc.compose_from_sense("title", &titles, label, 1.0).unwrap();
+        assert_ne!(r.label, "geography.format.wkt", "from {label}");
+    }
+}
