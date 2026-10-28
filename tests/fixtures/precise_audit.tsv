@@ -215,7 +215,7 @@ representation.scientific.inchi	false	^InChI=1S?/.+$	true
 representation.scientific.measurement_unit	true		true
 representation.scientific.protein_sequence	false	^[ACDEFGHIKLMNPQRSTVWXY*]+$	false
 representation.scientific.rna_sequence	false	^[AUGCRYSWKMBDHVN]+$	false
-representation.scientific.smiles	false	^[A-Za-z0-9@+\-\[\]\(\)\\/#=%.:]+$	false
+representation.scientific.smiles	false	^[A-Za-z0-9@+\-\[\]\(\)\\/#=%.:*$]+$	false
 representation.text.emoji	false	^(?:[0-9#*]️?⃣|[\p{So}\p{Sk}\p{Mn}\p{Cf}])+$	true
 representation.text.entity_name	false		false
 representation.text.plain_text	false		false

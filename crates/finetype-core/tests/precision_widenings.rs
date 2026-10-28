@@ -1579,3 +1579,27 @@ fn emoji_rejects_undefined_forms() {
         &["1", "#", "a\u{20e3}", "10", "1\u{fe0f}", "12\u{20e3}"],
     );
 }
+
+const SMILES_LABEL: &str = "representation.scientific.smiles";
+
+/// OpenSMILES: `*` (the wildcard atom) and `$` (the quadruple bond).
+#[test]
+fn smiles_accepts_source_forms() {
+    assert_pattern_boundary(
+        SMILES_LABEL,
+        &[
+            "[*]CC",
+            "*C",
+            "[Re]$[Re]",
+            "CC(=O)Oc1ccccc1C(=O)O",
+            "[Na+].[Cl-]",
+            "C\\C=C/C",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn smiles_rejects_undefined_forms() {
+    assert_pattern_boundary(SMILES_LABEL, &[], &["C C", "C;C", "C,C", "C{C}", ""]);
+}

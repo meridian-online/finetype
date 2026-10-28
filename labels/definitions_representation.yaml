@@ -956,7 +956,7 @@ representation.scientific.smiles:
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Za-z0-9@+\\-\\[\\]\\(\\)\\\\/#=%.:]+$"
+    pattern: "^[A-Za-z0-9@+\\-\\[\\]\\(\\)\\\\/#=%.:*$]+$"
     minLength: 1
     maxLength: 1000
   tier: [VARCHAR, scientific]
@@ -968,6 +968,8 @@ representation.scientific.smiles:
     - "c1ccccc1"
     - "CC(=O)O"
     - "C(=O)(N)N"
+    - "*C"
+    - "[Re]$[Re]"
   icon: flask
   references: null
   notes: >
@@ -976,6 +978,8 @@ representation.scientific.smiles:
     reflects that single values like "O" or "CC" are indistinguishable from
     plain text — column-level disambiguation (header hints) is essential.
     Common molecules: O=water, CCO=ethanol, c1ccccc1=benzene, CC(=O)O=acetic acid.
+    OpenSMILES also defines the wildcard atom * (unspecified atom, e.g. *C or
+    [*]CC) and $ (the quadruple bond, e.g. [Re]$[Re]); both are accepted.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: discrete

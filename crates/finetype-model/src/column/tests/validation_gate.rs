@@ -924,3 +924,10 @@ fn emoji_does_not_recover_digit_columns() {
         }
     }
 }
+
+/// A column of one repeated wildcard SMILES, which the old rule rejected,
+/// keeps its type (smiles has no detector).
+#[test]
+fn smiles_constant_column_keeps_type() {
+    assert_constant_column_kept("representation.scientific.smiles", "[*]CC");
+}
