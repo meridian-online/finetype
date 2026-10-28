@@ -21,6 +21,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "container.object.yaml" => Some(is_yaml_discrimination_shape),
         "container.object.xml" => Some(is_xml_discrimination_shape),
         "container.key_value.query_string" => Some(is_query_string_discrimination_shape),
+        "geography.location.state_code" => Some(is_state_code_discrimination_shape),
         _ => None,
     }
 }
@@ -231,6 +232,43 @@ fn is_query_string_discrimination_shape(value: &str) -> bool {
     })
 }
 
+/// The three-letter `EN_AU` state and territory codes of `state_code`'s
+/// `validation_by_locale`. A copy, because the library cannot read `labels/`
+/// when built from the crates.io package; the test
+/// `state_code_au_codes_match_the_taxonomy` keeps it equal to the taxonomy's.
+const STATE_CODE_AU_THREE_LETTER: [&str; 5] = ["ACT", "NSW", "QLD", "TAS", "VIC"];
+
+/// `state_code`: two uppercase letters, or one of the `EN_AU` three-letter codes.
+/// The published rule takes any two or three uppercase letters (ISO 3166-2:AU
+/// codes run to three), which would confirm three-letter airport and currency
+/// codes; this keeps column discrimination at the shapes state codes take. Every
+/// such value also passes the published rule.
+fn is_state_code_discrimination_shape(value: &str) -> bool {
+    let b = value.as_bytes();
+    (b.len() == 2 && b.iter().all(u8::is_ascii_uppercase))
+        || STATE_CODE_AU_THREE_LETTER.contains(&value)
+}
+
+#[cfg(test)]
+mod state_code_copy {
+    #[test]
+    fn state_code_au_codes_match_the_taxonomy() {
+        let doc: serde_yaml::Value =
+            serde_yaml::from_str(include_str!("../../../labels/definitions_geography.yaml"))
+                .expect("parse geography definitions");
+        let au = doc["geography.location.state_code"]["validation_by_locale"]["EN_AU"]["enum"]
+            .as_sequence()
+            .expect("EN_AU enum");
+        let mut three: Vec<&str> = au
+            .iter()
+            .filter_map(|c| c.as_str())
+            .filter(|c| c.len() == 3)
+            .collect();
+        three.sort_unstable();
+        assert_eq!(three, super::STATE_CODE_AU_THREE_LETTER);
+    }
+}
+
 /// `tsid`: the published rule (13 Crockford base32 characters, first character
 /// at most F) and at least one letter. The published rule is source-shaped, so it
 /// accepts every 13-digit number (the first character may be any hex digit),
@@ -312,10 +350,10 @@ mod tests {
         }
     }
 
-    /// The locale branches of the attractor sites and the fast path consult only
-    /// the published rule, so a detector label must never reach them.
+    /// The locale branches of the attractor sites consult only the published
+    /// rule, so a detector label must never reach them.
     #[test]
-    fn detector_labels_have_no_locale_rules_and_are_not_fast_path_leaves() {
+    fn detector_labels_have_no_locale_rules_the_detector_could_contradict() {
         let tax = taxonomy(false);
         let labels = [
             "identity.person.username",
@@ -325,10 +363,27 @@ mod tests {
             "container.object.yaml",
             "container.key_value.query_string",
             "container.object.xml",
+            "geography.location.state_code",
         ];
+        // `state_code` has locale rules. Its locale enums hold only shapes its
+        // detector counts (two letters, or an EN_AU three-letter code), so the
+        // locale branches, which consult the enums alone, cannot disagree.
+        let with_locale_rules = ["geography.location.state_code"];
         for label in labels {
             assert!(detector_for(label).is_some(), "{label} has a detector");
             let def = tax.get(label).expect("label in taxonomy");
+            if with_locale_rules.contains(&label) {
+                let by_locale = def.validation_by_locale.as_ref().expect("locale rules");
+                for (locale, rule) in by_locale {
+                    for code in rule.enum_values.as_ref().expect("locale enum") {
+                        assert!(
+                            detector_for(label).expect("detector")(code),
+                            "{label} {locale} code {code} not counted by the detector"
+                        );
+                    }
+                }
+                continue;
+            }
             assert!(
                 def.validation_by_locale.is_none()
                     || def
@@ -337,10 +392,8 @@ mod tests {
                         .is_some_and(|m| m.is_empty()),
                 "{label} has validation_by_locale"
             );
-            assert!(
-                !crate::fast_path::CONCLUSIVE_LEAVES.contains(&label),
-                "{label} is a fast-path leaf"
-            );
+            // The fast path reads `detector_for` (xml is a fast-path
+            // leaf), so only the locale branches need the check above.
         }
         // Every registered detector is covered by the list above.
         for (id, _) in tax.definitions() {

@@ -622,3 +622,10 @@ fn xml_does_not_recover_html_fragment_column() {
         assert_ne!(r.label, "container.object.xml", "from {label}");
     }
 }
+
+/// A column of one repeated Australian state code, which the old two-letter
+/// rule rejected, keeps its type: the detector counts EN_AU codes.
+#[test]
+fn state_code_constant_column_keeps_type() {
+    assert_constant_column_kept("geography.location.state_code", "NSW");
+}

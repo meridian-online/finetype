@@ -345,9 +345,11 @@ geography.location.country_code:
 geography.location.state_code:
   title: "State/Province Code"
   description: >
-    2-letter state or province abbreviation. Locale-specific due to
-    country-dependent subdivision codes (e.g., US states, CA provinces,
-    AU states/territories).
+    Two- or three-letter state or province abbreviation. Locale-specific due
+    to country-dependent subdivision codes (e.g., US states, CA provinces,
+    AU states/territories). The US form is the USPS abbreviation; the AU form
+    is the ISO 3166-2:AU subdivision code without its country prefix
+    (AU-NSW is the ISO 3166-2 form of NSW).
   designation: locale_specific
   locales: [EN_US, EN_CA, EN_AU]
   broad_type: VARCHAR
@@ -359,7 +361,7 @@ geography.location.state_code:
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Z]{2}$"
+    pattern: "^[A-Z]{2,3}$"
   validation_by_locale:
     EN_US:
       type: string
@@ -420,6 +422,12 @@ geography.location.state_code:
         - "MP"
         - "PR"
         - "VI"
+        - "FM"
+        - "MH"
+        - "PW"
+        - "AA"
+        - "AE"
+        - "AP"
     EN_CA:
       type: string
       enum:
@@ -455,15 +463,23 @@ geography.location.state_code:
     - "TX"
     - "FL"
     - "ON"
+    - "NSW"
   icon: map-pin
   canonical: "https://www.iso.org/iso-3166-country-codes.html"
   references: null
   notes: >
     New in v13. Separated from country_code remap (state_code→country_code
     was causing US state abbreviations like OR, CA, FL to train as country
-    codes). Locale-specific: US (50 states + DC + territories), CA
-    (13 provinces/territories), AU (8 states/territories). AU codes are
-    2-3 letters but universal pattern is ^[A-Z]{2}$ for the dominant case.
+    codes). Locale-specific: US (50 states + DC + territories, the freely
+    associated states FM, MH and PW, and the military codes AA, AE and AP, as
+    in USPS Publication 28 Appendix B), CA (13 provinces/territories), AU (8
+    states/territories, ISO 3166-2:AU). AU codes are 2-3 letters, so the
+    universal pattern is ^[A-Z]{2,3}$. FM, MH, PW and AE are also ISO 3166-1
+    country codes, so a bare column of them is ambiguous between the two types
+    (geo_code_membership_vote leaves such a column alone). For discrimination
+    a value counts only as two uppercase letters or an EN_AU three-letter
+    code, so three-letter airport and currency codes do not; the other
+    three-letter forms the pattern accepts conform but are not counted.
 
 geography.location.continent:
   title: "Continent Name"

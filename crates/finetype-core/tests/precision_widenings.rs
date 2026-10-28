@@ -1118,3 +1118,52 @@ fn query_string_rejects_undefined_forms() {
         ],
     );
 }
+
+const STATE_CODE_LABEL: &str = "geography.location.state_code";
+
+/// ISO 3166-2:AU codes are two or three letters; USPS Publication 28
+/// Appendix B lists the two-letter codes, military ones included.
+#[test]
+fn state_code_accepts_source_forms() {
+    assert_pattern_boundary(STATE_CODE_LABEL, &["NSW", "ACT", "AE", "TX"], &[]);
+}
+
+#[test]
+fn state_code_rejects_undefined_forms() {
+    assert_pattern_boundary(STATE_CODE_LABEL, &[], &["NSWX", "N", "ny"]);
+}
+
+/// Publication 28 Appendix B names the freely associated states and the
+/// military "states" beside the fifty states, so the US enum holds them.
+#[test]
+fn state_code_us_enum_has_the_pub_28_additions() {
+    let tax = load_taxonomy();
+    let def = tax.get(STATE_CODE_LABEL).expect("state_code");
+    let us = def
+        .validation_by_locale
+        .as_ref()
+        .and_then(|m| m.get("EN_US"))
+        .and_then(|v| v.enum_values.as_ref())
+        .expect("EN_US enum");
+    for code in ["FM", "MH", "PW", "AA", "AE", "AP"] {
+        assert!(us.iter().any(|c| c == code), "{code} missing from EN_US");
+    }
+}
+
+/// The detector counts two uppercase letters, or an EN_AU three-letter code,
+/// so three-letter airport and currency codes do not count for discrimination.
+#[test]
+fn state_code_detector_keeps_three_letter_codes_out() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(STATE_CODE_LABEL, &tax).expect("state_code rule");
+    let detector = detector_for(STATE_CODE_LABEL);
+    assert!(detector.is_some());
+    for ok in ["TX", "AE", "NSW", "ACT", "QLD", "TAS", "VIC"] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for bad in ["USD", "JFK", "EUR", "NSWX", "N", "ny", "N1", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
