@@ -669,8 +669,8 @@ fn is_issued_npi(value: &str) -> bool {
         && crate::checksum::npi(value)
 }
 
-/// Whether `value` passes for `label`: the detector when there is one, else the
-/// published rule. A label with no published rule (or an unknown one) never
+/// Whether `value` passes for `label`: the published rule, and the detector as
+/// well when there is one. A label with no published rule (or an unknown one) never
 /// passes, detector or not, matching the veto. The rule is resolved from the taxonomy's compiled cache or compiled on a
 /// miss (the same resolution `resolve_label_validator` gives `ceded_leaf_recovery`).
 ///
