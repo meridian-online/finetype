@@ -1396,7 +1396,8 @@ identity.government.ein:
   title: "US Employer Identification Number"
   description: >
     9-digit number assigned by the IRS to business entities for tax
-    identification. Format: XX-XXXXXXX (2 digits, hyphen, 7 digits).
+    identification. Format: XX-XXXXXXX (2 digits, hyphen, 7 digits). IRS
+    extracts also write it as 9 bare digits.
   designation: locale_specific
   locales: [EN_US]
   broad_type: VARCHAR
@@ -1408,9 +1409,11 @@ identity.government.ein:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{2}-\\d{7}$"
-    minLength: 10
+    pattern: "^\\d{2}-?\\d{7}$"
+    minLength: 9
     maxLength: 10
+  validation_notes:
+    canonical: { kind: non_canonical, name: hyphenated, pattern: "^\\d{2}-\\d{7}$" }
   tier: [VARCHAR, code]
   aliases: [employer_id, tax_id]
   samples:
@@ -1422,7 +1425,12 @@ identity.government.ein:
   references: null
   notes: >
     IRS-assigned. First two digits are the campus/service center code.
-    Required for business tax filings, hiring, and bank accounts.
+    Required for business tax filings, hiring, and bank accounts. The prefix
+    names the IRS campus or online issue (IRS valid EIN prefixes), and prefix
+    31 is the Small Business Administration. The bare nine digits are accepted
+    with a note naming the hyphenated form, but a bare nine-digit number is any
+    integer, so a detector counts only the hyphenated form in discrimination: a
+    column of bare nine-digit numbers is not kept as ein.
 
 identity.government.pan_india:
   title: "Indian PAN"

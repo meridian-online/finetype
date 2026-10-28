@@ -34,6 +34,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "finance.securities.ticker" => Some(is_ticker_discrimination_shape),
         "finance.securities.cusip" => Some(is_cusip_discrimination_shape),
         "identity.person.gender_code" => Some(is_gender_code_discrimination_shape),
+        "identity.government.ein" => Some(is_ein_discrimination_shape),
         "identity.medical.ndc" => Some(is_ndc_discrimination_shape),
         "technology.cryptographic.jwt" => Some(is_jwt_discrimination_shape),
         "representation.scientific.protein_sequence" => {
@@ -302,6 +303,18 @@ fn is_gender_code_discrimination_shape(value: &str) -> bool {
         value.to_ascii_uppercase().as_str(),
         "M" | "F" | "X" | "0" | "1" | "2" | "9"
     )
+}
+
+/// `ein`: the hyphenated `NN-NNNNNNN`. The published rule also takes the bare
+/// nine digits (IRS extracts drop the hyphen), which are any nine-digit integer,
+/// so only the hyphenated form counts for discrimination.
+fn is_ein_discrimination_shape(value: &str) -> bool {
+    let b = value.as_bytes();
+    b.len() == 10
+        && b[2] == b'-'
+        && b.iter()
+            .enumerate()
+            .all(|(i, c)| i == 2 || c.is_ascii_digit())
 }
 
 /// `ndc`: the shapes the type took before the six-digit-labeler forms joined the
@@ -958,6 +971,7 @@ mod tests {
             "technology.cryptographic.jwt",
             "finance.securities.ticker",
             "finance.securities.cusip",
+            "identity.government.ein",
             "identity.medical.ndc",
             "identity.person.gender_code",
         ];

@@ -161,7 +161,7 @@ identity.commerce.isrc	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 identity.commerce.issn	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 identity.commerce.upc	0.0000	0.0000	0.0490	0.0490	0.0000	0.0000
 identity.government.abn	0.0000	0.0000	0.0468	0.0468	0.0000	0.0000
-identity.government.ein	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
+identity.government.ein	0.0000	0.0000	0.0507	0.0000	0.0000	0.0000
 identity.government.eu_vat	0.0030	0.0030	0.0000	0.0000	0.0191	0.0191
 identity.government.pan_india	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 identity.government.ssn	0.0000	0.0000	0.0460	0.0460	0.0000	0.0000

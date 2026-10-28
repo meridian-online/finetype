@@ -2827,6 +2827,67 @@ fn naics_rejects_undefined_sectors() {
     assert_pattern_boundary(NAICS_LABEL, &[], &["40", "90", "400000", "900000", "11-99"]);
 }
 
+const EIN_LABEL: &str = "identity.government.ein";
+
+/// The IRS writes an EIN as `NN-NNNNNNN`; the hyphen is dropped in extracts.
+#[test]
+fn ein_accepts_source_forms() {
+    assert_pattern_boundary(EIN_LABEL, &["12-3456789", "010548657", "123456789"], &[]);
+}
+
+#[test]
+fn ein_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        EIN_LABEL,
+        &[],
+        &[
+            "12-345678",
+            "1234567890",
+            "12345678",
+            "1-23456789",
+            "12--3456789",
+        ],
+    );
+}
+
+/// The bare nine digits are accepted with a note naming the hyphenated form.
+#[test]
+fn ein_grades_the_bare_form_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    assert_eq!(
+        grade_value_for_label("12-3456789", EIN_LABEL, &tax),
+        Grade::Conforms
+    );
+    match grade_value_for_label("010548657", EIN_LABEL, &tax) {
+        Grade::Noted(note) => {
+            assert_eq!(note.kind, NoteKind::NonCanonical);
+            assert_eq!(note.detail, "hyphenated");
+        }
+        other => panic!("010548657 should be noted, got {other:?}"),
+    }
+}
+
+/// A bare nine-digit number conforms to the rule but is not counted for
+/// discrimination: it is any nine-digit integer.
+#[test]
+fn ein_detector_keeps_out_the_bare_form() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(EIN_LABEL, &tax).expect("ein rule");
+    let detector = detector_for(EIN_LABEL);
+    assert!(detector.is_some(), "ein has a detector");
+    assert!(passes_detector_or_rule(detector, &rule, "12-3456789"));
+    for bare in ["010548657", "123456789"] {
+        assert!(rule.is_valid(bare), "{bare} conforms to the rule");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, bare),
+            "{bare} is not counted"
+        );
+    }
+}
+
 /// The ICAO filler `<` conforms to gender_code but is not counted for
 /// discrimination; the earlier codes still are, in either case.
 #[test]

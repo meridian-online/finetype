@@ -1948,3 +1948,28 @@ fn naics_constant_column_keeps_type() {
     assert_constant_column_kept("identity.industry.naics", "411110");
 }
 
+/// A column of one repeated hyphenated EIN keeps its type. The bare nine digits,
+/// which the old rule rejected, conform to the rule but the detector does not count
+/// them, so a column of them is demoted (`ein_bare_digit_column_is_demoted`).
+#[test]
+fn ein_constant_column_keeps_type() {
+    assert_constant_column_kept("identity.government.ein", "12-3456789");
+}
+
+/// A column of bare nine-digit numbers labelled `ein` is demoted, as on 0.6.64.
+#[test]
+fn ein_bare_digit_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let constant: Vec<String> = vec!["010548657".to_string(); 40];
+    let varied: Vec<String> = (0..40)
+        .map(|i| format!("{:09}", 10_548_657 + i * 997))
+        .collect();
+    for values in [constant, varied] {
+        assert!(
+            schema_fail_demotion(&values, "identity.government.ein", &tax).is_some(),
+            "{:?}",
+            &values[..2]
+        );
+    }
+}
+

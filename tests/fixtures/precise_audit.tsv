@@ -161,7 +161,7 @@ identity.commerce.isrc	false	^[A-Z]{2}[A-Z0-9]{3}\d{7}$	false
 identity.commerce.issn	false	^[0-9]{4}-[0-9]{3}[0-9X]$	true
 identity.commerce.upc	false	^\d{12}$	false
 identity.government.abn	false	^\d{2}\s?\d{3}\s?\d{3}\s?\d{3}$	false
-identity.government.ein	false	^\d{2}-\d{7}$	true
+identity.government.ein	false	^\d{2}-?\d{7}$	true
 identity.government.eu_vat	false	^[A-Z]{2}[0-9A-Za-z+*.]{2,12}$	false
 identity.government.pan_india	false	^[A-Z]{5}\d{4}[A-Z]$	false
 identity.government.ssn	false	^(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}$|^(?!000|666|9\d{2})\d{3}(?!00)\d{2}(?!0000)\d{4}$	true
