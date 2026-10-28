@@ -180,7 +180,7 @@ identity.person.email_display	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 identity.person.first_name	0.0323	0.0323	0.0000	0.0000	0.3592	0.3592
 identity.person.full_name	0.0211	0.0211	0.0000	0.0000	0.3592	0.3592
 identity.person.gender	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
-identity.person.gender_code	0.0025	0.0025	0.0183	0.0183	0.0000	0.0000
+identity.person.gender_code	0.0030	0.0025	0.0183	0.0183	0.0000	0.0000
 identity.person.height	0.0022	0.0022	1.0000	1.0000	0.1661	0.1661
 identity.person.last_name	0.0323	0.0323	0.0000	0.0000	0.3592	0.3592
 identity.person.password	1.0000	1.0000	1.0000	1.0000	1.0000	1.0000

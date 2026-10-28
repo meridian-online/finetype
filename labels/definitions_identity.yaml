@@ -651,9 +651,10 @@ identity.person.gender_code:
   title: "Gender Code"
   description: >
     Single-character sex/gender code. ICAO Doc 9303 passport sex field uses
-    M (male), F (female), X (unspecified). ISO/IEC 5218 numeric coding uses
-    0 (not known), 1 (male), 2 (female), 9 (not applicable). Matched
-    case-insensitively (ac-02).
+    M (male), F (female), X (unspecified); the machine readable zone writes an
+    unspecified sex as the filler character < (part 4). ISO/IEC 5218 numeric
+    coding uses 0 (not known), 1 (male), 2 (female), 9 (not applicable).
+    Matched case-insensitively (ac-02).
   designation: broad_words
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -673,6 +674,7 @@ identity.person.gender_code:
       - "1"
       - "2"
       - "9"
+      - "<"
   tier: [VARCHAR, person]
   aliases: null
   samples:
@@ -692,7 +694,13 @@ identity.person.gender_code:
     The prior ^[MFX]$ pattern was uppercase-only and its description wrongly
     listed `O` as valid — ICAO uses X (not O) for unspecified. Converted to an
     enum so case-insensitive matching flows from ac-02; the transform still
-    uppercases for materialisation.
+    uppercases for materialisation. The filler `<` is the ICAO Doc 9303 part 4
+    MRZ convention for an unspecified sex. It is a one-character punctuation
+    mark, so no guard promotes a column to this type on it (the value-based
+    gender rule reads only M/F/X; the type is neither a ceded leaf nor on the
+    fast path) and a detector holds discrimination to the earlier codes: a
+    column made only of `<` conforms but is demoted, as before, while a
+    zone column with a few fillers among M/F keeps its type.
 
 # identity.person.nationality: REMOVED in Phase 0
 # Collapsed into representation.discrete.categorical. Short enumerated list.

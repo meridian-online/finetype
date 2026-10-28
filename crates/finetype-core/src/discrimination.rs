@@ -33,6 +33,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "technology.development.calver" => Some(is_calver_discrimination_shape),
         "finance.securities.ticker" => Some(is_ticker_discrimination_shape),
         "finance.securities.cusip" => Some(is_cusip_discrimination_shape),
+        "identity.person.gender_code" => Some(is_gender_code_discrimination_shape),
         "technology.cryptographic.jwt" => Some(is_jwt_discrimination_shape),
         "representation.scientific.protein_sequence" => {
             Some(is_protein_sequence_discrimination_shape)
@@ -289,6 +290,17 @@ fn is_jwt_discrimination_shape(value: &str) -> bool {
         (Some(a), Some(b), Some(c), None) if [a, b, c].iter().all(|p| p.len() >= 10)
     );
     three_long_segments || crate::structure::is_jwt(value)
+}
+
+/// `gender_code`: the codes the type took before the ICAO filler `<` joined the
+/// published rule (M, F, X and the ISO/IEC 5218 digits, in either case). A lone
+/// punctuation mark conforms without being counted, so a column of `<` is not
+/// confirmed as a sex code on that character alone.
+fn is_gender_code_discrimination_shape(value: &str) -> bool {
+    matches!(
+        value.to_ascii_uppercase().as_str(),
+        "M" | "F" | "X" | "0" | "1" | "2" | "9"
+    )
 }
 
 /// `cusip`: the published rule, which takes the private-placement characters
@@ -927,6 +939,7 @@ mod tests {
             "technology.cryptographic.jwt",
             "finance.securities.ticker",
             "finance.securities.cusip",
+            "identity.person.gender_code",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

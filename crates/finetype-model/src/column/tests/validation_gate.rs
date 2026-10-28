@@ -1817,3 +1817,81 @@ fn cusip_does_not_keep_reserved_character_codes_without_a_check_digit() {
         r.disambiguation_rule
     );
 }
+/// A column of one repeated `M` keeps its type. `<`, which the old rule rejected,
+/// conforms to the rule but the detector does not count it, so a column of it is
+/// demoted by design (see `gender_code_filler_constant_column_is_demoted`).
+#[test]
+fn gender_code_constant_column_keeps_type() {
+    assert_constant_column_kept("identity.person.gender_code", "M");
+}
+
+/// A column of one repeated `<` conforms to gender_code but is a lone punctuation
+/// mark; the detector does not count it, so schema_fail_demotion demotes it, as on
+/// 0.6.64 (the old rule rejected it outright).
+#[test]
+fn gender_code_filler_constant_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["<".to_string(); 40];
+    assert!(schema_fail_demotion(&values, "identity.person.gender_code", &tax).is_some());
+}
+
+/// A machine readable zone column (mostly M/F with a few `<`) keeps its type: the
+/// detector still counts the codes, and demotion needs a majority to fail.
+#[test]
+fn gender_code_mrz_column_with_fillers_is_not_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = (0..40)
+        .map(|i| {
+            if i % 8 == 0 {
+                "<"
+            } else if i % 2 == 0 {
+                "M"
+            } else {
+                "F"
+            }
+        })
+        .map(String::from)
+        .collect();
+    assert!(schema_fail_demotion(&values, "identity.person.gender_code", &tax).is_none());
+}
+
+/// `gender_code` now takes the ICAO filler `<`. It is not a ceded leaf and not on
+/// the fast path, and `disambiguate_gender` reads only M/F/X, so nothing promotes a
+/// column of fillers (or a comparison-operator column) to it.
+#[test]
+fn gender_code_is_not_promoted_for_filler_columns() {
+    for values in [
+        vec!["<"; 40],
+        vec!["<", ">", "<", ">", "<", ">"],
+        vec!["<", "M", "F", "<", "M", "<"],
+    ] {
+        let values: Vec<String> = values.iter().map(|s| s.to_string()).collect();
+        assert_ne!(
+            disambiguate_gender(&values),
+            Some("identity.person.gender_code".to_string()),
+            "{values:?}"
+        );
+    }
+    let tax = super::shipped_taxonomy();
+    assert_eq!(
+        finetype_core::fast_path::deterministic_fast_path(&tax, &vec!["<".to_string(); 40]),
+        None
+    );
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+    for label in [
+        "representation.text.word",
+        "representation.text.entity_name",
+    ] {
+        let r = cc
+            .compose_from_sense("gender", &vec!["<".to_string(); 40], label, 0.9)
+            .unwrap();
+        assert_ne!(
+            r.label, "identity.person.gender_code",
+            "{label}: {:?}",
+            r.disambiguation_rule
+        );
+    }
+}
+

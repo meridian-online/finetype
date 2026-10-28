@@ -2752,3 +2752,35 @@ fn cusip_rejects_undefined_forms() {
         ],
     );
 }
+const GENDER_CODE_LABEL: &str = "identity.person.gender_code";
+
+/// ICAO Doc 9303 part 4 writes an unspecified sex as the filler `<` in the
+/// machine readable zone; ISO/IEC 5218 gives `9` for not applicable.
+#[test]
+fn gender_code_accepts_source_forms() {
+    assert_pattern_boundary(GENDER_CODE_LABEL, &["<", "M", "9", "F", "X", "0", "m"], &[]);
+}
+
+/// A doubled filler or a letter outside the code sets is no sex code.
+#[test]
+fn gender_code_rejects_undefined_forms() {
+    assert_pattern_boundary(GENDER_CODE_LABEL, &[], &["<<", "U", ">", "<M", ""]);
+}
+
+/// The ICAO filler `<` conforms to gender_code but is not counted for
+/// discrimination; the earlier codes still are, in either case.
+#[test]
+fn gender_code_detector_keeps_out_the_filler() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(GENDER_CODE_LABEL, &tax).expect("rule");
+    let detector = detector_for(GENDER_CODE_LABEL);
+    assert!(detector.is_some());
+    assert!(rule.is_valid("<"));
+    assert!(!passes_detector_or_rule(detector, &rule, "<"));
+    for code in ["M", "f", "X", "0", "1", "2", "9"] {
+        assert!(passes_detector_or_rule(detector, &rule, code), "{code}");
+    }
+}
+
