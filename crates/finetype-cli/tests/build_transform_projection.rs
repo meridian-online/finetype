@@ -784,3 +784,29 @@ fn data_uri_is_base64_is_false_on_null_input() {
     assert!(out.status.success());
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "false");
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn version_parts_keep_hyphens_in_prerelease_and_build() {
+    let tax = test_taxonomy();
+    let label = "technology.development.version";
+    for (value, prerelease, metadata) in [
+        ("1.2.3", "", ""),
+        ("1.2.3-alpha", "alpha", ""),
+        ("1.2.3-alpha-1", "alpha-1", ""),
+        ("1.0.0+build-7", "", "build-7"),
+        ("1.2.3-beta.1+exp-5", "beta.1", "exp-5"),
+        ("v1.2.3-rc-2", "rc-2", ""),
+    ] {
+        assert_eq!(
+            run_color_part(&tax, label, "prerelease", value),
+            prerelease,
+            "prerelease of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "metadata", value),
+            metadata,
+            "metadata of {value:?}"
+        );
+    }
+}

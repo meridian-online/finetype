@@ -567,9 +567,10 @@ technology.code.locale_code:
 technology.development.version:
   title: "Version Number"
   description: >
-    Software or document version in semantic versioning format (e.g., 1.2.3)
-    or variant formats (e.g., v1.2.3, 1.2.3-alpha, 1.2.3+build).
-    Resolves to VARCHAR.
+    Software or document version in Semantic Versioning 2.0.0 format (e.g., 1.2.3)
+    or variant formats (e.g., v1.2.3, 1.2.3-alpha-1, 1.2.3+build-7).
+    Pre-release and build identifiers are dot-separated runs of letters, digits
+    and hyphens. Resolves to VARCHAR.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -582,11 +583,16 @@ technology.development.version:
     major: "CAST(REGEXP_EXTRACT({col}, '^v?([0-9]+)', 1) AS SMALLINT)"
     minor: "CAST(REGEXP_EXTRACT({col}, '^v?[0-9]+\\.([0-9]+)', 1) AS SMALLINT)"
     patch: "CAST(REGEXP_EXTRACT({col}, '^v?[0-9]+\\.[0-9]+\\.([0-9]+)', 1) AS SMALLINT)"
-    prerelease: "REGEXP_EXTRACT({col}, '-([a-zA-Z0-9.]+)(?:\\+|$)', 1)"
-    metadata: "REGEXP_EXTRACT({col}, '\\+([a-zA-Z0-9.]+)$', 1)"
+    prerelease: "REGEXP_EXTRACT({col}, '^v?[0-9]+\\.[0-9]+\\.[0-9]+-([a-zA-Z0-9.-]+)(?:\\+|$)', 1)"
+    metadata: "REGEXP_EXTRACT({col}, '\\+([a-zA-Z0-9.-]+)$', 1)"
   validation:
     type: string
-    pattern: "^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:-[a-zA-Z0-9.]+)?(?:\\+[a-zA-Z0-9.]+)?$"
+    pattern: "^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:-[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*)?(?:\\+[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*)?$"
+  validation_notes:
+    canonical:
+      kind: nonstandard
+      name: "no leading zeros"
+      pattern: "^v?(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][a-zA-Z0-9-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][a-zA-Z0-9-]*))*)?(?:\\+[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*)?$"
   tier: [VARCHAR, development]
   aliases: null
   samples:
@@ -595,12 +601,17 @@ technology.development.version:
     - "1.2.3-alpha"
     - "1.2.3-beta.1"
     - "1.2.3+build.123"
+    - "1.2.3-alpha-1"
+    - "1.0.0+build-7"
   icon: bookmark
   canonical: "https://semver.org/"
   references: null
   notes: >
     v1 migration: Was development.version. Semantic versioning (MAJOR.MINOR.PATCH).
-    Decompose extracts major, minor, patch, prerelease, and metadata components.
+    Decompose extracts major, minor, patch, prerelease, and metadata components
+    (`1.2.3-alpha-1` gives prerelease `alpha-1`; `1.0.0+build-7` gives metadata
+    `build-7`). Semantic Versioning forbids leading zeros in the numeric
+    identifiers (`1.02.3`); such a value is accepted with a note.
 
 technology.development.calver:
   title: "Calendar Version"

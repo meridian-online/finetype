@@ -1336,3 +1336,10 @@ fn ip_v6_does_not_recover_placeholder_column() {
         Some("representation.text.word")
     );
 }
+
+/// A column of one repeated hyphenated pre-release version (which the old rule
+/// rejected) keeps its type.
+#[test]
+fn version_constant_column_keeps_type() {
+    assert_constant_column_kept("technology.development.version", "1.2.3-alpha-1");
+}

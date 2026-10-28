@@ -2037,3 +2037,66 @@ fn ip_v6_detector_keeps_out_the_bare_double_colon() {
         assert!(passes_detector_or_rule(detector, &rule, kept), "{kept:?}");
     }
 }
+
+const VERSION_LABEL: &str = "technology.development.version";
+
+/// Semantic Versioning 2.0.0: pre-release and build identifiers are dot-separated
+/// runs of `[0-9A-Za-z-]`, so a hyphen may appear inside them.
+#[test]
+fn version_accepts_source_forms() {
+    assert_pattern_boundary(
+        VERSION_LABEL,
+        &[
+            "1.2.3-alpha-1",
+            "1.0.0+build-7",
+            "v1.2.3",
+            "1.2.3-beta.1+exp.sha.5114f85",
+            "1.0.0-0.3.7",
+            "1.02.3",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn version_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        VERSION_LABEL,
+        &[],
+        &[
+            "1.2",
+            "1.2.3-",
+            "1.2.3-al pha",
+            "1.2.3+",
+            // Semantic Versioning requires every identifier to be non-empty; the old
+            // rule took these.
+            "1.2.3-alpha.",
+            "1.2.3-a..b",
+            "1.2.3-.x",
+        ],
+    );
+}
+
+/// A leading zero in a numeric identifier is not Semantic Versioning, so it is
+/// accepted with a note.
+#[test]
+fn version_grades_leading_zeros_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in ["1.2.3", "v1.2.3", "1.2.3-alpha-1", "1.0.0+build-7", "0.0.0"] {
+        assert_eq!(
+            grade_value_for_label(value, VERSION_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    for value in ["1.02.3", "01.2.3", "1.2.3-01"] {
+        match grade_value_for_label(value, VERSION_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::Nonstandard, "{value}");
+                assert_eq!(note.detail, "no leading zeros", "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
+        }
+    }
+}

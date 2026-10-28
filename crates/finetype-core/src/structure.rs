@@ -1162,6 +1162,9 @@ mod tests {
             "1.2.3-beta.1",
             "1.2.3+build.123",
             "1.11.23",
+            // The published rule's hyphenated identifiers (the type's examples).
+            "1.2.3-alpha-1",
+            "1.0.0+build-7",
         ] {
             assert!(is_version_string(s), "{s} must be a version");
         }
