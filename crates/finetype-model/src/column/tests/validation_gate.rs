@@ -447,7 +447,8 @@ fn assert_constant_column_kept(label: &str, value: &str) {
 }
 
 /// A column of one repeated space-padded object (which the old rule rejected)
-/// keeps its type.
+/// keeps its type. This documents keep-type behaviour; it does not fail on the
+/// old rule, because json is not vetoed or demoted under either rule.
 #[test]
 fn json_constant_column_keeps_type() {
     assert_constant_column_kept("container.object.json", " {\"a\": 1} ");
@@ -471,7 +472,10 @@ fn yaml_constant_column_keeps_type() {
 /// (which the old rule rejected) keeps its type. The plan's first such value,
 /// `a,,c`, is accepted by the published rule but not by the detector, which
 /// keeps empty-field text out of discrimination by design, so a column of it
-/// is demoted; a quoted field is what the detector keeps.
+/// is demoted; a quoted field is what the detector keeps. The old rule also
+/// rejected `a,,c`, so that demotion is not a regression. RFC 4180 requires
+/// the new rejections of a bare quote in an unquoted field and of a line break
+/// outside quotes.
 #[test]
 fn csv_constant_column_keeps_type() {
     assert_constant_column_kept("container.object.csv", "\"a,,b\",1");
