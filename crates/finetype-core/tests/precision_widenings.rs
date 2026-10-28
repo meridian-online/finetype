@@ -2073,6 +2073,8 @@ fn version_rejects_undefined_forms() {
             "1.2.3-alpha.",
             "1.2.3-a..b",
             "1.2.3-.x",
+            "1.0.0+build.",
+            "1.0.0+a..b",
         ],
     );
 }

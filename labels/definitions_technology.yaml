@@ -682,6 +682,7 @@ technology.development.docker_ref:
     - "docker.io/library/postgres:16-alpine"
     - "gcr.io/project/service@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
     - "app:_dev"
+    - "app@sha512:a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4"
     - "app@blake3:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
   icon: bookmark
   references: null
@@ -920,7 +921,9 @@ technology.cryptographic.jwt:
     five-part JWE is not split (its parts are header, encrypted key,
     initialization vector, ciphertext and tag), so its payload and signature
     read ''. Discrimination counts a JWE or an unsecured JWT only when its
-    header decodes to a JSON object with an "alg" member.
+    header decodes to a JSON object with an "alg" member. An empty signature is
+    accepted for any "alg", because logs often redact signatures, although
+    RFC 7515 allows it only with "alg": "none".
 
 technology.internet.cidr:
   title: "CIDR Notation"

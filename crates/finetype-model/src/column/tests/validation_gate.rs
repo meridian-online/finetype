@@ -1366,6 +1366,10 @@ fn calver_decimal_column_is_demoted() {
     );
 }
 
+/// calver is not a ceded leaf, so nothing promotes a column to it; the real guard
+/// for decimals is `calver_decimal_column_is_demoted` (the detector does not count
+/// them). This pins that no promotion path exists.
+///
 /// A column of decimals that look like a calendar version (`2024.1`, `2020.5`)
 /// is not promoted to `calver`, from the decimal, the integer or the unknown
 /// label, with a version-like or a date-like header.
