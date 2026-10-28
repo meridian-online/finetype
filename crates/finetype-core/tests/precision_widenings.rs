@@ -2543,6 +2543,7 @@ fn iana_accepts_source_forms() {
             "Etc/GMT-0",
             "Etc/GMT-1",
             "Etc/GMT+1",
+            "Etc/GMT0",
             "America/North_Dakota/New_Salem",
             "Etc/UTC",
         ],

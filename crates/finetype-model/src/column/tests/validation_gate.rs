@@ -1565,7 +1565,7 @@ fn full_month_year_column_keeps_month_year_full() {
     let tax = super::shipped_taxonomy();
     assert!(
         !label_validates_sample(&tax, "datetime.date.month_year_abbrev", &values),
-        "no full month name conforms to month_year_abbrev"
+        "the full-name column fails month_year_abbrev as a whole (only May, June and July values conform on their own)"
     );
 }
 
@@ -1608,7 +1608,21 @@ fn iana_does_not_recover_path_or_code_columns() {
     let mut cc =
         ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
     cc.set_taxonomy(super::shipped_taxonomy());
-    let columns: [Vec<String>; 4] = [
+    let columns: [Vec<String>; 5] = [
+        // Under real tz areas, where the widened class (not the area list) is
+        // what decides: file names and versioned names are not zones.
+        [
+            "Europe/Sales-Report.pdf",
+            "Asia/Tokyo.png",
+            "America/data.v2",
+            "Europe/Q3-Summary.xlsx",
+            "Asia/Osaka.jpg",
+        ]
+        .iter()
+        .cycle()
+        .take(70)
+        .map(|s| s.to_string())
+        .collect(),
         [
             "Sales/North",
             "Sales/South-East",
@@ -1649,6 +1663,8 @@ fn iana_does_not_recover_path_or_code_columns() {
             "representation.text.word",
             "representation.text.plain_text",
             "representation.text.entity_name",
+            "geography.location.continent",
+            "geography.location.city",
             "unknown",
         ] {
             let r = cc.compose_from_sense("name", values, label, 1.0).unwrap();

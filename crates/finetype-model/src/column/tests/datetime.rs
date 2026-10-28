@@ -1439,6 +1439,7 @@ fn iana_zone_shape_takes_tz_areas_only() {
         "Etc/GMT+12",
         "Etc/GMT-14",
         "Etc/GMT-0",
+        "Etc/GMT0",
     ] {
         assert!(is_iana_zone_name(ok), "{ok} is a zone name");
     }
@@ -1460,6 +1461,38 @@ fn iana_zone_shape_takes_tz_areas_only() {
     ] {
         assert!(!is_iana_zone_name(bad), "{bad} is not a zone name");
     }
+}
+
+/// Under a real tz area the area list no longer separates a zone from a file or
+/// versioned name, so the location class does: no tz name contains a dot.
+#[test]
+fn iana_recovery_leaves_dotted_names_under_real_areas() {
+    let column = vals(&[
+        "Europe/Sales-Report.pdf",
+        "Asia/Tokyo.png",
+        "America/data.v2",
+        "Europe/Q3-Summary.xlsx",
+        "Asia/Osaka.jpg",
+    ]);
+    let many: Vec<String> = column.iter().cycle().take(70).cloned().collect();
+    for label in ["geography.location.continent", "representation.text.word"] {
+        assert_eq!(iana_zone_recovery(&many, label), None, "from {label}");
+    }
+    for bad in [
+        "Asia/Tokyo.png",
+        "America/data.v2",
+        "Europe/Sales-Report.pdf",
+    ] {
+        assert!(!is_iana_zone_name(bad), "{bad} is not a zone name");
+    }
+    // Real hyphenated and Etc zones are still recovered.
+    let zones = vals(&[
+        "America/Port-au-Prince",
+        "Etc/GMT+4",
+        "Etc/GMT0",
+        "Asia/Tokyo",
+    ]);
+    assert!(iana_zone_recovery(&zones, "geography.location.continent").is_some());
 }
 
 #[test]

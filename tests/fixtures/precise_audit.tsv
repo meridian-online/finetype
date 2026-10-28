@@ -59,7 +59,7 @@ datetime.duration.iso_8601	false	^(?:-?P(?=\d|T\d)(?!.*[.,]\d+[A-Z]T?\d)(?:(\d+(
 datetime.epoch.unix_microseconds	false	^\d{16}$	false
 datetime.epoch.unix_milliseconds	false	^\d{13}$	false
 datetime.epoch.unix_seconds	false	^\d{10}$	false
-datetime.offset.iana	false	^(?:Etc/GMT(?:\+(?:[0-9]|1[0-2])|-(?:[0-9]|1[0-4]))|[A-Z][a-zA-Z]+/[A-Za-z_][A-Za-z_.-]*(?:/[A-Za-z_][A-Za-z_.-]*)?)$	true
+datetime.offset.iana	false	^(?:Etc/GMT(?:0|\+(?:[0-9]|1[0-2])|-(?:[0-9]|1[0-4]))|[A-Z][a-zA-Z]+/[A-Za-z_][A-Za-z_.-]*(?:/[A-Za-z_][A-Za-z_.-]*)?)$	true
 datetime.offset.timezone_abbreviation	false	^(UTC|GMT|EST|EDT|CST|CDT|MST|MDT|PST|PDT|AKST|AKDT|HST|HAST|HADT|AST|ADT|NST|NDT|CET|CEST|EET|EEST|WET|WEST|BST|IST|WAT|CAT|EAT|SAST|MSK|GST|PKT|ICT|WIB|SGT|HKT|JST|KST|AEST|AEDT|ACST|ACDT|AWST|NZST|NZDT)$	true
 datetime.offset.utc	false	^UTC [+-]\d{2}:\d{2}$	true
 datetime.period.fiscal_year	false	^FY\d{2,4}$	true

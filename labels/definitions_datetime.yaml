@@ -1480,7 +1480,7 @@ datetime.offset.iana:
   decompose: null
   validation:
     type: string
-    pattern: "^(?:Etc/GMT(?:\\+(?:[0-9]|1[0-2])|-(?:[0-9]|1[0-4]))|[A-Z][a-zA-Z]+/[A-Za-z_][A-Za-z_.-]*(?:/[A-Za-z_][A-Za-z_.-]*)?)$"
+    pattern: "^(?:Etc/GMT(?:0|\\+(?:[0-9]|1[0-2])|-(?:[0-9]|1[0-4]))|[A-Z][a-zA-Z]+/[A-Za-z_][A-Za-z_.-]*(?:/[A-Za-z_][A-Za-z_.-]*)?)$"
   tier: [VARCHAR, offset]
   aliases: [timezone]
   samples:
@@ -1501,8 +1501,10 @@ datetime.offset.iana:
     is the stable structural invariant. Name components may hold letters,
     '.', '-' and '_' (America/Port-au-Prince, America/Argentina/Buenos_Aires).
     The one place digits appear is the fixed-offset zones of the etcetera
-    file: Etc/GMT+N for N 0 to 12 and Etc/GMT-N for N 0 to 14. Add an enum
-    only if generated from tzdata at build time, never hand-maintained.
+    file: Etc/GMT+N for N 0 to 12 and Etc/GMT-N for N 0 to 14, plus the
+    Etc/GMT0 link. No tz name contains a dot; the rule allows it, and the
+    recovery guard that promotes other labels to this one does not. Add an
+    enum only if generated from tzdata at build time, never hand-maintained.
 
 datetime.offset.timezone_abbreviation:
   title: Timezone Abbreviation
@@ -3113,7 +3115,9 @@ datetime.date.month_year_abbrev:
     The twelve months in title or upper case (Jan, JAN), plus the longer forms
     Sept, June and July that the US BLS writes. The transform reads the first
     letter in upper case, the next two in lower case and the final four digits,
-    so Sept, June and July all read as Sep, Jun and Jul. Full month names
+    so Sept, June and July all read as Sep, Jun and Jul. format_string and
+    the frictionless format (%b) cover the three-letter title-case form only;
+    Sept, June, July and upper case parse through the transform. Full month names
     (January 2024) are not this type; they are month_year_full.
 
 datetime.date.month_year_slash:

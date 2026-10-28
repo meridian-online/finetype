@@ -426,9 +426,11 @@ pub(crate) fn is_iso_8601_duration(v: &str) -> bool {
 
 /// An IANA tz database zone name: one of the database's top-level areas, then a
 /// capitalised location, optionally a second (`America/Argentina/Buenos_Aires`).
-/// A location may hold `.`, `-` and `_` (`America/Port-au-Prince`), and the
+/// A location may hold `-` and `_` (`America/Port-au-Prince`), and the
 /// fixed-offset zones of the `etcetera` file are `Etc/GMT+N` for N 0 to 12 and
-/// `Etc/GMT-N` for N 0 to 14. The area list is closed — the database has used
+/// `Etc/GMT-N` for N 0 to 14, plus the `Etc/GMT0` link. No tz name contains a
+/// dot, so the guard (unlike the published rule) omits it: under a real area it
+/// is what keeps `Asia/Tokyo.png` out. The area list is closed — the database has used
 /// these names throughout — so `Region/City` text in general (`Sales/North`) is
 /// not admitted. Strictly inside the `datetime.offset.iana` validator.
 pub(crate) fn is_iana_zone_name(v: &str) -> bool {
@@ -436,9 +438,9 @@ pub(crate) fn is_iana_zone_name(v: &str) -> bool {
     static RE: OnceLock<regex::Regex> = OnceLock::new();
     let re = RE.get_or_init(|| {
         regex::Regex::new(concat!(
-            r"^(?:Etc/GMT(?:\+(?:[0-9]|1[0-2])|-(?:[0-9]|1[0-4]))|",
+            r"^(?:Etc/GMT(?:0|\+(?:[0-9]|1[0-2])|-(?:[0-9]|1[0-4]))|",
             r"(?:Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|",
-            r"Indian|Pacific|Etc)/[A-Z][A-Za-z_.-]*(?:/[A-Z][A-Za-z_.-]*)?)$",
+            r"Indian|Pacific|Etc)/[A-Z][A-Za-z_-]*(?:/[A-Z][A-Za-z_-]*)?)$",
         ))
         .expect("iana zone regex")
     });
