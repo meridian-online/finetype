@@ -454,11 +454,13 @@ fn json_constant_column_keeps_type() {
     assert_constant_column_kept("container.object.json", " {\"a\": 1} ");
 }
 
-/// A column of one repeated empty-element tag (which the old rule rejected)
-/// keeps its type.
+/// A column of one repeated single-line element keeps its type. An
+/// empty-element tag (`<root/>`), which the old rule rejected, conforms but
+/// does not count for discrimination (the detector keeps the old shape), so a
+/// column of it is demoted by design; new-form constants are not pinned here.
 #[test]
 fn xml_constant_column_keeps_type() {
-    assert_constant_column_kept("container.object.xml", "<root/>");
+    assert_constant_column_kept("container.object.xml", "<a>1</a>");
 }
 
 /// A column of one repeated `key:` document keeps its type. A `---`-opened
@@ -593,4 +595,30 @@ fn yaml_marker_column_is_demoted_by_the_function() {
         demoted.map(|(label, _)| label).as_deref(),
         Some("representation.text.word")
     );
+}
+
+/// A column of multi-line HTML fragments labelled `html` is not relabelled xml
+/// either: they conform to the XML rule but the detector keeps the old
+/// single-line shape.
+#[test]
+fn xml_does_not_recover_html_fragment_column() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let fragments: Vec<String> = [
+        "<p>Hello</p>\n<p>World</p>",
+        "<div>\n  <span>x</span>\n</div>",
+        "<ul>\n<li>a</li>\n</ul>",
+    ]
+    .iter()
+    .cycle()
+    .take(42)
+    .map(|s| s.to_string())
+    .collect();
+    for label in ["container.object.html", "representation.text.word"] {
+        let r = cc
+            .compose_from_sense("frag", &fragments, label, 1.0)
+            .unwrap();
+        assert_ne!(r.label, "container.object.xml", "from {label}");
+    }
 }

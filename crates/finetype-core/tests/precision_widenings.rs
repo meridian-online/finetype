@@ -899,7 +899,6 @@ fn xml_accepts_source_forms() {
             "<?xml version=\"1.0\"?><!-- generated --><a>1</a>",
             "<a/><!-- end -->",
             "<a>1</a>\n<?pi data?>\n",
-            "<a\u{10000}/>",
         ],
         &[],
     );
@@ -922,9 +921,49 @@ fn xml_detector_keeps_out_html() {
     ] {
         assert!(!detect(bad), "{bad:?}");
     }
-    for ok in ["<a>1</a>", "<?xml version=\"1.0\"?><!-- c --><a/>"] {
+    // A DOCTYPE with an internal subset is skipped to find the root.
+    assert!(!detect(
+        "<!DOCTYPE x [<!ENTITY e \"v\">]><html><b>1</b></html>"
+    ));
+    for ok in [
+        "<a>1</a>",
+        "<?xml version=\"1.0\"?><a>1</a>",
+        "<!DOCTYPE x [<!ENTITY e \"v\">]><a>1</a>",
+    ] {
         assert!(detect(ok), "{ok:?}");
     }
+}
+
+/// The newly accepted forms conform but do not count for discrimination, so
+/// multi-line HTML fragments and empty-element tags are not promoted.
+#[test]
+fn xml_detector_keeps_the_old_single_line_shape() {
+    let detect = finetype_core::discrimination::detector_for(XML_LABEL).expect("xml detector");
+    for new_form in [
+        "<root/>",
+        "<a>\n  <b>1</b>\n</a>",
+        "<p>Hello</p>\n<p>World</p>",
+        "<a/><!-- end -->",
+    ] {
+        assert!(!detect(new_form), "{new_form:?}");
+    }
+}
+
+/// Newly rejected, source-required: XML 1.0 is case-sensitive about
+/// `<!DOCTYPE`, a root must be an element, and an end tag is `</Name S?>`.
+#[test]
+fn xml_rejects_forms_the_source_forbids() {
+    assert_pattern_boundary(
+        XML_LABEL,
+        &[],
+        &[
+            "<!doctype html><a/>",
+            "<![CDATA[x]]>",
+            "<a>x</a b>",
+            "<a>x</ a>",
+            "<>x</>",
+        ],
+    );
 }
 
 const YAML_LABEL: &str = "container.object.yaml";

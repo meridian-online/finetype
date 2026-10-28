@@ -111,40 +111,57 @@ fn is_csv_discrimination_shape(value: &str) -> bool {
     is_csv_record(value) && (value.contains('"') || value.split(',').all(|f| !f.is_empty()))
 }
 
-/// The published `container.object.xml` rule, compiled once from the embedded
-/// taxonomy so the detector can never drift from it.
-fn xml_rule() -> Option<&'static regex::Regex> {
-    static RULE: std::sync::OnceLock<Option<regex::Regex>> = std::sync::OnceLock::new();
-    RULE.get_or_init(|| {
-        let doc: serde_yaml::Value =
-            serde_yaml::from_str(include_str!("../../../labels/definitions_container.yaml"))
-                .ok()?;
-        let pattern = doc
-            .get("container.object.xml")?
-            .get("validation")?
-            .get("pattern")?
-            .as_str()?;
-        regex::Regex::new(pattern).ok()
-    })
-    .as_ref()
+/// The published `container.object.xml` rule. A copy, because the library
+/// cannot read `labels/` when built from the crates.io package; the test
+/// `xml_rule_copy_matches_the_taxonomy` keeps it equal to the taxonomy's.
+const XML_RULE: &str = "^(?:<\\?xml[^>]*\\?>)?(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*(?:<!DOCTYPE\\s[^\\[>]*(?:\\[[\\s\\S]*?\\]\\s*)?>(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*)?(?:<[A-Za-z_:\u{C0}-\u{D6}\u{D8}-\u{F6}\u{F8}-\u{2FF}\u{370}-\u{37D}\u{37F}-\u{1FFF}\u{200C}\u{200D}\u{2070}-\u{218F}\u{2C00}-\u{2FEF}\u{3001}-\u{D7FF}\u{F900}-\u{FDCF}\u{FDF0}-\u{FFFD}][A-Za-z_:\u{C0}-\u{D6}\u{D8}-\u{F6}\u{F8}-\u{2FF}\u{370}-\u{37D}\u{37F}-\u{1FFF}\u{200C}\u{200D}\u{2070}-\u{218F}\u{2C00}-\u{2FEF}\u{3001}-\u{D7FF}\u{F900}-\u{FDCF}\u{FDF0}-\u{FFFD}\\-.0-9\u{B7}\u{300}-\u{36F}\u{203F}-\u{2040}]*(?:\\s[^<>]*)?/>|<[A-Za-z_:\u{C0}-\u{D6}\u{D8}-\u{F6}\u{F8}-\u{2FF}\u{370}-\u{37D}\u{37F}-\u{1FFF}\u{200C}\u{200D}\u{2070}-\u{218F}\u{2C00}-\u{2FEF}\u{3001}-\u{D7FF}\u{F900}-\u{FDCF}\u{FDF0}-\u{FFFD}][A-Za-z_:\u{C0}-\u{D6}\u{D8}-\u{F6}\u{F8}-\u{2FF}\u{370}-\u{37D}\u{37F}-\u{1FFF}\u{200C}\u{200D}\u{2070}-\u{218F}\u{2C00}-\u{2FEF}\u{3001}-\u{D7FF}\u{F900}-\u{FDCF}\u{FDF0}-\u{FFFD}\\-.0-9\u{B7}\u{300}-\u{36F}\u{203F}-\u{2040}]*(?:\\s[^<>]*)?>[\\s\\S]*</[A-Za-z_:\u{C0}-\u{D6}\u{D8}-\u{F6}\u{F8}-\u{2FF}\u{370}-\u{37D}\u{37F}-\u{1FFF}\u{200C}\u{200D}\u{2070}-\u{218F}\u{2C00}-\u{2FEF}\u{3001}-\u{D7FF}\u{F900}-\u{FDCF}\u{FDF0}-\u{FFFD}][A-Za-z_:\u{C0}-\u{D6}\u{D8}-\u{F6}\u{F8}-\u{2FF}\u{370}-\u{37D}\u{37F}-\u{1FFF}\u{200C}\u{200D}\u{2070}-\u{218F}\u{2C00}-\u{2FEF}\u{3001}-\u{D7FF}\u{F900}-\u{FDCF}\u{FDF0}-\u{FFFD}\\-.0-9\u{B7}\u{300}-\u{36F}\u{203F}-\u{2040}]*\\s*>)(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*$";
+
+/// The shape the type had before the rule followed XML 1.0: single line,
+/// `<...>...</...>`.
+const XML_OLD_SHAPE: &str = "^<.*>.*</.*>$";
+
+fn xml_regexes() -> Option<&'static (regex::Regex, regex::Regex)> {
+    static RULES: std::sync::OnceLock<Option<(regex::Regex, regex::Regex)>> =
+        std::sync::OnceLock::new();
+    RULES
+        .get_or_init(|| {
+            Some((
+                regex::Regex::new(XML_RULE).ok()?,
+                regex::Regex::new(XML_OLD_SHAPE).ok()?,
+            ))
+        })
+        .as_ref()
 }
 
 /// The name of the root element: the first tag after any declaration,
-/// processing instructions, comments and DOCTYPE.
+/// processing instructions, comments and DOCTYPE (with its internal subset).
 fn xml_root_name(value: &str) -> Option<&str> {
     let mut rest = value.trim_start();
     loop {
-        let skip = if rest.starts_with("<?") {
-            "?>"
+        let end = if rest.starts_with("<?") {
+            rest.find("?>")? + 2
         } else if rest.starts_with("<!--") {
-            "-->"
+            rest.find("-->")? + 3
         } else if rest.starts_with("<!") {
-            ">"
+            // A declaration ends at the first `>` outside an internal subset.
+            let mut depth = 0usize;
+            let mut end = None;
+            for (i, c) in rest.char_indices() {
+                match c {
+                    '[' => depth += 1,
+                    ']' => depth = depth.saturating_sub(1),
+                    '>' if depth == 0 => {
+                        end = Some(i + 1);
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            end?
         } else {
             break;
         };
-        let end = rest.find(skip)?;
-        rest = rest[end + skip.len()..].trim_start();
+        rest = rest[end..].trim_start();
     }
     let rest = rest.strip_prefix('<')?;
     let end = rest
@@ -153,22 +170,38 @@ fn xml_root_name(value: &str) -> Option<&str> {
     Some(&rest[..end])
 }
 
-/// `xml`: the published rule, and neither an `html` root element (in any
-/// case) nor a `<!DOCTYPE html` declaration. The published rule is shaped by
-/// XML 1.0, so it also accepts XHTML and any multi-line `<html>` page; the type
-/// is a ceded leaf, so without this a column of HTML pages could be relabelled
-/// xml. XHTML still conforms; it is not counted for discrimination.
+/// `xml`: the published rule, the single-line `<...>...</...>` shape the type
+/// had first, and neither an `html` root element (in any case) nor a
+/// `<!DOCTYPE html` declaration. The published rule is shaped by XML 1.0, so it
+/// also accepts multi-line text, XHTML and any `<html>` page or HTML fragment;
+/// the type is a ceded leaf, so without this a column of HTML could be
+/// relabelled xml. Those forms conform but are not counted for discrimination.
 fn is_xml_discrimination_shape(value: &str) -> bool {
-    let Some(rule) = xml_rule() else {
+    let Some((rule, old_shape)) = xml_regexes() else {
         return false;
     };
     rule.is_match(value)
+        && old_shape.is_match(value)
         && !value
             .get(..value.len().min(2048))
             .unwrap_or(value)
             .to_ascii_lowercase()
             .contains("<!doctype html")
         && !xml_root_name(value).is_some_and(|n| n.eq_ignore_ascii_case("html"))
+}
+
+#[cfg(test)]
+mod xml_rule_copy {
+    #[test]
+    fn xml_rule_copy_matches_the_taxonomy() {
+        let doc: serde_yaml::Value =
+            serde_yaml::from_str(include_str!("../../../labels/definitions_container.yaml"))
+                .expect("parse container definitions");
+        let published = doc["container.object.xml"]["validation"]["pattern"]
+            .as_str()
+            .expect("xml pattern");
+        assert_eq!(super::XML_RULE, published);
+    }
 }
 
 /// `yaml`: a first line of the form `key:` with a key of letters, digits and

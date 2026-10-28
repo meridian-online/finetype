@@ -141,7 +141,7 @@ container.object.xml:
   decompose: null
   validation:
     type: string
-    pattern: "^(?:<\\?xml[^>]*\\?>)?(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*(?:<!DOCTYPE\\s[^\\[>]*(?:\\[[\\s\\S]*?\\]\\s*)?>(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*)?(?:<[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\U00010000-\U000EFFFF][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\U00010000-\U000EFFFF\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*(?:\\s[^<>]*)?/>|<[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\U00010000-\U000EFFFF][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\U00010000-\U000EFFFF\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*(?:\\s[^<>]*)?>[\\s\\S]*</[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\U00010000-\U000EFFFF][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\U00010000-\U000EFFFF\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*\\s*>)(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*$"
+    pattern: "^(?:<\\?xml[^>]*\\?>)?(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*(?:<!DOCTYPE\\s[^\\[>]*(?:\\[[\\s\\S]*?\\]\\s*)?>(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*)?(?:<[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*(?:\\s[^<>]*)?/>|<[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*(?:\\s[^<>]*)?>[\\s\\S]*</[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*\\s*>)(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*$"
   tier: [VARCHAR, object]
   aliases: [xml_document]
   samples:
@@ -161,8 +161,12 @@ container.object.xml:
     comments, processing instructions and whitespace, an optional DOCTYPE
     with an internal subset, one root element, then trailing Misc), not that
     the element names match or that the document is well-formed. XHTML
-    conforms, but a detector keeps HTML documents (an html root or a
-    DOCTYPE html) out of discrimination.
+    conforms. Name characters from the supplementary planes (U+10000 and
+    above) are not accepted, so the pattern compiles in ECMA-262 without the
+    u flag. A detector counts only the narrower single-line shape
+    `<...>...</...>` that is not HTML (no html root, no DOCTYPE html), so
+    multi-line documents, empty-element tags and prologs conform in grading
+    but not in discrimination.
 
 container.object.html:
   title: "HTML Content"
