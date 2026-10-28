@@ -679,8 +679,8 @@ pub(crate) fn schema_fail_demotion(
     // tight bar — a real geohash or SI-unit column "should" validate ~100%. But the
     // shipped definitions don't: the geohash detector (six to twelve characters)
     // deliberately does not count valid 1-5 and 13-20 char geohashes (~23% of a
-    // genuine column — see the geohash `notes`), and the measurement_unit enum lists only 30 SI units, so real unit
-    // columns fail ~44%. A tighter bar would demote those genuine columns. >50% fires
+    // genuine column — see the geohash `notes`), and the measurement_unit enum
+    // lists only 30 SI units, so real unit columns fail ~44%. A tighter bar would demote those genuine columns. >50% fires
     // only when the column is overwhelmingly not the type (network codes that are
     // 100% non-units), which is the over-emit this rule targets. Precision Principle.
     if fail_rate <= 0.5 {

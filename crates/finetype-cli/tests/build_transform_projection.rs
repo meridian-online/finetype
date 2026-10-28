@@ -562,3 +562,30 @@ fn coordinates_transform_and_parts_read_every_accepted_form() {
         }
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI and the spatial extension; CI runs it with --include-ignored"]
+fn coordinates_transform_ext_puts_longitude_first() {
+    // ST_Point takes x (longitude) first: "48.8761, 2.3681" is x = 2.3681, y = 48.8761.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let ext = tax
+        .get("geography.coordinate.coordinates")
+        .expect("coordinates is a known label")
+        .transform_ext
+        .clone()
+        .expect("coordinates has a transform_ext");
+    let point = ext.replace("{col}", "'48.8761, 2.3681'");
+    let sql = format!("INSTALL spatial; LOAD spatial; SELECT ST_X({point}), ST_Y({point})");
+    let out = Command::new("duckdb")
+        .args(["-no-init", "-noheader", "-list", "-csv", "-c", &sql])
+        .output()
+        .expect("run the duckdb CLI");
+    assert!(
+        out.status.success(),
+        "duckdb failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(stdout.trim().lines().last(), Some("2.3681,48.8761"));
+}

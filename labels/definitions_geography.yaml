@@ -1467,7 +1467,10 @@ geography.coordinate.mgrs:
     1 mm (16 digits; FGDC-STD-011-2001 gives such an example). Digits come in
     equal easting and northing halves, so an odd count is not a reference. For
     discrimination a value counts only with a zone number and 2 to 10 digits;
-    UPS references and 12 to 16 digits conform but are not counted.
+    UPS references and 12 to 16 digits conform but are not counted. A 100 km
+    reference with no digits (18SUJ) is valid MGRS but is deliberately not
+    matched, because a zone and two letters are too short to tell from other
+    codes.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: transportation
