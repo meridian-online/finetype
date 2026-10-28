@@ -1343,3 +1343,55 @@ fn ip_v6_does_not_recover_placeholder_column() {
 fn version_constant_column_keeps_type() {
     assert_constant_column_kept("technology.development.version", "1.2.3-alpha-1");
 }
+
+/// A column of one repeated single-digit-month, third-component calver (which the
+/// old rule rejected) keeps its type. The detector counts it: it has a third
+/// component. A column of `2024.1`, which the detector does not count, is
+/// demoted instead (see `calver_decimal_column_is_demoted`).
+#[test]
+fn calver_constant_column_keeps_type() {
+    assert_constant_column_kept("technology.development.calver", "2024.2.9");
+}
+
+/// A column of one repeated `2024.1` conforms to calver but is a decimal; the
+/// detector does not count it, so schema_fail_demotion demotes it, as on 0.6.64
+/// (the old rule rejected it outright).
+#[test]
+fn calver_decimal_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["2024.1".to_string(); 40];
+    assert!(
+        schema_fail_demotion(&values, "technology.development.calver", &tax).is_some(),
+        "a column of 2024.1 is demoted"
+    );
+}
+
+/// A column of decimals that look like a calendar version (`2024.1`, `2020.5`)
+/// is not promoted to `calver`, from the decimal, the integer or the unknown
+/// label, with a version-like or a date-like header.
+#[test]
+fn calver_does_not_recover_decimal_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let decimals: Vec<String> = ["2024.1", "2020.5", "1999.9", "2024.7", "2021.3", "2022.8"]
+        .iter()
+        .cycle()
+        .take(60)
+        .map(|s| s.to_string())
+        .collect();
+    for header in ["value", "version", "release", "year"] {
+        for from in [
+            "representation.numeric.decimal_number",
+            "representation.numeric.integer_number",
+            "unknown",
+        ] {
+            let r = cc.compose_from_sense(header, &decimals, from, 1.0).unwrap();
+            assert_ne!(
+                r.label, "technology.development.calver",
+                "{header} / {from}: {:?}",
+                r.disambiguation_rule
+            );
+        }
+    }
+}

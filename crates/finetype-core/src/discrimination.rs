@@ -30,6 +30,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "representation.scientific.smiles" => Some(is_smiles_discrimination_shape),
         "technology.internet.hostname" => Some(is_hostname_discrimination_shape),
         "technology.internet.ip_v6" => Some(is_ip_v6_discrimination_shape),
+        "technology.development.calver" => Some(is_calver_discrimination_shape),
         "representation.scientific.protein_sequence" => {
             Some(is_protein_sequence_discrimination_shape)
         }
@@ -251,6 +252,24 @@ fn is_hostname_discrimination_shape(value: &str) -> bool {
             .is_some_and(|(_, last)| last.len() >= 2),
         None => true,
     }
+}
+
+/// `calver`: the published rule, which takes a one-digit month (calver.org's
+/// `MM`), counted only when the month has two digits or the value has a third
+/// component (`2024.02`, `2024.2.9`). `2024.1` and `2020.5` conform but are not
+/// counted: they are decimals, and a column of them would otherwise be promoted
+/// with certainty.
+fn is_calver_discrimination_shape(value: &str) -> bool {
+    let mut parts = value.split('.');
+    let (Some(year), Some(month)) = (parts.next(), parts.next()) else {
+        return false;
+    };
+    let digits = |p: &str| p.bytes().all(|b| b.is_ascii_digit());
+    year.len() == 4
+        && digits(year)
+        && (1..=2).contains(&month.len())
+        && digits(month)
+        && (month.len() == 2 || parts.next().is_some_and(|third| !third.is_empty()))
 }
 
 /// `query_string`: only `name=value` pairs joined by `&`, every name non-empty
@@ -788,6 +807,7 @@ mod tests {
             "representation.scientific.smiles",
             "technology.internet.hostname",
             "technology.internet.ip_v6",
+            "technology.development.calver",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

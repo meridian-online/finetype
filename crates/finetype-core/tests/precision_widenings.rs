@@ -2100,3 +2100,61 @@ fn version_grades_leading_zeros_as_noted() {
         }
     }
 }
+
+const CALVER_LABEL: &str = "technology.development.calver";
+
+/// calver.org: the month and the day are `MM`/`0M` and `DD`/`0D`, so a single
+/// digit is a calendar version too.
+#[test]
+fn calver_accepts_source_forms() {
+    assert_pattern_boundary(
+        CALVER_LABEL,
+        &[
+            "2024.2.9",
+            "2024.12.31",
+            "2024.1",
+            "2024.02",
+            "2024.01.15.1",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn calver_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        CALVER_LABEL,
+        &[],
+        &["24.2", "2024..1", "2024", "2024.", "2024.123", "2024.1x"],
+    );
+}
+
+/// `2024.1` and `2020.5` conform but are also decimals, so the detector does not
+/// count them; a two-digit month or a third component does.
+#[test]
+fn calver_detector_keeps_out_decimals() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(CALVER_LABEL, &tax).expect("calver rule");
+    let detector = detector_for(CALVER_LABEL);
+    assert!(detector.is_some());
+    for kept in [
+        "2024.02",
+        "2024.12",
+        "2024.2.9",
+        "2024.12.31",
+        "2024.01.15.1",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, kept), "{kept:?}");
+    }
+    for out in ["2024.1", "2020.5", "1999.9", "2024.1.", "24.2", "2024"] {
+        assert!(
+            !passes_detector_or_rule(detector, &rule, out),
+            "{out:?} is not counted"
+        );
+    }
+    for decimal in ["2024.1", "2020.5"] {
+        assert!(rule.is_valid(decimal), "{decimal:?} conforms");
+    }
+}

@@ -810,3 +810,48 @@ fn version_parts_keep_hyphens_in_prerelease_and_build() {
         );
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn calver_decompose_day_is_null_without_a_day() {
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let decompose = tax
+        .ddl_info("technology.development.calver")
+        .expect("calver is a known label")
+        .decompose
+        .clone()
+        .expect("calver has decompose");
+    // The part's value, or "NULL" for a SQL NULL, so a NULL is not read as ''.
+    let run = |part: &str, value: &str| -> String {
+        let expr = decompose[part].as_str().expect("decompose part");
+        let sql = format!(
+            "SELECT COALESCE(CAST(({}) AS VARCHAR), 'NULL')",
+            expr.replace("{col}", &format!("'{}'", value))
+        );
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(
+            out.status.success(),
+            "duckdb failed on {value:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    let cases: &[(&str, &str, &str, &str)] = &[
+        ("2024.1", "2024", "1", "NULL"),
+        ("2024.12", "2024", "12", "NULL"),
+        ("2024.2.9", "2024", "2", "9"),
+        ("2024.12.31", "2024", "12", "31"),
+        ("2024.02.09", "2024", "2", "9"),
+        ("2024.01.15.1", "2024", "1", "15"),
+        ("2024.3.2024", "2024", "3", "NULL"),
+    ];
+    for (value, year, month, day) in cases {
+        assert_eq!(run("year", value), *year, "year of {value:?}");
+        assert_eq!(run("month", value), *month, "month of {value:?}");
+        assert_eq!(run("day", value), *day, "day of {value:?}");
+    }
+}

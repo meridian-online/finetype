@@ -616,8 +616,9 @@ technology.development.version:
 technology.development.calver:
   title: "Calendar Version"
   description: >
-    Calendar versioning (CalVer) following date-based patterns like YYYY.MM.DD
-    or YYYY.MM. Used by projects that version based on release calendar.
+    Calendar versioning (CalVer) following date-based patterns like YYYY.MM.DD,
+    YYYY.MM or YYYY.0M.0D, with a one- or two-digit month and day. Used by
+    projects that version based on release calendar.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -628,22 +629,27 @@ technology.development.calver:
   transform_ext: null
   decompose:
     year: "CAST(REGEXP_EXTRACT({col}, '^([0-9]{4})', 1) AS SMALLINT)"
-    month: "CAST(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.([0-9]{2})', 1) AS SMALLINT)"
-    day: "CAST(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.[0-9]{2}\\.([0-9]{2})', 1) AS SMALLINT)"
+    month: "TRY_CAST(NULLIF(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.([0-9]{1,2})(?:\\.|$)', 1), '') AS SMALLINT)"
+    day: "TRY_CAST(NULLIF(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.[0-9]{1,2}\\.([0-9]{1,2})(?:\\.|$)', 1), '') AS SMALLINT)"
   validation:
     type: string
-    pattern: "^[0-9]{4}\\.[0-9]{2}(?:\\.[0-9]{2})?(?:\\..*)?$"
+    pattern: "^[0-9]{4}\\.[0-9]{1,2}(?:\\.[0-9]{1,2})?(?:\\..*)?$"
   tier: [VARCHAR, development]
   aliases: null
   samples:
     - "2024.02.09"
     - "2023.12.31"
     - "2024.01.15.1"
+    - "2024.2.9"
   icon: bookmark
   references: null
   notes: >
     v1 migration: Was development.calver. Decompose extracts year, month, day.
-    Format: YYYY.MM or YYYY.MM.DD.
+    Format: YYYY.MM or YYYY.MM.DD, month and day of one or two digits (calver.org
+    allows both `MM` and `0M`). `day` is NULL on a value with no day (`2024.1`,
+    `2024.12`). Discrimination counts a value with a two-digit month or a third
+    component; `2024.1` and `2020.5` conform but are also decimals, so they are
+    not counted.
 
 technology.development.docker_ref:
   title: "Docker/OCI Image Reference"
