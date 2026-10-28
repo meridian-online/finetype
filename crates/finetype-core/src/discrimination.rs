@@ -277,9 +277,10 @@ const WKT_RULE: &str = "^(?:[Pp][Oo][Ii][Nn][Tt]|[Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii
 
 /// What `wkt` counts beyond the published rule (which fixes the keyword, ASCII
 /// only): `EMPTY` straight after the keyword, or a `(` followed, before the first
-/// `)`, by a coordinate pair (a number, white space, a number) or `EMPTY`. The
+/// `)`, by a coordinate pair (a number, white space, a number) or a geometry
+/// keyword then `EMPTY`. The
 /// case-insensitive part is ASCII-only (`(?i-u:...)`).
-const WKT_BODY: &str = "(?s)^(?:[A-Za-z]+\\s*[ZMzm]{0,2}\\s*(?i-u:empty)|[^(]*\\([^)]*?(?:[-+]?[0-9]+(?:\\.[0-9]+)?\\s+[-+]?[.0-9]|(?i-u:\\bempty\\b)))";
+const WKT_BODY: &str = "(?s)^(?:[A-Za-z]+\\s*[ZMzm]{0,2}\\s*(?i-u:empty)|[^(]*\\([^)]*?(?:[-+]?[0-9]+(?:\\.[0-9]+)?\\s+[-+]?[.0-9]|(?i-u:\\b(?:point|linestring|polygon|multipoint|multilinestring|multipolygon|geometrycollection|triangle|polyhedralsurface|tin)\\s*(?:zm|z|m)?\\s*empty\\b)))";
 
 /// `wkt`: the published rule and a body that is `EMPTY` or holds a coordinate pair
 /// or `EMPTY` inside the parentheses. The published rule stops at the opening

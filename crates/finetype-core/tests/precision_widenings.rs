@@ -1251,6 +1251,9 @@ fn wkt_detector_needs_a_coordinate_pair_or_empty() {
         "Tin (2 cans)",
         "Polygon (regular)",
         "Tin (small) 250 2pk",
+        "Tin (empty)",
+        "Point (empty lot)",
+        "Tin (empty box)",
     ] {
         assert!(rule.is_valid(bad), "{bad:?} conforms");
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
