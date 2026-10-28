@@ -36,6 +36,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "identity.person.gender_code" => Some(is_gender_code_discrimination_shape),
         "identity.government.ein" => Some(is_ein_discrimination_shape),
         "identity.medical.ndc" => Some(is_ndc_discrimination_shape),
+        "finance.currency.currency_code" => Some(is_currency_code_discrimination_shape),
         "technology.cryptographic.jwt" => Some(is_jwt_discrimination_shape),
         "representation.scientific.protein_sequence" => {
             Some(is_protein_sequence_discrimination_shape)
@@ -303,6 +304,67 @@ fn is_gender_code_discrimination_shape(value: &str) -> bool {
         value.to_ascii_uppercase().as_str(),
         "M" | "F" | "X" | "0" | "1" | "2" | "9"
     )
+}
+
+/// The ISO 4217 codes that are not currencies in circulation: the placeholder
+/// `XXX` (no currency), the testing code `XTS`, and the withdrawn codes the
+/// taxonomy lists under `validation_notes.historic`. A copy, because the library
+/// cannot read `labels/` when built from the crates.io package; the test
+/// `currency_code_excluded_copy_matches_the_taxonomy` keeps it equal.
+const CURRENCY_CODE_EXCLUDED: &[&str] = &[
+    "XXX", "XTS", "ADP", "AFA", "ANG", "AON", "AOR", "ATS", "AYM", "AZM", "BEF", "BGL", "BGN",
+    "BYB", "BYR", "CHC", "CSD", "CUC", "CYP", "DEM", "ECS", "ECV", "EEK", "ESP", "FIM", "FRF",
+    "GHC", "GHP", "GRD", "HRK", "IEP", "ITL", "LTL", "LUF", "LVL", "MGF", "MRO", "MTL", "MZM",
+    "NLG", "PTE", "ROL", "RUR", "SDD", "SIT", "SKK", "SLL", "SRG", "STD", "TJR", "TMM", "TPE",
+    "TRL", "USS", "VEB", "VEF", "XEU", "XFO", "XFU", "XRE", "YUM", "ZMK", "ZRN", "ZWD", "ZWL",
+    "ZWN", "ZWR",
+];
+
+/// `currency_code`: a code in the published ISO 4217 list that is not the
+/// placeholder, the testing code or a withdrawn code. Every historic code is an
+/// ordinary three-letter token (`TRL` is also a street type, `ESP` an airport
+/// and a language), so a column of them is not confirmed as currencies on that
+/// alone; the published rule still conforms them.
+fn is_currency_code_discrimination_shape(value: &str) -> bool {
+    !CURRENCY_CODE_EXCLUDED
+        .iter()
+        .any(|code| value.eq_ignore_ascii_case(code))
+}
+
+#[cfg(test)]
+mod currency_code_excluded_copy {
+    #[test]
+    fn currency_code_excluded_copy_matches_the_taxonomy() {
+        let doc: serde_yaml::Value =
+            serde_yaml::from_str(include_str!("../../../labels/definitions_finance.yaml"))
+                .expect("parse finance definitions");
+        let def = &doc["finance.currency.currency_code"];
+        let mut published: Vec<String> = def["validation_notes"]["historic"]
+            .as_sequence()
+            .expect("historic list")
+            .iter()
+            .map(|e| e["value"].as_str().expect("value").to_string())
+            .collect();
+        published.push("XXX".into());
+        published.push("XTS".into());
+        published.sort();
+        let mut copy: Vec<String> = super::CURRENCY_CODE_EXCLUDED
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        copy.sort();
+        assert_eq!(copy, published);
+        // Every excluded code is still in the published enum.
+        let en: Vec<&str> = def["validation"]["enum"]
+            .as_sequence()
+            .expect("enum")
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        for code in &copy {
+            assert!(en.contains(&code.as_str()), "{code} not in the enum");
+        }
+    }
 }
 
 /// `ein`: the hyphenated `NN-NNNNNNN`. The published rule also takes the bare

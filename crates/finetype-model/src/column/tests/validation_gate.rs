@@ -2064,3 +2064,46 @@ fn isbn_header_recovery_declines_spaced_values_the_rule_rejects() {
         r.disambiguation_rule
     );
 }
+
+/// `currency_code` is a ceded leaf. A column of the `XXX` placeholder, or of the
+/// withdrawn code `TRL` (also a street type), conforms to the published rule but
+/// is not promoted to it by ceded-leaf recovery.
+#[test]
+fn currency_code_does_not_recover_placeholder_column() {
+    assert_no_currency_recovery("XXX");
+}
+
+#[test]
+fn currency_code_does_not_recover_street_type_column() {
+    assert_no_currency_recovery("TRL");
+}
+
+fn assert_no_currency_recovery(value: &str) {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let values: Vec<String> = vec![value.to_string(); 40];
+    let r = cc
+        .compose_from_sense("code", &values, "representation.text.word", 1.0)
+        .unwrap();
+    assert_ne!(r.label, "finance.currency.currency_code", "{value}");
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("ceded_leaf_recovery"),
+        "{value}"
+    );
+}
+
+/// A column of the placeholder is demoted by schema-fail demotion (the detector
+/// does not count it), as are withdrawn codes.
+#[test]
+fn currency_code_placeholder_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    for value in ["XXX", "TRL"] {
+        let values: Vec<String> = vec![value.to_string(); 40];
+        assert!(
+            schema_fail_demotion(&values, "finance.currency.currency_code", &tax).is_some(),
+            "a column of {value} is demoted"
+        );
+    }
+}

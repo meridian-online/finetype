@@ -2967,3 +2967,32 @@ fn ndc_detector_keeps_out_the_six_digit_labeler_forms() {
         assert!(!passes_detector_or_rule(detector, &rule, out), "{out}");
     }
 }
+
+/// Placeholder, testing and withdrawn ISO 4217 codes conform to the published
+/// rule but are not counted for discrimination; current codes are, in any case.
+#[test]
+fn currency_code_detector_keeps_placeholder_and_historic_codes_out() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(CURRENCY_CODE_LABEL, &tax).expect("currency_code rule");
+    let detector = detector_for(CURRENCY_CODE_LABEL);
+    assert!(detector.is_some());
+    for ok in ["USD", "EUR", "GBP", "JPY", "XCG", "XAU", "usd", "CHF"] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    // The rule itself still accepts the excluded codes.
+    for excluded in ["XXX", "XTS", "TRL", "ESP", "DEM", "HRK", "trl"] {
+        assert!(
+            rule.validate(excluded).is_valid,
+            "{excluded:?} conforms to the rule"
+        );
+        assert!(
+            !passes_detector_or_rule(detector, &rule, excluded),
+            "{excluded:?}"
+        );
+    }
+    for bad in ["UDP", "TCP", "US", "USDD", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
