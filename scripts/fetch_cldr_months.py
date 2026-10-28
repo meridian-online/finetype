@@ -6,15 +6,15 @@ crates/finetype-core/src/discrimination.rs.
 The table holds, for each Latin-script locale the type lists (plus en-GB, whose
 `Sept` the type's description names), the union of CLDR's format and
 stand-alone abbreviated month names, lower-cased with the trailing full stop
-removed. The data comes from the Unicode CLDR release bundled with Babel; the
+removed. The data comes from the Unicode CLDR release bundled with Babel (pinned to 2.18.0, which ships CLDR 47); the
 CLDR version is written into the generated block.
 
 Run by hand when CLDR publishes a new release; the build never touches the
 network - the Rust source is the checked-in output.
 
 Usage:
-    uv run --with babel python3 scripts/fetch_cldr_months.py          # rewrite
-    uv run --with babel python3 scripts/fetch_cldr_months.py --check  # exit 1 if stale
+    uv run --with babel==2.18.0 python3 scripts/fetch_cldr_months.py          # rewrite
+    uv run --with babel==2.18.0 python3 scripts/fetch_cldr_months.py --check  # exit 1 if stale
 """
 import pathlib
 import sys

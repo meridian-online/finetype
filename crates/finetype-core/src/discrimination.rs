@@ -402,10 +402,18 @@ fn is_abbreviated_month_discrimination_shape(value: &str) -> bool {
         _ => return false,
     };
     let token = token.trim_end_matches('.').to_lowercase();
-    CLDR_ABBREVIATED_MONTHS
-        .iter()
-        .any(|(_, months)| months.contains(&token.as_str()))
+    AP_SPELLED_OUT_MONTHS.contains(&token.as_str())
+        || CLDR_ABBREVIATED_MONTHS
+            .iter()
+            .any(|(_, months)| months.contains(&token.as_str()))
 }
+
+/// The months AP style spells out rather than abbreviates (March, April, May,
+/// June, July; AP Stylebook, "months"), so the AP-style dates the type's
+/// description names (`March 4, 2023`, `Feb. 4, 2023`) count. A hand list kept
+/// apart from the generated CLDR table; `may` is also CLDR's and listed for
+/// completeness. February stays abbreviated in AP, so `February` is not here.
+const AP_SPELLED_OUT_MONTHS: &[&str] = &["march", "april", "may", "june", "july"];
 
 #[cfg(test)]
 mod abbreviated_month_locales {

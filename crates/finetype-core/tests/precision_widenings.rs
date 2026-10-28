@@ -3038,3 +3038,23 @@ fn abbreviated_month_detector_keeps_full_names_and_words_out() {
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
     }
 }
+
+/// AP style spells out March through July; those count, and February (which AP
+/// abbreviates) spelled out still does not.
+#[test]
+fn abbreviated_month_detector_counts_ap_spelled_out_months() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(ABBREVIATED_MONTH_LABEL, &tax).expect("rule");
+    let detector = detector_for(ABBREVIATED_MONTH_LABEL);
+    for ok in [
+        "Feb. 4, 2023",
+        "March 4, 2023",
+        "July 4, 2023",
+        "April 4, 2023",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    assert!(!passes_detector_or_rule(detector, &rule, "4 February 2023"));
+}
