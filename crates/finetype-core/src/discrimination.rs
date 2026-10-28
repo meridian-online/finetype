@@ -31,6 +31,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "technology.internet.hostname" => Some(is_hostname_discrimination_shape),
         "technology.internet.ip_v6" => Some(is_ip_v6_discrimination_shape),
         "technology.development.calver" => Some(is_calver_discrimination_shape),
+        "technology.cryptographic.jwt" => Some(is_jwt_discrimination_shape),
         "representation.scientific.protein_sequence" => {
             Some(is_protein_sequence_discrimination_shape)
         }
@@ -270,6 +271,22 @@ fn is_calver_discrimination_shape(value: &str) -> bool {
         && (1..=2).contains(&month.len())
         && digits(month)
         && (month.len() == 2 || parts.next().is_some_and(|third| !third.is_empty()))
+}
+
+/// `jwt`: the published rule, which also takes the unsecured form (an empty
+/// signature, RFC 7519 section 6) and the five-part JWE (RFC 7516), counted only
+/// when the value is the shape the type was first defined by (three segments of
+/// ten or more base64url characters) or its header decodes to a JSON object with
+/// an `alg` member (`structure::is_jwt`). `jwt` is a ceded leaf, so a dotted
+/// name such as `internationalization.name.` or a five-part package path must not
+/// be promoted on the strength of the new forms' shape alone.
+fn is_jwt_discrimination_shape(value: &str) -> bool {
+    let mut parts = value.split('.');
+    let three_long_segments = matches!(
+        (parts.next(), parts.next(), parts.next(), parts.next()),
+        (Some(a), Some(b), Some(c), None) if [a, b, c].iter().all(|p| p.len() >= 10)
+    );
+    three_long_segments || crate::structure::is_jwt(value)
 }
 
 /// `query_string`: only `name=value` pairs joined by `&`, every name non-empty
@@ -808,6 +825,7 @@ mod tests {
             "technology.internet.hostname",
             "technology.internet.ip_v6",
             "technology.development.calver",
+            "technology.cryptographic.jwt",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

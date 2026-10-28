@@ -227,7 +227,7 @@ technology.code.imei	false	^[0-9]{15}$	false
 technology.code.locale_code	false	^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{3})?(?:[-_][a-zA-Z]{4})?(?:[-_](?:[a-zA-Z]{2}|[0-9]{3}))?$	false
 technology.code.qualified_name	false	^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){2,}$	true
 technology.cryptographic.hash	false	^[0-9a-f]{32}$|^[0-9a-f]{40}$|^[0-9a-f]{64}$|^[0-9a-f]{128}$	false
-technology.cryptographic.jwt	false	^[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}$	true
+technology.cryptographic.jwt	false	^[A-Za-z0-9_-]{10,}\.(?:[A-Za-z0-9_-]{10,}\.(?:[A-Za-z0-9_-]{10,})?|[A-Za-z0-9_-]*\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{10,})$	true
 technology.cryptographic.token_urlsafe	false	^[A-Za-z0-9_-]{12,128}$	false
 technology.development.calver	false	^[0-9]{4}\.[0-9]{1,2}(?:\.[0-9]{1,2})?(?:\..*)?$	true
 technology.development.docker_ref	false	^(?:(?:[a-zA-Z0-9.\-]+(?::\d+)?)/)?(?:[a-z0-9._\-/]+)(?::[a-zA-Z0-9_][a-zA-Z0-9._\-]{0,127})?(?:@(?:sha256:[a-fA-F0-9]{64}|sha512:[a-fA-F0-9]{128}|blake3:[a-fA-F0-9]{64}))?$	true

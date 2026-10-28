@@ -1403,3 +1403,88 @@ fn docker_ref_constant_column_keeps_type() {
     let value = format!("app@sha512:{}", "a".repeat(128));
     assert_constant_column_kept("technology.development.docker_ref", &value);
 }
+
+/// RFC 7519 section 6.1: the example Unsecured JWT (empty signature).
+const JWT_UNSECURED: &str = "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.";
+
+/// RFC 7516 appendix A.1.7: the complete JWE Compact Serialization example.
+const JWT_JWE: &str = "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ";
+
+/// A column of one repeated unsecured JWT (which the old rule rejected) keeps its
+/// type: its header decodes to JSON with `alg`, so the detector counts it.
+#[test]
+fn jwt_constant_column_keeps_type() {
+    assert_constant_column_kept("technology.cryptographic.jwt", JWT_UNSECURED);
+}
+
+/// A column of RFC 7516 JWEs labelled `jwt` keeps its type through the veto and
+/// the substance guard.
+#[test]
+fn jwt_jwe_column_keeps_type() {
+    assert_constant_column_kept("technology.cryptographic.jwt", JWT_JWE);
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let tokens: Vec<String> = vec![JWT_JWE.to_string(), JWT_UNSECURED.to_string()]
+        .into_iter()
+        .cycle()
+        .take(42)
+        .collect();
+    let r = cc
+        .compose_from_sense("token", &tokens, "technology.cryptographic.jwt", 0.9)
+        .unwrap();
+    assert_eq!(r.label, "technology.cryptographic.jwt");
+}
+
+/// `jwt` is a ceded leaf and now takes a trailing dot and five parts, so columns of
+/// dotted names must not be promoted to it.
+#[test]
+fn jwt_does_not_recover_dotted_name_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let columns: [Vec<String>; 3] = [
+        [
+            "internationalization.configuration.",
+            "authentication.middleware.",
+            "documentation.reference.",
+        ]
+        .iter()
+        .cycle()
+        .take(42)
+        .map(|s| s.to_string())
+        .collect(),
+        [
+            "springframework.web.configuration.mvcdispatcher.DispatcherServlet",
+            "jakartaservlet.http.configuration.HttpSessionListener.Handlerclass",
+        ]
+        .iter()
+        .cycle()
+        .take(42)
+        .map(|s| s.to_string())
+        .collect(),
+        [
+            "Introduction.Background.",
+            "Conclusionsection.Appendixmaterial.",
+            "Methodology.Participants.",
+        ]
+        .iter()
+        .cycle()
+        .take(42)
+        .map(|s| s.to_string())
+        .collect(),
+    ];
+    for values in &columns {
+        for label in [
+            "representation.text.word",
+            "representation.text.plain_text",
+            "unknown",
+        ] {
+            let r = cc.compose_from_sense("name", values, label, 1.0).unwrap();
+            assert_ne!(
+                r.label, "technology.cryptographic.jwt",
+                "from {label}: {values:?}"
+            );
+        }
+    }
+}

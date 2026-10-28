@@ -881,9 +881,13 @@ technology.cloud.s3_uri:
 technology.cryptographic.jwt:
   title: "JSON Web Token"
   description: >
-    JSON Web Token (JWT) consisting of three base64url-encoded segments
-    separated by dots: header.payload.signature. Used for authentication
-    and information exchange.
+    JSON Web Token (JWT) in either compact serialisation. A JWS is three
+    base64url-encoded segments separated by dots, header.payload.signature;
+    an unsecured JWT (RFC 7519 section 6) ends in a dot with an empty
+    signature. A JWE (RFC 7516) is five segments (header, encrypted key,
+    initialization vector, ciphertext and tag), where the encrypted key may be
+    empty. Used for
+    authentication and information exchange.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -894,23 +898,29 @@ technology.cryptographic.jwt:
   transform_ext: null
   decompose:
     header: "REGEXP_EXTRACT({col}, '^([A-Za-z0-9_-]+)\\.', 1)"
-    payload: "REGEXP_EXTRACT({col}, '^[A-Za-z0-9_-]+\\.([A-Za-z0-9_-]+)\\.', 1)"
-    signature: "REGEXP_EXTRACT({col}, '\\.([A-Za-z0-9_-]+)$', 1)"
+    payload: "REGEXP_EXTRACT({col}, '^[A-Za-z0-9_-]+\\.([A-Za-z0-9_-]+)\\.[A-Za-z0-9_-]*$', 1)"
+    signature: "REGEXP_EXTRACT({col}, '^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.([A-Za-z0-9_-]+)$', 1)"
   validation:
     type: string
-    pattern: "^[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}$"
+    pattern: "^[A-Za-z0-9_-]{10,}\\.(?:[A-Za-z0-9_-]{10,}\\.(?:[A-Za-z0-9_-]{10,})?|[A-Za-z0-9_-]*\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]{10,})$"
   tier: [VARCHAR, cryptographic]
   aliases: [json_web_token]
   samples:
     - "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
     - "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdXRoLmV4YW1wbGUuY29tIn0.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+    - "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ."
   icon: shield-lock
   canonical: "https://www.rfc-editor.org/rfc/rfc7519"
   references: null
   notes: >
-    Each segment is at least 10 base64url chars to
-    distinguish from other dot-separated formats. Header typically starts
-    with "eyJ" (base64 for '{"').
+    Each JWS segment, and the header, initialization vector and tag of a JWE,
+    is at least 10 base64url chars to distinguish from other dot-separated
+    formats. Header typically starts with "eyJ" (base64 for '{"'). Decompose
+    reads the three JWS parts; the signature of an unsecured JWT is ''. A
+    five-part JWE is not split (its parts are header, encrypted key,
+    initialization vector, ciphertext and tag), so its payload and signature
+    read ''. Discrimination counts a JWE or an unsecured JWT only when its
+    header decodes to a JSON object with an "alg" member.
 
 technology.internet.cidr:
   title: "CIDR Notation"

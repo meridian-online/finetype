@@ -887,3 +887,47 @@ fn docker_ref_parts_read_every_digest_algorithm() {
         );
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn jwt_parts_keep_three_jws_parts_and_leave_a_jwe_unsplit() {
+    let tax = test_taxonomy();
+    let label = "technology.cryptographic.jwt";
+    let header = "eyJhbGciOiJub25lIn0";
+    let payload = "eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ";
+    // RFC 7519 section 6.1: the unsecured JWT has an empty signature.
+    let unsecured = format!("{header}.{payload}.");
+    let signed = format!("{header}.{payload}.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c");
+    let jwe = "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DV.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4.XFBoMYUZodetZdvTiFvSkQ";
+    for (value, h, p, s) in [
+        (unsecured.as_str(), header, payload, ""),
+        (
+            signed.as_str(),
+            header,
+            payload,
+            "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+        ),
+        (
+            jwe,
+            "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ",
+            "",
+            "",
+        ),
+    ] {
+        assert_eq!(
+            run_color_part(&tax, label, "header", value),
+            h,
+            "header of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "payload", value),
+            p,
+            "payload of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "signature", value),
+            s,
+            "signature of {value:?}"
+        );
+    }
+}

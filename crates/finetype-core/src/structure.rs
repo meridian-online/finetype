@@ -84,12 +84,14 @@ fn b64url_decode(s: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// True if `value` is a JSON Web Token: three dot-separated non-empty segments
-/// whose first segment (the header) base64url-decodes to a JSON object carrying
-/// an `alg` field.
+/// True if `value` is a JSON Web Token in either compact serialisation: a JWS of
+/// three dot-separated segments (RFC 7519; the signature of an unsecured JWT,
+/// section 6, is empty) or a JWE of five (RFC 7516 section 3.1; the encrypted key
+/// may be empty). The first segment (the header) must base64url-decode to a JSON
+/// object carrying an `alg` field.
 ///
 /// This is the substance check behind the `jwt_substance_guard`. The taxonomy
-/// pattern only checks the three-base64url-segment SHAPE — which any dotted
+/// pattern only checks the dotted-base64url SHAPE — which any dotted
 /// token-ish string of the right length satisfies — so the model over-emits
 /// `jwt` on text (file paths, prose, entity names) at corpus scale. A genuine
 /// JWT header decodes to `{"alg":...,"typ":...}`; that `alg` key is the
@@ -97,21 +99,24 @@ fn b64url_decode(s: &str) -> Option<Vec<u8>> {
 /// truncated in its payload or signature still validates.
 ///
 /// Requirements:
-/// - exactly three dot-separated, non-empty segments
+/// - three segments with a non-empty header and payload (the signature may be
+///   empty), or five with every segment but the encrypted key non-empty
 /// - segment 1 is valid unpadded base64url
 /// - the decoded header is a JSON object with an `alg` member
 pub fn is_jwt(value: &str) -> bool {
     let t = value.trim();
-    let mut parts = t.split('.');
-    let (Some(h), Some(p), Some(s), None) =
-        (parts.next(), parts.next(), parts.next(), parts.next())
-    else {
-        return false;
+    let parts: Vec<&str> = t.split('.').collect();
+    let well_formed = match parts.as_slice() {
+        [h, p, _signature] => !h.is_empty() && !p.is_empty(),
+        [h, _encrypted_key, iv, ciphertext, tag] => {
+            !h.is_empty() && !iv.is_empty() && !ciphertext.is_empty() && !tag.is_empty()
+        }
+        _ => false,
     };
-    if h.is_empty() || p.is_empty() || s.is_empty() {
+    if !well_formed {
         return false;
     }
-    let Some(bytes) = b64url_decode(h) else {
+    let Some(bytes) = b64url_decode(parts[0]) else {
         return false;
     };
     match serde_json::from_slice::<serde_json::Value>(&bytes) {
@@ -817,6 +822,26 @@ mod tests {
         assert!(is_jwt(
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.x"
         ));
+    }
+
+    #[test]
+    fn jwt_accepts_the_unsecured_and_encrypted_forms() {
+        // RFC 7519 section 6.1 (empty signature) and RFC 7516 appendix A.1.7.
+        assert!(is_jwt("eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ."));
+        assert!(is_jwt(
+            "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ"
+        ));
+        // An empty encrypted key is allowed in a JWE; any other empty part is not.
+        assert!(is_jwt(
+            "eyJhbGciOiJkaXIifQ..48V1_ALb6US04U3b.5eym8TW_c8S.XFBoMYUZodetZdvTiFvSkQ"
+        ));
+        assert!(!is_jwt(
+            "eyJhbGciOiJkaXIifQ.k..5eym8TW_c8S.XFBoMYUZodetZdvTiFvSkQ"
+        ));
+        // Four parts, an empty payload, and an empty header are not.
+        assert!(!is_jwt("eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UifQ.x.y"));
+        assert!(!is_jwt("eyJhbGciOiJub25lIn0..sig"));
+        assert!(!is_jwt(".eyJpc3MiOiJqb2UifQ."));
     }
 
     #[test]

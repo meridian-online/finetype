@@ -2204,3 +2204,78 @@ fn docker_ref_rejects_undefined_forms() {
         ],
     );
 }
+
+const JWT_LABEL: &str = "technology.cryptographic.jwt";
+
+/// RFC 7519 section 6.1: the example Unsecured JWT (empty signature).
+const JWT_UNSECURED: &str = "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.";
+
+/// RFC 7516 appendix A.1.7: the complete JWE Compact Serialization example.
+const JWT_JWE: &str = "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ";
+
+const JWT_JWS: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+
+/// RFC 7519 allows an Unsecured JWT, which ends in a dot, and RFC 7516 defines the
+/// five-part JWE compact form, whose encrypted key may be empty.
+#[test]
+fn jwt_accepts_source_forms() {
+    let empty_key = JWT_JWE.replacen(
+        ".OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.",
+        "..",
+        1,
+    );
+    assert!(empty_key.contains(".."), "the encrypted key is empty");
+    assert_pattern_boundary(
+        JWT_LABEL,
+        &[JWT_UNSECURED, JWT_JWE, &empty_key, JWT_JWS],
+        &[],
+    );
+}
+
+#[test]
+fn jwt_rejects_undefined_forms() {
+    let four_part = format!("{JWT_JWS}.eyJhbGciOiJub25lIn0");
+    let two_part = "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UifQ";
+    // A JWE is exactly five parts: four segments, or the first three of a JWE.
+    let jwe_four: String = JWT_JWE.rsplitn(2, '.').last().unwrap().to_string();
+    assert_pattern_boundary(
+        JWT_LABEL,
+        &[],
+        &[
+            "a.b.c",
+            &four_part,
+            two_part,
+            &jwe_four,
+            "...",
+            "eyJhbGciOiJub25lIn0..",
+            ".eyJpc3MiOiJqb2UifQ.",
+        ],
+    );
+}
+
+/// The detector counts the three-segment shape the type was first defined by, and
+/// a JWE or an unsecured token only when its header decodes to JSON with `alg`;
+/// dotted names that fit the widened rule conform but are not counted.
+#[test]
+fn jwt_detector_keeps_out_dotted_names() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(JWT_LABEL, &tax).expect("jwt rule");
+    let detector = detector_for(JWT_LABEL);
+    assert!(detector.is_some());
+    for kept in [JWT_JWS, JWT_UNSECURED, JWT_JWE] {
+        assert!(passes_detector_or_rule(detector, &rule, kept), "{kept:?}");
+    }
+    for not_counted in [
+        "internationalization.configuration.",
+        "springframework.web.configuration.mvcdispatcher.DispatcherServlet",
+        "abcdefghijk.lmnopqrstuv.wxyzabcdefg.hijklmnopqr.stuvwxyzabc",
+    ] {
+        assert!(rule.is_valid(not_counted), "{not_counted:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, not_counted),
+            "{not_counted:?} is not counted"
+        );
+    }
+}
