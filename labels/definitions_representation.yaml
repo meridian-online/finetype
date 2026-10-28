@@ -337,8 +337,9 @@ representation.text.word:
 representation.format.color_hex:
   title: "Color (Hexadecimal)"
   description: >
-    Color as hexadecimal value (e.g., #FF0000, #f00, FF0000).
-    May include # prefix. Short form (3 chars) or long form (6 chars).
+    Color as a CSS hexadecimal notation (e.g., #FF0000, #f00, #f00c, #0000ffcc).
+    A # prefix with 3, 4, 6 or 8 hex digits (red, green, blue and an optional
+    alpha). The bare 3- and 6-digit forms (FF0000) are accepted with a note.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -350,7 +351,12 @@ representation.format.color_hex:
   decompose: null
   validation:
     type: string
-    pattern: "^#?[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$"
+    pattern: "^(?:#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+  validation_notes:
+    canonical:
+      kind: nonstandard
+      name: "leading #"
+      pattern: "^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
   tier: [VARCHAR, text]
   aliases: [hex_color]
   samples:
@@ -358,12 +364,18 @@ representation.format.color_hex:
     - "#f00"
     - "0000FF"
     - "#00FF00"
+    - "#f00c"
+    - "#0000ffcc"
   icon: palette
   canonical: "https://www.w3.org/TR/css-color-4/"
   references: null
   notes: >
     v1 migration: Was text.hex_color. Transform uppercases.
-    Accepts # prefix or without. 3-digit (short) or 6-digit (long) hex.
+    CSS Color 4 writes # then 3, 4, 6 or 8 hex digits (the 4- and 8-digit forms
+    carry an alpha channel) and requires the #. The bare 3- and 6-digit forms
+    stay accepted, with a nonstandard note for the missing #; a bare 4- or
+    8-digit string is not a CSS colour (it is as likely a year or an ID) and
+    is rejected.
 
 representation.format.color_rgb:
   title: "Color (RGB)"

@@ -1770,3 +1770,50 @@ fn color_hsl_rejects_undefined_forms() {
         ],
     );
 }
+
+const COLOR_HEX_LABEL: &str = "representation.format.color_hex";
+
+/// CSS Color 4: `#` with 3, 4, 6 or 8 hex digits.
+#[test]
+fn color_hex_accepts_source_forms() {
+    assert_pattern_boundary(
+        COLOR_HEX_LABEL,
+        &["#0000ffcc", "#f00c", "#FF0000", "#f00", "#0000FFCC"],
+        &[],
+    );
+}
+
+#[test]
+fn color_hex_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        COLOR_HEX_LABEL,
+        &[],
+        &[
+            "0000ffcc", "f00c", "#12345", "#1234567", "#12", "12345", "#ggg",
+        ],
+    );
+}
+
+/// The bare 3- and 6-digit forms stay accepted, with a `nonstandard` note for
+/// the missing `#`; the `#` forms conform.
+#[test]
+fn color_hex_grades_bare_forms_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in ["#FF0000", "#f00", "#f00c", "#0000ffcc"] {
+        assert_eq!(
+            grade_value_for_label(value, COLOR_HEX_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    for value in ["FF0000", "f00"] {
+        match grade_value_for_label(value, COLOR_HEX_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::Nonstandard, "{value}");
+                assert_eq!(note.detail, "leading #", "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
+        }
+    }
+}

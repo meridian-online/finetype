@@ -196,7 +196,7 @@ representation.file.excel_format	false	^[#0.,;\[\]$€£¥%EeAaPpMm/dDyYhHsS ?:"
 representation.file.extension	false	^\.?[a-zA-Z0-9]{1,10}$	true
 representation.file.file_size	false	^[0-9]+(\.[0-9]+)?\s*(B|[kK]B|[MGTP]B|[KMGTP]iB|[KMGTP])?$	true
 representation.file.mime_type	false	^[a-zA-Z]+/[a-zA-Z0-9.+\-]+(;.*)?$	true
-representation.format.color_hex	false	^#?[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$	true
+representation.format.color_hex	false	^(?:#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$	true
 representation.format.color_hsl	false	^hsla?\(\s*(?:[0-9]{1,3}(?:\.[0-9]+)?(?:deg)?\s*,\s*[0-9]{1,3}(?:\.[0-9]+)?%\s*,\s*[0-9]{1,3}(?:\.[0-9]+)?%(?:\s*,\s*(?:[0-9]*\.?[0-9]+%?))?|(?:none|[0-9]{1,3}(?:\.[0-9]+)?(?:deg)?)\s+(?:none|[0-9]{1,3}(?:\.[0-9]+)?%?)\s+(?:none|[0-9]{1,3}(?:\.[0-9]+)?%?)(?:\s*/\s*(?:none|[0-9]*\.?[0-9]+%?))?)\s*\)$	true
 representation.format.color_rgb	false	^(?:(?:rgb)?\(?([0-9]{1,3}),\s*([0-9]{1,3}),\s*([0-9]{1,3})\)?|rgba?\(\s*(?:[0-9]{1,3},\s*[0-9]{1,3},\s*[0-9]{1,3}|[0-9]{1,3}(?:\.[0-9]+)?%,\s*[0-9]{1,3}(?:\.[0-9]+)?%,\s*[0-9]{1,3}(?:\.[0-9]+)?%)(?:,\s*[0-9]*\.?[0-9]+%?)?\s*\)|rgba?\(\s*(?:[0-9]{1,3}\s+[0-9]{1,3}\s+[0-9]{1,3}|[0-9]{1,3}(?:\.[0-9]+)?%\s+[0-9]{1,3}(?:\.[0-9]+)?%\s+[0-9]{1,3}(?:\.[0-9]+)?%)(?:\s*/\s*[0-9]*\.?[0-9]+%?)?\s*\))$	true
 representation.identifier.alphanumeric_id	false	^[A-Za-z][A-Za-z0-9 /_.#-]*[0-9][A-Za-z0-9 /_.#-]*$|^[0-9][A-Za-z0-9 /_.#-]*[A-Za-z][A-Za-z0-9 /_.#-]*$	false

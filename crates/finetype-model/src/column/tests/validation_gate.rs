@@ -1049,3 +1049,34 @@ fn color_hsl_does_not_recover_neighbouring_colour_columns() {
         }
     }
 }
+
+/// A column of one repeated `#0000ffcc` (the old rule took 3 or 6 digits only)
+/// keeps its type.
+#[test]
+fn color_hex_constant_column_keeps_type() {
+    assert_constant_column_kept("representation.format.color_hex", "#0000ffcc");
+}
+
+/// `color_hex` is a ceded leaf (it is not on the ceded-recovery list, its
+/// bare form being permissive) and now takes 4- and 8-digit forms, but only
+/// with a `#`, so a column of 4-digit years is not promoted to it.
+#[test]
+fn color_hex_does_not_recover_year_column() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let values: Vec<String> = ["2019", "2020", "2021"]
+        .iter()
+        .cycle()
+        .take(42)
+        .map(|s| s.to_string())
+        .collect();
+    for label in [
+        "representation.text.word",
+        "representation.identifier.alphanumeric_id",
+        "datetime.component.year",
+    ] {
+        let r = cc.compose_from_sense("year", &values, label, 1.0).unwrap();
+        assert_ne!(r.label, "representation.format.color_hex", "from {label}");
+    }
+}
