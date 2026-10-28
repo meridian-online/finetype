@@ -1022,6 +1022,14 @@ fn query_string_rejects_undefined_forms() {
     assert_pattern_boundary(
         QUERY_STRING_LABEL,
         &[],
-        &["debug", "&&", "=x", "hello world"],
+        &[
+            "debug",
+            "&&",
+            "=x",
+            "hello world",
+            "a == 1 && b == 2",
+            "status=='x' && age>18",
+            "AT&T price=5",
+        ],
     );
 }

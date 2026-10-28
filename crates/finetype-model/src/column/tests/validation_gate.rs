@@ -512,3 +512,31 @@ fn query_string_does_not_recover_word_column() {
         Some("ceded_leaf_recovery")
     );
 }
+
+/// A column of boolean-expression text is not promoted to `query_string`
+/// either: `a == 1 && b == 2` splits on `&` into pieces the widened rule would
+/// otherwise read as bare names and pairs.
+#[test]
+fn query_string_does_not_recover_expression_column() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let exprs: Vec<String> = [
+        "a == 1 && b == 2",
+        "x == 3 && y == 4",
+        "status == 1 && ok == 0",
+    ]
+    .iter()
+    .cycle()
+    .take(42)
+    .map(|s| s.to_string())
+    .collect();
+    let r = cc
+        .compose_from_sense("rule", &exprs, "representation.text.word", 1.0)
+        .unwrap();
+    assert_ne!(r.label, "container.key_value.query_string");
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("ceded_leaf_recovery")
+    );
+}

@@ -499,7 +499,7 @@ container.key_value.query_string:
   decompose: null
   validation:
     type: string
-    pattern: "^(?:[^=&]+&|&)*[^=&]+=[^&]*(?:&(?:[^=&]+(?:=[^&]*)?)?)*$"
+    pattern: "^(?:[^=&]+=[^&]*(?:&[^=&]+=[^&]*)*|(?:[^=&\\s]+&|&)*[^=&\\s]+=(?:[^=&][^&]*)?(?:&(?:[^=&\\s]+(?:=(?:[^=&][^&]*)?)?)?)*)$"
   tier: [VARCHAR, key_value]
   aliases: null
   samples:
@@ -515,7 +515,11 @@ container.key_value.query_string:
     key-value pairs and types each value independently.
     The WHATWG URL Standard allows bare names and empty sequences beside
     pairs; at least one name=value pair is required here, so a column of
-    bare names is not a query string.
+    bare names is not a query string. A sequence of only name=value pairs
+    keeps the looser reading (any name text); once a bare name or an empty
+    sequence appears, names may not hold whitespace and a value may not
+    start with `=`, so expression text such as `a == 1 && b == 2` is not a
+    query string.
 
 # ═════════════════════════════════════════════════════════════════════
 # Recursive inference notes:
