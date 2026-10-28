@@ -2336,8 +2336,9 @@ datetime.timestamp.pg_short_offset:
   notes: >
     New in format coverage expansion. PostgreSQL sometimes emits short offsets
     (-05 instead of -05:00). Transform appends :00 for strptime compatibility
-    and parses the value with a fraction (1-6 digits) or without one;
-    format_string and the frictionless format describe the fractional form.
+    and parses the value with a fraction (1-6 digits) or without one.
+    format_string and the Frictionless format describe the fractional form;
+    whole-second values parse through the transform, not through format_string.
 
 datetime.timestamp.dot_dmy_24h:
   title: European Dot Timestamp (DMY 24h)
