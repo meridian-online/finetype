@@ -33,7 +33,7 @@ datetime.date.dmy_space_abbrev	false	^[0-3]?\d [A-Z][a-z]{2} \d{4}$	true
 datetime.date.dmy_space_full	false	^[0-3]?\d [A-Z][a-z]+ \d{4}$	true
 datetime.date.full_month_no_comma	false	^[A-Z][a-z]+ [0-3]?\d \d{4}$	true
 datetime.date.iso	false	^\d{4}-\d{2}-\d{2}$	true
-datetime.date.iso_week	false	^\d{4}-W\d{1,2}$	true
+datetime.date.iso_week	false	^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3]|[1-9])$	true
 datetime.date.jp_era_long	false	^(令和|平成|昭和|大正|明治)\d{1,2}年\d{1,2}月\d{1,2}日$	true
 datetime.date.jp_era_short	false	^[RHSTM]\d{1,2}/\d{1,2}/\d{1,2}$	true
 datetime.date.julian	false	^\d{2}-\d{3}$	true

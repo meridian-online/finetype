@@ -1020,3 +1020,20 @@ fn month_year_abbrev_transform_reads_case_and_long_forms() {
         assert_eq!(run_transform(&tax, label, value, ""), expect, "{value:?}");
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn iso_week_transform_casts_padded_and_unpadded_weeks() {
+    let tax = test_taxonomy();
+    for (value, expect) in [
+        ("2024-W03", "2024-01-15"),
+        ("2024-W3", "2024-01-15"),
+        ("2020-W53", "2020-12-28"),
+    ] {
+        assert_eq!(
+            run_transform(&tax, "datetime.date.iso_week", value, ""),
+            expect,
+            "{value:?}"
+        );
+    }
+}

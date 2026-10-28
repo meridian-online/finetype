@@ -1174,12 +1174,18 @@ datetime.date.iso_week:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}-W\\d{1,2}$"
+    pattern: "^\\d{4}-W(?:0[1-9]|[1-4]\\d|5[0-3]|[1-9])$"
+  validation_notes:
+    canonical:
+      kind: non_canonical
+      name: two-digit week
+      pattern: "^\\d{4}-W\\d{2}$"
   tier: [DATE, date]
   aliases: [week_date]
   samples:
     - "2024-W03"
     - "2019-W52"
+    - "2020-W53"
   icon: calendar
   canonical: "https://www.iso.org/standard/70907.html"
   references:
@@ -1187,7 +1193,12 @@ datetime.date.iso_week:
       link: "https://en.wikipedia.org/wiki/ISO_week_date"
   notes: >
     v1 name: datetime.week_date. Transform appends '-1' (Monday) to
-    produce a full week-date that strptime can parse.
+    produce a full week-date that strptime can parse. ISO 8601 numbers weeks
+    01 to 53, so week 00 and weeks 54 to 99 are rejected. The standard writes
+    the week with two digits; a one-digit week (2024-W3) is accepted and
+    noted as non-canonical. The year is not checked against the weeks it has:
+    2021-W53 passes the rule, and the transform rolls it into the next ISO
+    year (2022-01-03) instead of failing.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: time

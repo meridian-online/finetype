@@ -2425,3 +2425,60 @@ fn month_year_abbrev_rejects_undefined_forms() {
         ],
     );
 }
+
+const ISO_WEEK_LABEL: &str = "datetime.date.iso_week";
+
+/// ISO 8601-1 section 5.2.4: week 01 to 53, two digits. A one-digit week is
+/// accepted as before and graded as non-canonical.
+#[test]
+fn iso_week_accepts_source_forms() {
+    assert_pattern_boundary(
+        ISO_WEEK_LABEL,
+        &[
+            "2024-W03", "2020-W53", "2019-W52", "2024-W01", "2024-W10", "2024-W49", "2024-W50",
+            "2024-W3",
+        ],
+        &[],
+    );
+}
+
+/// ISO 8601 numbers weeks 01 to 53, so the source requires rejecting week 00 and
+/// weeks 54 to 99, which the old `\d{1,2}` accepted.
+#[test]
+fn iso_week_rejects_weeks_outside_one_to_fifty_three() {
+    assert_pattern_boundary(
+        ISO_WEEK_LABEL,
+        &[],
+        &[
+            "2024-W00",
+            "2024-W54",
+            "2024-W99",
+            "2024-W60",
+            "2024-W0",
+            "2024-W100",
+            "24-W03",
+            "2024W03",
+            "2024-w03",
+        ],
+    );
+}
+
+#[test]
+fn iso_week_grades_a_one_digit_week_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in ["2024-W03", "2020-W53", "2024-W12"] {
+        assert_eq!(
+            grade_value_for_label(value, ISO_WEEK_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    match grade_value_for_label("2024-W3", ISO_WEEK_LABEL, &tax) {
+        Grade::Noted(note) => {
+            assert_eq!(note.kind, NoteKind::NonCanonical);
+            assert_eq!(note.detail, "two-digit week");
+        }
+        other => panic!("2024-W3 should be noted, got {other:?}"),
+    }
+}

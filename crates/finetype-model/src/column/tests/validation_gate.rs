@@ -1568,3 +1568,11 @@ fn full_month_year_column_keeps_month_year_full() {
         "no full month name conforms to month_year_abbrev"
     );
 }
+
+/// A column of one repeated week-number written without its leading zero, the
+/// Noted form (the old rule accepted every week, so no ACCEPT value was newly
+/// accepted), keeps its type.
+#[test]
+fn iso_week_constant_column_keeps_type() {
+    assert_constant_column_kept("datetime.date.iso_week", "2024-W3");
+}
