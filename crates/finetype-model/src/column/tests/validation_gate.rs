@@ -675,3 +675,55 @@ fn wkt_does_not_recover_title_column() {
         assert_ne!(r.label, "geography.format.wkt", "from {label}");
     }
 }
+
+/// A column of one repeated plus code keeps its type. Every form the old rule
+/// rejected (a bare-plus code, a padded code, lower case) conforms but does not
+/// count for discrimination (the detector keeps the first-defined form), so a
+/// column of those is demoted by design and has no keep-type test; this value is
+/// the first accepted one, which the old rule also took.
+#[test]
+fn plus_code_constant_column_keeps_type() {
+    assert_constant_column_kept("geography.coordinate.plus_code", "849VCWC8+R9");
+}
+
+/// A column of one repeated padded plus code, which the old rule rejected, is
+/// demoted to `word` by `schema_fail_demotion`, as on 0.6.64.
+#[test]
+fn plus_code_padded_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["6P000000+".to_string(); 40];
+    let demoted = schema_fail_demotion(&values, "geography.coordinate.plus_code", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
+    );
+}
+
+/// `plus_code` is a ceded leaf and now takes a padded code with a bare plus, so
+/// a column of figures with a trailing plus (`22000000+`) must not be promoted.
+#[test]
+fn plus_code_does_not_recover_plus_suffixed_figures() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let figures: Vec<String> = ["22000000+", "33000000+", "55000000+", "72000000+"]
+        .iter()
+        .cycle()
+        .take(42)
+        .map(|s| s.to_string())
+        .collect();
+    for label in [
+        "representation.text.word",
+        "representation.identifier.alphanumeric_id",
+    ] {
+        let r = cc
+            .compose_from_sense("downloads", &figures, label, 1.0)
+            .unwrap();
+        assert_ne!(r.label, "geography.coordinate.plus_code", "from {label}");
+        assert_ne!(
+            r.disambiguation_rule.as_deref(),
+            Some("ceded_leaf_recovery"),
+            "from {label}"
+        );
+    }
+}

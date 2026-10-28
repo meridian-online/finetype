@@ -23,6 +23,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "container.key_value.query_string" => Some(is_query_string_discrimination_shape),
         "geography.location.state_code" => Some(is_state_code_discrimination_shape),
         "geography.format.wkt" => Some(is_wkt_discrimination_shape),
+        "geography.coordinate.plus_code" => Some(is_plus_code_discrimination_shape),
         _ => None,
     }
 }
@@ -233,6 +234,62 @@ fn is_query_string_discrimination_shape(value: &str) -> bool {
     })
 }
 
+/// The published `plus_code` rule, copied because the library cannot read
+/// `labels/` when built from the crates.io package; the test
+/// `plus_code_rule_copy_matches_the_taxonomy` keeps it equal to the taxonomy's.
+const PLUS_CODE_RULE: &str = r"^[2-9Cc][2-9CcFfGgHhJjMmPpQqRrVv](?:[23456789CFGHJMPQRVWXcfghjmpqrvwx]{6}\+(?:[23456789CFGHJMPQRVWXcfghjmpqrvwx]{2,7})?|[23456789CFGHJMPQRVWXcfghjmpqrvwx]{4}00\+|[23456789CFGHJMPQRVWXcfghjmpqrvwx]{2}0{4}\+|0{6}\+)$";
+
+/// The shape `plus_code` was first defined by: upper case, eight characters,
+/// `+`, then two or more.
+const PLUS_CODE_OLD_SHAPE: &str = r"^[23456789CFGHJMPQRVWX]{8}\+[23456789CFGHJMPQRVWX]{2,}$";
+
+fn plus_code_regexes() -> Option<&'static (regex::Regex, regex::Regex)> {
+    static RULES: std::sync::OnceLock<Option<(regex::Regex, regex::Regex)>> =
+        std::sync::OnceLock::new();
+    RULES
+        .get_or_init(|| {
+            Some((
+                regex::Regex::new(PLUS_CODE_RULE).ok()?,
+                regex::Regex::new(PLUS_CODE_OLD_SHAPE).ok()?,
+            ))
+        })
+        .as_ref()
+}
+
+/// `plus_code`: the published rule and the shape the type was first defined by
+/// (upper case, eight characters before the `+`, two to seven after). The
+/// published rule follows the Open Location Code specification, which also takes
+/// lower case, padded codes and a bare `+`; those conform but are not counted for
+/// discrimination, because the type is a ceded leaf and a figure such as
+/// `22000000+` is a padded code.
+fn is_plus_code_discrimination_shape(value: &str) -> bool {
+    let Some((rule, old_shape)) = plus_code_regexes() else {
+        return false;
+    };
+    rule.is_match(value) && old_shape.is_match(value)
+}
+
+#[cfg(test)]
+mod coordinate_rule_copies {
+    fn published(label: &str) -> String {
+        let doc: serde_yaml::Value =
+            serde_yaml::from_str(include_str!("../../../labels/definitions_geography.yaml"))
+                .expect("parse geography definitions");
+        doc[label]["validation"]["pattern"]
+            .as_str()
+            .expect("pattern")
+            .to_string()
+    }
+
+    #[test]
+    fn plus_code_rule_copy_matches_the_taxonomy() {
+        assert_eq!(
+            super::PLUS_CODE_RULE,
+            published("geography.coordinate.plus_code")
+        );
+    }
+}
+
 /// The three-letter `EN_AU` state and territory codes of `state_code`'s
 /// `validation_by_locale`. A copy, because the library cannot read `labels/`
 /// when built from the crates.io package; the test
@@ -407,6 +464,7 @@ mod tests {
             "container.object.xml",
             "geography.location.state_code",
             "geography.format.wkt",
+            "geography.coordinate.plus_code",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

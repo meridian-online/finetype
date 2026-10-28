@@ -42,7 +42,6 @@ pub const SAMPLES_CHECK_EXCEPTIONS: &[&str] = &[
     "finance.crypto.bitcoin_address",
     "finance.currency.amount_apostrophe",
     "finance.currency.amount_code_prefix",
-    "geography.coordinate.plus_code",
     "identity.person.weight",
     "representation.format.color_rgb",
     "technology.internet.ip_v6",

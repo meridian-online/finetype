@@ -1259,3 +1259,76 @@ fn wkt_detector_needs_a_coordinate_pair_or_empty() {
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
     }
 }
+
+const PLUS_CODE_LABEL: &str = "geography.coordinate.plus_code";
+
+/// Open Location Code specification: input is case-insensitive; a full code is
+/// up to 15 digits, padded only before the `+` and in pairs, with nothing after
+/// the `+` when padded, at most seven characters after it.
+#[test]
+fn plus_code_accepts_source_forms() {
+    assert_pattern_boundary(
+        PLUS_CODE_LABEL,
+        &[
+            "849VCWC8+R9",
+            "8FVC9G8F+",
+            "6P000000+",
+            "849vcwc8+r9",
+            "8FVC9G8F+6WXQRJH",
+            "6PH57V00+",
+            "6PH50000+",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn plus_code_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        PLUS_CODE_LABEL,
+        &[],
+        &[
+            // short code: no area part
+            "CWC8+R9",
+            // padded code with digits after the plus
+            "7FG49W00+2V",
+            // latitude above 90 degrees, longitude above 180 degrees
+            "X49VCWC8+R9",
+            "8WC8Q2PQ+QV",
+            // eight characters after the plus
+            "8FVC9G8F+6WXQRJHV",
+            // padding must come in pairs and only before the plus
+            "8FVC9G0F+",
+            "8FVC9G000+",
+            "8FVC0G8F+",
+            // one character after the plus names no cell
+            "849VCWC8+R",
+        ],
+    );
+}
+
+/// The detector counts the form the type was first defined by (upper case,
+/// eight characters, a refinement of two or more), so padded and bare-plus
+/// codes and lower-case input conform but do not count for discrimination.
+#[test]
+fn plus_code_detector_counts_the_first_defined_form() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(PLUS_CODE_LABEL, &tax).expect("plus_code rule");
+    let detector = detector_for(PLUS_CODE_LABEL);
+    assert!(detector.is_some());
+    for ok in ["849VCWC8+R9", "87G8Q2PQ+QV", "8FVC9G8F+6WXQRJH"] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for conforming in ["8FVC9G8F+", "6P000000+", "849vcwc8+r9", "22000000+"] {
+        assert!(rule.is_valid(conforming), "{conforming:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, conforming),
+            "{conforming:?}"
+        );
+    }
+    for bad in ["CWC8+R9", "7FG49W00+2V", "X49VCWC8+R9", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}

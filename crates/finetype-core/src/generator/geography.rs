@@ -182,8 +182,18 @@ impl Generator {
             }
             ("coordinate", "plus_code") => {
                 let alphabet = b"23456789CFGHJMPQRVWX";
+                // The first character is within 90 degrees of latitude (the first
+                // nine alphabet characters), the second within 180 of longitude
+                // (the first eighteen).
                 let first8: String = (0..8)
-                    .map(|_| alphabet[self.rng.gen_range(0..alphabet.len())] as char)
+                    .map(|i| {
+                        let limit = match i {
+                            0 => 9,
+                            1 => 18,
+                            _ => alphabet.len(),
+                        };
+                        alphabet[self.rng.gen_range(0..limit)] as char
+                    })
                     .collect();
                 let refine_len = self.rng.gen_range(2..=4);
                 let refine: String = (0..refine_len)
