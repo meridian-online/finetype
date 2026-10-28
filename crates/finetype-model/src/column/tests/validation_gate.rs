@@ -1695,3 +1695,10 @@ fn iana_recovers_hyphenated_and_etc_zones() {
         .unwrap();
     assert_eq!(r.label, "datetime.offset.iana");
 }
+
+/// A column of one repeated Czech amount with the symbol after the number
+/// (which the old rule rejected) keeps its type.
+#[test]
+fn amount_multisym_constant_column_keeps_type() {
+    assert_constant_column_kept("finance.currency.amount_multisym", "1 234,56 K\u{10d}");
+}

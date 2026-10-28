@@ -1054,3 +1054,69 @@ fn chinese_ymd_transform_casts_padded_and_unpadded_values() {
         );
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn amount_multisym_transform_strips_a_trailing_symbol() {
+    let tax = test_taxonomy();
+    let label = "finance.currency.amount_multisym";
+    // Every ACCEPT value, with plain, no-break (U+00A0) and narrow no-break
+    // (U+202F) spaces, casts to 1234.56.
+    for value in [
+        "1 234,56 K\u{10d}",
+        "1 234,56 z\u{142}",
+        "kr. 1.234,56",
+        "K\u{10d} 1 234,56",
+        "1\u{a0}234,56\u{a0}K\u{10d}",
+        "1\u{202f}234,56\u{202f}z\u{142}",
+        "1.234,56\u{a0}kr.",
+        "1 234,56 kr",
+        "R$ 1.234,56",
+        "HK$ 1,234.56",
+    ] {
+        assert_eq!(
+            run_transform(&tax, label, value, ""),
+            "1234.56",
+            "{value:?}"
+        );
+    }
+    assert_eq!(
+        run_transform(&tax, label, "-1 234,56 K\u{10d}", ""),
+        "-1234.56"
+    );
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn amount_multisym_symbol_part_reads_a_leading_or_trailing_symbol() {
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let decompose = tax
+        .ddl_info("finance.currency.amount_multisym")
+        .expect("known label")
+        .decompose
+        .clone()
+        .expect("amount_multisym has decompose");
+    let expr = decompose["symbol"].as_str().expect("symbol part");
+    for (value, symbol) in [
+        ("R$ 1.234,56", "R$"),
+        ("kr. 1.234,56", "kr."),
+        ("1 234,56 K\u{10d}", "K\u{10d}"),
+        ("1 234,56 z\u{142}", "z\u{142}"),
+        ("1\u{a0}234,56\u{a0}K\u{10d}", "K\u{10d}"),
+        ("1.234,56\u{202f}kr.", "kr."),
+        ("-1 234,56 K\u{10d}", "K\u{10d}"),
+    ] {
+        let sql = format!("SELECT {}", expr.replace("{col}", &format!("'{}'", value)));
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(out.status.success(), "{value:?}");
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout).trim(),
+            symbol,
+            "{value:?}"
+        );
+    }
+}

@@ -2575,3 +2575,57 @@ fn iana_rejects_undefined_forms() {
         ],
     );
 }
+
+const AMOUNT_MULTISYM_LABEL: &str = "finance.currency.amount_multisym";
+
+/// CLDR writes the symbol after the number for Czech (`1 234,56 Kč`), Polish
+/// (`1 234,56 zł`) and Danish (`1.234,56 kr.`), with U+00A0 or U+202F between
+/// the digit groups and before the symbol; `kr.` is a symbol. The prefix forms
+/// the type already took stay.
+#[test]
+fn amount_multisym_accepts_source_forms() {
+    assert_pattern_boundary(
+        AMOUNT_MULTISYM_LABEL,
+        &[
+            "1 234,56 K\u{10d}",
+            "1 234,56 z\u{142}",
+            "kr. 1.234,56",
+            "K\u{10d} 1 234,56",
+            // CLDR's no-break space and narrow no-break space
+            "1\u{a0}234,56\u{a0}K\u{10d}",
+            "1\u{202f}234,56\u{202f}z\u{142}",
+            "1.234,56\u{a0}kr.",
+            "1 234,56 kr",
+            "-1 234,56 K\u{10d}",
+            "1234 K\u{10d}",
+            "1234,5z\u{142}",
+            "kr.1234",
+            // the forms the type already took
+            "R$ 1.234,56",
+            "kr 1 234,56",
+        ],
+        &[],
+    );
+}
+
+/// A symbol with no amount is not an amount, and neither is an amount followed
+/// by a symbol the sources do not list after the number.
+#[test]
+fn amount_multisym_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        AMOUNT_MULTISYM_LABEL,
+        &[],
+        &[
+            "K\u{10d}",
+            "z\u{142}",
+            "kr.",
+            "1 234,56 \u{20ac}",
+            "1 234,56 K\u{10d} apple",
+            "1 234,56 K\u{10d} ",
+            "K\u{10d} 1 234,56 K\u{10d}",
+            "1 234,56 Kr",
+            "1 234, K\u{10d}",
+            "1 234,56 K\u{10d}.",
+        ],
+    );
+}

@@ -1085,34 +1085,41 @@ finance.currency.amount_multisym:
   title: "Currency Amount (Multi-Character Symbol)"
   description: >
     Currency amounts with multi-character symbols: R$ (Brazilian Real),
-    HK$ (Hong Kong Dollar), kr (Nordic Krone), Kč (Czech Koruna),
-    zł (Polish Zloty). Separator conventions follow local standard.
+    HK$ (Hong Kong Dollar), kr and kr. (Nordic Krone), K\u010d (Czech Koruna),
+    z\u0142 (Polish Zloty). The symbol comes before the amount, or after it for
+    Czech, Polish and Danish, as CLDR writes them (1 234,56 K\u010d,
+    1 234,56 z\u0142, 1.234,56 kr.), with a space, a no-break space (U+00A0) or a
+    narrow no-break space (U+202F) between the digit groups and before the
+    symbol. Separator conventions follow local standard.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
   frictionless:
     type: string
   format_string: null
-  transform: "CAST(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[^0-9-]+|\\s', '', 'g'), '[.,]([0-9]{1,2})$', 'D\\1'), '[.,]', '', 'g'), 'D', '.') AS DECIMAL(18,2))"
+  transform: "CAST(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[^0-9-]+|[^0-9]+$|[\\s\\x{A0}\\x{202F}]', '', 'g'), '[.,]([0-9]{1,2})$', 'D\\1'), '[.,]', '', 'g'), 'D', '.') AS DECIMAL(18,2))"
   transform_ext: null
   decompose:
-    symbol: "REGEXP_EXTRACT({col}, '^([^0-9\\s-]+)', 1)"
+    symbol: "COALESCE(NULLIF(REGEXP_EXTRACT({col}, '^([^0-9\\s\\x{A0}\\x{202F}-]+)', 1), ''), REGEXP_EXTRACT({col}, '([^0-9\\s\\x{A0}\\x{202F}]+)$', 1))"
   validation:
     type: string
-    pattern: "^(R\\$|HK\\$|NT\\$|S\\$|A\\$|C\\$|NZ\\$|kr|Kč|zł|Ft|lei|Rp|Rs\\.?)\\s?-?[0-9]+([.,\\s][0-9]+)*$"
+    pattern: "^(?:(?:R\\$|HK\\$|NT\\$|S\\$|A\\$|C\\$|NZ\\$|kr\\.?|K\u010d|z\u0142|Ft|lei|Rp|Rs\\.?)[\\s\u202F]?-?[0-9]+(?:[.,\\s\u202F][0-9]+)*|-?[0-9]+(?:[.,\\s\u202F][0-9]+)*[\\s\u202F]?(?:kr\\.?|K\u010d|z\u0142))$"
   tier: [VARCHAR, currency]
   aliases: []
   samples:
     - "R$ 1.234,56"
     - "HK$ 1,234.56"
-    - "kr 1 234,56"
-    - "Kč 1 234,56"
-    - "zł 1 234,56"
+    - "kr. 1.234,56"
+    - "1 234,56 K\u010d"
+    - "1 234,56 z\u0142"
   icon: cash
   references: null
   notes: >
     New in format coverage expansion. Multi-character symbols generalize
-    locale-specific parsing. Transform strips symbol, normalizes separators.
+    locale-specific parsing. Transform strips a leading or trailing symbol and
+    every space, including U+00A0 and U+202F, and normalizes separators.
+    Source: CLDR (cs, pl, da currency patterns). A trailing symbol is taken for
+    kr, kr., K\u010d and z\u0142 only; the other symbols are prefixes.
 
 finance.currency.amount_neg_trailing:
   title: "Currency Amount (Trailing Negative)"
