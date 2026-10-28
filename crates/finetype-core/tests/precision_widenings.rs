@@ -2767,6 +2767,45 @@ fn gender_code_rejects_undefined_forms() {
     assert_pattern_boundary(GENDER_CODE_LABEL, &[], &["<<", "U", ">", "<M", ""]);
 }
 
+const NDC_LABEL: &str = "identity.medical.ndc";
+
+/// 21 CFR 207.33: a labeler code of up to six digits, a product code and a
+/// package code. The six-digit labeler forms are 6-4-1 and 6-3-2, and RxNorm
+/// writes a twelve-digit 6-4-2.
+#[test]
+fn ndc_accepts_source_forms() {
+    assert_pattern_boundary(
+        NDC_LABEL,
+        &[
+            "123456-7890-1",
+            "123456-789-01",
+            "123456-7890-12",
+            "0002-1433-80",
+            "12345-678-90",
+            "12345-6789-0",
+            "00021433801",
+        ],
+        &[],
+    );
+}
+
+/// A bare twelve-digit number is a UPC, not an NDC, and a seven-digit labeler
+/// is longer than any labeler code.
+#[test]
+fn ndc_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        NDC_LABEL,
+        &[],
+        &[
+            "123456789012",
+            "1234567-890-1",
+            "123456-78-901",
+            "123456-7890-123",
+            "123456-7890",
+        ],
+    );
+}
+
 /// The ICAO filler `<` conforms to gender_code but is not counted for
 /// discrimination; the earlier codes still are, in either case.
 #[test]
@@ -2784,3 +2823,26 @@ fn gender_code_detector_keeps_out_the_filler() {
     }
 }
 
+/// The six-digit-labeler NDC forms conform to the rule but are not counted for
+/// discrimination (ndc is an attractor leaf); the earlier shapes still are.
+#[test]
+fn ndc_detector_keeps_out_the_six_digit_labeler_forms() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(NDC_LABEL, &tax).expect("rule");
+    let detector = detector_for(NDC_LABEL);
+    assert!(detector.is_some());
+    for kept in [
+        "0002-1433-80",
+        "12345-678-90",
+        "12345-6789-0",
+        "00021433801",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, kept), "{kept}");
+    }
+    for out in ["123456-7890-1", "123456-789-01", "123456-7890-12"] {
+        assert!(rule.is_valid(out), "{out} conforms");
+        assert!(!passes_detector_or_rule(detector, &rule, out), "{out}");
+    }
+}

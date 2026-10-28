@@ -34,6 +34,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "finance.securities.ticker" => Some(is_ticker_discrimination_shape),
         "finance.securities.cusip" => Some(is_cusip_discrimination_shape),
         "identity.person.gender_code" => Some(is_gender_code_discrimination_shape),
+        "identity.medical.ndc" => Some(is_ndc_discrimination_shape),
         "technology.cryptographic.jwt" => Some(is_jwt_discrimination_shape),
         "representation.scientific.protein_sequence" => {
             Some(is_protein_sequence_discrimination_shape)
@@ -301,6 +302,24 @@ fn is_gender_code_discrimination_shape(value: &str) -> bool {
         value.to_ascii_uppercase().as_str(),
         "M" | "F" | "X" | "0" | "1" | "2" | "9"
     )
+}
+
+/// `ndc`: the shapes the type took before the six-digit-labeler forms joined the
+/// published rule (4-4-2, 5-3-2, 5-4-1 and eleven bare digits). `ndc` is an
+/// attractor leaf, so a form the published rule added does not count here.
+fn is_ndc_discrimination_shape(value: &str) -> bool {
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|c| c.is_ascii_digit());
+    let parts: Vec<&str> = value.split('-').collect();
+    match parts.as_slice() {
+        [all] => all.len() == 11 && digits(all),
+        [a, b, c] => {
+            matches!(
+                (a.len(), b.len(), c.len()),
+                (4, 4, 2) | (5, 3, 2) | (5, 4, 1)
+            ) && parts.iter().all(|p| digits(p))
+        }
+        _ => false,
+    }
 }
 
 /// `cusip`: the published rule, which takes the private-placement characters
@@ -939,6 +958,7 @@ mod tests {
             "technology.cryptographic.jwt",
             "finance.securities.ticker",
             "finance.securities.cusip",
+            "identity.medical.ndc",
             "identity.person.gender_code",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its

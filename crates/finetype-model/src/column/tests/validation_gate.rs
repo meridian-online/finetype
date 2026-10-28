@@ -1895,3 +1895,49 @@ fn gender_code_is_not_promoted_for_filler_columns() {
     }
 }
 
+/// A column of one repeated NDC in a form the detector keeps (the old shape)
+/// keeps its type. The six-digit-labeler forms the old rule rejected conform to
+/// the rule but the detector does not count them, so a column of them is demoted
+/// by design, as on 0.6.64; see `ndc_six_digit_labeler_column_is_demoted`.
+#[test]
+fn ndc_constant_column_keeps_type() {
+    assert_constant_column_kept("identity.medical.ndc", "0002-1433-80");
+}
+
+#[test]
+fn ndc_six_digit_labeler_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    for value in ["123456-7890-1", "123456-789-01", "123456-7890-12"] {
+        let values: Vec<String> = vec![value.to_string(); 40];
+        assert!(
+            schema_fail_demotion(&values, "identity.medical.ndc", &tax).is_some(),
+            "a column of {value} is demoted"
+        );
+    }
+}
+
+/// `ndc` is an attractor leaf. A column of twelve-digit UPCs is still demoted from
+/// it by attractor demotion, and a hyphenated six-digit-labeler column is not kept.
+#[test]
+fn ndc_attractor_demotion_still_demotes_upc_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let upcs: Vec<String> = (0..40)
+        .map(|i| format!("{:012}", 36_000_291_452u64 + i * 7_919))
+        .collect();
+    let hyphenated: Vec<String> = (0..40)
+        .map(|i| format!("{:06}-{:04}-{}", 100_000 + i * 31, 1_000 + i, i % 10))
+        .collect();
+    for (name, values) in [("upc", upcs), ("six-digit labeler", hyphenated)] {
+        let r = cc
+            .compose_from_sense("code", &values, "identity.medical.ndc", 0.9)
+            .unwrap();
+        assert_ne!(
+            r.label, "identity.medical.ndc",
+            "{name}: {:?}",
+            r.disambiguation_rule
+        );
+    }
+}
+

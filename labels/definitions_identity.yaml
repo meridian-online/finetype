@@ -1118,6 +1118,8 @@ identity.medical.ndc:
     the FDA. Three segments: labeler code, product code, package code.
     Common formats with dashes: 4-4-2, 5-3-2, or 5-4-1 (totaling
     10 digits). May also appear as 11 digits with zero-padded segments.
+    A six-digit labeler code is written 6-4-1 or 6-3-2, and RxNorm writes
+    a hyphenated 6-4-2.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -1129,7 +1131,7 @@ identity.medical.ndc:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}-\\d{4}-\\d{2}$|^\\d{5}-\\d{3}-\\d{2}$|^\\d{5}-\\d{4}-\\d{1}$|^\\d{11}$"
+    pattern: "^\\d{4}-\\d{4}-\\d{2}$|^\\d{5}-\\d{3}-\\d{2}$|^\\d{5}-\\d{4}-\\d{1}$|^\\d{6}-\\d{4}-\\d{1,2}$|^\\d{6}-\\d{3}-\\d{2}$|^\\d{11}$"
   tier: [VARCHAR, medical]
   aliases: [national_drug_code, drug_code]
   samples:
@@ -1142,7 +1144,12 @@ identity.medical.ndc:
   notes: >
     NDC formats vary by segment width. The FDA accepts multiple formats.
     Transformation preserves the string since the dash-separated format
-    carries structural meaning.
+    carries structural meaning (21 CFR 207.33; RxNorm). A bare twelve-digit
+    number is a UPC, not an NDC, and is rejected. The six-digit-labeler
+    forms are in the published rule but not in discrimination: ndc is an
+    attractor leaf, so a detector holds to the 4-4-2, 5-3-2, 5-4-1 and
+    11-digit shapes and a column of 6-4-1, 6-3-2 or 6-4-2 values is demoted
+    as before.
 
 identity.medical.icd10:
   title: "ICD-10 Diagnosis Code"
