@@ -212,9 +212,8 @@ fn formats() -> &'static [Format] {
                 chk_ymd_hms,
             ),
             f(
-                // rfc_3339 space form carries an offset; pg_short_offset is its
-                // millisecond+short-offset sibling. Keep rfc_3339 for the plain
-                // second-precision space-offset shape.
+                // rfc_3339 space form carries a four-digit (or colon) offset;
+                // pg_short_offset, below, is the two-digit-offset sibling.
                 "datetime.timestamp.rfc_3339",
                 true,
                 &format!(r"^{ymd_sp} ?[+-]\d{{2}}:?\d{{2}}$"),
