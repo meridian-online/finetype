@@ -892,6 +892,12 @@ fn xml_accepts_source_forms() {
             "<?xml version=\"1.0\"?><a>1</a>",
             "<a>\n  <b>1</b>\n</a>",
             "<gr\u{f6}\u{df}e>1</gr\u{f6}\u{df}e>",
+            "<!DOCTYPE note><note>x</note>",
+            "<!DOCTYPE note [<!ENTITY e \"v\">]>\n<note>&e;</note>",
+            "<?xml version=\"1.0\"?><!-- generated --><a>1</a>",
+            "<a/><!-- end -->",
+            "<a>1</a>\n<?pi data?>\n",
+            "<a\u{10000}/>",
         ],
         &[],
     );
