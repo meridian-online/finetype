@@ -2285,8 +2285,10 @@ datetime.timestamp.sql_microseconds_offset:
 datetime.timestamp.pg_short_offset:
   title: PostgreSQL Short Offset
   description: >
-    PostgreSQL-specific format with 2-digit timezone offset (e.g., -05
-    instead of -05:00). Microsecond precision with abbreviated offset.
+    PostgreSQL ISO output with a 2-digit timezone offset (e.g., -05
+    instead of -05:00). The fraction of a second is written only when it is
+    non-zero, one to six digits, so both 2022-01-06 18:00:00+03 and
+    2024-01-15 14:30:00.123456-05 are in this format.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
@@ -2294,25 +2296,27 @@ datetime.timestamp.pg_short_offset:
     type: datetime
     format: "%Y-%m-%d %H:%M:%S.%f%z"
   format_string: "%Y-%m-%d %H:%M:%S.%f%z"
-  transform: "strptime({col} || ':00', '%Y-%m-%d %H:%M:%S.%f%z')"
+  transform: "COALESCE(try_strptime({col} || ':00', '%Y-%m-%d %H:%M:%S%z'), try_strptime({col} || ':00', '%Y-%m-%d %H:%M:%S.%f%z'))"
   transform_ext: null
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{6}[+-]\\d{2}$"
-    minLength: 28
-    maxLength: 29
+    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?[+-]\\d{2}$"
   tier: [TIMESTAMPTZ, timestamp]
   aliases: []
   samples:
     - "2024-01-15 14:30:00.123456-05"
     - "2023-12-31 23:59:59.000000+00"
     - "2024-06-01 08:15:30.789012+10"
+    - "2022-01-06 18:00:00+03"
+    - "2022-01-06 18:00:00.5+03"
   icon: clock
   references: null
   notes: >
     New in format coverage expansion. PostgreSQL sometimes emits short offsets
-    (-05 instead of -05:00). Transform appends :00 for strptime compatibility.
+    (-05 instead of -05:00). Transform appends :00 for strptime compatibility
+    and parses the value with a fraction (1-6 digits) or without one;
+    format_string and the frictionless format describe the fractional form.
 
 datetime.timestamp.dot_dmy_24h:
   title: European Dot Timestamp (DMY 24h)

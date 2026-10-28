@@ -931,3 +931,54 @@ fn jwt_parts_keep_three_jws_parts_and_leave_a_jwe_unsplit() {
         );
     }
 }
+
+/// Runs the published transform of `label` on `value` through the duckdb CLI,
+/// after `setup`, wrapped in `TRY` as `validate` does, and returns the result as text.
+fn run_transform(tax: &Taxonomy, label: &str, value: &str, setup: &str) -> String {
+    use std::process::Command;
+    let transform = tax
+        .ddl_info(label)
+        .expect("known label")
+        .transform
+        .clone()
+        .expect("label has a transform");
+    let sql = format!(
+        "{setup}SELECT TRY({})",
+        transform.replace("{col}", &format!("'{}'", value))
+    );
+    let out = Command::new("duckdb")
+        .args(["-no-init", "-noheader", "-list", "-c", &sql])
+        .output()
+        .expect("run the duckdb CLI");
+    assert!(
+        out.status.success(),
+        "duckdb failed on {value:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn pg_short_offset_transform_parses_with_and_without_a_fraction() {
+    let tax = test_taxonomy();
+    let label = "datetime.timestamp.pg_short_offset";
+    // Rendered in UTC so the check does not depend on the session time zone.
+    for (value, expect) in [
+        ("2022-01-06 18:00:00+03", "2022-01-06 15:00:00+00"),
+        ("1997-12-17 07:37:16-08", "1997-12-17 15:37:16+00"),
+        ("2022-01-06 18:00:00.5+03", "2022-01-06 15:00:00.5+00"),
+        (
+            "2024-01-15 14:30:00.123456-05",
+            "2024-01-15 19:30:00.123456+00",
+        ),
+    ] {
+        let got = run_transform(&tax, label, value, "SET TimeZone='UTC'; ");
+        assert_eq!(got, expect, "{value:?}");
+    }
+    // A value the rule rejects casts to NULL.
+    assert_eq!(
+        run_transform(&tax, label, "2022-01-06 18:00:00+3", ""),
+        "NULL"
+    );
+}

@@ -2281,3 +2281,39 @@ fn jwt_detector_keeps_out_dotted_names() {
         );
     }
 }
+
+const PG_SHORT_OFFSET_LABEL: &str = "datetime.timestamp.pg_short_offset";
+
+/// PostgreSQL's ISO output (`DateStyle` ISO) writes the fraction only when it is
+/// non-zero and trims trailing zeros, so one to six digits or none.
+#[test]
+fn pg_short_offset_accepts_source_forms() {
+    assert_pattern_boundary(
+        PG_SHORT_OFFSET_LABEL,
+        &[
+            "2022-01-06 18:00:00+03",
+            "1997-12-17 07:37:16-08",
+            "2022-01-06 18:00:00.5+03",
+            "2024-01-15 14:30:00.123456-05",
+            "2023-12-31 23:59:59.000000+00",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn pg_short_offset_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        PG_SHORT_OFFSET_LABEL,
+        &[],
+        &[
+            "2022-01-06 18:00:00+3",
+            "2022-01-06 18:00:00.1234567+03",
+            "2022-01-06 18:00:00.+03",
+            "2022-01-06 18:00:00",
+            "2022-01-06 18:00:00+03:00",
+            "2022-01-06 18:00:00+0300",
+            "2022-01-06T18:00:00+03",
+        ],
+    );
+}

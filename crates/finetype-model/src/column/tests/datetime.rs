@@ -1585,3 +1585,102 @@ fn header_hint_does_not_undo_a_shape_recovery() {
     cc.apply_header_sharpen(&mut other, "duration", &sample);
     assert_eq!(other.label, "representation.numeric.integer_number");
 }
+
+// ── pg_short_offset routing (batch 2) ─────────────────────────────────────────
+
+fn refine_to(label_in: &str, values: &[&str]) -> String {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new(label_in)));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let mut r = ColumnResult {
+        label: label_in.to_string(),
+        confidence: 0.5,
+        vote_distribution: vec![],
+        disambiguation_applied: false,
+        disambiguation_rule: None,
+        samples_used: values.len(),
+        detected_locale: None,
+        is_generic: false,
+        column_features: None,
+    };
+    let sample = vals(values);
+    cc.datetime_format_refinement(&mut r, &sample);
+    r.label
+}
+
+/// Each form the PostgreSQL rule accepts routes to `pg_short_offset`, from the
+/// label the model is likely to have reached for.
+#[test]
+fn pg_short_offset_forms_route_to_the_leaf() {
+    const PG: &str = "datetime.timestamp.pg_short_offset";
+    for column in [
+        vec!["2022-01-06 18:00:00+03", "1997-12-17 07:37:16-08"],
+        vec!["2022-01-06 18:00:00.5+03", "2021-02-03 04:05:06.25-05"],
+        vec![
+            "2024-01-15 14:30:00.123456-05",
+            "2023-12-31 23:59:59.000000+00",
+        ],
+        vec!["2022-01-06 18:00:00+03"],
+    ] {
+        for from in [
+            "unknown",
+            "datetime.timestamp.rfc_3339",
+            "datetime.timestamp.sql_standard",
+        ] {
+            assert_eq!(refine_to(from, &column), PG, "{from}: {column:?}");
+        }
+    }
+}
+
+/// No neighbouring timestamp leaf is captured by `pg_short_offset`: each keeps
+/// its own reading.
+#[test]
+fn pg_short_offset_does_not_capture_neighbouring_timestamps() {
+    const PG: &str = "datetime.timestamp.pg_short_offset";
+    let cases: [(&str, Vec<&str>); 8] = [
+        (
+            "datetime.timestamp.rfc_3339",
+            vec!["2022-01-06 18:00:00+03:00", "1997-12-17 07:37:16-08:00"],
+        ),
+        (
+            "datetime.timestamp.rfc_3339",
+            vec!["2022-01-06 18:00:00+0300", "1997-12-17 07:37:16-0800"],
+        ),
+        (
+            "datetime.timestamp.sql_microseconds_offset",
+            vec!["2024-01-15 14:30:00.123456-05:00"],
+        ),
+        (
+            "datetime.timestamp.iso_8601_offset",
+            vec!["2022-01-06T18:00:00+03:00"],
+        ),
+        (
+            "datetime.timestamp.iso_8601_offset",
+            vec!["2022-01-06T18:00:00+03"],
+        ),
+        (
+            "datetime.timestamp.sql_standard",
+            vec!["2022-01-06 18:00:00", "1997-12-17 07:37:16"],
+        ),
+        (
+            "datetime.timestamp.sql_milliseconds",
+            vec!["2022-01-06 18:00:00.123"],
+        ),
+        (
+            "datetime.timestamp.iso_space_zulu",
+            vec!["2022-01-06 18:00:00Z"],
+        ),
+    ];
+    for (expect, column) in cases {
+        let got = refine_to(expect, &column);
+        assert_ne!(got, PG, "{column:?}");
+    }
+    // A mixed column holds no single voice, so nothing is asserted.
+    assert_eq!(
+        refine_to(
+            "datetime.timestamp.rfc_3339",
+            &["2022-01-06 18:00:00+03", "2022-01-06 18:00:00+03:00"]
+        ),
+        "datetime.timestamp.rfc_3339"
+    );
+}

@@ -89,7 +89,7 @@ datetime.timestamp.iso_seconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$	true
 datetime.timestamp.iso_space_zulu	false	^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$	true
 datetime.timestamp.mdy_12h	false	^\d{2}/\d{2}/\d{4} \d{2}:\d{2} [AP]M$	true
 datetime.timestamp.mdy_24h	false	^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}$	true
-datetime.timestamp.pg_short_offset	false	^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}[+-]\d{2}$	true
+datetime.timestamp.pg_short_offset	false	^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,6})?[+-]\d{2}$	true
 datetime.timestamp.rfc_2822	false	^[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} .+$	true
 datetime.timestamp.rfc_2822_ordinal	false	^\d{1,2}(?:st|nd|rd|th) [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}$	true
 datetime.timestamp.rfc_3339	false	^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)? ?(?:[Zz]|[+-]\d{2}:?\d{2})$	true

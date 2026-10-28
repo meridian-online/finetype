@@ -1492,3 +1492,13 @@ fn jwt_does_not_recover_dotted_name_columns() {
         }
     }
 }
+
+/// A column of one repeated whole-second PostgreSQL timestamp (`+03`), which the
+/// old rule rejected, is not vetoed or demoted.
+#[test]
+fn pg_short_offset_constant_column_keeps_type() {
+    assert_constant_column_kept(
+        "datetime.timestamp.pg_short_offset",
+        "2022-01-06 18:00:00+03",
+    );
+}
