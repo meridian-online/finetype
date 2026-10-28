@@ -1086,3 +1086,55 @@ fn color_hex_does_not_recover_year_column() {
         assert_ne!(r.label, "representation.format.color_hex", "from {label}");
     }
 }
+
+/// A column of one repeated compressed address (the old rule took only the
+/// eight-group form) keeps its type.
+#[test]
+fn ip_v6_constant_column_keeps_type() {
+    assert_constant_column_kept("technology.internet.ip_v6", "2001:db8:85a3::8a2e:370:7334");
+}
+
+/// `ip_v6` is a ceded-recovery leaf and now takes `::`-compressed values, so
+/// columns that are not addresses but share colons (MAC addresses, clock times,
+/// C++ and Rust paths with an upper-case or longer-than-four-hex segment) must
+/// not be promoted.
+#[test]
+fn ip_v6_does_not_recover_neighbouring_colon_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let columns: [(&str, [&str; 3]); 4] = [
+        (
+            "hw",
+            [
+                "00:1a:2b:3c:4d:5e",
+                "12:34:56:78:9a:bc",
+                "aa:bb:cc:dd:ee:ff",
+            ],
+        ),
+        ("at", ["10:30", "12:45:10", "23:59:59"]),
+        (
+            "symbol",
+            ["std::vector", "Foo::bar", "crate::module::function"],
+        ),
+        ("ratio", ["1:2", "3:4:5", "16:9"]),
+    ];
+    for (header, codes) in columns {
+        let values: Vec<String> = codes
+            .iter()
+            .cycle()
+            .take(42)
+            .map(|s| s.to_string())
+            .collect();
+        for label in [
+            "representation.text.word",
+            "representation.identifier.alphanumeric_id",
+        ] {
+            let r = cc.compose_from_sense(header, &values, label, 1.0).unwrap();
+            assert_ne!(
+                r.label, "technology.internet.ip_v6",
+                "{header} from {label}"
+            );
+        }
+    }
+}

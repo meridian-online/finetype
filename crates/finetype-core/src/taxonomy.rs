@@ -43,7 +43,6 @@ pub const SAMPLES_CHECK_EXCEPTIONS: &[&str] = &[
     "finance.currency.amount_apostrophe",
     "finance.currency.amount_code_prefix",
     "identity.person.weight",
-    "technology.internet.ip_v6",
 ];
 
 /// A sample's text as the validator sees it; `None` for non-scalar samples.

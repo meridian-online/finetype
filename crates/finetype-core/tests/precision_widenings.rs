@@ -1827,3 +1827,60 @@ fn color_hex_grades_bare_forms_as_noted() {
         }
     }
 }
+
+const IP_V6_LABEL: &str = "technology.internet.ip_v6";
+
+/// RFC 4291 section 2.2: the full, `::`-compressed and IPv4-mixed forms.
+#[test]
+fn ip_v6_accepts_source_forms() {
+    assert_pattern_boundary(
+        IP_V6_LABEL,
+        &[
+            "2001:db8:85a3::8a2e:370:7334",
+            "::1",
+            "::",
+            "fe80::1",
+            "::ffff:192.0.2.128",
+            "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+            "1::",
+            "::ffff:0:0",
+            "1:2:3:4:5:6:7::",
+            "::2:3:4:5:6:7:8",
+            "1:2:3:4:5:6:1.2.3.4",
+            "1::1.2.3.4",
+            "1:2:3:4:5::1.2.3.4",
+            "::1.2.3.4",
+            "64:ff9b::192.0.2.33",
+            "2001:DB8::ABCD",
+        ],
+        &[],
+    );
+}
+
+/// Two `::`, a short group count without `::`, a 9-group value, a bad octet or
+/// digit, and a zone ID are not RFC 4291 addresses.
+#[test]
+fn ip_v6_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        IP_V6_LABEL,
+        &[],
+        &[
+            "1::2::3",
+            "12:34:56:78:9a:bc",
+            "::ffff:192.0.2.256",
+            "2001:db8::g",
+            "1:2:3:4:5:6:7:8:9",
+            "1:2:3:4:5:6:7::8",
+            "::1:2:3:4:5:6:7:8",
+            "12345::1",
+            ":1",
+            "1:",
+            ":::",
+            "fe80::1%eth0",
+            "::ffff:192.0.2",
+            "::ffff:01.2.3.4",
+            "1:2:3:4:5:6:7:1.2.3.4",
+            "1:2:3:4:5:6::1.2.3.4",
+        ],
+    );
+}

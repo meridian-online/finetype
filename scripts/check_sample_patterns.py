@@ -141,24 +141,6 @@ PUBLISHED_CONTRADICTIONS: tuple[tuple[str, str, str], ...] = (
         "the pattern's unit alternation is `kg|lbs|lb|g|oz|stones` and does not "
         "include `pounds`",
     ),
-    (
-        "technology.internet.ip_v6",
-        "2001:db8:85a3::8a2e:370:7334",
-        "`::` zero compression, under a pattern that requires all eight groups "
-        "written out",
-    ),
-    (
-        "technology.internet.ip_v6",
-        "::1",
-        "the loopback address in its only legal form, under the same "
-        "all-eight-groups pattern",
-    ),
-    (
-        "technology.internet.ip_v6",
-        "fe80::1",
-        "a link-local address in compressed form, under the same "
-        "all-eight-groups pattern",
-    ),
 )
 
 
