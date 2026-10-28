@@ -297,7 +297,8 @@ impl ColumnClassifier {
 
     /// `protein_sequence_length_veto` (default ON). Demotes a
     /// `representation.scientific.protein_sequence` OVERCALL on a short-string
-    /// column to `unknown`. The protein pattern `^[ACDEFGHIKLMNPQRSTVWXY*]+$`
+    /// column to `unknown`. The protein discrimination class
+    /// `^[ACDEFGHIKLMNPQRSTVWXY*]+$` (the 20 standard letters, X and `*`)
     /// is a magnet for short uppercase codes — a stock-ticker column is 56%
     /// all-amino-acid on the EDGAR measurement, so when the membership
     /// recovery declines the column keeps the confidently-wrong protein

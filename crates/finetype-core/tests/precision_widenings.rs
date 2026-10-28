@@ -1603,3 +1603,50 @@ fn smiles_accepts_source_forms() {
 fn smiles_rejects_undefined_forms() {
     assert_pattern_boundary(SMILES_LABEL, &[], &["C C", "C;C", "C,C", "C{C}", ""]);
 }
+
+const PROTEIN_LABEL: &str = "representation.scientific.protein_sequence";
+
+/// IUPAC one-letter code and NCBI BLAST: B, Z, U, O and the gap `-` join the
+/// 20 standard letters, X and `*`. J is not in the IUPAC table.
+#[test]
+fn protein_sequence_accepts_source_forms() {
+    assert_pattern_boundary(
+        PROTEIN_LABEL,
+        &["MKVBZU", "MKV-LLI", "MKOVL", "MKVLLIVGS", "MKXV*"],
+        &[],
+    );
+}
+
+#[test]
+fn protein_sequence_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        PROTEIN_LABEL,
+        &[],
+        &["MKV LLI", "MKV1", "MKVJLI", "mkvlli", ""],
+    );
+}
+
+/// The detector keeps the old class (the 20 standard letters, X and `*`), so
+/// the ambiguity codes, rare residues and gap conform without counting.
+#[test]
+fn protein_sequence_detector_keeps_old_class() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(PROTEIN_LABEL, &tax).expect("protein rule");
+    let detector = detector_for(PROTEIN_LABEL);
+    assert!(detector.is_some());
+    for ok in ["MKVLLIVGS", "ACDEFGHIKLMNPQRSTVWYXX*"] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for conforming in ["MKVBZU", "MKV-LLI", "MKOVL"] {
+        assert!(rule.is_valid(conforming), "{conforming:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, conforming),
+            "{conforming:?}"
+        );
+    }
+    for bad in ["MKV LLI", "MKV1", "MKVJLI", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}

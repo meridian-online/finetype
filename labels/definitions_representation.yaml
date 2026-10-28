@@ -767,8 +767,10 @@ representation.scientific.rna_sequence:
 representation.scientific.protein_sequence:
   title: "Protein Sequence"
   description: >
-    Amino acid sequence in single-letter IUPAC notation
-    (20 standard amino acids plus ambiguity codes).
+    Amino acid sequence in single-letter IUPAC notation: the 20 standard
+    amino acids, the ambiguity codes B (D or N), Z (E or Q) and X (any), the
+    rare residues U (selenocysteine) and O (pyrrolysine), the stop codon *
+    and the alignment gap -.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -782,19 +784,27 @@ representation.scientific.protein_sequence:
     molecular_weight_estimate: "LENGTH({col}) * 110"
   validation:
     type: string
-    pattern: "^[ACDEFGHIKLMNPQRSTVWXY*]+$"
+    pattern: "^[ABCDEFGHIKLMNOPQRSTUVWXYZ*-]+$"
   tier: [VARCHAR, scientific]
   aliases: [protein, peptide, amino_acid_sequence]
   samples:
     - "MKVLLIVGS"
     - "ACDEFGHIKLMNPQRSTVWYFL"
     - "MPKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVG"
+    - "MKVBZULLIO"
+    - "MKV-LLIVGS"
   icon: dna
   references: null
   notes: >
     v1 migration: New for v2. Single-letter amino acid notation.
     Standard: A, C, D, E, F, G, H, I, K, L, M, N, P, Q, R, S, T, V, W, Y
     Ambiguity: B (D or N), Z (E or Q), X (any), * (stop codon)
+    Rare residues: U (selenocysteine), O (pyrrolysine); - is an alignment gap.
+    J (Leu or Ile) is not accepted: the IUPAC-IUB 1983 amino acid table lists
+    B, Z and X but not J. The decompose parts count every character, gaps and
+    stops included. For discrimination only the 20 standard letters, X and *
+    count; sequences with B, Z, U, O or - conform but are not counted, so a
+    column of them is not kept as protein_sequence by schema_fail_demotion.
 
 representation.scientific.measurement_unit:
   title: "Measurement Unit"

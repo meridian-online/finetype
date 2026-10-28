@@ -931,3 +931,49 @@ fn emoji_does_not_recover_digit_columns() {
 fn smiles_constant_column_keeps_type() {
     assert_constant_column_kept("representation.scientific.smiles", "[*]CC");
 }
+
+/// The detector keeps the old class, so every ACCEPT form the old class
+/// rejected (`MKVBZU`) is not counted; no such value can pin keep-type. A
+/// column of one repeated standard-letter sequence, which both rules accept,
+/// keeps its type.
+#[test]
+fn protein_sequence_constant_column_keeps_type() {
+    assert_constant_column_kept(
+        "representation.scientific.protein_sequence",
+        "MKVLLIVGSLLIVGKQ",
+    );
+}
+
+/// A column of one repeated `MKVBZU`, which the old rule rejected, conforms but
+/// does not count (the detector keeps the old class), so it is demoted by
+/// `schema_fail_demotion` as on 0.6.64.
+#[test]
+fn protein_sequence_ambiguity_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["MKVBZU".to_string(); 40];
+    let demoted = schema_fail_demotion(&values, "representation.scientific.protein_sequence", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
+    );
+}
+
+/// `protein_sequence` now takes B, Z, U, O and `-`, but a column of uppercase
+/// words is not kept as protein_sequence by `schema_fail_demotion` (the
+/// detector keeps the old class, which rejects `HELLO`'s O, `WORLD`'s O and
+/// `BOOK`'s B and O).
+#[test]
+fn protein_sequence_does_not_recover_uppercase_words() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = ["HELLO", "WORLD", "BOOK"]
+        .iter()
+        .cycle()
+        .take(42)
+        .map(|s| s.to_string())
+        .collect();
+    let demoted = schema_fail_demotion(&values, "representation.scientific.protein_sequence", &tax);
+    assert!(
+        demoted.is_some(),
+        "uppercase words kept as protein_sequence"
+    );
+}

@@ -27,6 +27,9 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "geography.coordinate.mgrs" => Some(is_mgrs_discrimination_shape),
         "geography.coordinate.geohash" => Some(is_geohash_discrimination_shape),
         "geography.address.street_suffix" => Some(is_street_suffix_discrimination_shape),
+        "representation.scientific.protein_sequence" => {
+            Some(is_protein_sequence_discrimination_shape)
+        }
         _ => None,
     }
 }
@@ -460,6 +463,56 @@ mod street_suffix_copy {
     }
 }
 
+/// The published `protein_sequence` rule, copied because the library cannot read
+/// `labels/` when built from the crates.io package;
+/// `protein_sequence_rule_copy_matches_the_taxonomy` keeps it equal to the
+/// taxonomy's.
+const PROTEIN_SEQUENCE_RULE: &str = r"^[ABCDEFGHIKLMNOPQRSTUVWXYZ*-]+$";
+
+/// The class `protein_sequence` was first defined by: the 20 standard letters, `X`
+/// and `*`.
+const PROTEIN_SEQUENCE_OLD_SHAPE: &str = r"^[ACDEFGHIKLMNPQRSTVWXY*]+$";
+
+fn protein_sequence_regexes() -> Option<&'static (regex::Regex, regex::Regex)> {
+    static RULES: std::sync::OnceLock<Option<(regex::Regex, regex::Regex)>> =
+        std::sync::OnceLock::new();
+    RULES
+        .get_or_init(|| {
+            Some((
+                regex::Regex::new(PROTEIN_SEQUENCE_RULE).ok()?,
+                regex::Regex::new(PROTEIN_SEQUENCE_OLD_SHAPE).ok()?,
+            ))
+        })
+        .as_ref()
+}
+
+/// `protein_sequence`: the published rule and the class the type was first
+/// defined by (the 20 standard letters, `X` and `*`). The published rule follows
+/// the IUPAC one-letter code and NCBI BLAST, which add `B`, `Z`, `U`, `O` and the
+/// gap `-`; those conform but are not counted for discrimination, because
+/// uppercase words such as `HELLO` or `BOOK` are made of those letters.
+fn is_protein_sequence_discrimination_shape(value: &str) -> bool {
+    let Some((rule, old_shape)) = protein_sequence_regexes() else {
+        return false;
+    };
+    rule.is_match(value) && old_shape.is_match(value)
+}
+
+#[cfg(test)]
+mod protein_sequence_rule_copy {
+    #[test]
+    fn protein_sequence_rule_copy_matches_the_taxonomy() {
+        let doc: serde_yaml::Value = serde_yaml::from_str(include_str!(
+            "../../../labels/definitions_representation.yaml"
+        ))
+        .expect("parse representation definitions");
+        let published = doc["representation.scientific.protein_sequence"]["validation"]["pattern"]
+            .as_str()
+            .expect("protein_sequence pattern");
+        assert_eq!(super::PROTEIN_SEQUENCE_RULE, published);
+    }
+}
+
 /// The three-letter `EN_AU` state and territory codes of `state_code`'s
 /// `validation_by_locale`. A copy, because the library cannot read `labels/`
 /// when built from the crates.io package; the test
@@ -638,6 +691,7 @@ mod tests {
             "geography.coordinate.mgrs",
             "geography.coordinate.geohash",
             "geography.address.street_suffix",
+            "representation.scientific.protein_sequence",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the
