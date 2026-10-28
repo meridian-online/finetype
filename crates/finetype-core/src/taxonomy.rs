@@ -48,6 +48,16 @@ pub const SAMPLES_CHECK_EXCEPTIONS: &[&str] = &[
     "technology.internet.ip_v6",
 ];
 
+/// A sample's text as the validator sees it; `None` for non-scalar samples.
+fn sample_text(v: &serde_yaml::Value) -> Option<String> {
+    match v {
+        serde_yaml::Value::String(s) => Some(s.clone()),
+        serde_yaml::Value::Number(n) => Some(n.to_string()),
+        serde_yaml::Value::Bool(b) => Some(b.to_string()),
+        _ => None,
+    }
+}
+
 /// Whether `finetype generate` emits a leaf by default. See `Definition::generate`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -780,11 +790,8 @@ impl Taxonomy {
                 continue;
             }
             for sample in &def.samples {
-                let text = match sample {
-                    serde_yaml::Value::String(s) => s.clone(),
-                    serde_yaml::Value::Number(n) => n.to_string(),
-                    serde_yaml::Value::Bool(b) => b.to_string(),
-                    _ => continue,
+                let Some(text) = sample_text(sample) else {
+                    continue;
                 };
                 if !compiled.is_valid(&text) {
                     problems.push(format!("{key}: sample `{text}` fails the published rule"));
@@ -2178,15 +2185,11 @@ representation.discrete.categorical:
             });
             let compiled = crate::validator::CompiledValidator::new_for_label(validation, key)
                 .unwrap_or_else(|e| panic!("{key}: validation does not compile: {e}"));
-            let any_fails = def.samples.iter().any(|sample| {
-                let text = match sample {
-                    serde_yaml::Value::String(s) => s.clone(),
-                    serde_yaml::Value::Number(n) => n.to_string(),
-                    serde_yaml::Value::Bool(b) => b.to_string(),
-                    _ => return false,
-                };
-                !compiled.is_valid(&text)
-            });
+            let any_fails = def
+                .samples
+                .iter()
+                .filter_map(sample_text)
+                .any(|text| !compiled.is_valid(&text));
             assert!(
                 any_fails,
                 "{key}: every sample now passes; remove it from SAMPLES_CHECK_EXCEPTIONS"
