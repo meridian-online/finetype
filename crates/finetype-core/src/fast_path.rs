@@ -237,6 +237,34 @@ mod tests {
         );
     }
 
+    /// wkt and xml are fast-path leaves whose published rules are wider than
+    /// their detectors, so text that only conforms must get no fast-path type.
+    #[test]
+    fn declines_text_that_only_conforms_to_wkt_or_xml() {
+        let tax = taxonomy();
+        let wkt: Vec<String> = ["Triangle (equilateral)", "Point (of sale)", "Tin (small)"]
+            .iter()
+            .cycle()
+            .take(42)
+            .map(|v| v.to_string())
+            .collect();
+        assert_eq!(deterministic_fast_path(&tax, &wkt), None);
+        let html: Vec<String> = [
+            "<p>Hello</p>\n<p>World</p>",
+            "<div>\n  <span>x</span>\n</div>",
+            "<ul>\n<li>a</li>\n</ul>",
+        ]
+        .iter()
+        .cycle()
+        .take(42)
+        .map(|v| v.to_string())
+        .collect();
+        assert_ne!(
+            deterministic_fast_path(&tax, &html).as_deref(),
+            Some("container.object.xml")
+        );
+    }
+
     #[test]
     fn declines_plain_words() {
         let tax = taxonomy();
