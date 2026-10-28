@@ -1037,3 +1037,20 @@ fn iso_week_transform_casts_padded_and_unpadded_weeks() {
         );
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn chinese_ymd_transform_casts_padded_and_unpadded_values() {
+    let tax = test_taxonomy();
+    for (value, expect) in [
+        ("2024\u{5E74}01\u{6708}11\u{65E5}", "2024-01-11"),
+        ("2024\u{5E74}1\u{6708}15\u{65E5}", "2024-01-15"),
+        ("2024\u{5E74}09\u{6708}05\u{65E5}", "2024-09-05"),
+    ] {
+        assert_eq!(
+            run_transform(&tax, "datetime.date.chinese_ymd", value, ""),
+            expect,
+            "{value:?}"
+        );
+    }
+}

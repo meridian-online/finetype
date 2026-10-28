@@ -1576,3 +1576,13 @@ fn full_month_year_column_keeps_month_year_full() {
 fn iso_week_constant_column_keeps_type() {
     assert_constant_column_kept("datetime.date.iso_week", "2024-W3");
 }
+
+/// A column of one repeated zero-padded date (which the old rule rejected) keeps
+/// its type.
+#[test]
+fn chinese_ymd_constant_column_keeps_type() {
+    assert_constant_column_kept(
+        "datetime.date.chinese_ymd",
+        "2024\u{5E74}01\u{6708}11\u{65E5}",
+    );
+}

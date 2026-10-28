@@ -3197,18 +3197,23 @@ datetime.date.chinese_ymd:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}\u5E74[1-9]\\d?\u6708[1-3]?\\d\u65E5$"
+    pattern: "^\\d{4}\u5E74(?:0[1-9]|1[0-2]|[1-9])\u6708(?:0[1-9]|[12]\\d|3[01]|[1-9])\u65E5$"
   tier: [VARCHAR, date]
   aliases: [cn_standard]
   samples:
     - "2024\u5E741\u670815\u65E5"
     - "2023\u5E7412\u670825\u65E5"
     - "2022\u5E746\u67081\u65E5"
+    - "2024\u5E7401\u670811\u65E5"
   icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Chinese standard date with Unicode
-    delimiters. Transform strips Chinese characters and parses as ISO-like.
+    delimiters. Month and day are written with or without a leading zero
+    (gov.cn writes both); month runs 1 to 12 and day 1 to 31. The calendar is
+    not checked, so a 31st of February passes the rule and the transform
+    fails to cast it (a conversion error). Transform strips Chinese characters and parses as
+    ISO-like; the parse accepts padded and unpadded fields alike.
 
 datetime.date.korean_ymd:
   title: Korean Standard Date

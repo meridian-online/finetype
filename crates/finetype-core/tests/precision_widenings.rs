@@ -2482,3 +2482,42 @@ fn iso_week_grades_a_one_digit_week_as_noted() {
         other => panic!("2024-W3 should be noted, got {other:?}"),
     }
 }
+
+const CHINESE_YMD_LABEL: &str = "datetime.date.chinese_ymd";
+
+/// gov.cn writes month and day with or without a leading zero.
+#[test]
+fn chinese_ymd_accepts_source_forms() {
+    assert_pattern_boundary(
+        CHINESE_YMD_LABEL,
+        &[
+            "2024\u{5E74}01\u{6708}11\u{65E5}",
+            "2024\u{5E74}1\u{6708}15\u{65E5}",
+            "2024\u{5E74}12\u{6708}31\u{65E5}",
+            "2024\u{5E74}09\u{6708}05\u{65E5}",
+            "2024\u{5E74}1\u{6708}5\u{65E5}",
+            "2023\u{5E74}12\u{6708}25\u{65E5}",
+        ],
+        &[],
+    );
+}
+
+/// Month 13 to 99 and day 0 or 32 to 39 were accepted by the old rule; no
+/// calendar has them.
+#[test]
+fn chinese_ymd_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        CHINESE_YMD_LABEL,
+        &[],
+        &[
+            "2024\u{5E74}13\u{6708}01\u{65E5}",
+            "2024\u{5E74}13\u{6708}15\u{65E5}",
+            "2024\u{5E74}1\u{6708}",
+            "2024\u{5E74}1\u{6708}0\u{65E5}",
+            "2024\u{5E74}00\u{6708}10\u{65E5}",
+            "2024\u{5E74}2\u{6708}39\u{65E5}",
+            "2024\u{5E74}1\u{6708}32\u{65E5}",
+            "2024-01-11",
+        ],
+    );
+}
