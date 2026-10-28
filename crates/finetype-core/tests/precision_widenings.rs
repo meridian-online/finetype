@@ -2806,6 +2806,27 @@ fn ndc_rejects_undefined_forms() {
     );
 }
 
+const NAICS_LABEL: &str = "identity.industry.naics";
+
+/// NAICS Canada 2022 v1.0 adds sectors 41 (Wholesale Trade) and 91 (Public
+/// Administration) beside the US sectors.
+#[test]
+fn naics_accepts_canadian_sectors() {
+    assert_pattern_boundary(
+        NAICS_LABEL,
+        &[
+            "41", "411110", "91", "911110", "42", "92", "541511", "31-33",
+        ],
+        &[],
+    );
+}
+
+/// 40 and 90 are no sector in either country's scheme.
+#[test]
+fn naics_rejects_undefined_sectors() {
+    assert_pattern_boundary(NAICS_LABEL, &[], &["40", "90", "400000", "900000", "11-99"]);
+}
+
 /// The ICAO filler `<` conforms to gender_code but is not counted for
 /// discrimination; the earlier codes still are, in either case.
 #[test]

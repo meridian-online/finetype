@@ -166,7 +166,7 @@ identity.government.eu_vat	0.0030	0.0030	0.0000	0.0000	0.0191	0.0191
 identity.government.pan_india	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 identity.government.ssn	0.0000	0.0000	0.0460	0.0460	0.0000	0.0000
 identity.government.vin	0.0000	0.0000	0.0492	0.0492	0.0000	0.0000
-identity.industry.naics	0.0001	0.0001	0.0642	0.0642	0.0000	0.0000
+identity.industry.naics	0.0001	0.0001	0.0705	0.0705	0.0000	0.0000
 identity.medical.cpt	0.0000	0.0000	0.0504	0.0504	0.0000	0.0000
 identity.medical.dea_number	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 identity.medical.hcpcs	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000

@@ -1941,3 +1941,10 @@ fn ndc_attractor_demotion_still_demotes_upc_columns() {
     }
 }
 
+/// A column of one repeated Canadian wholesale code (sector 41, which the old rule
+/// rejected) keeps its type.
+#[test]
+fn naics_constant_column_keeps_type() {
+    assert_constant_column_kept("identity.industry.naics", "411110");
+}
+
