@@ -57,13 +57,14 @@ container.object.json:
   decompose: null
   validation:
     type: string
-    pattern: "^\\{.*\\}$"
+    pattern: "^\\s*\\{[\\s\\S]*\\}\\s*$"
   tier: [JSON, object]
   aliases: [json_object]
   samples:
     - '{"user": "john", "age": 30}'
     - '{"name": "Alice", "email": "alice@example.com", "active": true}'
     - '{"nested": {"key": "value"}}'
+    - "{\n  \"user\": \"john\",\n  \"age\": 30\n}"
   icon: package
   canonical: "https://www.rfc-editor.org/rfc/rfc8259"
   references: null
@@ -71,6 +72,8 @@ container.object.json:
     v1 migration: New for v2. JSON objects stored as VARCHAR strings.
     CRITICAL: Classification triggers recursive field-level inference.
     DuckDB JSON type allows NULL, arrays, objects, and scalar values.
+    Whitespace, line breaks included, may surround and sit inside the object
+    (RFC 8259); the rule checks the braces, not that the text parses.
 
 container.object.json_array:
   title: "JSON Array"

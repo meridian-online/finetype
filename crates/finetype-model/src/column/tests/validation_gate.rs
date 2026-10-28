@@ -434,3 +434,21 @@ fn tsid_label_on_32_hex_column_is_vetoed_to_alphanumeric_id() {
         Some("representation.identifier.alphanumeric_id")
     );
 }
+
+/// Asserts a column of 40 copies of `value` is neither vetoed nor demoted for `label`.
+fn assert_constant_column_kept(label: &str, value: &str) {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec![value.to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(label, &refs, &tax, &audited_safe_labels());
+    assert!(!veto.vetoed, "{value:?}: vetoed: {veto:?}");
+    assert!(schema_fail_demotion(&values, label, &tax).is_none());
+}
+
+/// A column of one repeated space-padded object (which the old rule rejected)
+/// keeps its type.
+#[test]
+fn json_constant_column_keeps_type() {
+    assert_constant_column_kept("container.object.json", " {\"a\": 1} ");
+}

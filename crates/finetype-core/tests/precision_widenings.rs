@@ -859,3 +859,21 @@ fn npi_detector_requires_issued_range_and_check_digit() {
     assert!(!detect("1234567890"));
     assert!(!detect("123456789"));
 }
+
+const JSON_LABEL: &str = "container.object.json";
+
+/// RFC 8259: insignificant whitespace, line breaks included, may surround and
+/// sit inside the object.
+#[test]
+fn json_accepts_source_forms() {
+    assert_pattern_boundary(
+        JSON_LABEL,
+        &["{\"a\": 1}", " {\"a\": 1} ", "{\n  \"a\": 1\n}"],
+        &[],
+    );
+}
+
+#[test]
+fn json_rejects_undefined_forms() {
+    assert_pattern_boundary(JSON_LABEL, &[], &["[1, 2]", "{\"a\": 1", "a {}"]);
+}
