@@ -682,7 +682,6 @@ technology.development.docker_ref:
     - "docker.io/library/postgres:16-alpine"
     - "gcr.io/project/service@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
     - "app:_dev"
-    - "app@sha512:a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4"
     - "app@blake3:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
   icon: bookmark
   references: null
@@ -690,7 +689,9 @@ technology.development.docker_ref:
     OCI image reference format. Includes optional registry,
     repository path, tag, and digest components (OCI distribution and image
     specifications). `digest` returns the algorithm and the hex, for example
-    `sha512:...`.
+    `sha512:...`. No sha512 reference is among the samples: a column of
+    them reads as plain text, because the 128-hex digest dominates the value, so
+    the sha512 branch is pinned by the accept test and the duckdb digest test.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: identifier
