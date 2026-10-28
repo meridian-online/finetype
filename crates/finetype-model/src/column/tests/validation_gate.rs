@@ -566,3 +566,16 @@ fn xml_does_not_recover_html_column() {
         .unwrap();
     assert_ne!(r.label, "container.object.xml");
 }
+
+/// A column of one repeated bare-name query string, labelled `query_string`,
+/// is demoted to `word`: the old rule rejected it too, so 0.6.64 did the same.
+#[test]
+fn query_string_bare_name_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["debug&page=2".to_string(); 40];
+    let demoted = schema_fail_demotion(&values, "container.key_value.query_string", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
+    );
+}
