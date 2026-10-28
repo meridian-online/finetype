@@ -394,6 +394,10 @@ mod tests {
             if with_locale_rules.contains(&label) {
                 let by_locale = def.validation_by_locale.as_ref().expect("locale rules");
                 for (locale, rule) in by_locale {
+                    assert!(
+                        rule.pattern.is_none(),
+                        "{label} {locale} has a pattern the detector could contradict"
+                    );
                     for code in rule.enum_values.as_ref().expect("locale enum") {
                         assert!(
                             detector_for(label).expect("detector")(code),
