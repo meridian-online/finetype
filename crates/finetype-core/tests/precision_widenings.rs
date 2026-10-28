@@ -2363,9 +2363,20 @@ fn iso_duration_rejects_undefined_forms() {
             "PT0,S",
             "P0003-13-04T12:30:05",
             "P0003-06-31T12:30:05",
-            "P0003-06-04T12:60:05",
             "P0003-06-04T12:30",
             "P0003-06-04",
         ],
+    );
+}
+
+/// ISO 8601-1 allows 60 as the minute or second of the alternative format. The rule
+/// deliberately rejects it (a deviation from the standard) because the transform
+/// cannot cast an interval with a 60 there; `notes` say so.
+#[test]
+fn iso_duration_rejects_sixty_in_the_alternative_format_by_design() {
+    assert_pattern_boundary(
+        ISO_DURATION_LABEL,
+        &[],
+        &["P0003-06-04T12:60:05", "P0003-06-04T12:30:60"],
     );
 }

@@ -1628,6 +1628,9 @@ datetime.duration.iso_8601:
     of day. A negative duration (-P...) is accepted but the transform does
     not carry the sign. A fractional year or month converts at DuckDB's
     interval rates (a month is 30 days); a W component converts to 7 days each.
+    ISO 8601-1 also allows 60 as the minute or second of the alternative
+    format; that conforms to the standard but is rejected here, because the
+    transform cannot cast it.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: component
