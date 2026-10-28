@@ -461,7 +461,7 @@ impl VScalar for FineTypeInfer {
 /// Schema fragment, returning a STRUCT mirroring the CLI `reject_errors` shape
 /// so a report can name which constraint failed:
 ///   - `valid` BOOLEAN
-///   - `constraint` VARCHAR — `pattern` | `min_length` | … | `other` (NULL when valid)
+///   - `constraint` VARCHAR — `pattern` | `min_length` | … | `checksum` | `other` (NULL when valid)
 ///   - `message` VARCHAR — the `jsonschema` error text (NULL when valid)
 ///   - `grade` VARCHAR — `conforms` | `noted` | `fails` (NULL for a skipped value)
 ///   - `note` VARCHAR — `<kind>: <detail>` when the grade is `noted`

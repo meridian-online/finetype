@@ -250,7 +250,7 @@ migration, and two of the six do not map by renaming. The `ft_detail` scalar and
 | `ft_profile(col, header?)` | aggregate | STRUCT("type" VARCHAR, confidence DOUBLE, duckdb_type VARCHAR) | Column-level classification over a column |
 | `ft_profile(tbl)` | table macro | TABLE | One row per column of `tbl` — the everyday form |
 | `ft_validate(tbl, schema)` | table macro | TABLE | One row per column: totals, rejects, a sample message |
-| `ft_validate_text(value, schema)` | scalar | STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR, grade VARCHAR, note VARCHAR) | Per-cell validation naming the failed constraint, and the value's grade (`conforms`, `noted` or `fails`) with its note; `valid` and `grade` follow the fragment's JSON Schema keywords and note extensions only, not the checksum or case-folded enum checks `finetype validate` applies |
+| `ft_validate_text(value, schema)` | scalar | STRUCT("valid" BOOLEAN, "constraint" VARCHAR, message VARCHAR, grade VARCHAR, note VARCHAR) | Per-cell validation naming the failed constraint, and the value's grade (`conforms`, `noted` or `fails`) with its note; `valid` and `grade` follow the fragment's JSON Schema keywords, its case-folded enum, the check digit of the leaf named by `x-finetype-label` (constraint `checksum`) and its note extensions: the per-value check `finetype validate` applies, shared as `finetype_core::check_value_against_property` |
 | `ft_detail(col, header?)` | aggregate | VARCHAR | Why the column typed as it did, as a JSON string, from `ft_profile`'s own sample |
 | `ft_cast(value)` | scalar | VARCHAR | Normalize value for TRY_CAST |
 | `ft_unpack(json)` | scalar | VARCHAR | Recursively classify JSON fields |

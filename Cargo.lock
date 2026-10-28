@@ -1715,7 +1715,6 @@ dependencies = [
  "finetype-core",
  "finetype-model",
  "hf-hub",
- "jsonschema",
  "libduckdb-sys",
  "openssl",
  "serde_json",

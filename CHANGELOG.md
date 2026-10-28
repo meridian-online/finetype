@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **`ft_validate_text` applies the same per-value check as `finetype validate`.** A value whose enum member differs only in letter-case now conforms, and a right-shape value with a bad check digit fails with constraint `checksum`. The STRUCT's fields and the `constraint` vocabulary are unchanged apart from the new `checksum` token.
+
 ## [0.6.64] - 2026-10-26
 
 ### Changed
