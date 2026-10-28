@@ -1200,3 +1200,45 @@ fn hostname_lone_word_with_stop_column_is_demoted() {
         Some("representation.text.word")
     );
 }
+
+/// A column of one repeated empty data URI (the old rule needed at least one
+/// character of data) keeps its type.
+#[test]
+fn data_uri_constant_column_keeps_type() {
+    assert_constant_column_kept("technology.internet.data_uri", "data:,");
+}
+
+/// `data_uri` is a ceded-recovery leaf and now takes empty data, but still needs
+/// the comma, so a column of bare `data:` heads or media types is not promoted.
+#[test]
+fn data_uri_does_not_recover_headless_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let columns: [(&str, [&str; 3]); 3] = [
+        ("scheme", ["data:", "data:text/plain", "data:image/png"]),
+        (
+            "mime",
+            ["text/plain;base64", "image/png;base64", "text/html"],
+        ),
+        ("note", ["data: pending", "data: n/a", "data: see file"]),
+    ];
+    for (header, codes) in columns {
+        let values: Vec<String> = codes
+            .iter()
+            .cycle()
+            .take(42)
+            .map(|s| s.to_string())
+            .collect();
+        for label in [
+            "representation.text.word",
+            "representation.identifier.alphanumeric_id",
+        ] {
+            let r = cc.compose_from_sense(header, &values, label, 1.0).unwrap();
+            assert_ne!(
+                r.label, "technology.internet.data_uri",
+                "{header} from {label}"
+            );
+        }
+    }
+}

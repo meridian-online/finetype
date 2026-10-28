@@ -953,7 +953,8 @@ technology.internet.data_uri:
   title: "Data URI"
   description: >
     Inline data URI scheme embedding content directly in a string.
-    Format: data:[mediatype][;base64],data. Used for embedding small
+    Format: data:[mediatype][;base64],data. The data may be empty (`data:,`),
+    and `base64` is matched case-insensitively. Used for embedding small
     files in HTML, CSS, and API responses.
   designation: universal
   locales: [UNIVERSAL]
@@ -966,10 +967,10 @@ technology.internet.data_uri:
   transform_ext: null
   decompose:
     media_type: "REGEXP_EXTRACT({col}, '^data:([^;,]+)', 1)"
-    is_base64: "CASE WHEN {col} LIKE '%base64,%' THEN true ELSE false END"
+    is_base64: "REGEXP_MATCHES({col}, '^data:[^,]*;[bB][aA][sS][eE]64,')"
   validation:
     type: string
-    pattern: "^data:(?:[a-zA-Z0-9]+/[a-zA-Z0-9\\-+.]+)?(?:;[a-zA-Z0-9\\-]+=[^;,]*)*(?:;base64)?,.+$"
+    pattern: "^data:(?:[a-zA-Z0-9]+/[a-zA-Z0-9\\-+.]+)?(?:;[a-zA-Z0-9\\-]+=[^;,]*)*(?:;[bB][aA][sS][eE]64)?,.*$"
   tier: [VARCHAR, internet]
   aliases: null
   samples:
@@ -977,12 +978,17 @@ technology.internet.data_uri:
     - "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="
     - "data:application/json,{\"key\":\"value\"}"
     - "data:text/html,%3Ch1%3EHello%3C%2Fh1%3E"
+    - "data:,"
+    - "data:text/plain;BASE64,SGk="
   icon: world
   canonical: "https://www.rfc-editor.org/rfc/rfc2397"
   references: null
   notes: >
     Media type is optional (defaults to text/plain;charset=US-ASCII).
-    Base64 encoding is indicated by ;base64 before the comma.
+    Base64 encoding is indicated by ;base64 before the comma, in any letter
+    case (RFC 2397 section 3; the Fetch Standard matches it case-insensitively).
+    The data may be empty: `data:,` has no media type, so `media_type` is ''
+    there, and `is_base64` reads only the part before the first comma.
 
 technology.filesystem.windows_path:
   title: "Windows File Path"

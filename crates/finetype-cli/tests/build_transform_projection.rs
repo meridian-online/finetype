@@ -707,3 +707,30 @@ fn color_hsl_parts_read_the_modern_forms() {
         }
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn data_uri_parts_read_empty_data_and_any_case_base64() {
+    let tax = test_taxonomy();
+    let label = "technology.internet.data_uri";
+    // `data:,` has no media type: the string part is '' (not NULL), and it is
+    // not base64. `base64` is read in any case, and only before the first comma.
+    for (value, media_type, is_base64) in [
+        ("data:,", "", "false"),
+        ("data:text/plain;BASE64,SGk=", "text/plain", "true"),
+        ("data:;base64,SGk=", "", "true"),
+        ("data:text/plain,hello base64,x", "text/plain", "false"),
+        ("data:text/plain;base64,", "text/plain", "true"),
+    ] {
+        assert_eq!(
+            run_color_part(&tax, label, "media_type", value),
+            media_type,
+            "media_type of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "is_base64", value),
+            is_base64,
+            "is_base64 of {value:?}"
+        );
+    }
+}

@@ -1937,3 +1937,40 @@ fn hostname_detector_keeps_out_lone_words_with_a_stop() {
         assert!(!passes_detector_or_rule(detector, &rule, word), "{word:?}");
     }
 }
+
+const DATA_URI_LABEL: &str = "technology.internet.data_uri";
+
+/// RFC 2397: the data may be empty; the Fetch Standard matches `base64`
+/// case-insensitively.
+#[test]
+fn data_uri_accepts_source_forms() {
+    assert_pattern_boundary(
+        DATA_URI_LABEL,
+        &[
+            "data:,",
+            "data:text/plain;BASE64,SGk=",
+            "data:text/plain;Base64,SGk=",
+            "data:text/plain;base64,",
+            "data:;base64,SGk=",
+            "data:text/plain;charset=utf-8,Hi",
+            "data:image/png;base64,iVBORw0KGgo=",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn data_uri_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        DATA_URI_LABEL,
+        &[],
+        &[
+            "data:",
+            "data:text/plain",
+            "data:text/plain;base64",
+            "data:text/plain;base63,SGk=",
+            "text/plain;base64,SGk=",
+            "DATA:,",
+        ],
+    );
+}

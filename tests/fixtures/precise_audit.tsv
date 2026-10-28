@@ -238,7 +238,7 @@ technology.identifier.snowflake_id	false	^\d{17,20}$	false
 technology.identifier.tsid	false	^[0-9A-Fa-f][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{12}$	false
 technology.identifier.ulid	false	^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$	false
 technology.internet.cidr	false	^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/([0-9]|[12]\d|3[0-2])$	true
-technology.internet.data_uri	false	^data:(?:[a-zA-Z0-9]+/[a-zA-Z0-9\-+.]+)?(?:;[a-zA-Z0-9\-]+=[^;,]*)*(?:;base64)?,.+$	true
+technology.internet.data_uri	false	^data:(?:[a-zA-Z0-9]+/[a-zA-Z0-9\-+.]+)?(?:;[a-zA-Z0-9\-]+=[^;,]*)*(?:;[bB][aA][sS][eE]64)?,.*$	true
 technology.internet.hostname	false	^(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\.?$	true
 technology.internet.http_method	true	^(GET|Get|get|POST|Post|post|PUT|Put|put|DELETE|Delete|delete|PATCH|Patch|patch|HEAD|Head|head|OPTIONS|Options|options|TRACE|Trace|trace|CONNECT|Connect|connect)$	true
 technology.internet.ip_v4	false	^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$	true
