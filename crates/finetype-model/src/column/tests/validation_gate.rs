@@ -993,3 +993,10 @@ fn protein_sequence_does_not_recover_uppercase_words() {
         "uppercase words kept as protein_sequence"
     );
 }
+
+/// A column of one repeated `rgba(0, 0, 255, 0.5)` (the old rule rejected the
+/// `rgba` head and the alpha) keeps its type.
+#[test]
+fn color_rgb_constant_column_keeps_type() {
+    assert_constant_column_kept("representation.format.color_rgb", "rgba(0, 0, 255, 0.5)");
+}

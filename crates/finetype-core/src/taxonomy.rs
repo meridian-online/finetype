@@ -43,7 +43,6 @@ pub const SAMPLES_CHECK_EXCEPTIONS: &[&str] = &[
     "finance.currency.amount_apostrophe",
     "finance.currency.amount_code_prefix",
     "identity.person.weight",
-    "representation.format.color_rgb",
     "technology.internet.ip_v6",
 ];
 

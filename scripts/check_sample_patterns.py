@@ -142,11 +142,6 @@ PUBLISHED_CONTRADICTIONS: tuple[tuple[str, str, str], ...] = (
         "include `pounds`",
     ),
     (
-        "representation.format.color_rgb",
-        "rgba(0, 0, 255, 0.5)",
-        "the pattern has no `rgba` head and no alpha component",
-    ),
-    (
         "technology.internet.ip_v6",
         "2001:db8:85a3::8a2e:370:7334",
         "`::` zero compression, under a pattern that requires all eight groups "

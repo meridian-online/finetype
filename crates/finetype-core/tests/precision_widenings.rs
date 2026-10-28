@@ -1678,3 +1678,48 @@ fn protein_sequence_detector_keeps_old_class() {
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
     }
 }
+
+const COLOR_RGB_LABEL: &str = "representation.format.color_rgb";
+
+/// CSS Color 3 and 4: `rgb(`/`rgba(` with three integers or three percentages
+/// and an optional alpha, comma-separated or space-separated with `/ alpha`.
+/// The bare and parenthesised triples the old rule took stay.
+#[test]
+fn color_rgb_accepts_source_forms() {
+    assert_pattern_boundary(
+        COLOR_RGB_LABEL,
+        &[
+            "rgba(0, 0, 255, 0.5)",
+            "rgba(0,0,255,.5)",
+            "rgb(255, 0, 0, 50%)",
+            "rgb(100% 0% 0% / 50%)",
+            "rgb(255 0 0)",
+            "rgb(255 128 0 / 0.5)",
+            "rgb(12.5%, 0%, 100%)",
+            "rgb(255, 0, 0)",
+            "255,0,0",
+            "(255, 0, 0)",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn color_rgb_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        COLOR_RGB_LABEL,
+        &[],
+        &[
+            "rgb(255, 0)",
+            "(0.1, 0.2, 0.5)",
+            "rgb(100%, 0, 0)",
+            "rgb(255 0)",
+            "rgb(255 0 0 0.5)",
+            "rgb(255, 0, 0 / 0.5)",
+            "rgb(255 0 0, 0.5)",
+            "rgb(100% 0 0)",
+            "rgba(0, 0, 255, )",
+            "",
+        ],
+    );
+}

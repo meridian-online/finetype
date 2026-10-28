@@ -626,3 +626,51 @@ fn coordinates_transform_ext_puts_longitude_first() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert_eq!(stdout.trim().lines().last(), Some("2.3681,48.8761"));
 }
+
+/// Runs a published decompose part through the external `duckdb` CLI.
+fn run_color_part(tax: &Taxonomy, label: &str, part: &str, value: &str) -> String {
+    use std::process::Command;
+    let decompose = tax
+        .ddl_info(label)
+        .expect("known label")
+        .decompose
+        .clone()
+        .expect("label has decompose");
+    let expr = decompose[part].as_str().expect("decompose part");
+    let sql = format!("SELECT {}", expr.replace("{col}", &format!("'{}'", value)));
+    let out = Command::new("duckdb")
+        .args(["-no-init", "-noheader", "-list", "-c", &sql])
+        .output()
+        .expect("run the duckdb CLI");
+    assert!(
+        out.status.success(),
+        "duckdb failed on {value:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn color_rgb_parts_read_the_modern_forms() {
+    let tax = test_taxonomy();
+    let rgb = "representation.format.color_rgb";
+    // Space-separated, slash alpha, percentages (scaled to 0-255), bare triples.
+    for (value, expect) in [
+        ("rgb(255 0 0)", ["255", "0", "0"]),
+        ("rgb(255 128 0 / 0.5)", ["255", "128", "0"]),
+        ("rgb(100% 0% 0% / 50%)", ["255", "0", "0"]),
+        ("rgb(50% 25.5% 0%)", ["128", "65", "0"]),
+        ("rgba(0,0,255,.5)", ["0", "0", "255"]),
+        ("255,0,0", ["255", "0", "0"]),
+        ("(128, 128, 128)", ["128", "128", "128"]),
+    ] {
+        for (part, want) in ["red", "green", "blue"].iter().zip(expect) {
+            assert_eq!(
+                run_color_part(&tax, rgb, part, value),
+                want,
+                "{part} of {value:?}"
+            );
+        }
+    }
+}
