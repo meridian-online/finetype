@@ -19,6 +19,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "technology.identifier.tsid" => Some(is_tsid_shape),
         "container.object.csv" => Some(is_csv_discrimination_shape),
         "container.object.yaml" => Some(is_yaml_discrimination_shape),
+        "container.key_value.query_string" => Some(is_query_string_discrimination_shape),
         _ => None,
     }
 }
@@ -124,6 +125,18 @@ fn is_yaml_discrimination_shape(value: &str) -> bool {
         .is_some_and(|c| c == ':')
 }
 
+/// `query_string`: only `name=value` pairs joined by `&`, every name non-empty
+/// and every sequence present, the shape the type was first defined by. Every
+/// such value also passes the published rule, which additionally takes bare
+/// names and empty sequences; those conform but are not counted for
+/// discrimination.
+fn is_query_string_discrimination_shape(value: &str) -> bool {
+    value.split('&').all(|seq| {
+        seq.split_once('=')
+            .is_some_and(|(name, _)| !name.is_empty())
+    })
+}
+
 /// `tsid`: the published rule (13 Crockford base32 characters, first character
 /// at most F) and at least one letter. The published rule is source-shaped, so it
 /// accepts every 13-digit number (the first character may be any hex digit),
@@ -216,6 +229,7 @@ mod tests {
             "technology.identifier.tsid",
             "container.object.csv",
             "container.object.yaml",
+            "container.key_value.query_string",
         ];
         for label in labels {
             assert!(detector_for(label).is_some(), "{label} has a detector");

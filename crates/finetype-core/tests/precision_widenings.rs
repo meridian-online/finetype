@@ -961,6 +961,31 @@ fn container_object_yaml_detector_keeps_old_shape() {
     }
 }
 
+/// The detector keeps the old pairs-only shape, so the newly accepted forms
+/// conform in grading but do not count for discrimination.
+#[test]
+fn query_string_detector_keeps_old_shape() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(QUERY_STRING_LABEL, &tax).expect("query_string rule");
+    let detector = detector_for(QUERY_STRING_LABEL);
+    assert!(detector.is_some());
+    for old_form in ["name=John&age=30", "q=", "my key=1"] {
+        assert!(
+            passes_detector_or_rule(detector, &rule, old_form),
+            "{old_form:?}"
+        );
+    }
+    for new_form in ["debug&page=2", "a=1&&b=2"] {
+        assert!(rule.is_valid(new_form), "{new_form:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, new_form),
+            "{new_form:?}"
+        );
+    }
+}
+
 const CSV_LABEL: &str = "container.object.csv";
 
 /// RFC 4180: fields may be empty, and a quoted field may hold commas, doubled
