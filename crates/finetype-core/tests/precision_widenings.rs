@@ -1627,6 +1627,9 @@ fn smiles_detector_keeps_old_class() {
     for bad in ["C C", "C;C", ""] {
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
     }
+    // Over the rule's maxLength of 1000: the detector never widens the rule.
+    let long = "C".repeat(1001);
+    assert!(!passes_detector_or_rule(detector, &rule, &long));
 }
 
 const PROTEIN_LABEL: &str = "representation.scientific.protein_sequence";

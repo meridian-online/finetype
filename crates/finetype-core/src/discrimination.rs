@@ -35,33 +35,32 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
     }
 }
 
-/// Whether `value` passes: the detector when there is one, else the compiled
-/// published rule. The one per-value form every discrimination site shares, so a
-/// site cannot grow its own reading of "detector else rule".
+/// Whether `value` passes: the published rule, and when there is a detector, the
+/// detector as well. A detector narrows the published rule and is always applied
+/// on top of it, so it can never accept what the rule rejects (length bounds
+/// included). The one per-value form every discrimination site shares, so a site
+/// cannot grow its own reading of "detector and rule".
 pub fn passes_detector_or_rule(
     detector: Option<fn(&str) -> bool>,
     rule: &CompiledValidator,
     value: &str,
 ) -> bool {
-    detector.map_or_else(|| rule.is_valid(value), |d| d(value))
+    rule.is_valid(value) && detector.is_none_or(|d| d(value))
 }
 
 /// As [`passes_detector_or_rule`], for a site whose taxonomy has no compiled
 /// cache: the published rule is compiled per call. A rule that fails to compile
-/// counts the value as passing, as `validate_value`'s callers have always read it.
+/// counts the value as passing, as `validate_value`'s callers have always read it;
+/// a detector is still applied on top of it.
 pub fn passes_detector_or_uncompiled_rule(
     detector: Option<fn(&str) -> bool>,
     rule: &Validation,
     value: &str,
 ) -> bool {
-    detector.map_or_else(
-        || {
-            validate_value(value, rule)
-                .map(|r| r.is_valid)
-                .unwrap_or(true)
-        },
-        |d| d(value),
-    )
+    validate_value(value, rule)
+        .map(|r| r.is_valid)
+        .unwrap_or(true)
+        && detector.is_none_or(|d| d(value))
 }
 
 /// `username`: 3 to 32 characters of `[a-zA-Z0-9_.-]`, optionally followed by a
@@ -699,6 +698,25 @@ mod tests {
             tax.compile_validators();
         }
         tax
+    }
+
+    #[test]
+    fn detector_never_widens_the_published_rule() {
+        let tax = taxonomy(true);
+        let label = "representation.scientific.smiles";
+        let rule = tax.get_validator(label).expect("smiles rule");
+        let detector = detector_for(label);
+        assert!(passes_detector_or_rule(detector, rule, "CC(=O)O"));
+        let long = "C".repeat(1001);
+        assert!(!rule.is_valid(&long), "the rule's maxLength rejects it");
+        assert!(!passes_detector_or_rule(detector, rule, &long));
+        let validation = tax.get(label).unwrap().validation.as_ref().unwrap();
+        assert!(!passes_detector_or_uncompiled_rule(
+            detector, validation, &long
+        ));
+        assert!(passes_detector_or_uncompiled_rule(
+            detector, validation, "CC(=O)O"
+        ));
     }
 
     #[test]
