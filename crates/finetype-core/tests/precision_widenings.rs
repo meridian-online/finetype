@@ -1207,41 +1207,40 @@ fn wkt_rejects_undefined_forms() {
     assert_pattern_boundary(WKT_LABEL, &[], &["POINTS (1 2)", "circle(1 2)"]);
 }
 
-/// The detector keeps the old upper-case, seven-keyword shape, so text such as
-/// `Triangle (equilateral)` conforms in grading but does not count for
-/// discrimination or confirm a ceded recovery.
+/// The detector counts a keyword in any letter case with `EMPTY` or a coordinate
+/// pair, so genuine mixed-case WKT counts and parenthesised text does not.
 #[test]
-fn wkt_detector_keeps_old_shape() {
+fn wkt_detector_needs_a_coordinate_pair_or_empty() {
     use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
     use finetype_core::validator::resolve_label_validator;
     let tax = load_taxonomy();
     let rule = resolve_label_validator(WKT_LABEL, &tax).expect("wkt rule");
     let detector = detector_for(WKT_LABEL);
     assert!(detector.is_some());
-    for old_form in [
+    for ok in [
         "POINT (30 10)",
         "POINT(30 10)",
         "POINT EMPTY",
         "POINT ZM (1 2 3 4)",
         "MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)))",
         "GEOMETRYCOLLECTION EMPTY",
-    ] {
-        assert!(
-            passes_detector_or_rule(detector, &rule, old_form),
-            "{old_form:?}"
-        );
-    }
-    for new_form in [
         "Point (10 10)",
         "point(1 2)",
-        "Triangle (equilateral)",
+        "point(-1.5 2e0)",
         "TIN Z (((0 0 0, 0 1 0, 1 0 0, 0 0 0)))",
         "TRIANGLE ((0 0, 0 1, 1 0, 0 0))",
+        "Polygon empty",
     ] {
-        assert!(rule.is_valid(new_form), "{new_form:?} conforms");
-        assert!(
-            !passes_detector_or_rule(detector, &rule, new_form),
-            "{new_form:?}"
-        );
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for bad in [
+        "Triangle (equilateral)",
+        "Triangle (1999)",
+        "Point (of sale)",
+        "Tin (2 cans)",
+        "Polygon (regular)",
+    ] {
+        assert!(rule.is_valid(bad), "{bad:?} conforms");
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
     }
 }

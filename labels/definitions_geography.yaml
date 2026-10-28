@@ -1151,9 +1151,10 @@ geography.format.wkt:
     ST_GeomFromText for parsing; it reads any letter case, but not TRIANGLE,
     TIN or POLYHEDRALSURFACE (transform_ext raises an error on those, so they
     conform to the type but have no geometry value in DuckDB). For
-    discrimination a value counts only with an upper-case POINT, LINESTRING,
-    POLYGON, MULTI*, or GEOMETRYCOLLECTION keyword, so text such as "Triangle
-    (equilateral)" does not; other forms conform but are not counted.
+    discrimination a value counts when a geometry keyword in any letter case
+    is followed by EMPTY or a body holding a coordinate pair, so text such as
+    "Triangle (equilateral)" does not; conforming-only forms are not counted
+    for discrimination.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: index

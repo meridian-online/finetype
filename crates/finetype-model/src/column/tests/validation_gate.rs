@@ -638,26 +638,17 @@ fn h3_constant_column_keeps_type() {
 }
 
 /// A column of one repeated mixed-case point, which the old upper-case rule
-/// rejected, conforms but does not count for discrimination (the detector keeps
-/// the old shape), so a column of it is demoted by design; the constant column
-/// that is kept holds an upper-case `POINT`, which the old rule accepted too
-/// (no new form keeps its type here).
+/// rejected, keeps its type: the detector counts a keyword in any case with a
+/// coordinate pair.
 #[test]
 fn wkt_constant_column_keeps_type() {
-    assert_constant_column_kept("geography.format.wkt", "POINT (10 10)");
+    assert_constant_column_kept("geography.format.wkt", "Point (10 10)");
 }
 
-/// A column of one repeated `Point (10 10)` is demoted to `word`, as on 0.6.64,
-/// where the old rule rejected it too.
+/// The same holds for a lower-case keyword with no space before the parenthesis.
 #[test]
-fn wkt_mixed_case_column_is_demoted() {
-    let tax = super::shipped_taxonomy();
-    let values: Vec<String> = vec!["Point (10 10)".to_string(); 40];
-    let demoted = schema_fail_demotion(&values, "geography.format.wkt", &tax);
-    assert_eq!(
-        demoted.map(|(label, _)| label).as_deref(),
-        Some("representation.text.word")
-    );
+fn wkt_mixed_case_column_keeps_type() {
+    assert_constant_column_kept("geography.format.wkt", "point(1 2)");
 }
 
 /// `wkt` is a ceded leaf and now accepts mixed-case keywords, so a column of
@@ -672,6 +663,7 @@ fn wkt_does_not_recover_title_column() {
         "Point (of sale)",
         "Polygon (regular)",
         "Tin (small)",
+        "Point (of sale)",
     ]
     .iter()
     .cycle()

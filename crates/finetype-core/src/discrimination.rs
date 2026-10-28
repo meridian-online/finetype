@@ -270,20 +270,21 @@ mod state_code_copy {
     }
 }
 
-/// The shape `wkt` had before the rule followed OGC 06-103r4: upper-case
-/// keyword from the first seven, then an optional dimension letter and `(` or
-/// `EMPTY`.
-const WKT_OLD_SHAPE: &str = "^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\\s*(Z|M|ZM)?\\s*(\\(|EMPTY)";
+/// What `wkt` counts for discrimination: a geometry keyword in any letter case,
+/// an optional `Z`/`M`/`ZM`, then `EMPTY` or a `(` followed, somewhere inside,
+/// by a coordinate pair (a number, white space, a number).
+const WKT_DETECTOR_SHAPE: &str = "(?is)^(?:point|linestring|polygon|multipoint|multilinestring|multipolygon|geometrycollection|triangle|polyhedralsurface|tin)\\s*(?:zm|z|m)?\\s*(?:empty|\\(.*?[-+]?\\d+(?:\\.\\d+)?\\s+[-+]?[.\\d])";
 
-/// `wkt`: the shape the type was first defined by, an upper-case keyword. The
-/// published rule takes keywords in any letter case, so `Triangle (equilateral)`
-/// and `Point (of sale)` conform; they do not count for discrimination or for a
-/// ceded recovery. Every such value also passes the published rule.
+/// `wkt`: a keyword in any case followed by `EMPTY` or a body holding at least one
+/// coordinate pair. The published rule stops at the opening parenthesis, so
+/// `Triangle (1999)` and `Point (of sale)` conform; with no coordinate pair they
+/// do not count for discrimination or for a ceded recovery. Every value counted
+/// here also passes the published rule.
 fn is_wkt_discrimination_shape(value: &str) -> bool {
-    static OLD: std::sync::OnceLock<Option<regex::Regex>> = std::sync::OnceLock::new();
-    OLD.get_or_init(|| regex::Regex::new(WKT_OLD_SHAPE).ok())
-        .as_ref()
-        .is_some_and(|re| re.is_match(value))
+    static SHAPE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    SHAPE
+        .get_or_init(|| regex::Regex::new(WKT_DETECTOR_SHAPE).expect("wkt detector shape"))
+        .is_match(value)
 }
 
 /// `tsid`: the published rule (13 Crockford base32 characters, first character
