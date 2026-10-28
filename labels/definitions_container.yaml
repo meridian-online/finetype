@@ -271,12 +271,14 @@ container.object.csv:
   decompose: null
   validation:
     type: string
-    pattern: "^[^,]+(,[^,]+)*$"
+    pattern: '^(?:"(?:[^"]|"")*"|[^,"\r\n]*)(?:,(?:"(?:[^"]|"")*"|[^,"\r\n]*))*$'
   tier: [VARCHAR, object]
   aliases: [csv_row, delimited_record]
   samples:
     - "John,30,true"
     - '"Smith, John",30,Engineer'
+    - 'a,,c'
+    - '"say ""hi""",2'
   icon: package
   canonical: "https://www.rfc-editor.org/rfc/rfc4180"
   references: null
@@ -284,6 +286,9 @@ container.object.csv:
     v1 migration: New for v2. CSV is typically a multi-row format,
     but may appear as individual records in some contexts.
     Parsing requires explicit schema.
+    RFC 4180 fields may be empty, and a quoted field may hold commas, doubled
+    quotes and line breaks; a bare quote or line break in an unquoted field
+    is not a record.
 
 container.object.s_expression:
   title: "S-Expression"

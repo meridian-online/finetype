@@ -929,3 +929,46 @@ fn yaml_rejects_undefined_forms() {
         &["#hashtag", "- just a bullet", "hello world", ": x"],
     );
 }
+
+const CSV_LABEL: &str = "container.object.csv";
+
+/// RFC 4180: fields may be empty, and a quoted field may hold commas, doubled
+/// quotes and line breaks.
+#[test]
+fn csv_accepts_source_forms() {
+    assert_pattern_boundary(
+        CSV_LABEL,
+        &[
+            "a,,c",
+            "\"a,,b\",1",
+            "\"say \"\"hi\"\"\",2",
+            "John,30,true",
+            "\"line\nbreak\",1",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn csv_rejects_undefined_forms() {
+    assert_pattern_boundary(CSV_LABEL, &[], &["\"unterminated,1", "a\"b,c", "a,b\nc,d"]);
+}
+
+/// The detector is the published rule and either the old shape (every field
+/// non-empty) or at least one quoted field, so the rule's empty fields do not
+/// lift the type's discrimination rate on random text.
+#[test]
+fn csv_detector_keeps_empty_field_text_out() {
+    let detect = finetype_core::discrimination::detector_for(CSV_LABEL).expect("csv detector");
+    for ok in [
+        "John,30,true",
+        "\"a,,b\",1",
+        "\"say \"\"hi\"\"\",2",
+        "a,,\"c\"",
+    ] {
+        assert!(detect(ok), "{ok:?}");
+    }
+    for bad in ["a,,c", ",", "a,", "\"unterminated,1", "a\"b,c", "a,b\nc,d"] {
+        assert!(!detect(bad), "{bad:?}");
+    }
+}

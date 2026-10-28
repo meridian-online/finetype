@@ -50,7 +50,7 @@ const BASELINE_EXCEPTIONS: &[(&str, f64)] = &[
     ("container.array.pipe_separated", 0.9751),
     ("container.array.semicolon_separated", 0.9781),
     ("container.array.whitespace_separated", 0.9763),
-    ("container.object.csv", 0.9770),
+    ("container.object.csv", 0.7917),
     ("geography.address.full_address", 0.7765),
     ("geography.address.street_name", 0.9773),
     ("geography.coordinate.longitude", 0.9999),

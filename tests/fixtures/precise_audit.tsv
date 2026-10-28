@@ -4,7 +4,7 @@ container.array.pipe_separated	false	^[^|]+(\|[^|]+)*$	true
 container.array.semicolon_separated	false	^[^;]+(;[^;]+)*$	true
 container.array.whitespace_separated	false	^[^\s]+(\s+[^\s]+)*$	false
 container.key_value.query_string	false	^[^=&]+=([^&]*)(&[^=&]+=[^&]*)*$	true
-container.object.csv	false	^[^,]+(,[^,]+)*$	true
+container.object.csv	false	^(?:"(?:[^"]|"")*"|[^,"\r\n]*)(?:,(?:"(?:[^"]|"")*"|[^,"\r\n]*))*$	true
 container.object.html	false	^.*<(p|div|span|a|br|img|h[1-6]|ul|ol|li|table|tr|td|th|strong|em|b|i|form|input|button|select|textarea|header|footer|nav|section|article|main|aside|figure|figcaption|blockquote|pre|code|script|style|link|meta|head|body|html)[\s>/ ].*$	true
 container.object.json	false	^\s*\{[\s\S]*\}\s*$	true
 container.object.json_array	false	^\[.*\]$	true

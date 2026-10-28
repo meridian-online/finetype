@@ -17,6 +17,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "identity.person.username" => Some(is_username_shape),
         "identity.medical.npi" => Some(is_issued_npi),
         "technology.identifier.tsid" => Some(is_tsid_shape),
+        "container.object.csv" => Some(is_csv_discrimination_shape),
         _ => None,
     }
 }
@@ -61,6 +62,50 @@ fn is_username_shape(value: &str) -> bool {
         && body
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
+}
+
+/// Whether `value` is one RFC 4180 record: `field(,field)*`, where a field is
+/// either quoted (any text, a doubled quote standing for one) or unquoted
+/// (no comma, quote or line break). The same set as the published rule.
+fn is_csv_record(value: &str) -> bool {
+    let b = value.as_bytes();
+    let mut i = 0;
+    loop {
+        if b.get(i) == Some(&b'"') {
+            i += 1;
+            loop {
+                match b.get(i) {
+                    None => return false,
+                    Some(b'"') if b.get(i + 1) == Some(&b'"') => i += 2,
+                    Some(b'"') => break,
+                    Some(_) => i += 1,
+                }
+            }
+            i += 1;
+        } else {
+            while let Some(c) = b.get(i) {
+                match c {
+                    b',' => break,
+                    b'"' | b'\r' | b'\n' => return false,
+                    _ => i += 1,
+                }
+            }
+        }
+        match b.get(i) {
+            None => return true,
+            Some(b',') => i += 1,
+            Some(_) => return false,
+        }
+    }
+}
+
+/// `csv`: the published rule (an RFC 4180 record, whose fields may be empty)
+/// and either every field non-empty (the shape the type was first defined by)
+/// or at least one quoted field. The published rule alone would confirm most
+/// random text with a comma in it, since an empty field is allowed; this keeps
+/// column discrimination at the rate it had.
+fn is_csv_discrimination_shape(value: &str) -> bool {
+    is_csv_record(value) && (value.contains('"') || value.split(',').all(|f| !f.is_empty()))
 }
 
 /// `tsid`: the published rule (13 Crockford base32 characters, first character
@@ -153,6 +198,7 @@ mod tests {
             "identity.person.username",
             "identity.medical.npi",
             "technology.identifier.tsid",
+            "container.object.csv",
         ];
         for label in labels {
             assert!(detector_for(label).is_some(), "{label} has a detector");
