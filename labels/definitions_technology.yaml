@@ -117,7 +117,6 @@ technology.internet.ip_v6:
     - "2001:db8:85a3::8a2e:370:7334"
     - "::1"
     - "fe80::1"
-    - "::"
     - "::ffff:192.0.2.128"
   icon: world
   canonical: "https://www.rfc-editor.org/rfc/rfc4291"

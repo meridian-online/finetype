@@ -265,6 +265,19 @@ mod tests {
         );
     }
 
+    /// A bare `::` conforms to ip_v6 but its detector does not count it, so a
+    /// placeholder column (alone or with times) gets no fast-path type.
+    #[test]
+    fn declines_a_bare_double_colon_column() {
+        let tax = taxonomy();
+        let all: Vec<String> = vec!["::".to_string(); 40];
+        assert_eq!(deterministic_fast_path(&tax, &all), None);
+        let mixed: Vec<String> = (0..40)
+            .map(|i| if i < 36 { "::" } else { "12:30:00" }.to_string())
+            .collect();
+        assert_eq!(deterministic_fast_path(&tax, &mixed), None);
+    }
+
     #[test]
     fn declines_plain_words() {
         let tax = taxonomy();

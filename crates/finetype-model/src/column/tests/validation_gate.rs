@@ -1097,7 +1097,8 @@ fn ip_v6_constant_column_keeps_type() {
 /// `ip_v6` is a ceded-recovery leaf and now takes `::`-compressed values, so
 /// columns that are not addresses but share colons (MAC addresses, clock times,
 /// C++ and Rust paths with an upper-case or longer-than-four-hex segment) must
-/// not be promoted.
+/// not be promoted. All-hex `::` names such as `cafe::babe` are valid IPv6 and
+/// would conform, so they are not used as neighbours here.
 #[test]
 fn ip_v6_does_not_recover_neighbouring_colon_columns() {
     let mut cc =
@@ -1302,4 +1303,36 @@ fn s3_uri_does_not_recover_arn_columns() {
             assert_ne!(r.label, "technology.cloud.s3_uri", "{header} from {label}");
         }
     }
+}
+
+/// A bare `::` is a valid address that the detector does not count, so a column
+/// of it (alone, or 90% of it with times) is not promoted to `ip_v6`, and an
+/// all-`::` column labelled `ip_v6` is demoted to `word`.
+#[test]
+fn ip_v6_does_not_recover_placeholder_column() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let all: Vec<String> = vec!["::".to_string(); 40];
+    let mixed: Vec<String> = (0..40)
+        .map(|i| if i < 36 { "::" } else { "12:30:00" }.to_string())
+        .collect();
+    for (header, values) in [("addr", &all), ("seen", &mixed)] {
+        for label in [
+            "representation.text.word",
+            "representation.identifier.alphanumeric_id",
+        ] {
+            let r = cc.compose_from_sense(header, values, label, 1.0).unwrap();
+            assert_ne!(
+                r.label, "technology.internet.ip_v6",
+                "{header} from {label}"
+            );
+        }
+    }
+    let tax = super::shipped_taxonomy();
+    let demoted = schema_fail_demotion(&all, "technology.internet.ip_v6", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
+    );
 }

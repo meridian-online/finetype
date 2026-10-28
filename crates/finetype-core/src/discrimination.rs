@@ -29,6 +29,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "geography.address.street_suffix" => Some(is_street_suffix_discrimination_shape),
         "representation.scientific.smiles" => Some(is_smiles_discrimination_shape),
         "technology.internet.hostname" => Some(is_hostname_discrimination_shape),
+        "technology.internet.ip_v6" => Some(is_ip_v6_discrimination_shape),
         "representation.scientific.protein_sequence" => {
             Some(is_protein_sequence_discrimination_shape)
         }
@@ -227,6 +228,14 @@ fn is_yaml_discrimination_shape(value: &str) -> bool {
     chars
         .find(|c| !(c.is_ascii_alphanumeric() || *c == '_'))
         .is_some_and(|c| c == ':')
+}
+
+/// `ip_v6`: the published rule, except that the bare unspecified address `::`
+/// does not count. It is a valid address and conforms, but as a placeholder it
+/// is common in columns that are not addresses, and a column of it would
+/// otherwise be promoted with certainty.
+fn is_ip_v6_discrimination_shape(value: &str) -> bool {
+    value != "::"
 }
 
 /// `hostname`: the published rule, which takes a trailing full stop (RFC 3696),
@@ -775,6 +784,7 @@ mod tests {
             "representation.scientific.protein_sequence",
             "representation.scientific.smiles",
             "technology.internet.hostname",
+            "technology.internet.ip_v6",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

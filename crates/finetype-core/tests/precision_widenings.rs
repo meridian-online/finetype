@@ -2012,3 +2012,19 @@ fn s3_uri_rejects_undefined_forms() {
         ],
     );
 }
+
+/// The bare `::` conforms (grading) but is not counted for discrimination.
+#[test]
+fn ip_v6_detector_keeps_out_the_bare_double_colon() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(IP_V6_LABEL, &tax).expect("ip_v6 rule");
+    let detector = detector_for(IP_V6_LABEL);
+    assert!(detector.is_some());
+    assert!(rule.is_valid("::"));
+    assert!(!passes_detector_or_rule(detector, &rule, "::"));
+    for kept in ["::1", "1::", "fe80::1", "::ffff:192.0.2.128"] {
+        assert!(passes_detector_or_rule(detector, &rule, kept), "{kept:?}");
+    }
+}
