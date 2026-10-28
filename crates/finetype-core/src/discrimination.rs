@@ -31,6 +31,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "technology.internet.hostname" => Some(is_hostname_discrimination_shape),
         "technology.internet.ip_v6" => Some(is_ip_v6_discrimination_shape),
         "technology.development.calver" => Some(is_calver_discrimination_shape),
+        "finance.securities.ticker" => Some(is_ticker_discrimination_shape),
         "technology.cryptographic.jwt" => Some(is_jwt_discrimination_shape),
         "representation.scientific.protein_sequence" => {
             Some(is_protein_sequence_discrimination_shape)
@@ -287,6 +288,21 @@ fn is_jwt_discrimination_shape(value: &str) -> bool {
         (Some(a), Some(b), Some(c), None) if [a, b, c].iter().all(|p| p.len() >= 10)
     );
     three_long_segments || crate::structure::is_jwt(value)
+}
+
+/// `ticker`: the alphabetic shape the type was first defined by, one to seven
+/// upper-case letters with an optional class suffix (`AAPL`, `BRK-B`, `BF.B`).
+/// The published rule also takes one to six digits, the numeric tickers of the
+/// Hong Kong, Tokyo and Shanghai exchanges, but a bare `5` or `0005` is just as
+/// much a quantity or a code, so it conforms without being counted.
+fn is_ticker_discrimination_shape(value: &str) -> bool {
+    let upper = |p: &str, max: usize| {
+        (1..=max).contains(&p.len()) && p.bytes().all(|b| b.is_ascii_uppercase())
+    };
+    match value.split_once(['.', '/', '-']) {
+        Some((head, suffix)) => upper(head, 7) && upper(suffix, 4),
+        None => upper(value, 7),
+    }
 }
 
 /// `query_string`: only `name=value` pairs joined by `&`, every name non-empty
@@ -782,6 +798,51 @@ mod tests {
     }
 
     #[test]
+    fn ticker_detector_keeps_the_alphabetic_shape_and_not_bare_digits() {
+        let tax = taxonomy(true);
+        let detect = detector_for("finance.securities.ticker").expect("ticker detector");
+        for ok in [
+            "AAPL",
+            "A",
+            "BRK-B",
+            "BF.B",
+            "BRK/B",
+            "ABCDEFG",
+            "ABCD.WXYZ",
+        ] {
+            assert!(detect(ok), "{ok}");
+        }
+        for bad in [
+            "5",
+            "0005",
+            "000001",
+            "aapl",
+            "AAPL1",
+            "ABCDEFGH",
+            "BRK-",
+            "-B",
+            "BRK-b",
+            "A.B.C",
+            "ABCD.VWXYZ",
+            "",
+        ] {
+            assert!(!detect(bad), "{bad}");
+        }
+        // The published rule takes the digits the detector does not count, and
+        // the detector never accepts what the rule rejects.
+        let rule = resolve_label_validator("finance.securities.ticker", &tax).expect("rule");
+        for v in ["5", "0005", "123456", "AAPL", "BRK-B"] {
+            assert!(rule.is_valid(v), "{v}");
+        }
+        for v in ["5", "0005", "123456"] {
+            assert!(!passes_detector_or_rule(Some(detect), &rule, v), "{v}");
+        }
+        for v in ["1234567", "aapl"] {
+            assert!(!rule.is_valid(v) && !detect(v), "{v}");
+        }
+    }
+
+    #[test]
     fn username_detector_keeps_the_old_shape_and_allows_trailing_dollar() {
         let detect = detector_for("identity.person.username").expect("username detector");
         for ok in ["alice", "bob.smith", "svc$", "abc", &"a".repeat(32)] {
@@ -826,6 +887,7 @@ mod tests {
             "technology.internet.ip_v6",
             "technology.development.calver",
             "technology.cryptographic.jwt",
+            "finance.securities.ticker",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

@@ -1709,3 +1709,58 @@ fn amount_multisym_constant_column_keeps_type() {
 fn amount_lakh_constant_column_keeps_type() {
     assert_constant_column_kept("finance.currency.amount_lakh", "\u{20b9} 5,00,000");
 }
+
+/// A column of one repeated alphabetic ticker keeps its type. The values the old
+/// rule rejected (`5`, `0005`) conform but the detector does not count them, so a
+/// column of them is demoted by design (see
+/// `ticker_numeric_constant_column_is_demoted`); a form the detector keeps is
+/// what is pinned here.
+#[test]
+fn ticker_constant_column_keeps_type() {
+    assert_constant_column_kept("finance.securities.ticker", "BRK-B");
+}
+
+/// A column of one repeated `5` conforms to ticker but is a number; the detector
+/// does not count it, so schema_fail_demotion demotes it, as on 0.6.64 (the old
+/// rule rejected it outright).
+#[test]
+fn ticker_numeric_constant_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    for value in ["5", "0005"] {
+        let values: Vec<String> = vec![value.to_string(); 40];
+        assert!(
+            schema_fail_demotion(&values, "finance.securities.ticker", &tax).is_some(),
+            "a column of {value} is demoted"
+        );
+    }
+}
+
+/// A column of small integers is not kept as, or promoted to, `ticker`, from a
+/// ticker label or a numeric one, under a ticker-like header or a neutral one.
+#[test]
+fn ticker_does_not_keep_or_recover_small_integer_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let ints: Vec<String> = ["5", "12", "7", "300", "0005", "42", "9", "1500"]
+        .iter()
+        .cycle()
+        .take(60)
+        .map(|s| s.to_string())
+        .collect();
+    for header in ["value", "ticker", "symbol", "code", "count"] {
+        for from in [
+            "finance.securities.ticker",
+            "representation.numeric.integer_number",
+            "representation.identifier.numeric_code",
+            "unknown",
+        ] {
+            let r = cc.compose_from_sense(header, &ints, from, 1.0).unwrap();
+            assert_ne!(
+                r.label, "finance.securities.ticker",
+                "{header} / {from}: {:?}",
+                r.disambiguation_rule
+            );
+        }
+    }
+}

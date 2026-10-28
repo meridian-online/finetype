@@ -2665,3 +2665,26 @@ fn amount_lakh_rejects_undefined_forms() {
         ],
     );
 }
+
+const TICKER_LABEL: &str = "finance.securities.ticker";
+
+/// Numeric tickers of one to six digits (Hong Kong's `0005`, Tokyo's `7203`) are
+/// published symbols (Wikipedia, Ticker symbol), alongside the alphabetic forms.
+#[test]
+fn ticker_accepts_source_forms() {
+    assert_pattern_boundary(
+        TICKER_LABEL,
+        &["5", "0005", "7203", "600519", "AAPL", "BRK-B", "BF.B", "A"],
+        &[],
+    );
+}
+
+/// Seven digits is no ticker, nor is lower case or a mix of letters and digits.
+#[test]
+fn ticker_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        TICKER_LABEL,
+        &[],
+        &["1234567", "aapl", "AAPL1", "5A", "ABCDEFGH", "BRK-", "-5"],
+    );
+}
