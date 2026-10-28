@@ -2160,6 +2160,40 @@ representation.discrete.categorical:
         }
     }
 
+    #[test]
+    fn samples_check_exceptions_are_not_stale() {
+        let taxonomy = ["labels", "../../labels"]
+            .iter()
+            .find_map(|p| Taxonomy::from_directory(p).ok());
+        let Some(taxonomy) = taxonomy else {
+            eprintln!("Skipping samples-check staleness test (labels/ not found)");
+            return;
+        };
+        for key in SAMPLES_CHECK_EXCEPTIONS {
+            let def = taxonomy.get(key).unwrap_or_else(|| {
+                panic!("{key}: listed in SAMPLES_CHECK_EXCEPTIONS but not defined")
+            });
+            let validation = def.validation.as_ref().unwrap_or_else(|| {
+                panic!("{key}: listed in SAMPLES_CHECK_EXCEPTIONS but has no validation rule")
+            });
+            let compiled = crate::validator::CompiledValidator::new_for_label(validation, key)
+                .unwrap_or_else(|e| panic!("{key}: validation does not compile: {e}"));
+            let any_fails = def.samples.iter().any(|sample| {
+                let text = match sample {
+                    serde_yaml::Value::String(s) => s.clone(),
+                    serde_yaml::Value::Number(n) => n.to_string(),
+                    serde_yaml::Value::Bool(b) => b.to_string(),
+                    _ => return false,
+                };
+                !compiled.is_valid(&text)
+            });
+            assert!(
+                any_fails,
+                "{key}: every sample now passes; remove it from SAMPLES_CHECK_EXCEPTIONS"
+            );
+        }
+    }
+
     // ── Locale validator cache tests ────────────────────────────────────
 
     const LOCALE_YAML: &str = r#"
