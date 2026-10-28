@@ -2945,3 +2945,44 @@ fn npi_mixed_column_is_kept_by_the_guard_and_vetoed() {
         "60% of the values pass the check digit, so the guard keeps the label"
     );
 }
+
+/// Completes an eight-character CUSIP body with its check digit, or with a
+/// wrong one, using the library's checker so no literal check digit is written.
+fn cusip_body_with(body: &str, valid: bool) -> String {
+    (0..=9)
+        .map(|d| format!("{body}{d}"))
+        .find(|c| finetype_core::checksum::cusip(c) == valid)
+        .unwrap()
+}
+
+#[test]
+fn cusip_checksum_recovery_promotes_private_placement_numbers() {
+    // Private placement numbers carry `*`, `@` or `#`; with a valid check digit
+    // the column recovers to cusip from the word attractor.
+    let values: Vec<String> = ["12345*10", "67890@A1", "24680#B2", "13579*C3", "97531@D4"]
+        .iter()
+        .map(|b| cusip_body_with(b, true))
+        .collect();
+    let refs: Vec<&str> = values.iter().map(String::as_str).collect();
+    let l = recovered_label_shipped("id", &refs, "representation.text.word");
+    assert_eq!(l, "finance.securities.cusip");
+}
+
+#[test]
+fn cusip_checksum_recovery_declines_reserved_characters_without_a_check_digit() {
+    // Codes like `ABC*12345` fit the widened shape but fail the check digit, so
+    // they are not promoted from any attractor label.
+    let values: Vec<String> = ["ABC*1234", "XYZ@5678", "QRS#9012", "LMN*3456", "TUV@7890"]
+        .iter()
+        .map(|b| cusip_body_with(b, false))
+        .collect();
+    let refs: Vec<&str> = values.iter().map(String::as_str).collect();
+    for from in [
+        "representation.text.word",
+        "representation.identifier.alphanumeric_id",
+        "unknown",
+    ] {
+        let l = recovered_label_shipped("id", &refs, from);
+        assert_ne!(l, "finance.securities.cusip", "{from}");
+    }
+}

@@ -2688,3 +2688,64 @@ fn ticker_rejects_undefined_forms() {
         &["1234567", "aapl", "AAPL1", "5A", "ABCDEFGH", "BRK-", "-5"],
     );
 }
+
+const CUSIP_LABEL: &str = "finance.securities.cusip";
+
+/// The check digit that makes `body` (eight characters) a valid CUSIP, found by
+/// the library's own checker so the test carries no literal check digit.
+fn cusip_with_check_digit(body: &str) -> String {
+    (0..=9)
+        .map(|d| format!("{body}{d}"))
+        .find(|candidate| finetype_core::checksum::cusip(candidate))
+        .expect("exactly one digit completes a CUSIP")
+}
+
+/// A different digit from the valid check digit.
+fn cusip_with_wrong_check_digit(body: &str) -> String {
+    (0..=9)
+        .map(|d| format!("{body}{d}"))
+        .find(|candidate| !finetype_core::checksum::cusip(candidate))
+        .expect("nine digits are wrong")
+}
+
+/// CUSIP Global Services reserves `*`, `@` and `#` for private placement
+/// numbers, and the check digit values them 36, 37 and 38.
+#[test]
+fn cusip_accepts_private_placement_forms() {
+    let valid: Vec<String> = ["12345*10", "12345@10", "12345#10", "1234*A12", "*2345A10"]
+        .iter()
+        .map(|body| cusip_with_check_digit(body))
+        .collect();
+    let refs: Vec<&str> = valid.iter().map(String::as_str).collect();
+    assert_pattern_boundary(CUSIP_LABEL, &refs, &[]);
+    for v in &valid {
+        assert!(finetype_core::checksum::cusip(v), "{v}");
+    }
+    // the forms the type already took
+    assert_pattern_boundary(CUSIP_LABEL, &["037833100", "17275R102"], &[]);
+}
+
+/// The check digit is a digit, and only the three reserved characters join
+/// the alphabet. A wrong check digit is the checksum's to reject.
+#[test]
+fn cusip_rejects_undefined_forms() {
+    // A pattern cannot compute a check digit, so a wrong one is rejected by the
+    // checksum (`checksum: cusip`), not by the rule; see the column tests in
+    // finetype-model.
+    let wrong = cusip_with_wrong_check_digit("12345*10");
+    assert!(!finetype_core::checksum::cusip(&wrong));
+    assert_pattern_boundary(
+        CUSIP_LABEL,
+        &[],
+        &[
+            "12345678*",
+            "12345678@",
+            "12345678#",
+            "1234$5100",
+            "12345 100",
+            "12345*1000",
+            "1234*100",
+            "12345*1o0",
+        ],
+    );
+}

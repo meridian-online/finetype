@@ -32,6 +32,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "technology.internet.ip_v6" => Some(is_ip_v6_discrimination_shape),
         "technology.development.calver" => Some(is_calver_discrimination_shape),
         "finance.securities.ticker" => Some(is_ticker_discrimination_shape),
+        "finance.securities.cusip" => Some(is_cusip_discrimination_shape),
         "technology.cryptographic.jwt" => Some(is_jwt_discrimination_shape),
         "representation.scientific.protein_sequence" => {
             Some(is_protein_sequence_discrimination_shape)
@@ -288,6 +289,16 @@ fn is_jwt_discrimination_shape(value: &str) -> bool {
         (Some(a), Some(b), Some(c), None) if [a, b, c].iter().all(|p| p.len() >= 10)
     );
     three_long_segments || crate::structure::is_jwt(value)
+}
+
+/// `cusip`: the published rule, which takes the private-placement characters
+/// `*`, `@` and `#`, counted only when the check digit is right. The rule alone
+/// is shape-only, so `ABC*12345` would conform; with a reserved character the
+/// check digit (which values them 36 to 38) is what separates a placement
+/// number from any other nine-character code. A value with none of the three
+/// is counted as before.
+fn is_cusip_discrimination_shape(value: &str) -> bool {
+    !value.contains(['*', '@', '#']) || crate::checksum::cusip(value)
 }
 
 /// `ticker`: the alphabetic shape the type was first defined by, one to seven
@@ -798,6 +809,33 @@ mod tests {
     }
 
     #[test]
+    fn cusip_detector_counts_a_placement_number_only_with_its_check_digit() {
+        let tax = taxonomy(true);
+        let detect = detector_for("finance.securities.cusip").expect("cusip detector");
+        let with_check = |body: &str| {
+            (0..=9)
+                .map(|d| format!("{body}{d}"))
+                .find(|c| crate::checksum::cusip(c))
+                .expect("one digit completes it")
+        };
+        let rule = resolve_label_validator("finance.securities.cusip", &tax).expect("rule");
+        for body in ["12345*10", "12345@10", "12345#10"] {
+            let good = with_check(body);
+            assert!(detect(&good) && rule.is_valid(&good), "{good}");
+            let bad = (0..=9)
+                .map(|d| format!("{body}{d}"))
+                .find(|c| !crate::checksum::cusip(c))
+                .unwrap();
+            assert!(rule.is_valid(&bad) && !detect(&bad), "{bad}");
+        }
+        // Values with no reserved character are counted as the rule counts them.
+        for v in ["037833100", "037833101", "17275R102"] {
+            assert!(detect(v), "{v}");
+        }
+        assert!(!rule.is_valid("12345678*"));
+    }
+
+    #[test]
     fn ticker_detector_keeps_the_alphabetic_shape_and_not_bare_digits() {
         let tax = taxonomy(true);
         let detect = detector_for("finance.securities.ticker").expect("ticker detector");
@@ -888,6 +926,7 @@ mod tests {
             "technology.development.calver",
             "technology.cryptographic.jwt",
             "finance.securities.ticker",
+            "finance.securities.cusip",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

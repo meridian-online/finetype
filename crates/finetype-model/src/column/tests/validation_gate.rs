@@ -1764,3 +1764,56 @@ fn ticker_does_not_keep_or_recover_small_integer_columns() {
         }
     }
 }
+
+/// A column of one repeated private placement number with its check digit
+/// (which the old rule rejected) keeps its type. The check digit is computed by
+/// the library's checker.
+#[test]
+fn cusip_constant_column_keeps_type() {
+    let value = (0..=9)
+        .map(|d| format!("12345*10{d}"))
+        .find(|c| finetype_core::checksum::cusip(c))
+        .unwrap();
+    assert_constant_column_kept("finance.securities.cusip", &value);
+}
+
+/// The same placement number with a wrong check digit conforms to the rule but
+/// the detector does not count it, so a column of it is demoted.
+#[test]
+fn cusip_placement_number_with_wrong_check_digit_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let value = (0..=9)
+        .map(|d| format!("12345*10{d}"))
+        .find(|c| !finetype_core::checksum::cusip(c))
+        .unwrap();
+    let values: Vec<String> = vec![value; 40];
+    assert!(schema_fail_demotion(&values, "finance.securities.cusip", &tax).is_some());
+}
+
+/// `cusip` is an attractor leaf and now takes `*`, `@` and `#`, so a column of
+/// codes that use them without a valid check digit is not kept as cusip.
+#[test]
+fn cusip_does_not_keep_reserved_character_codes_without_a_check_digit() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let values: Vec<String> = ["ABC*1234", "XYZ@5678", "QRS#9012", "LMN*3456", "TUV@7890"]
+        .iter()
+        .cycle()
+        .take(40)
+        .map(|b| {
+            (0..=9)
+                .map(|d| format!("{b}{d}"))
+                .find(|c| !finetype_core::checksum::cusip(c))
+                .unwrap()
+        })
+        .collect();
+    let r = cc
+        .compose_from_sense("code", &values, "finance.securities.cusip", 0.9)
+        .unwrap();
+    assert_ne!(
+        r.label, "finance.securities.cusip",
+        "{:?}",
+        r.disambiguation_rule
+    );
+}

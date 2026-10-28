@@ -428,9 +428,11 @@ finance.payment.credit_card_number:
 finance.securities.cusip:
   title: "CUSIP"
   description: >
-    Committee on Uniform Securities Identification Procedures identifier.
-    9-character alphanumeric code for US and Canadian securities. Format:
-    6-character issuer code + 2-character issue number + 1 check digit.
+    Committee on Uniform Security Identification Procedures (American Bankers
+    Association, 1964) identifier. 9-character alphanumeric code for US and
+    Canadian securities. Format: 6-character issuer code + 2-character issue
+    number + 1 check digit. The special characters *, @ and # are reserved for
+    private placement numbers; the check digit values them 36, 37 and 38.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -445,7 +447,7 @@ finance.securities.cusip:
     check_digit: "SUBSTRING({col}, 9, 1)"
   validation:
     type: string
-    pattern: "^[A-Z0-9]{8}[0-9]$"
+    pattern: "^[A-Z0-9*@#]{8}[0-9]$"
   checksum: cusip
   tier: [VARCHAR, payment]
   aliases: null
@@ -453,12 +455,19 @@ finance.securities.cusip:
     - "037833100"
     - "17275R102"
     - "594918104"
+    - "12345*109"
   icon: chart-line
   references: null
   notes: >
     New in v2. CUSIP is the primary identifier for US/Canadian securities.
     Check digit uses a custom weighted algorithm where characters at even positions
     are doubled (similar to Luhn but with alphanumeric conversion).
+    Source: CUSIP Global Services and Wikipedia (CUSIP). The published rule is
+    shape-only, so it takes *, @ and # in any of the first eight characters (the
+    CGS page naming the reserved positions could not be reached, so none is
+    enforced); a discrimination detector counts a value with one of them only
+    when its check digit is right, so a column of codes like ABC*12345 is not
+    kept as cusip.
 
 finance.securities.isin:
   title: "ISIN"
