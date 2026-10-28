@@ -763,3 +763,24 @@ fn s3_uri_parts_read_bucket_names_and_access_point_arns() {
         );
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn data_uri_is_base64_is_false_on_null_input() {
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let decompose = tax
+        .ddl_info("technology.internet.data_uri")
+        .expect("known label")
+        .decompose
+        .clone()
+        .expect("data_uri has decompose");
+    let expr = decompose["is_base64"].as_str().expect("is_base64");
+    let sql = format!("SELECT {}", expr.replace("{col}", "CAST(NULL AS VARCHAR)"));
+    let out = Command::new("duckdb")
+        .args(["-no-init", "-noheader", "-list", "-c", &sql])
+        .output()
+        .expect("run the duckdb CLI");
+    assert!(out.status.success());
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "false");
+}

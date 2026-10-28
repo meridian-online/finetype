@@ -976,7 +976,7 @@ technology.internet.data_uri:
   transform_ext: null
   decompose:
     media_type: "REGEXP_EXTRACT({col}, '^data:([^;,]+)', 1)"
-    is_base64: "REGEXP_MATCHES({col}, '^data:[^,]*;[bB][aA][sS][eE]64,')"
+    is_base64: "COALESCE(REGEXP_MATCHES({col}, '^data:[^,]*;[bB][aA][sS][eE]64,'), false)"
   validation:
     type: string
     pattern: "^data:(?:[a-zA-Z0-9]+/[a-zA-Z0-9\\-+.]+)?(?:;[a-zA-Z0-9\\-]+=[^;,]*)*(?:;[bB][aA][sS][eE]64)?,.*$"
