@@ -972,3 +972,25 @@ fn csv_detector_keeps_empty_field_text_out() {
         assert!(!detect(bad), "{bad:?}");
     }
 }
+
+const QUERY_STRING_LABEL: &str = "container.key_value.query_string";
+
+/// WHATWG URL Standard: bare names and empty sequences sit beside at least one
+/// `name=value` pair.
+#[test]
+fn query_string_accepts_source_forms() {
+    assert_pattern_boundary(
+        QUERY_STRING_LABEL,
+        &["debug&page=2", "a=1&&b=2", "q=", "name=John&age=30"],
+        &[],
+    );
+}
+
+#[test]
+fn query_string_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        QUERY_STRING_LABEL,
+        &[],
+        &["debug", "&&", "=x", "hello world"],
+    );
+}

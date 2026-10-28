@@ -476,3 +476,33 @@ fn yaml_constant_column_keeps_type() {
 fn csv_constant_column_keeps_type() {
     assert_constant_column_kept("container.object.csv", "\"a,,b\",1");
 }
+
+/// A column of one repeated query string with a bare name (which the old rule
+/// rejected) keeps its type.
+#[test]
+fn query_string_constant_column_keeps_type() {
+    assert_constant_column_kept("container.key_value.query_string", "debug&page=2");
+}
+
+/// `query_string` now accepts bare names beside a pair, but not a column of
+/// bare names alone: ceded-leaf recovery does not promote a word column to it.
+#[test]
+fn query_string_does_not_recover_word_column() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let words: Vec<String> = ["alpha", "beta", "gamma"]
+        .iter()
+        .cycle()
+        .take(42)
+        .map(|s| s.to_string())
+        .collect();
+    let r = cc
+        .compose_from_sense("name", &words, "representation.text.word", 1.0)
+        .unwrap();
+    assert_ne!(r.label, "container.key_value.query_string");
+    assert_ne!(
+        r.disambiguation_rule.as_deref(),
+        Some("ceded_leaf_recovery")
+    );
+}
