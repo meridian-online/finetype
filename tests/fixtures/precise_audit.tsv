@@ -9,7 +9,7 @@ container.object.html	false	^.*<(p|div|span|a|br|img|h[1-6]|ul|ol|li|table|tr|td
 container.object.json	false	^\s*\{[\s\S]*\}\s*$	true
 container.object.json_array	false	^\[.*\]$	true
 container.object.s_expression	false	^\s*\(.*\)\s*$	true
-container.object.xml	false	^<.*>.*</.*>$	true
+container.object.xml	false	^\s*(<\?xml[^>]*\?>\s*)?(<[A-Za-z_:À-ÖØ-öø-˿Ͱ-ͽͿ-῿‌‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�][A-Za-z_:À-ÖØ-öø-˿Ͱ-ͽͿ-῿‌‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�\-.0-9·̀-ͯ‿-⁀]*(\s[^<>]*)?/>|<[A-Za-z_:À-ÖØ-öø-˿Ͱ-ͽͿ-῿‌‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�][A-Za-z_:À-ÖØ-öø-˿Ͱ-ͽͿ-῿‌‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�\-.0-9·̀-ͯ‿-⁀]*(\s[^<>]*)?>[\s\S]*</[A-Za-z_:À-ÖØ-öø-˿Ͱ-ͽͿ-῿‌‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�][A-Za-z_:À-ÖØ-öø-˿Ͱ-ͽͿ-῿‌‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�\-.0-9·̀-ͯ‿-⁀]*\s*>)\s*$	true
 container.object.yaml	false	^[a-zA-Z_][a-zA-Z0-9_]*:\s*.*	false
 datetime.component.day_of_week	true		true
 datetime.component.month_name	true		true

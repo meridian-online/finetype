@@ -877,3 +877,27 @@ fn json_accepts_source_forms() {
 fn json_rejects_undefined_forms() {
     assert_pattern_boundary(JSON_LABEL, &[], &["[1, 2]", "{\"a\": 1", "a {}"]);
 }
+
+const XML_LABEL: &str = "container.object.xml";
+
+/// XML 1.0: an optional declaration, then an empty-element tag or a start tag
+/// through its end tag, across lines.
+#[test]
+fn xml_accepts_source_forms() {
+    assert_pattern_boundary(
+        XML_LABEL,
+        &[
+            "<root/>",
+            "<br />",
+            "<?xml version=\"1.0\"?><a>1</a>",
+            "<a>\n  <b>1</b>\n</a>",
+            "<gr\u{f6}\u{df}e>1</gr\u{f6}\u{df}e>",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn xml_rejects_undefined_forms() {
+    assert_pattern_boundary(XML_LABEL, &[], &["<a>1", "a <b/>", "<>", "<1a/>"]);
+}

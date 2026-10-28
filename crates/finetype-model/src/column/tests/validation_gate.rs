@@ -452,3 +452,10 @@ fn assert_constant_column_kept(label: &str, value: &str) {
 fn json_constant_column_keeps_type() {
     assert_constant_column_kept("container.object.json", " {\"a\": 1} ");
 }
+
+/// A column of one repeated empty-element tag (which the old rule rejected)
+/// keeps its type.
+#[test]
+fn xml_constant_column_keeps_type() {
+    assert_constant_column_kept("container.object.xml", "<root/>");
+}

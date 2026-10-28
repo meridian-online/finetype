@@ -141,12 +141,14 @@ container.object.xml:
   decompose: null
   validation:
     type: string
-    pattern: "^<.*>.*</.*>$"
+    pattern: "^\\s*(<\\?xml[^>]*\\?>\\s*)?(<[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*(\\s[^<>]*)?/>|<[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*(\\s[^<>]*)?>[\\s\\S]*</[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*\\s*>)\\s*$"
   tier: [VARCHAR, object]
   aliases: [xml_document]
   samples:
     - '<root><name>John</name><age>30</age></root>'
     - '<user id="123"><email>john@example.com</email></user>'
+    - '<root/>'
+    - "<?xml version=\"1.0\"?>\n<a>\n  <b>1</b>\n</a>"
   icon: package
   canonical: "https://www.w3.org/TR/xml/"
   references: null
@@ -155,6 +157,9 @@ container.object.xml:
     and adoption is decreasing.
     DuckDB has limited native XML support (xmlparse requires extension).
     Recursive inference may be partial.
+    The rule checks the XML 1.0 shape (an optional declaration, then an
+    empty-element tag or a start tag through an end tag), not that the
+    element names match or that the document is well-formed.
 
 container.object.html:
   title: "HTML Content"
