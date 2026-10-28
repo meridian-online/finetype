@@ -206,6 +206,8 @@ technology.internet.hostname:
   description: >
     Fully qualified domain name or simple hostname. Does not include protocol or path.
     Allows alphanumeric characters, hyphens, and dots. Subdomains supported.
+    A single trailing full stop (the root label of an absolute name,
+    `example.com.`) is accepted.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -217,7 +219,7 @@ technology.internet.hostname:
   decompose: null
   validation:
     type: string
-    pattern: "^(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$"
+    pattern: "^(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\\.?$"
   tier: [VARCHAR, internet]
   aliases: [domain_name]
   samples:
@@ -225,12 +227,15 @@ technology.internet.hostname:
     - "www.google.com"
     - "subdomain.example.org"
     - "localhost"
+    - "example.com."
   icon: world
   canonical: "https://www.rfc-editor.org/rfc/rfc1035"
   references: null
   notes: >
     v1 migration: Was internet.hostname. Pattern requires lowercase (use LOWER()
-    to normalize). Does not validate DNS resolution.
+    to normalize). Does not validate DNS resolution. A trailing full stop marks
+    a fully qualified name (RFC 3696 section 2); it is part of the value, so
+    strip it before joining against names written without it.
 
 # technology.internet.port: REMOVED
 # False positives on plain integer columns. Range 0-65535 overlaps heavily with integer_number.

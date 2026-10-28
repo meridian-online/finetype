@@ -28,6 +28,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "geography.coordinate.geohash" => Some(is_geohash_discrimination_shape),
         "geography.address.street_suffix" => Some(is_street_suffix_discrimination_shape),
         "representation.scientific.smiles" => Some(is_smiles_discrimination_shape),
+        "technology.internet.hostname" => Some(is_hostname_discrimination_shape),
         "representation.scientific.protein_sequence" => {
             Some(is_protein_sequence_discrimination_shape)
         }
@@ -226,6 +227,18 @@ fn is_yaml_discrimination_shape(value: &str) -> bool {
     chars
         .find(|c| !(c.is_ascii_alphanumeric() || *c == '_'))
         .is_some_and(|c| c == ':')
+}
+
+/// `hostname`: the published rule, which takes a trailing full stop (RFC 3696),
+/// with the stop counted only on a name that has a dot before it
+/// (`example.com.`). A lone word with a stop (`done.`, `inc.`, `localhost.`)
+/// conforms but is not counted: without this the stop would confirm any
+/// lowercase word that ends a sentence.
+fn is_hostname_discrimination_shape(value: &str) -> bool {
+    match value.strip_suffix('.') {
+        Some(rest) => rest.contains('.'),
+        None => true,
+    }
 }
 
 /// `query_string`: only `name=value` pairs joined by `&`, every name non-empty
@@ -761,6 +774,7 @@ mod tests {
             "geography.address.street_suffix",
             "representation.scientific.protein_sequence",
             "representation.scientific.smiles",
+            "technology.internet.hostname",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

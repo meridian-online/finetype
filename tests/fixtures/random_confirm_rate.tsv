@@ -239,7 +239,7 @@ technology.identifier.tsid	0.0000	0.0000	0.0495	0.0000	0.0834	0.0012
 technology.identifier.ulid	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 technology.internet.cidr	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 technology.internet.data_uri	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
-technology.internet.hostname	0.0153	0.0153	1.0000	1.0000	0.5368	0.5368
+technology.internet.hostname	0.0156	0.0153	1.0000	1.0000	0.5368	0.5368
 technology.internet.http_method	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 technology.internet.ip_v4	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
 technology.internet.ip_v4_with_port	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000

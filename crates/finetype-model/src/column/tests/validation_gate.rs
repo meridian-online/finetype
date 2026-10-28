@@ -1138,3 +1138,65 @@ fn ip_v6_does_not_recover_neighbouring_colon_columns() {
         }
     }
 }
+
+/// A column of one repeated fully qualified name with its root dot (the old
+/// rule rejected the dot) keeps its type: the detector counts a stop after a
+/// dotted name.
+#[test]
+fn hostname_constant_column_keeps_type() {
+    assert_constant_column_kept("technology.internet.hostname", "example.com.");
+}
+
+/// `hostname` now takes a trailing full stop. It is neither a ceded leaf nor an
+/// attractor, but the stop is common at the end of a word, an abbreviation or a
+/// file name, so a column of those must not be promoted to it by the recoveries
+/// that read the validator.
+#[test]
+fn hostname_does_not_recover_dotted_word_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let columns: [(&str, [&str; 4]); 3] = [
+        ("remark", ["done.", "pending.", "see note.", "ok."]),
+        ("abbr", ["inc.", "corp.", "ltd.", "approx."]),
+        (
+            "attachment",
+            ["report.csv.", "readme.md.", "data.json.", "notes.txt."],
+        ),
+    ];
+    for (header, codes) in columns {
+        let values: Vec<String> = codes
+            .iter()
+            .cycle()
+            .take(42)
+            .map(|s| s.to_string())
+            .collect();
+        for label in [
+            "representation.text.word",
+            "representation.text.plain_text",
+            "representation.text.entity_name",
+            "representation.identifier.alphanumeric_id",
+            "unknown",
+        ] {
+            let r = cc.compose_from_sense(header, &values, label, 1.0).unwrap();
+            assert_ne!(
+                r.label, "technology.internet.hostname",
+                "{header} from {label}"
+            );
+        }
+    }
+}
+
+/// A column of one repeated lone word with a stop, labelled `hostname`, is
+/// demoted to `word` by `schema_fail_demotion`, as on 0.6.64 (the detector does
+/// not count `done.`).
+#[test]
+fn hostname_lone_word_with_stop_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["done.".to_string(); 40];
+    let demoted = schema_fail_demotion(&values, "technology.internet.hostname", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
+    );
+}

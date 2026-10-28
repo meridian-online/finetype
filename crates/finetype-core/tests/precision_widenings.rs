@@ -1884,3 +1884,56 @@ fn ip_v6_rejects_undefined_forms() {
         ],
     );
 }
+
+const HOSTNAME_LABEL: &str = "technology.internet.hostname";
+
+/// RFC 3696: an absolute name may end in one full stop.
+#[test]
+fn hostname_accepts_source_forms() {
+    assert_pattern_boundary(
+        HOSTNAME_LABEL,
+        &[
+            "example.com.",
+            "localhost",
+            "localhost.",
+            "a.b.c.",
+            "example.com",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn hostname_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        HOSTNAME_LABEL,
+        &[],
+        &[
+            "example..com",
+            ".example.com",
+            ".",
+            "example.com..",
+            "example .com.",
+            "-a.com.",
+        ],
+    );
+}
+
+/// The detector counts a trailing full stop only after a dotted name, so a lone
+/// word that ends a sentence conforms but is not counted for discrimination.
+#[test]
+fn hostname_detector_keeps_out_lone_words_with_a_stop() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(HOSTNAME_LABEL, &tax).expect("hostname rule");
+    let detector = detector_for(HOSTNAME_LABEL);
+    assert!(detector.is_some());
+    for kept in ["example.com", "localhost", "example.com.", "a.b."] {
+        assert!(passes_detector_or_rule(detector, &rule, kept), "{kept:?}");
+    }
+    for word in ["done.", "inc.", "localhost.", "ok."] {
+        assert!(rule.is_valid(word), "{word:?} conforms");
+        assert!(!passes_detector_or_rule(detector, &rule, word), "{word:?}");
+    }
+}
