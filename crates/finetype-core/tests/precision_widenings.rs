@@ -2996,3 +2996,45 @@ fn currency_code_detector_keeps_placeholder_and_historic_codes_out() {
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
     }
 }
+
+/// The detector counts a value only when its month token is a CLDR abbreviated
+/// month for one of the type's Latin-script locales. Full month names and
+/// ordinary words conform to the published rule but are not counted.
+#[test]
+fn abbreviated_month_detector_keeps_full_names_and_words_out() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(ABBREVIATED_MONTH_LABEL, &tax).expect("rule");
+    let detector = detector_for(ABBREVIATED_MONTH_LABEL);
+    assert!(detector.is_some());
+    for ok in [
+        "4 Feb 2023",
+        "4 janv. 2023",
+        "4 ene 2023",
+        "Feb 4, 2023",
+        "Sept 4, 2023",
+        "Feb. 4, 2023",
+        "15 Mai 2024",
+        "12 d\u{e9}c. 2023",
+        "4 ao\u{fb}t 2023",
+        "4 FEB 2023",
+        "4 okt 2023",
+        "4 mrt 2023",
+        "4 Feb 23",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for bad in [
+        "4 February 2023",
+        "February 4, 2023",
+        "Room 12, 2023",
+        "Page 12, 2023",
+        "Suite 4, 2023",
+        "4 Tuesday 2023",
+        "4 Foo 2023",
+    ] {
+        assert!(rule.validate(bad).is_valid, "{bad:?} conforms to the rule");
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}

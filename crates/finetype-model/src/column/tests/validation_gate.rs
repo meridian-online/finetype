@@ -2107,3 +2107,24 @@ fn currency_code_placeholder_column_is_demoted() {
         );
     }
 }
+
+/// A column of full-month-name dates conforms to the published rule but the
+/// detector does not count it, so the validation veto rejects the label for it.
+/// (The veto allowlist entry for this type is re-measured separately.)
+#[test]
+fn abbreviated_month_full_name_column_is_vetoed() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["4 February 2023".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(
+        "datetime.date.abbreviated_month",
+        &refs,
+        &tax,
+        &audited_safe_labels(),
+    );
+    assert!(
+        veto.vetoed,
+        "a column of full month names is vetoed: {veto:?}"
+    );
+}
