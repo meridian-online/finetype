@@ -1974,3 +1974,41 @@ fn data_uri_rejects_undefined_forms() {
         ],
     );
 }
+
+const S3_URI_LABEL: &str = "technology.cloud.s3_uri";
+
+/// AWS CLI S3Uri: an access-point ARN may stand in for the bucket.
+#[test]
+fn s3_uri_accepts_source_forms() {
+    assert_pattern_boundary(
+        S3_URI_LABEL,
+        &[
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint/mykey",
+            "s3://my-bucket/data/file.csv",
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint",
+            "s3://arn:aws-cn:s3:cn-north-1:123456789012:accesspoint/my-ap/a/b.csv",
+            "s3://arn:aws-us-gov:s3:us-gov-west-1:123456789012:accesspoint/my-ap/",
+            "s3://my-bucket",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn s3_uri_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        S3_URI_LABEL,
+        &[],
+        &[
+            "s3://arn:aws:s3:us-west-2:1234:accesspoint/x",
+            "s3://A",
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/x",
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/-bad-name",
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/UPPER",
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint",
+            "s3://arn:aws:s3:::my-bucket",
+            "s3://arn:aws:ec2:us-west-2:123456789012:accesspoint/myaccesspoint",
+            "s3://arn:azure:s3:us-west-2:123456789012:accesspoint/myaccesspoint",
+        ],
+    );
+}

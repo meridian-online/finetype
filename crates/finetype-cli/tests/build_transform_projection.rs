@@ -734,3 +734,32 @@ fn data_uri_parts_read_empty_data_and_any_case_base64() {
         );
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn s3_uri_parts_read_bucket_names_and_access_point_arns() {
+    let tax = test_taxonomy();
+    let label = "technology.cloud.s3_uri";
+    // An access-point ARN stands in for the bucket: `bucket` is the ARN up to
+    // and including the access-point name, `key` what follows ('' when nothing).
+    let ap = "arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint";
+    for (value, bucket, key) in [
+        ("s3://my-bucket/data/file.csv", "my-bucket", "data/file.csv"),
+        ("s3://my-bucket", "my-bucket", ""),
+        (&format!("s3://{ap}/mykey") as &str, ap, "mykey"),
+        (&format!("s3://{ap}/a/b.csv") as &str, ap, "a/b.csv"),
+        (&format!("s3://{ap}") as &str, ap, ""),
+        (&format!("s3://{ap}/") as &str, ap, ""),
+    ] {
+        assert_eq!(
+            run_color_part(&tax, label, "bucket", value),
+            bucket,
+            "bucket of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "key", value),
+            key,
+            "key of {value:?}"
+        );
+    }
+}

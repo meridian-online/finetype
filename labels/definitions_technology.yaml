@@ -818,8 +818,11 @@ technology.cloud.aws_arn:
 technology.cloud.s3_uri:
   title: "S3 URI"
   description: >
-    Amazon S3 bucket/key URI in the format s3://bucket-name/key-path.
-    Used in data pipelines, ETL tools, and cloud storage references.
+    Amazon S3 bucket/key URI in the format s3://bucket-name/key-path, or with
+    an S3 access-point ARN in place of the bucket name
+    (s3://arn:aws:s3:us-west-2:123456789012:accesspoint/name/key-path), as the
+    AWS CLI accepts. Used in data pipelines, ETL tools, and cloud storage
+    references.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -829,22 +832,29 @@ technology.cloud.s3_uri:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    bucket: "REGEXP_EXTRACT({col}, '^s3://([^/]+)', 1)"
-    key: "REGEXP_EXTRACT({col}, '^s3://[^/]+/(.*)', 1)"
+    bucket: "REGEXP_EXTRACT({col}, '^s3://(arn:[^/]+/[^/]+|[^/]+)', 1)"
+    key: "CASE WHEN {col} LIKE 's3://arn:%' THEN REGEXP_EXTRACT({col}, '^s3://arn:[^/]+/[^/]+/(.*)', 1) ELSE REGEXP_EXTRACT({col}, '^s3://[^/]+/(.*)', 1) END"
   validation:
     type: string
-    pattern: "^s3://[a-z0-9][a-z0-9.\\-]{1,61}[a-z0-9](/.*)?$"
+    pattern: "^s3://(?:[a-z0-9][a-z0-9.\\-]{1,61}[a-z0-9]|arn:aws(?:-cn|-us-gov)?:s3:[a-z0-9-]+:[0-9]{12}:accesspoint/[a-z0-9][a-z0-9\\-]{1,48}[a-z0-9])(/.*)?$"
   tier: [VARCHAR, cloud]
   aliases: null
   samples:
     - "s3://my-bucket/data/file.csv"
     - "s3://production-logs/2024/01/events.parquet"
     - "s3://data-lake-raw/ingestion/batch-001/part-00000.json"
+    - "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint/mykey"
   icon: cloud
   references: null
   notes: >
     Bucket names: 3-63 chars, lowercase, no underscores.
     Key paths can contain any characters after the bucket name.
+    An access-point ARN (partition aws, aws-cn or aws-us-gov; 12-digit account;
+    a 3-50 character lower-case name) may stand in for the bucket. For such a
+    value `bucket` returns the whole ARN up to and including the access-point
+    name (`arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint`), and
+    `key` the part after it (`mykey`); `key` is '' when there is none. Multi-Region
+    access-point ARNs (empty region) and S3 on Outposts ARNs are not covered.
 
 technology.cryptographic.jwt:
   title: "JSON Web Token"

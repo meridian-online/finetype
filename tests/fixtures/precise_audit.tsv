@@ -221,7 +221,7 @@ representation.text.entity_name	false		false
 representation.text.plain_text	false		false
 representation.text.word	false	^[a-zA-Z0-9]([a-zA-Z0-9\-_]*[a-zA-Z0-9])?$	false
 technology.cloud.aws_arn	false	^arn:(aws|aws-cn|aws-us-gov):[a-zA-Z0-9\-]+:[a-z0-9\-]*:\d{0,12}:.+$	true
-technology.cloud.s3_uri	false	^s3://[a-z0-9][a-z0-9.\-]{1,61}[a-z0-9](/.*)?$	true
+technology.cloud.s3_uri	false	^s3://(?:[a-z0-9][a-z0-9.\-]{1,61}[a-z0-9]|arn:aws(?:-cn|-us-gov)?:s3:[a-z0-9-]+:[0-9]{12}:accesspoint/[a-z0-9][a-z0-9\-]{1,48}[a-z0-9])(/.*)?$	true
 technology.code.doi	false	^10\.[0-9]{4,9}/[^\s]+$	true
 technology.code.imei	false	^[0-9]{15}$	false
 technology.code.locale_code	false	^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{3})?(?:[-_][a-zA-Z]{4})?(?:[-_](?:[a-zA-Z]{2}|[0-9]{3}))?$	false

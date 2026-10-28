@@ -1242,3 +1242,64 @@ fn data_uri_does_not_recover_headless_columns() {
         }
     }
 }
+
+/// A column of one repeated access-point URI (the old rule took only a bucket
+/// name) keeps its type.
+#[test]
+fn s3_uri_constant_column_keeps_type() {
+    assert_constant_column_kept(
+        "technology.cloud.s3_uri",
+        "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint/mykey",
+    );
+}
+
+/// `s3_uri` is a ceded-recovery leaf and now takes an access-point ARN after
+/// `s3://`, so a column of bare ARNs (aws_arn's own form) or of malformed
+/// access points is not promoted to it.
+#[test]
+fn s3_uri_does_not_recover_arn_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let columns: [(&str, [&str; 3]); 3] = [
+        (
+            "arn",
+            [
+                "arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint",
+                "arn:aws:s3:::my-bucket/key",
+                "arn:aws:iam::123456789012:role/admin",
+            ],
+        ),
+        (
+            "target",
+            [
+                "s3://arn:aws:s3:us-west-2:1234:accesspoint/x",
+                "s3://arn:aws:ec2:us-west-2:123456789012:accesspoint/abc",
+                "s3://A",
+            ],
+        ),
+        (
+            "path",
+            [
+                "s3:/bucket/key",
+                "gs://bucket/key",
+                "https://x.s3.amazonaws.com/k",
+            ],
+        ),
+    ];
+    for (header, codes) in columns {
+        let values: Vec<String> = codes
+            .iter()
+            .cycle()
+            .take(42)
+            .map(|s| s.to_string())
+            .collect();
+        for label in [
+            "representation.text.word",
+            "representation.identifier.alphanumeric_id",
+        ] {
+            let r = cc.compose_from_sense(header, &values, label, 1.0).unwrap();
+            assert_ne!(r.label, "technology.cloud.s3_uri", "{header} from {label}");
+        }
+    }
+}
