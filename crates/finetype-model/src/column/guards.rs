@@ -1704,7 +1704,9 @@ impl ColumnClassifier {
     }
 
     /// `color_rgb_recovery` (default ON). Recovers `representation.format.color_rgb`
-    /// (not in the 244-dim softmax) from VALUES. The taxonomy validator
+    /// (not in the 244-dim softmax) from VALUES. A value counts when it starts
+    /// with `rgb(`/`rgba(` and passes the published rule, so the CSS Color 4 space
+    /// syntax is recovered as well as the comma syntax. The taxonomy validator
     /// `^(?:rgb)?\(?(\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)?$` is PERMISSIVE — `rgb`,
     /// `(` and `)` are all optional, so a bare comma triple `255,0,0` (a coordinate, a
     /// comma_separated array, or the `word` attractor) passes; that is why color_rgb was
@@ -1724,24 +1726,18 @@ impl ColumnClassifier {
         if non_empty.len() < 3 {
             return;
         }
-        // Anchored substance check: literal rgb(/rgba( prefix + closing ) + 3 (rgb)
-        // or 4 (rgba) comma components whose first three are integers in 0..=255.
+        // Anchored substance check: the literal rgb(/rgba( head a bare triple cannot
+        // carry, and the published color_rgb rule (legacy comma and CSS Color 4
+        // space syntax alike). Values are lowercased first, as this guard always did.
+        let Some(tax) = self.taxonomy.as_ref() else {
+            return;
+        };
+        let Some(rule) = finetype_core::validator::resolve_label_validator(LEAF, tax) else {
+            return;
+        };
         let is_rgb = |raw: &str| -> bool {
             let lower = raw.trim().to_ascii_lowercase();
-            let inner = lower
-                .strip_prefix("rgba(")
-                .or_else(|| lower.strip_prefix("rgb("));
-            let Some(inner) = inner.and_then(|s| s.strip_suffix(')')) else {
-                return false;
-            };
-            let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
-            if parts.len() != 3 && parts.len() != 4 {
-                return false;
-            }
-            parts.iter().take(3).all(|p| {
-                let n = p.strip_suffix('%').unwrap_or(p);
-                n.parse::<u16>().map(|v| v <= 255).unwrap_or(false)
-            })
+            (lower.starts_with("rgb(") || lower.starts_with("rgba(")) && rule.is_valid(&lower)
         };
         let valid = non_empty.iter().filter(|v| is_rgb(v)).count();
         // >=90% carry the literal rgb(...) certainty.

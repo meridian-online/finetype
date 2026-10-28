@@ -753,14 +753,6 @@ geography.transportation.unlocode:
     type: string
     pattern: "^[A-Z]{2}[A-Z2-9]{3}$"
   samples: ["USLAX"]
-representation.format.color_rgb:
-  title: Color (RGB)
-  designation: universal
-  tier: [VARCHAR, text]
-  validation:
-    type: string
-    pattern: "^(?:rgb)?\\(?([0-9]{1,3}),\\s*([0-9]{1,3}),\\s*([0-9]{1,3})\\)?$"
-  samples: ["rgb(255, 0, 0)"]
 "#;
 
 fn certainty_cc() -> ColumnClassifier {
@@ -770,6 +762,22 @@ fn certainty_cc() -> ColumnClassifier {
         ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
     cc.set_taxonomy(tax);
     cc
+}
+
+/// A classifier on the shipped taxonomy, for guards that read the published
+/// rule of a leaf (color_rgb) rather than a fixture copy of it.
+fn shipped_cc() -> ColumnClassifier {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    cc
+}
+
+fn recovered_label_shipped(header: &str, values: &[&str], sense: &str) -> String {
+    shipped_cc()
+        .compose_from_sense(header, &v(values), sense, 1.0)
+        .unwrap()
+        .label
 }
 
 fn v(items: &[&str]) -> Vec<String> {
@@ -1398,7 +1406,7 @@ fn tld_geography_recovery_requires_tld_header() {
 
 #[test]
 fn color_rgb_recovery_promotes_anchored_rgb() {
-    let l = recovered_label(
+    let l = recovered_label_shipped(
         "colour",
         &[
             "rgb(255, 0, 0)",
@@ -1412,10 +1420,26 @@ fn color_rgb_recovery_promotes_anchored_rgb() {
 }
 
 #[test]
+fn color_rgb_recovery_promotes_a_space_syntax_column() {
+    let rows = ["rgb(255 0 0)", "rgb(0 128 0 / 50%)", "rgb(10% 20% 30%)"];
+    let values: Vec<&str> = rows.iter().cycle().take(40).copied().collect();
+    let l = recovered_label_shipped("colour", &values, "representation.text.plain_text");
+    assert_eq!(l, "representation.format.color_rgb");
+}
+
+#[test]
+fn color_rgb_recovery_declines_rgb_prefixed_non_colours() {
+    let rows = ["rgb(a b c)", "rgb(x y z)", "rgb(red green blue)"];
+    let values: Vec<&str> = rows.iter().cycle().take(40).copied().collect();
+    let l = recovered_label_shipped("colour", &values, "representation.text.plain_text");
+    assert_ne!(l, "representation.format.color_rgb");
+}
+
+#[test]
 fn color_rgb_recovery_declines_bare_triples() {
     // Bare comma triples are genuinely ambiguous (coordinate / comma_separated /
     // word); without the literal rgb( prefix they must not be promoted.
-    let l = recovered_label(
+    let l = recovered_label_shipped(
         "colour",
         &["255, 0, 0", "0, 255, 0", "128, 128, 128", "12, 45, 90"],
         "representation.text.word",
