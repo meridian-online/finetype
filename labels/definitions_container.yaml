@@ -165,8 +165,9 @@ container.object.xml:
     above) are not accepted, so the pattern compiles in ECMA-262 without the
     u flag. A detector counts only the narrower single-line shape
     `<...>...</...>` that is not HTML (no html root, no DOCTYPE html), so
-    multi-line documents, empty-element tags and prologs conform in grading
-    but not in discrimination.
+    multi-line documents and empty-element-only documents conform in grading
+    but not in discrimination; a single-line value with a declaration or
+    DOCTYPE still counts.
 
 container.object.html:
   title: "HTML Content"
