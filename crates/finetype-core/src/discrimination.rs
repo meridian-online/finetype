@@ -239,13 +239,16 @@ fn is_ip_v6_discrimination_shape(value: &str) -> bool {
 }
 
 /// `hostname`: the published rule, which takes a trailing full stop (RFC 3696),
-/// with the stop counted only on a name that has a dot before it
-/// (`example.com.`). A lone word with a stop (`done.`, `inc.`, `localhost.`)
+/// with the stop counted only on a name that has a dot before it and a final
+/// label of two or more characters (`example.com.`). A lone word with a stop
+/// (`done.`, `inc.`, `localhost.`) or an abbreviation (`a.m.`, `e.g.`, `u.s.`)
 /// conforms but is not counted: without this the stop would confirm any
 /// lowercase word that ends a sentence.
 fn is_hostname_discrimination_shape(value: &str) -> bool {
     match value.strip_suffix('.') {
-        Some(rest) => rest.contains('.'),
+        Some(rest) => rest
+            .rsplit_once('.')
+            .is_some_and(|(_, last)| last.len() >= 2),
         None => true,
     }
 }

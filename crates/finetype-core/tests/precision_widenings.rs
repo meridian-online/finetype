@@ -1929,10 +1929,19 @@ fn hostname_detector_keeps_out_lone_words_with_a_stop() {
     let rule = resolve_label_validator(HOSTNAME_LABEL, &tax).expect("hostname rule");
     let detector = detector_for(HOSTNAME_LABEL);
     assert!(detector.is_some());
-    for kept in ["example.com", "localhost", "example.com.", "a.b."] {
+    for kept in ["example.com", "localhost", "example.com.", "a.bc."] {
         assert!(passes_detector_or_rule(detector, &rule, kept), "{kept:?}");
     }
-    for word in ["done.", "inc.", "localhost.", "ok."] {
+    for word in [
+        "done.",
+        "inc.",
+        "localhost.",
+        "ok.",
+        "a.m.",
+        "p.m.",
+        "e.g.",
+        "u.s.",
+    ] {
         assert!(rule.is_valid(word), "{word:?} conforms");
         assert!(!passes_detector_or_rule(detector, &rule, word), "{word:?}");
     }
