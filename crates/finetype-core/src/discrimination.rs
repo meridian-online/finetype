@@ -27,6 +27,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "geography.coordinate.mgrs" => Some(is_mgrs_discrimination_shape),
         "geography.coordinate.geohash" => Some(is_geohash_discrimination_shape),
         "geography.address.street_suffix" => Some(is_street_suffix_discrimination_shape),
+        "representation.scientific.smiles" => Some(is_smiles_discrimination_shape),
         "representation.scientific.protein_sequence" => {
             Some(is_protein_sequence_discrimination_shape)
         }
@@ -463,6 +464,54 @@ mod street_suffix_copy {
     }
 }
 
+/// The published `smiles` rule, copied because the library cannot read `labels/`
+/// when built from the crates.io package; `smiles_rule_copy_matches_the_taxonomy`
+/// keeps it equal to the taxonomy's.
+const SMILES_RULE: &str = r"^[A-Za-z0-9@+\-\[\]\(\)\\/#=%.:*$]+$";
+
+/// The class `smiles` was first defined by, without `*` and `$`.
+const SMILES_OLD_SHAPE: &str = r"^[A-Za-z0-9@+\-\[\]\(\)\\/#=%.:]+$";
+
+fn smiles_regexes() -> Option<&'static (regex::Regex, regex::Regex)> {
+    static RULES: std::sync::OnceLock<Option<(regex::Regex, regex::Regex)>> =
+        std::sync::OnceLock::new();
+    RULES
+        .get_or_init(|| {
+            Some((
+                regex::Regex::new(SMILES_RULE).ok()?,
+                regex::Regex::new(SMILES_OLD_SHAPE).ok()?,
+            ))
+        })
+        .as_ref()
+}
+
+/// `smiles`: the published rule and the class the type was first defined by.
+/// OpenSMILES adds the wildcard atom `*` and the quadruple bond `$`; values with
+/// them conform but are not counted for discrimination, because the rule
+/// already confirms a tenth of random printable ASCII and these two characters
+/// raise that.
+fn is_smiles_discrimination_shape(value: &str) -> bool {
+    let Some((rule, old_shape)) = smiles_regexes() else {
+        return false;
+    };
+    rule.is_match(value) && old_shape.is_match(value)
+}
+
+#[cfg(test)]
+mod smiles_rule_copy {
+    #[test]
+    fn smiles_rule_copy_matches_the_taxonomy() {
+        let doc: serde_yaml::Value = serde_yaml::from_str(include_str!(
+            "../../../labels/definitions_representation.yaml"
+        ))
+        .expect("parse representation definitions");
+        let published = doc["representation.scientific.smiles"]["validation"]["pattern"]
+            .as_str()
+            .expect("smiles pattern");
+        assert_eq!(super::SMILES_RULE, published);
+    }
+}
+
 /// The published `protein_sequence` rule, copied because the library cannot read
 /// `labels/` when built from the crates.io package;
 /// `protein_sequence_rule_copy_matches_the_taxonomy` keeps it equal to the
@@ -692,6 +741,7 @@ mod tests {
             "geography.coordinate.geohash",
             "geography.address.street_suffix",
             "representation.scientific.protein_sequence",
+            "representation.scientific.smiles",
         ];
         // `state_code` has locale rules. Its locale enums hold only shapes its
         // detector counts (two letters, or an EN_AU three-letter code), so the

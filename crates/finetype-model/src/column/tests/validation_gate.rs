@@ -925,11 +925,27 @@ fn emoji_does_not_recover_digit_columns() {
     }
 }
 
-/// A column of one repeated wildcard SMILES, which the old rule rejected,
-/// keeps its type (smiles has no detector).
+/// A column of one repeated `CC(=O)O` keeps its type. Every form the old rule
+/// rejected (`*`, `$`) conforms but is not counted by the detector, so no new
+/// form can pin keep-type.
 #[test]
 fn smiles_constant_column_keeps_type() {
-    assert_constant_column_kept("representation.scientific.smiles", "[*]CC");
+    assert_constant_column_kept("representation.scientific.smiles", "CC(=O)O");
+}
+
+/// A column of one repeated wildcard SMILES, which the old rule rejected,
+/// conforms but is not counted (the detector keeps the old shape), so
+/// `schema_fail_demotion` demotes it as on 0.6.64. `smiles` is not on the veto
+/// allowlist, so only the function is pinned.
+#[test]
+fn smiles_wildcard_column_is_demoted() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["[*]CC".to_string(); 40];
+    let demoted = schema_fail_demotion(&values, "representation.scientific.smiles", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
+    );
 }
 
 /// The detector keeps the old class, so every ACCEPT form the old class

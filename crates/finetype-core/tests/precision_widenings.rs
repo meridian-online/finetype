@@ -1604,6 +1604,31 @@ fn smiles_rejects_undefined_forms() {
     assert_pattern_boundary(SMILES_LABEL, &[], &["C C", "C;C", "C,C", "C{C}", ""]);
 }
 
+/// The detector keeps the old class, so `*` and `$` forms conform without
+/// counting.
+#[test]
+fn smiles_detector_keeps_old_class() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(SMILES_LABEL, &tax).expect("smiles rule");
+    let detector = detector_for(SMILES_LABEL);
+    assert!(detector.is_some());
+    for ok in ["CCO", "CC(=O)Oc1ccccc1C(=O)O", "[Na+].[Cl-]"] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for conforming in ["[*]CC", "*C", "[Re]$[Re]"] {
+        assert!(rule.is_valid(conforming), "{conforming:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, conforming),
+            "{conforming:?}"
+        );
+    }
+    for bad in ["C C", "C;C", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
 const PROTEIN_LABEL: &str = "representation.scientific.protein_sequence";
 
 /// IUPAC one-letter code and NCBI BLAST: B, Z, U, O and the gap `-` join the

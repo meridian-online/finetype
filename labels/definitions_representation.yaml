@@ -978,8 +978,6 @@ representation.scientific.smiles:
     - "c1ccccc1"
     - "CC(=O)O"
     - "C(=O)(N)N"
-    - "*C"
-    - "[Re]$[Re]"
   icon: flask
   references: null
   notes: >
@@ -989,7 +987,10 @@ representation.scientific.smiles:
     plain text — column-level disambiguation (header hints) is essential.
     Common molecules: O=water, CCO=ethanol, c1ccccc1=benzene, CC(=O)O=acetic acid.
     OpenSMILES also defines the wildcard atom * (unspecified atom, e.g. *C or
-    [*]CC) and $ (the quadruple bond, e.g. [Re]$[Re]); both are accepted.
+    [*]CC) and $ (the quadruple bond, e.g. [Re]$[Re]); both are accepted. For
+    discrimination only the older character class counts, so values with * or $
+    conform but are not counted, and a column of them is not kept as smiles by
+    schema_fail_demotion.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: discrete
