@@ -1706,6 +1706,7 @@ fn color_rgb_accepts_source_forms() {
             "rgb(0 none 128 / none)",
             // whitespace before a comma; a leading-dot percentage.
             "rgb(255 , 0 , 0)",
+            "rgb(1.5, 0, 0)",
             "rgb(.5% 0% 0%)",
         ],
         &[],
@@ -1720,14 +1721,12 @@ fn color_rgb_rejects_undefined_forms() {
         &[
             "rgb(255, 0)",
             "(0.1, 0.2, 0.5)",
-            "rgb(100%, 0, 0)",
             "rgb(255 0)",
             "rgb(255 0 0 0.5)",
             "rgb(255, 0, 0 / 0.5)",
             "rgb(255 0 0, 0.5)",
             "rgb(100%, 0, 0)",
             "rgb(none, 0, 0)",
-            "rgb(1.5, 0, 0)",
             "rgba(0, 0, 255, )",
             "",
         ],
