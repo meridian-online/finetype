@@ -1515,3 +1515,56 @@ fn iso_duration_constant_column_keeps_type() {
 fn iso_duration_alternative_format_constant_column_keeps_type() {
     assert_constant_column_kept("datetime.duration.iso_8601", "P0003-06-04T12:30:05");
 }
+
+/// A column of one repeated upper-case month-year (which the old rule rejected)
+/// keeps its type.
+#[test]
+fn month_year_abbrev_constant_column_keeps_type() {
+    assert_constant_column_kept("datetime.date.month_year_abbrev", "JAN 2024");
+}
+
+/// The BLS's `Sept` is the same.
+#[test]
+fn month_year_abbrev_sept_constant_column_keeps_type() {
+    assert_constant_column_kept("datetime.date.month_year_abbrev", "Sept 2026");
+}
+
+/// Full month names are `month_year_full`, which is what a column of them reads
+/// as today (profile on 60 rows of `January 2024` gives `month_year_full`). The
+/// abbreviated rule must not take them, whichever leaf the model proposes.
+#[test]
+fn full_month_year_column_keeps_month_year_full() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let months = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ];
+    let values: Vec<String> = months
+        .iter()
+        .cycle()
+        .take(48)
+        .enumerate()
+        .map(|(i, m)| format!("{m} {}", 2015 + i % 10))
+        .collect();
+    let r = cc
+        .compose_from_sense("period", &values, "datetime.date.month_year_full", 0.9)
+        .unwrap();
+    assert_eq!(r.label, "datetime.date.month_year_full");
+    let tax = super::shipped_taxonomy();
+    assert!(
+        !label_validates_sample(&tax, "datetime.date.month_year_abbrev", &values),
+        "no full month name conforms to month_year_abbrev"
+    );
+}

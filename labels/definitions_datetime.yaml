@@ -3075,24 +3075,30 @@ datetime.date.month_year_abbrev:
     type: date
     format: "%b %Y"
   format_string: "%b %Y"
-  transform: "strptime('01 ' || {col}, '%d %b %Y')::DATE"
+  transform: "strptime('01 ' || upper(substr({col}, 1, 1)) || lower(substr({col}, 2, 2)) || ' ' || substr({col}, length({col}) - 3), '%d %b %Y')::DATE"
   transform_ext: null
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Z][a-z]{2} \\d{4}$"
-    minLength: 8
-    maxLength: 8
+    pattern: "^(?:Jan|JAN|Feb|FEB|Mar|MAR|Apr|APR|May|MAY|June?|JUNE?|July?|JULY?|Aug|AUG|Sept?|SEPT?|Oct|OCT|Nov|NOV|Dec|DEC) \\d{4}$"
   tier: [VARCHAR, date]
   aliases: []
   samples:
     - "Jan 2024"
     - "Dec 2023"
     - "Jun 2000"
+    - "JAN 2024"
+    - "Sept 2026"
+    - "June 2026"
   icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Financial dashboards, CLDR yMMM skeleton.
+    The twelve months in title or upper case (Jan, JAN), plus the longer forms
+    Sept, June and July that the US BLS writes. The transform reads the first
+    letter in upper case, the next two in lower case and the final four digits,
+    so Sept, June and July all read as Sep, Jun and Jul. Full month names
+    (January 2024) are not this type; they are month_year_full.
 
 datetime.date.month_year_slash:
   title: Month/Year (slash-separated)

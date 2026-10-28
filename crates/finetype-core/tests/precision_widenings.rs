@@ -2380,3 +2380,48 @@ fn iso_duration_rejects_sixty_in_the_alternative_format_by_design() {
         &["P0003-06-04T12:60:05", "P0003-06-04T12:30:60"],
     );
 }
+
+const MONTH_YEAR_ABBREV_LABEL: &str = "datetime.date.month_year_abbrev";
+
+/// The abbreviations Metadata.NSW and the US BLS write: the three-letter month
+/// in title or upper case, plus `Sept`, `June` and `July`.
+#[test]
+fn month_year_abbrev_accepts_source_forms() {
+    assert_pattern_boundary(
+        MONTH_YEAR_ABBREV_LABEL,
+        &[
+            "JAN 2024",
+            "Sept 2026",
+            "June 2026",
+            "Jan 2024",
+            "SEPT 2026",
+            "JULY 2025",
+            "July 2025",
+            "MAY 1999",
+            "Dec 2023",
+        ],
+        &[],
+    );
+}
+
+/// `Xyz 2024` and `Foo 2024` were accepted by the old rule, which took any
+/// capitalised three letters; the sources name twelve months, so they go.
+#[test]
+fn month_year_abbrev_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        MONTH_YEAR_ABBREV_LABEL,
+        &[],
+        &[
+            "Janu 2024",
+            "Jan 24",
+            "Xyz 2024",
+            "Foo 2024",
+            "jan 2024",
+            "Sep. 2024",
+            "Sept. 2024",
+            "January 2024",
+            "Jan2024",
+            "Jan 2024-01",
+        ],
+    );
+}

@@ -42,7 +42,7 @@ datetime.date.long_full_month	false	^(?:[A-Za-z]+ \d{1,2},? \d{4}|\d{1,2}\.? [A-
 datetime.date.mdy_dash	false	^\d{2}-\d{2}-\d{4}$	true
 datetime.date.mdy_short_slash	false	^\d{2}/\d{2}/\d{2}$	true
 datetime.date.mdy_slash	false	^\d{2}/\d{2}/\d{4}$	true
-datetime.date.month_year_abbrev	false	^[A-Z][a-z]{2} \d{4}$	true
+datetime.date.month_year_abbrev	false	^(?:Jan|JAN|Feb|FEB|Mar|MAR|Apr|APR|May|MAY|June?|JUNE?|July?|JULY?|Aug|AUG|Sept?|SEPT?|Oct|OCT|Nov|NOV|Dec|DEC) \d{4}$	true
 datetime.date.month_year_full	false	^[A-Z][a-z]+ \d{4}$	true
 datetime.date.month_year_slash	false	^(0[1-9]|1[0-2])/(\d{2}|\d{4})$	true
 datetime.date.ordinal	false	^\d{4}-\d{3}$	true

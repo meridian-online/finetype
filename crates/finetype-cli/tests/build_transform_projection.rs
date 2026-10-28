@@ -1002,3 +1002,21 @@ fn iso_duration_transform_casts_fractions_and_the_alternative_format() {
         assert_eq!(run_transform(&tax, label, value, ""), expect, "{value:?}");
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn month_year_abbrev_transform_reads_case_and_long_forms() {
+    let tax = test_taxonomy();
+    let label = "datetime.date.month_year_abbrev";
+    for (value, expect) in [
+        ("Jan 2024", "2024-01-01"),
+        ("JAN 2024", "2024-01-01"),
+        ("Sept 2026", "2026-09-01"),
+        ("SEPT 2026", "2026-09-01"),
+        ("June 2026", "2026-06-01"),
+        ("JULY 2025", "2025-07-01"),
+        ("MAY 1999", "1999-05-01"),
+    ] {
+        assert_eq!(run_transform(&tax, label, value, ""), expect, "{value:?}");
+    }
+}
