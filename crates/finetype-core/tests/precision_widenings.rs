@@ -2629,3 +2629,39 @@ fn amount_multisym_rejects_undefined_forms() {
         ],
     );
 }
+
+const AMOUNT_LAKH_LABEL: &str = "finance.currency.amount_lakh";
+
+/// DICGC writes the rupee sign with a space before the figure (`₹ 5,00,000`);
+/// the unspaced forms the type already took stay.
+#[test]
+fn amount_lakh_accepts_source_forms() {
+    assert_pattern_boundary(
+        AMOUNT_LAKH_LABEL,
+        &[
+            "\u{20b9} 5,00,000",
+            "\u{20b9}4,99,000",
+            "\u{20b9} 12,34,567.89",
+            "\u{20b9}1,00,00,000.00",
+            "Rs. 1,23,456.78",
+            "5,00,000",
+        ],
+        &[],
+    );
+}
+
+/// Lakh grouping is two digits, then a final group of three.
+#[test]
+fn amount_lakh_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        AMOUNT_LAKH_LABEL,
+        &[],
+        &[
+            "\u{20b9} 5,0,000",
+            "\u{20b9} 500,000",
+            "\u{20b9}  5,00,000",
+            "\u{20b9} ",
+            "\u{20b9} 5,00,000 ",
+        ],
+    );
+}

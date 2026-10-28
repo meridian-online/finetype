@@ -1120,3 +1120,37 @@ fn amount_multisym_symbol_part_reads_a_leading_or_trailing_symbol() {
         );
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn amount_lakh_transform_and_parts_read_a_space_after_the_sign() {
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let label = "finance.currency.amount_lakh";
+    assert_eq!(
+        run_transform(&tax, label, "\u{20b9} 5,00,000", ""),
+        "500000.00"
+    );
+    assert_eq!(
+        run_transform(&tax, label, "\u{20b9}4,99,000", ""),
+        "499000.00"
+    );
+    let decompose = tax
+        .ddl_info(label)
+        .expect("known label")
+        .decompose
+        .clone()
+        .expect("amount_lakh has decompose");
+    let run = |part: &str, value: &str| -> String {
+        let expr = decompose[part].as_str().expect("decompose part");
+        let sql = format!("SELECT {}", expr.replace("{col}", &format!("'{}'", value)));
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(out.status.success(), "{value:?}");
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    assert_eq!(run("symbol", "\u{20b9} 5,00,000"), "\u{20b9}");
+    assert_eq!(run("numeric_value", "\u{20b9} 5,00,000"), "500000.00");
+}

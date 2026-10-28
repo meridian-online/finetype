@@ -1702,3 +1702,10 @@ fn iana_recovers_hyphenated_and_etc_zones() {
 fn amount_multisym_constant_column_keeps_type() {
     assert_constant_column_kept("finance.currency.amount_multisym", "1 234,56 K\u{10d}");
 }
+
+/// A column of one repeated rupee amount with a space after the sign (which the
+/// old rule rejected) keeps its type.
+#[test]
+fn amount_lakh_constant_column_keeps_type() {
+    assert_constant_column_kept("finance.currency.amount_lakh", "\u{20b9} 5,00,000");
+}
