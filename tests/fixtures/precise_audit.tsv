@@ -216,7 +216,7 @@ representation.scientific.measurement_unit	true		true
 representation.scientific.protein_sequence	false	^[ACDEFGHIKLMNPQRSTVWXY*]+$	false
 representation.scientific.rna_sequence	false	^[AUGCRYSWKMBDHVN]+$	false
 representation.scientific.smiles	false	^[A-Za-z0-9@+\-\[\]\(\)\\/#=%.:]+$	false
-representation.text.emoji	false	^[\p{So}\p{Sk}\p{Mn}\p{Cf}]+$	false
+representation.text.emoji	false	^(?:[0-9#*]️?⃣|[\p{So}\p{Sk}\p{Mn}\p{Cf}])+$	true
 representation.text.entity_name	false		false
 representation.text.plain_text	false		false
 representation.text.word	false	^[a-zA-Z0-9]([a-zA-Z0-9\-_]*[a-zA-Z0-9])?$	false

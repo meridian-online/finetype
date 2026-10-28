@@ -884,3 +884,43 @@ fn geohash_long_column_is_demoted() {
         Some("representation.text.word")
     );
 }
+
+/// A column of one repeated keycap, which the old class rejected (a digit is
+/// not a symbol), keeps its type (emoji has no detector, so conforming is
+/// counting).
+#[test]
+fn emoji_constant_column_keeps_type() {
+    assert_constant_column_kept("representation.text.emoji", "1\u{fe0f}\u{20e3}");
+}
+
+/// `emoji` is a ceded leaf and now takes keycap sequences, which need U+20E3,
+/// so columns of bare digits, `#` and `*` must not be promoted to it.
+#[test]
+fn emoji_does_not_recover_digit_columns() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let columns: [(&str, [&str; 6]); 3] = [
+        ("digit", ["1", "2", "3", "4", "5", "1"]),
+        ("symbol", ["#", "*", "#", "*", "#", "*"]),
+        ("rank", ["10", "2", "#3", "*", "7", "1"]),
+    ];
+    for (header, codes) in columns {
+        let values: Vec<String> = codes
+            .iter()
+            .cycle()
+            .take(42)
+            .map(|s| s.to_string())
+            .collect();
+        for label in [
+            "representation.text.word",
+            "representation.identifier.alphanumeric_id",
+        ] {
+            let r = cc.compose_from_sense(header, &values, label, 1.0).unwrap();
+            assert_ne!(
+                r.label, "representation.text.emoji",
+                "{header} from {label}"
+            );
+        }
+    }
+}

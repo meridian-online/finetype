@@ -1549,3 +1549,33 @@ fn coordinates_rejects_undefined_forms() {
         ],
     );
 }
+
+const EMOJI_LABEL: &str = "representation.text.emoji";
+
+/// UTS #51: keycap sequences, a digit, `#` or `*`, an optional U+FE0F and
+/// U+20E3, join the symbol class.
+#[test]
+fn emoji_accepts_source_forms() {
+    assert_pattern_boundary(
+        EMOJI_LABEL,
+        &[
+            "1\u{fe0f}\u{20e3}",
+            "#\u{fe0f}\u{20e3}",
+            "*\u{fe0f}\u{20e3}",
+            "1\u{20e3}",
+            "\u{1f600}",
+            "\u{2764}\u{fe0f}",
+            "\u{1f600}1\u{fe0f}\u{20e3}",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn emoji_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        EMOJI_LABEL,
+        &[],
+        &["1", "#", "a\u{20e3}", "10", "1\u{fe0f}", "12\u{20e3}"],
+    );
+}

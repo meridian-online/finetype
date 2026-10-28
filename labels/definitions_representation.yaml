@@ -447,7 +447,8 @@ representation.format.color_hsl:
 representation.text.emoji:
   title: "Emoji"
   description: >
-    Single emoji character or emoji sequence.
+    Single emoji character or emoji sequence, including keycap sequences
+    (a digit, # or * with an optional variation selector and U+20E3).
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -459,7 +460,7 @@ representation.text.emoji:
   decompose: null
   validation:
     type: string
-    pattern: "^[\\p{So}\\p{Sk}\\p{Mn}\\p{Cf}]+$"
+    pattern: "^(?:[0-9#*]\uFE0F?\u20E3|[\\p{So}\\p{Sk}\\p{Mn}\\p{Cf}])+$"
   tier: [VARCHAR, text]
   aliases: null
   samples:
@@ -467,12 +468,17 @@ representation.text.emoji:
     - "🎉"
     - "❤️"
     - "🚀"
+    - "1\uFE0F\u20E3"
+    - "#\uFE0F\u20E3"
   icon: abc
   canonical: "https://www.unicode.org/reports/tr51/"
   references: null
   notes: >
     v1 migration: Was text.emoji. Single emoji or emoji sequence.
     Pattern matches Unicode symbol categories. Emoji width variable.
+    Keycap sequences (UTS #51: a digit, # or * then an optional U+FE0F and
+    U+20E3) are accepted in both the fully-qualified form and the unqualified
+    form without U+FE0F. A bare digit, # or * is not an emoji.
 
 representation.text.entity_name:
   title: "Entity Name"
