@@ -791,8 +791,6 @@ representation.scientific.protein_sequence:
     - "MKVLLIVGS"
     - "ACDEFGHIKLMNPQRSTVWYFL"
     - "MPKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVG"
-    - "MKVBZULLIO"
-    - "MKV-LLIVGS"
   icon: dna
   references: null
   notes: >

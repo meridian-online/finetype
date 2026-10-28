@@ -505,6 +505,43 @@ fn blood_type_decompose_normalises_the_minus_sign() {
 
 #[test]
 #[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn protein_sequence_decompose_on_ambiguity_and_gap_forms() {
+    // Runs the published decompose expressions through the external `duckdb` CLI.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let decompose = tax
+        .ddl_info("representation.scientific.protein_sequence")
+        .expect("protein_sequence is a known label")
+        .decompose
+        .clone()
+        .expect("protein_sequence has decompose");
+    let run = |part: &str, value: &str| -> String {
+        let expr = decompose[part].as_str().expect("decompose part");
+        let sql = format!("SELECT {}", expr.replace("{col}", &format!("'{}'", value)));
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(
+            out.status.success(),
+            "duckdb failed on {value:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    // Gaps and ambiguity codes count as characters (the notes say so).
+    for (value, length, weight) in [("MKVBZULLIO", "10", "1100"), ("MKV-LLIVGS", "10", "1100")] {
+        assert_eq!(run("length", value), length, "length of {value:?}");
+        assert_eq!(
+            run("molecular_weight_estimate", value),
+            weight,
+            "weight of {value:?}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
 fn coordinates_transform_and_parts_read_every_accepted_form() {
     // Runs the published transform and decompose parts through the external `duckdb` CLI.
     use std::process::Command;

@@ -674,9 +674,10 @@ fn is_issued_npi(value: &str) -> bool {
 /// passes, detector or not, matching the veto. The rule is resolved from the taxonomy's compiled cache or compiled on a
 /// miss (the same resolution `resolve_label_validator` gives `ceded_leaf_recovery`).
 ///
-/// The profile call sites keep their own validator lookup and call
-/// `detector_for` directly, so a failed lookup behaves at each as it did before;
-/// this form serves callers with no lookup of their own.
+/// The profile call sites keep their own validator lookup and call `detector_for`
+/// for the detector, but they still apply the published rule through
+/// `passes_detector_or_rule` (or its uncompiled twin), so a failed lookup behaves
+/// at each as it did before; this form serves callers with no lookup of their own.
 pub fn value_passes_for_discrimination(value: &str, label: &str, tax: &Taxonomy) -> bool {
     let Some(rule) = resolve_label_validator(label, tax) else {
         return false;
