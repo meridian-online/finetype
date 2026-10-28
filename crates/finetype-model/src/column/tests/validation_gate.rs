@@ -579,3 +579,18 @@ fn query_string_bare_name_column_is_demoted() {
         Some("representation.text.word")
     );
 }
+
+/// The same function demotes a column of `---`-opened documents labelled
+/// `yaml` to `word`, as 0.6.64 did (the old rule rejected them). `yaml` is not
+/// on the production demotion list in `value_sharpen`, so only the validation
+/// veto reaches such a column in a profile; this pins the function's reading.
+#[test]
+fn yaml_marker_column_is_demoted_by_the_function() {
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["---\nname: x".to_string(); 40];
+    let demoted = schema_fail_demotion(&values, "container.object.yaml", &tax);
+    assert_eq!(
+        demoted.map(|(label, _)| label).as_deref(),
+        Some("representation.text.word")
+    );
+}
