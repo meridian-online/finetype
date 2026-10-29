@@ -2968,7 +2968,7 @@ fn ndc_detector_keeps_out_the_six_digit_labeler_forms() {
     }
 }
 
-/// Placeholder, testing and withdrawn ISO 4217 codes conform to the published
+/// Placeholder, testing and pre-2010 withdrawn ISO 4217 codes conform to the published
 /// rule but are not counted for discrimination; current codes are, in any case.
 #[test]
 fn currency_code_detector_keeps_placeholder_and_historic_codes_out() {
@@ -2982,7 +2982,15 @@ fn currency_code_detector_keeps_placeholder_and_historic_codes_out() {
         assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
     }
     // The rule itself still accepts the excluded codes.
-    for excluded in ["XXX", "XTS", "TRL", "ESP", "DEM", "HRK", "trl"] {
+    // Codes withdrawn since 2010 still count: data from before the withdrawal
+    // carries them as real currencies.
+    for recent in ["BGN", "HRK", "ZWL", "VEF", "hrk"] {
+        assert!(
+            passes_detector_or_rule(detector, &rule, recent),
+            "{recent:?}"
+        );
+    }
+    for excluded in ["XXX", "XTS", "TRL", "ESP", "DEM", "trl"] {
         assert!(
             rule.validate(excluded).is_valid,
             "{excluded:?} conforms to the rule"
@@ -3033,6 +3041,9 @@ fn abbreviated_month_detector_keeps_full_names_and_words_out() {
         "Suite 4, 2023",
         "4 Tuesday 2023",
         "4 Foo 2023",
+        "4 March 2023",
+        "15 June 2024",
+        "1 July 2023",
     ] {
         assert!(rule.validate(bad).is_valid, "{bad:?} conforms to the rule");
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");

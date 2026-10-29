@@ -2095,7 +2095,7 @@ fn assert_no_currency_recovery(value: &str) {
 }
 
 /// A column of the placeholder is demoted by schema-fail demotion (the detector
-/// does not count it), as are withdrawn codes.
+/// does not count it), as are codes withdrawn before 2010.
 #[test]
 fn currency_code_placeholder_column_is_demoted() {
     let tax = super::shipped_taxonomy();
@@ -2106,6 +2106,47 @@ fn currency_code_placeholder_column_is_demoted() {
             "a column of {value} is demoted"
         );
     }
+}
+
+/// Codes withdrawn since 2010 still count, so a column of `BGN` (until 2026-01)
+/// or `HRK` (until 2023-01) from the years before keeps the label: it is neither
+/// demoted nor vetoed.
+#[test]
+fn currency_code_recently_withdrawn_column_keeps_type() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    let tax = super::shipped_taxonomy();
+    for value in ["BGN", "HRK"] {
+        let values: Vec<String> = vec![value.to_string(); 40];
+        assert!(
+            schema_fail_demotion(&values, "finance.currency.currency_code", &tax).is_none(),
+            "a column of {value} is not demoted"
+        );
+        let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+        let veto = evaluate_validation_veto(
+            "finance.currency.currency_code",
+            &refs,
+            &tax,
+            &audited_safe_labels(),
+        );
+        assert!(!veto.vetoed, "a column of {value} is not vetoed: {veto:?}");
+    }
+}
+
+/// A column of day-first full-month dates in March to July is not AP style
+/// (AP writes month-first), so the veto rejects the label for it too.
+#[test]
+fn abbreviated_month_day_first_spelled_out_column_is_vetoed() {
+    use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
+    let tax = super::shipped_taxonomy();
+    let values: Vec<String> = vec!["4 March 2023".to_string(); 40];
+    let refs: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let veto = evaluate_validation_veto(
+        "datetime.date.abbreviated_month",
+        &refs,
+        &tax,
+        &audited_safe_labels(),
+    );
+    assert!(veto.vetoed, "a column of 4 March 2023 is vetoed: {veto:?}");
 }
 
 /// A column of full-month-name dates conforms to the published rule but the

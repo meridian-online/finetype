@@ -307,25 +307,30 @@ fn is_gender_code_discrimination_shape(value: &str) -> bool {
     )
 }
 
-/// The ISO 4217 codes that are not currencies in circulation: the placeholder
-/// `XXX` (no currency), the testing code `XTS`, and the withdrawn codes the
-/// taxonomy lists under `validation_notes.historic`. A copy, because the library
-/// cannot read `labels/` when built from the crates.io package; the test
-/// `currency_code_excluded_copy_matches_the_taxonomy` keeps it equal.
+/// The ISO 4217 codes not counted as currencies: the placeholder `XXX` (no
+/// currency), the testing code `XTS`, and the codes the taxonomy lists under
+/// `validation_notes.historic` that were withdrawn before 2010. A copy, because
+/// the library cannot read `labels/` when built from the crates.io package; the
+/// test `currency_code_excluded_copy_matches_the_taxonomy` keeps it equal.
 const CURRENCY_CODE_EXCLUDED: &[&str] = &[
-    "XXX", "XTS", "ADP", "AFA", "ANG", "AON", "AOR", "ATS", "AYM", "AZM", "BEF", "BGL", "BGN",
-    "BYB", "BYR", "CHC", "CSD", "CUC", "CYP", "DEM", "ECS", "ECV", "EEK", "ESP", "FIM", "FRF",
-    "GHC", "GHP", "GRD", "HRK", "IEP", "ITL", "LTL", "LUF", "LVL", "MGF", "MRO", "MTL", "MZM",
-    "NLG", "PTE", "ROL", "RUR", "SDD", "SIT", "SKK", "SLL", "SRG", "STD", "TJR", "TMM", "TPE",
-    "TRL", "USS", "VEB", "VEF", "XEU", "XFO", "XFU", "XRE", "YUM", "ZMK", "ZRN", "ZWD", "ZWL",
-    "ZWN", "ZWR",
+    "XXX", "XTS", "ADP", "AFA", "AON", "AOR", "ATS", "AYM", "AZM", "BEF", "BGL", "BYB", "CHC",
+    "CSD", "CYP", "DEM", "ECS", "ECV", "ESP", "FIM", "FRF", "GHC", "GHP", "GRD", "IEP", "ITL",
+    "LUF", "MGF", "MTL", "MZM", "NLG", "PTE", "ROL", "RUR", "SDD", "SIT", "SKK", "SRG", "TJR",
+    "TMM", "TPE", "TRL", "VEB", "XEU", "XFO", "XRE", "YUM", "ZRN", "ZWD", "ZWN", "ZWR",
 ];
 
+/// Codes withdrawn on or after this month still count. Data from the years
+/// before a withdrawal carries them as real currencies (`BGN` until 2026-01,
+/// `HRK` until 2023-01), while the older legacy codes are the ordinary
+/// three-letter tokens that collide with other vocabularies (`TRL` is also a
+/// street type, `ESP` an airport and a language).
+#[cfg(test)]
+const CURRENCY_CODE_HISTORIC_CUTOFF: &str = "2010-01";
+
 /// `currency_code`: a code in the published ISO 4217 list that is not the
-/// placeholder, the testing code or a withdrawn code. Every historic code is an
-/// ordinary three-letter token (`TRL` is also a street type, `ESP` an airport
-/// and a language), so a column of them is not confirmed as currencies on that
-/// alone; the published rule still conforms them.
+/// placeholder, the testing code or a code withdrawn before 2010. A column of
+/// those is not confirmed as currencies on that alone; the published rule still
+/// conforms them.
 fn is_currency_code_discrimination_shape(value: &str) -> bool {
     !CURRENCY_CODE_EXCLUDED
         .iter()
@@ -344,6 +349,7 @@ mod currency_code_excluded_copy {
             .as_sequence()
             .expect("historic list")
             .iter()
+            .filter(|e| e["until"].as_str().expect("until") < super::CURRENCY_CODE_HISTORIC_CUTOFF)
             .map(|e| e["value"].as_str().expect("value").to_string())
             .collect();
         published.push("XXX".into());
@@ -396,23 +402,26 @@ const CLDR_ABBREVIATED_MONTHS: &[(&str, &[&str])] = &[
 /// abbreviation, so they are not counted for discrimination.
 fn is_abbreviated_month_discrimination_shape(value: &str) -> bool {
     let mut parts = value.split_whitespace();
-    let token = match (parts.next(), parts.next()) {
-        (Some(first), _) if first.chars().next().is_some_and(char::is_alphabetic) => first,
-        (Some(_), Some(second)) => second,
+    let (token, month_first) = match (parts.next(), parts.next()) {
+        (Some(first), _) if first.chars().next().is_some_and(char::is_alphabetic) => (first, true),
+        (Some(_), Some(second)) => (second, false),
         _ => return false,
     };
     let token = token.trim_end_matches('.').to_lowercase();
-    AP_SPELLED_OUT_MONTHS.contains(&token.as_str())
+    (month_first && AP_SPELLED_OUT_MONTHS.contains(&token.as_str()))
         || CLDR_ABBREVIATED_MONTHS
             .iter()
             .any(|(_, months)| months.contains(&token.as_str()))
 }
 
 /// The months AP style spells out rather than abbreviates (March, April, May,
-/// June, July; AP Stylebook, "months"), so the AP-style dates the type's
-/// description names (`March 4, 2023`, `Feb. 4, 2023`) count. A hand list kept
-/// apart from the generated CLDR table; `may` is also CLDR's and listed for
-/// completeness. February stays abbreviated in AP, so `February` is not here.
+/// June, July; AP Stylebook, "months"), so AP-style dates such as
+/// `March 4, 2023` count beside the `Feb. 4, 2023` the type's description
+/// names. AP writes only month-first dates, so these count only as the first
+/// token: a day-first `4 March 2023` is a full-month date, not AP style. A hand
+/// list kept apart from the generated CLDR table; `may` is also CLDR's and
+/// listed for completeness. February stays abbreviated in AP, so `February` is
+/// not here.
 const AP_SPELLED_OUT_MONTHS: &[&str] = &["march", "april", "may", "june", "july"];
 
 #[cfg(test)]

@@ -65,7 +65,7 @@ fn note_text(note: &Note) -> String {
 ///   - `constraint` — canonical token of the first failed constraint
 ///     (`pattern` | `min_length` | `max_length` | `enum` | `type` |
 ///     `required` | `checksum` | `other`), or `None` when valid.
-///   - `message` — human-readable `jsonschema` error, or `None` when valid.
+///   - `message` — the human-readable reason for the first failed constraint, or `None` when valid.
 ///
 /// Scope: `valid` and `grade` reflect the fragment's JSON Schema keywords, its
 /// enum matched case-insensitively, the check digit of the taxonomy leaf named
@@ -113,7 +113,7 @@ pub fn validate_value_detail(value: Option<&str>, schema: Option<&str>) -> Value
         Err(e) => return ValueDetail::schema_error(e),
     };
 
-    // Compiled per call, like the validator above.
+    // Compiled per call, as `check_value_against_property` compiles its checks.
     let matcher = match NotesMatcher::from_schema_property(&schema_json) {
         Ok(m) => m,
         Err(e) => return ValueDetail::schema_error(e),
