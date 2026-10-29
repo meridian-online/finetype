@@ -136,39 +136,10 @@ PUBLISHED_CONTRADICTIONS: tuple[tuple[str, str, str], ...] = (
         "`\\.` only",
     ),
     (
-        "geography.coordinate.plus_code",
-        "7FG49W00+2V",
-        "`0` is the Open Location Code padding character and is not in the "
-        "pattern's 20-character alphabet",
-    ),
-    (
         "identity.person.weight",
         "170 pounds",
         "the pattern's unit alternation is `kg|lbs|lb|g|oz|stones` and does not "
         "include `pounds`",
-    ),
-    (
-        "representation.format.color_rgb",
-        "rgba(0, 0, 255, 0.5)",
-        "the pattern has no `rgba` head and no alpha component",
-    ),
-    (
-        "technology.internet.ip_v6",
-        "2001:db8:85a3::8a2e:370:7334",
-        "`::` zero compression, under a pattern that requires all eight groups "
-        "written out",
-    ),
-    (
-        "technology.internet.ip_v6",
-        "::1",
-        "the loopback address in its only legal form, under the same "
-        "all-eight-groups pattern",
-    ),
-    (
-        "technology.internet.ip_v6",
-        "fe80::1",
-        "a link-local address in compressed form, under the same "
-        "all-eight-groups pattern",
     ),
 )
 

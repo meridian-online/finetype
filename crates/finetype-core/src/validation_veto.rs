@@ -19,8 +19,9 @@
 use std::collections::HashSet;
 
 use crate::discrimination::detector_for;
+use crate::discrimination::passes_detector_or_rule;
 use crate::taxonomy::Taxonomy;
-use crate::validator::{validate_column_for_label, InvalidStrategy};
+use crate::validator::{resolve_label_validator, validate_column_for_label, InvalidStrategy};
 
 /// The canonical pass-rate veto threshold — matches `ydf_prediction_gated`
 /// (a prediction is vetoed when fewer than half its sample values pass the
@@ -50,7 +51,8 @@ pub struct ValidationVeto {
     ///
     /// This is the veto's evidence, surfaced as the profile JSON's
     /// `validation_pass_rate`. For a type with a discrimination detector
-    /// (`username`, `npi`, `tsid`) it counts values by that detector, which is stricter
+    /// (see `discrimination::detector_for`) it counts a value only when it passes the published
+    /// rule and that detector, which is stricter
     /// than the published rule, so it can differ from what `finetype validate`
     /// reports for the same column.
     pub pass_rate: Option<f64>,
@@ -93,10 +95,18 @@ pub fn evaluate_validation_veto(
         };
 
     let (valid, checked) = match detector_for(label) {
-        // A stricter detector replaces the per-value test only; the published
-        // rule above still decides whether the label carries validation at all.
+        // A stricter detector narrows the per-value test: a value counts only when
+        // it passes the published rule and the detector. The rule above still
+        // decides whether the label carries validation at all.
         Some(detect) => {
-            let valid = values.iter().flatten().filter(|v| detect(v)).count();
+            let Some(rule) = resolve_label_validator(label, taxonomy) else {
+                return ValidationVeto::inert();
+            };
+            let valid = values
+                .iter()
+                .flatten()
+                .filter(|v| passes_detector_or_rule(Some(detect), &rule, v))
+                .count();
             (valid, result.stats.valid_count + result.stats.invalid_count)
         }
         None => (
@@ -358,6 +368,26 @@ identity.person.gender_code:
         let mut t = Taxonomy::from_yaml(VETO_YAML).expect("parse inline taxonomy");
         t.compile_validators();
         t
+    }
+
+    /// A detector narrows the published rule: values the rule rejects (smiles
+    /// has a 1000-character maximum) never count, whatever the detector says.
+    #[test]
+    fn veto_applies_the_rule_under_a_detector() {
+        let mut dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        dir.pop();
+        dir.pop();
+        let mut tax = Taxonomy::from_directory(dir.join("labels")).expect("load labels");
+        tax.compile_validators();
+        let long = "C".repeat(1001);
+        let values: Vec<Option<&str>> = vec![Some(long.as_str()); 40];
+        let veto = evaluate_validation_veto(
+            "representation.scientific.smiles",
+            &values,
+            &tax,
+            &HashSet::new(),
+        );
+        assert_eq!(veto.pass_rate, Some(0.0));
     }
 
     #[test]

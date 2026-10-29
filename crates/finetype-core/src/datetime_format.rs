@@ -212,12 +212,20 @@ fn formats() -> &'static [Format] {
                 chk_ymd_hms,
             ),
             f(
-                // rfc_3339 space form carries an offset; pg_short_offset is its
-                // millisecond+short-offset sibling. Keep rfc_3339 for the plain
-                // second-precision space-offset shape.
+                // rfc_3339 space form carries a four-digit (or colon) offset;
+                // pg_short_offset, below, is the two-digit-offset sibling.
                 "datetime.timestamp.rfc_3339",
                 true,
                 &format!(r"^{ymd_sp} ?[+-]\d{{2}}:?\d{{2}}$"),
+                chk_ymd_hms,
+            ),
+            // PostgreSQL ISO output: a two-digit offset (`+03`), with a fraction of
+            // one to six digits or none. The offset is exactly two digits to the
+            // end, so it never matches the four-digit offsets above.
+            f(
+                "datetime.timestamp.pg_short_offset",
+                true,
+                &format!(r"^{ymd_sp}(?:\.\d{{1,6}})?[+-]\d{{2}}$"),
                 chk_ymd_hms,
             ),
             f(
@@ -489,6 +497,33 @@ mod tests {
             leaf(&["2013-06-04T01:02", "2024-01-15T10:30"]),
             Some("datetime.timestamp.iso_minutes")
         );
+    }
+
+    #[test]
+    fn pg_short_offset_reads_with_and_without_a_fraction() {
+        for column in [
+            vec!["2022-01-06 18:00:00+03", "1997-12-17 07:37:16-08"],
+            vec!["2022-01-06 18:00:00.5+03"],
+            vec!["2024-01-15 14:30:00.123456-05"],
+        ] {
+            assert_eq!(
+                leaf(&column),
+                Some("datetime.timestamp.pg_short_offset"),
+                "{column:?}"
+            );
+        }
+        // Four-digit and colon offsets stay with their own leaves.
+        assert_eq!(
+            leaf(&["2022-01-06 18:00:00+03:00"]),
+            Some("datetime.timestamp.rfc_3339")
+        );
+        assert_eq!(
+            leaf(&["2024-01-15 14:30:00.123456-0500"]),
+            Some("datetime.timestamp.sql_microseconds_offset")
+        );
+        // Seven fraction digits and a one-digit offset are not PostgreSQL output.
+        assert_eq!(det(&["2022-01-06 18:00:00.1234567+03"]), None);
+        assert_eq!(det(&["2022-01-06 18:00:00+3"]), None);
     }
 
     #[test]

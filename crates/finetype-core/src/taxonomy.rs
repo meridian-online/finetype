@@ -42,11 +42,18 @@ pub const SAMPLES_CHECK_EXCEPTIONS: &[&str] = &[
     "finance.crypto.bitcoin_address",
     "finance.currency.amount_apostrophe",
     "finance.currency.amount_code_prefix",
-    "geography.coordinate.plus_code",
     "identity.person.weight",
-    "representation.format.color_rgb",
-    "technology.internet.ip_v6",
 ];
+
+/// A sample's text as the validator sees it; `None` for non-scalar samples.
+fn sample_text(v: &serde_yaml::Value) -> Option<String> {
+    match v {
+        serde_yaml::Value::String(s) => Some(s.clone()),
+        serde_yaml::Value::Number(n) => Some(n.to_string()),
+        serde_yaml::Value::Bool(b) => Some(b.to_string()),
+        _ => None,
+    }
+}
 
 /// Whether `finetype generate` emits a leaf by default. See `Definition::generate`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -780,11 +787,8 @@ impl Taxonomy {
                 continue;
             }
             for sample in &def.samples {
-                let text = match sample {
-                    serde_yaml::Value::String(s) => s.clone(),
-                    serde_yaml::Value::Number(n) => n.to_string(),
-                    serde_yaml::Value::Bool(b) => b.to_string(),
-                    _ => continue,
+                let Some(text) = sample_text(sample) else {
+                    continue;
                 };
                 if !compiled.is_valid(&text) {
                     problems.push(format!("{key}: sample `{text}` fails the published rule"));
@@ -2003,9 +2007,10 @@ representation.discrete.categorical:
 
     #[test]
     fn dgd_ac01_real_precise_amount_multisym() {
-        // From labels/definitions_finance.yaml (finance.currency.amount_multisym).
-        // It ended at its first digit until it gained its end anchor; the
-        // anchored form is precise because every symbol branch is a literal.
+        // The prefix-only form finance.currency.amount_multisym had before it took
+        // a trailing symbol (a copy, not the YAML's current pattern). It ended at
+        // its first digit until it gained its end anchor; the anchored form is
+        // precise because every symbol branch is a literal.
         let v = validation_with_pattern(
             r"^(R\$|HK\$|NT\$|S\$|A\$|C\$|NZ\$|kr|Kč|zł|Ft|lei|Rp|Rs\.?)\s?-?[0-9]+([.,\s][0-9]+)*$",
         );
@@ -2157,6 +2162,36 @@ representation.discrete.categorical:
         };
         if let Err(problems) = taxonomy.validate() {
             panic!("{}", problems.join("\n"));
+        }
+    }
+
+    #[test]
+    fn samples_check_exceptions_are_not_stale() {
+        let taxonomy = ["labels", "../../labels"]
+            .iter()
+            .find_map(|p| Taxonomy::from_directory(p).ok());
+        let Some(taxonomy) = taxonomy else {
+            eprintln!("Skipping samples-check staleness test (labels/ not found)");
+            return;
+        };
+        for key in SAMPLES_CHECK_EXCEPTIONS {
+            let def = taxonomy.get(key).unwrap_or_else(|| {
+                panic!("{key}: listed in SAMPLES_CHECK_EXCEPTIONS but not defined")
+            });
+            let validation = def.validation.as_ref().unwrap_or_else(|| {
+                panic!("{key}: listed in SAMPLES_CHECK_EXCEPTIONS but has no validation rule")
+            });
+            let compiled = crate::validator::CompiledValidator::new_for_label(validation, key)
+                .unwrap_or_else(|e| panic!("{key}: validation does not compile: {e}"));
+            let any_fails = def
+                .samples
+                .iter()
+                .filter_map(sample_text)
+                .any(|text| !compiled.is_valid(&text));
+            assert!(
+                any_fails,
+                "{key}: every sample now passes; remove it from SAMPLES_CHECK_EXCEPTIONS"
+            );
         }
     }
 

@@ -502,3 +502,655 @@ fn blood_type_decompose_normalises_the_minus_sign() {
         assert_eq!(run("rh_factor", value), rh, "rh of {value:?}");
     }
 }
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn protein_sequence_decompose_on_ambiguity_and_gap_forms() {
+    // Runs the published decompose expressions through the external `duckdb` CLI.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let decompose = tax
+        .ddl_info("representation.scientific.protein_sequence")
+        .expect("protein_sequence is a known label")
+        .decompose
+        .clone()
+        .expect("protein_sequence has decompose");
+    let run = |part: &str, value: &str| -> String {
+        let expr = decompose[part].as_str().expect("decompose part");
+        let sql = format!("SELECT {}", expr.replace("{col}", &format!("'{}'", value)));
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(
+            out.status.success(),
+            "duckdb failed on {value:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    // Gaps and ambiguity codes count as characters (the notes say so).
+    for (value, length, weight) in [("MKVBZULLIO", "10", "1100"), ("MKV-LLIVGS", "10", "1100")] {
+        assert_eq!(run("length", value), length, "length of {value:?}");
+        assert_eq!(
+            run("molecular_weight_estimate", value),
+            weight,
+            "weight of {value:?}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn coordinates_transform_and_parts_read_every_accepted_form() {
+    // Runs the published transform and decompose parts through the external `duckdb` CLI.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let label = "geography.coordinate.coordinates";
+    let info = tax.ddl_info(label).expect("coordinates is a known label");
+    let transform = info.transform.clone().expect("coordinates has a transform");
+    let decompose = info
+        .decompose
+        .clone()
+        .expect("coordinates has decompose parts");
+    let cases: &[(&str, f64, f64)] = &[
+        ("48.8761, 2.3681", 48.8761, 2.3681),
+        (
+            "48.8761373390584, 2.3680844979417",
+            48.8761373390584,
+            2.3680844979417,
+        ),
+        ("40.7128,-74.0060", 40.7128, -74.006),
+        ("35.6762 139.6917", 35.6762, 139.6917),
+        ("35.6762  139.6917", 35.6762, 139.6917),
+        ("35.6762\t139.6917", 35.6762, 139.6917),
+        ("-33.8688 , 151.2093", -33.8688, 151.2093),
+        ("5,10", 5.0, 10.0),
+    ];
+    let run = |sql: &str, what: &str| -> String {
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(
+            out.status.success(),
+            "duckdb failed on {what}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    for (value, lat, lon) in cases {
+        let quoted = format!("'{}'", value);
+        // The transform returns a struct; read each field as a number.
+        for (field, expected) in [("lat", lat), ("lon", lon)] {
+            let sql = format!("SELECT ({}).{field}", transform.replace("{col}", &quoted));
+            let got: f64 = run(&sql, &format!("transform {value:?}"))
+                .parse()
+                .unwrap_or_else(|_| panic!("non-numeric {field} for {value:?}"));
+            assert_eq!(got, *expected, "transform {field} of {value:?}");
+        }
+        for (part, expected) in [("latitude", lat), ("longitude", lon)] {
+            let expr = decompose[part].as_str().expect("decompose part");
+            let sql = format!("SELECT {}", expr.replace("{col}", &quoted));
+            let got: f64 = run(&sql, &format!("{part} of {value:?}"))
+                .parse()
+                .unwrap_or_else(|_| panic!("non-numeric {part} for {value:?}"));
+            assert_eq!(got, *expected, "{part} of {value:?}");
+        }
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI and the spatial extension; CI runs it with --include-ignored"]
+fn coordinates_transform_ext_puts_longitude_first() {
+    // ST_Point takes x (longitude) first: "48.8761, 2.3681" is x = 2.3681, y = 48.8761.
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let ext = tax
+        .get("geography.coordinate.coordinates")
+        .expect("coordinates is a known label")
+        .transform_ext
+        .clone()
+        .expect("coordinates has a transform_ext");
+    let point = ext.replace("{col}", "'48.8761, 2.3681'");
+    let sql = format!("INSTALL spatial; LOAD spatial; SELECT ST_X({point}), ST_Y({point})");
+    let out = Command::new("duckdb")
+        .args(["-no-init", "-noheader", "-list", "-csv", "-c", &sql])
+        .output()
+        .expect("run the duckdb CLI");
+    assert!(
+        out.status.success(),
+        "duckdb failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(stdout.trim().lines().last(), Some("2.3681,48.8761"));
+}
+
+/// Runs a published decompose part through the external `duckdb` CLI.
+fn run_color_part(tax: &Taxonomy, label: &str, part: &str, value: &str) -> String {
+    use std::process::Command;
+    let decompose = tax
+        .ddl_info(label)
+        .expect("known label")
+        .decompose
+        .clone()
+        .expect("label has decompose");
+    let expr = decompose[part].as_str().expect("decompose part");
+    let sql = format!("SELECT {}", expr.replace("{col}", &format!("'{}'", value)));
+    let out = Command::new("duckdb")
+        .args(["-no-init", "-noheader", "-list", "-c", &sql])
+        .output()
+        .expect("run the duckdb CLI");
+    assert!(
+        out.status.success(),
+        "duckdb failed on {value:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn color_rgb_parts_read_the_modern_forms() {
+    let tax = test_taxonomy();
+    let rgb = "representation.format.color_rgb";
+    // Space-separated, slash alpha, percentages (scaled to 0-255), bare triples.
+    for (value, expect) in [
+        ("rgb(255 0 0)", ["255", "0", "0"]),
+        ("rgb(255 128 0 / 0.5)", ["255", "128", "0"]),
+        ("rgb(100% 0% 0% / 50%)", ["255", "0", "0"]),
+        ("rgb(50% 25.5% 0%)", ["128", "65", "0"]),
+        ("rgba(0,0,255,.5)", ["0", "0", "255"]),
+        ("rgb(100% 0 0)", ["255", "0", "0"]),
+        ("rgb(127.5 0 0)", ["128", "0", "0"]),
+        ("rgb(none 0 0)", ["NULL", "0", "0"]),
+        ("rgb(0 none 128 / none)", ["0", "NULL", "128"]),
+        ("rgb(1 2 none)", ["1", "2", "NULL"]),
+        ("rgb(255 , 0 , 0)", ["255", "0", "0"]),
+        ("rgb(1.5, 0, 0)", ["2", "0", "0"]),
+        ("255,0,0", ["255", "0", "0"]),
+        ("(128, 128, 128)", ["128", "128", "128"]),
+    ] {
+        for (part, want) in ["red", "green", "blue"].iter().zip(expect) {
+            assert_eq!(
+                run_color_part(&tax, rgb, part, value),
+                want,
+                "{part} of {value:?}"
+            );
+        }
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn color_hsl_parts_read_the_modern_forms() {
+    let tax = test_taxonomy();
+    let hsl = "representation.format.color_hsl";
+    // A `none` component, which has no number, reads as NULL (the CLI prints it
+    // as the text NULL with -noheader -list).
+    for (value, expect) in [
+        ("hsl(120deg 75% 25% / 60%)", ["120", "75", "25"]),
+        ("hsl(540 0 0)", ["540", "0", "0"]),
+        ("hsl(120.5, 100%, 50%)", ["121", "100", "50"]),
+        ("hsl(none 100% 50%)", ["NULL", "100", "50"]),
+        ("hsl(120 none none / none)", ["120", "NULL", "NULL"]),
+        ("hsla(240, 100%, 50%, 0.5)", ["240", "100", "50"]),
+        ("hsl(.5 .5% .5%)", ["1", "1", "1"]),
+    ] {
+        for (part, want) in ["hue", "saturation", "lightness"].iter().zip(expect) {
+            assert_eq!(
+                run_color_part(&tax, hsl, part, value),
+                want,
+                "{part} of {value:?}"
+            );
+        }
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn data_uri_parts_read_empty_data_and_any_case_base64() {
+    let tax = test_taxonomy();
+    let label = "technology.internet.data_uri";
+    // `data:,` has no media type: the string part is '' (not NULL), and it is
+    // not base64. `base64` is read in any case, and only before the first comma.
+    for (value, media_type, is_base64) in [
+        ("data:,", "", "false"),
+        ("data:text/plain;BASE64,SGk=", "text/plain", "true"),
+        ("data:;base64,SGk=", "", "true"),
+        ("data:text/plain,hello base64,x", "text/plain", "false"),
+        ("data:text/plain;base64,", "text/plain", "true"),
+    ] {
+        assert_eq!(
+            run_color_part(&tax, label, "media_type", value),
+            media_type,
+            "media_type of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "is_base64", value),
+            is_base64,
+            "is_base64 of {value:?}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn s3_uri_parts_read_bucket_names_and_access_point_arns() {
+    let tax = test_taxonomy();
+    let label = "technology.cloud.s3_uri";
+    // An access-point ARN stands in for the bucket: `bucket` is the ARN up to
+    // and including the access-point name, `key` what follows ('' when nothing).
+    let ap = "arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint";
+    for (value, bucket, key) in [
+        ("s3://my-bucket/data/file.csv", "my-bucket", "data/file.csv"),
+        ("s3://my-bucket", "my-bucket", ""),
+        (&format!("s3://{ap}/mykey") as &str, ap, "mykey"),
+        (&format!("s3://{ap}/a/b.csv") as &str, ap, "a/b.csv"),
+        (&format!("s3://{ap}") as &str, ap, ""),
+        (&format!("s3://{ap}/") as &str, ap, ""),
+    ] {
+        assert_eq!(
+            run_color_part(&tax, label, "bucket", value),
+            bucket,
+            "bucket of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "key", value),
+            key,
+            "key of {value:?}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn data_uri_is_base64_is_false_on_null_input() {
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let decompose = tax
+        .ddl_info("technology.internet.data_uri")
+        .expect("known label")
+        .decompose
+        .clone()
+        .expect("data_uri has decompose");
+    let expr = decompose["is_base64"].as_str().expect("is_base64");
+    let sql = format!("SELECT {}", expr.replace("{col}", "CAST(NULL AS VARCHAR)"));
+    let out = Command::new("duckdb")
+        .args(["-no-init", "-noheader", "-list", "-c", &sql])
+        .output()
+        .expect("run the duckdb CLI");
+    assert!(out.status.success());
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "false");
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn version_parts_keep_hyphens_in_prerelease_and_build() {
+    let tax = test_taxonomy();
+    let label = "technology.development.version";
+    for (value, prerelease, metadata) in [
+        ("1.2.3", "", ""),
+        ("1.2.3-alpha", "alpha", ""),
+        ("1.2.3-alpha-1", "alpha-1", ""),
+        ("1.0.0+build-7", "", "build-7"),
+        ("1.2.3-beta.1+exp-5", "beta.1", "exp-5"),
+        ("v1.2.3-rc-2", "rc-2", ""),
+    ] {
+        assert_eq!(
+            run_color_part(&tax, label, "prerelease", value),
+            prerelease,
+            "prerelease of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "metadata", value),
+            metadata,
+            "metadata of {value:?}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn calver_decompose_day_is_null_without_a_day() {
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let decompose = tax
+        .ddl_info("technology.development.calver")
+        .expect("calver is a known label")
+        .decompose
+        .clone()
+        .expect("calver has decompose");
+    // The part's value, or "NULL" for a SQL NULL, so a NULL is not read as ''.
+    let run = |part: &str, value: &str| -> String {
+        let expr = decompose[part].as_str().expect("decompose part");
+        let sql = format!(
+            "SELECT COALESCE(CAST(({}) AS VARCHAR), 'NULL')",
+            expr.replace("{col}", &format!("'{}'", value))
+        );
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(
+            out.status.success(),
+            "duckdb failed on {value:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    let cases: &[(&str, &str, &str, &str)] = &[
+        ("2024.1", "2024", "1", "NULL"),
+        ("2024.12", "2024", "12", "NULL"),
+        ("2024.2.9", "2024", "2", "9"),
+        ("2024.12.31", "2024", "12", "31"),
+        ("2024.02.09", "2024", "2", "9"),
+        ("2024.01.15.1", "2024", "1", "15"),
+        ("2024.3.2024", "2024", "3", "NULL"),
+    ];
+    for (value, year, month, day) in cases {
+        assert_eq!(run("year", value), *year, "year of {value:?}");
+        assert_eq!(run("month", value), *month, "month of {value:?}");
+        assert_eq!(run("day", value), *day, "day of {value:?}");
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn docker_ref_parts_read_every_digest_algorithm() {
+    let tax = test_taxonomy();
+    let label = "technology.development.docker_ref";
+    let sha256 = format!("sha256:{}", "a".repeat(64));
+    let sha512 = format!("sha512:{}", "b".repeat(128));
+    let blake3 = format!("blake3:{}", "c".repeat(64));
+    for (value, tag, digest) in [
+        ("app:_dev".to_string(), "_dev".to_string(), String::new()),
+        (format!("app@{sha256}"), String::new(), sha256.clone()),
+        (format!("app@{sha512}"), String::new(), sha512.clone()),
+        (format!("app:v1@{blake3}"), "v1".to_string(), blake3.clone()),
+        (
+            format!("ghcr.io/org/app:1.2@{sha512}"),
+            "1.2".to_string(),
+            sha512.clone(),
+        ),
+    ] {
+        assert_eq!(
+            run_color_part(&tax, label, "tag", &value),
+            tag,
+            "tag of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "digest", &value),
+            digest,
+            "digest of {value:?}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn jwt_parts_keep_three_jws_parts_and_leave_a_jwe_unsplit() {
+    let tax = test_taxonomy();
+    let label = "technology.cryptographic.jwt";
+    let header = "eyJhbGciOiJub25lIn0";
+    let payload = "eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ";
+    // RFC 7519 section 6.1: the unsecured JWT has an empty signature.
+    let unsecured = format!("{header}.{payload}.");
+    let signed = format!("{header}.{payload}.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c");
+    let jwe = "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DV.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4.XFBoMYUZodetZdvTiFvSkQ";
+    for (value, h, p, s) in [
+        (unsecured.as_str(), header, payload, ""),
+        (
+            signed.as_str(),
+            header,
+            payload,
+            "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+        ),
+        (
+            jwe,
+            "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ",
+            "",
+            "",
+        ),
+    ] {
+        assert_eq!(
+            run_color_part(&tax, label, "header", value),
+            h,
+            "header of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "payload", value),
+            p,
+            "payload of {value:?}"
+        );
+        assert_eq!(
+            run_color_part(&tax, label, "signature", value),
+            s,
+            "signature of {value:?}"
+        );
+    }
+}
+
+/// Runs the published transform of `label` on `value` through the duckdb CLI,
+/// after `setup`, wrapped in `TRY` as `validate` does, and returns the result as text.
+fn run_transform(tax: &Taxonomy, label: &str, value: &str, setup: &str) -> String {
+    use std::process::Command;
+    let transform = tax
+        .ddl_info(label)
+        .expect("known label")
+        .transform
+        .clone()
+        .expect("label has a transform");
+    let sql = format!(
+        "{setup}SELECT TRY({})",
+        transform.replace("{col}", &format!("'{}'", value))
+    );
+    let out = Command::new("duckdb")
+        .args(["-no-init", "-noheader", "-list", "-c", &sql])
+        .output()
+        .expect("run the duckdb CLI");
+    assert!(
+        out.status.success(),
+        "duckdb failed on {value:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn pg_short_offset_transform_parses_with_and_without_a_fraction() {
+    let tax = test_taxonomy();
+    let label = "datetime.timestamp.pg_short_offset";
+    // Rendered in UTC so the check does not depend on the session time zone.
+    for (value, expect) in [
+        ("2022-01-06 18:00:00+03", "2022-01-06 15:00:00+00"),
+        ("1997-12-17 07:37:16-08", "1997-12-17 15:37:16+00"),
+        ("2022-01-06 18:00:00.5+03", "2022-01-06 15:00:00.5+00"),
+        (
+            "2024-01-15 14:30:00.123456-05",
+            "2024-01-15 19:30:00.123456+00",
+        ),
+    ] {
+        let got = run_transform(&tax, label, value, "SET TimeZone='UTC'; ");
+        assert_eq!(got, expect, "{value:?}");
+    }
+    // A value the rule rejects casts to NULL.
+    assert_eq!(
+        run_transform(&tax, label, "2022-01-06 18:00:00+3", ""),
+        "NULL"
+    );
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn iso_duration_transform_casts_fractions_and_the_alternative_format() {
+    let tax = test_taxonomy();
+    let label = "datetime.duration.iso_8601";
+    for (value, expect) in [
+        ("PT30M", "00:30:00"),
+        ("P2W", "14 days"),
+        ("P0,5Y", "6 months"),
+        ("P0.5Y", "6 months"),
+        ("PT0.5S", "00:00:00.5"),
+        ("PT1H30,5M", "01:30:30"),
+        ("P1DT1.5H", "1 day 01:30:00"),
+        ("P1Y2,5M", "1 year 2 months 15 days"),
+        ("P0003-06-04T12:30:05", "3 years 6 months 4 days 12:30:05"),
+    ] {
+        assert_eq!(run_transform(&tax, label, value, ""), expect, "{value:?}");
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn month_year_abbrev_transform_reads_case_and_long_forms() {
+    let tax = test_taxonomy();
+    let label = "datetime.date.month_year_abbrev";
+    for (value, expect) in [
+        ("Jan 2024", "2024-01-01"),
+        ("JAN 2024", "2024-01-01"),
+        ("Sept 2026", "2026-09-01"),
+        ("SEPT 2026", "2026-09-01"),
+        ("June 2026", "2026-06-01"),
+        ("JULY 2025", "2025-07-01"),
+        ("MAY 1999", "1999-05-01"),
+    ] {
+        assert_eq!(run_transform(&tax, label, value, ""), expect, "{value:?}");
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn iso_week_transform_casts_padded_and_unpadded_weeks() {
+    let tax = test_taxonomy();
+    for (value, expect) in [
+        ("2024-W03", "2024-01-15"),
+        ("2024-W3", "2024-01-15"),
+        ("2020-W53", "2020-12-28"),
+    ] {
+        assert_eq!(
+            run_transform(&tax, "datetime.date.iso_week", value, ""),
+            expect,
+            "{value:?}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn chinese_ymd_transform_casts_padded_and_unpadded_values() {
+    let tax = test_taxonomy();
+    for (value, expect) in [
+        ("2024\u{5E74}01\u{6708}11\u{65E5}", "2024-01-11"),
+        ("2024\u{5E74}1\u{6708}15\u{65E5}", "2024-01-15"),
+        ("2024\u{5E74}09\u{6708}05\u{65E5}", "2024-09-05"),
+    ] {
+        assert_eq!(
+            run_transform(&tax, "datetime.date.chinese_ymd", value, ""),
+            expect,
+            "{value:?}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn amount_multisym_transform_strips_a_trailing_symbol() {
+    let tax = test_taxonomy();
+    let label = "finance.currency.amount_multisym";
+    // Every ACCEPT value, with plain, no-break (U+00A0) and narrow no-break
+    // (U+202F) spaces, casts to 1234.56.
+    for value in [
+        "1 234,56 K\u{10d}",
+        "1 234,56 z\u{142}",
+        "kr. 1.234,56",
+        "K\u{10d} 1 234,56",
+        "1\u{a0}234,56\u{a0}K\u{10d}",
+        "1\u{202f}234,56\u{202f}z\u{142}",
+        "1.234,56\u{a0}kr.",
+        "1 234,56 kr",
+        "R$ 1.234,56",
+        "HK$ 1,234.56",
+    ] {
+        assert_eq!(
+            run_transform(&tax, label, value, ""),
+            "1234.56",
+            "{value:?}"
+        );
+    }
+    assert_eq!(
+        run_transform(&tax, label, "-1 234,56 K\u{10d}", ""),
+        "-1234.56"
+    );
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn amount_multisym_symbol_part_reads_a_leading_or_trailing_symbol() {
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let decompose = tax
+        .ddl_info("finance.currency.amount_multisym")
+        .expect("known label")
+        .decompose
+        .clone()
+        .expect("amount_multisym has decompose");
+    let expr = decompose["symbol"].as_str().expect("symbol part");
+    for (value, symbol) in [
+        ("R$ 1.234,56", "R$"),
+        ("kr. 1.234,56", "kr."),
+        ("1 234,56 K\u{10d}", "K\u{10d}"),
+        ("1 234,56 z\u{142}", "z\u{142}"),
+        ("1\u{a0}234,56\u{a0}K\u{10d}", "K\u{10d}"),
+        ("1.234,56\u{202f}kr.", "kr."),
+        ("-1 234,56 K\u{10d}", "K\u{10d}"),
+    ] {
+        let sql = format!("SELECT {}", expr.replace("{col}", &format!("'{}'", value)));
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(out.status.success(), "{value:?}");
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout).trim(),
+            symbol,
+            "{value:?}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
+fn amount_lakh_transform_and_parts_read_a_space_after_the_sign() {
+    use std::process::Command;
+    let tax = test_taxonomy();
+    let label = "finance.currency.amount_lakh";
+    assert_eq!(
+        run_transform(&tax, label, "\u{20b9} 5,00,000", ""),
+        "500000.00"
+    );
+    assert_eq!(
+        run_transform(&tax, label, "\u{20b9}4,99,000", ""),
+        "499000.00"
+    );
+    let decompose = tax
+        .ddl_info(label)
+        .expect("known label")
+        .decompose
+        .clone()
+        .expect("amount_lakh has decompose");
+    let run = |part: &str, value: &str| -> String {
+        let expr = decompose[part].as_str().expect("decompose part");
+        let sql = format!("SELECT {}", expr.replace("{col}", &format!("'{}'", value)));
+        let out = Command::new("duckdb")
+            .args(["-no-init", "-noheader", "-list", "-c", &sql])
+            .output()
+            .expect("run the duckdb CLI");
+        assert!(out.status.success(), "{value:?}");
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    assert_eq!(run("symbol", "\u{20b9} 5,00,000"), "\u{20b9}");
+    assert_eq!(run("numeric_value", "\u{20b9} 5,00,000"), "500000.00");
+}

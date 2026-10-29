@@ -846,7 +846,7 @@ fn npi_grades_other_first_digits_as_noted_and_bad_check_digit_as_failing() {
         other => panic!("should be noted, got {other:?}"),
     }
     match grade_value_for_label("1234567890", NPI_LABEL, &tax) {
-        Grade::Fails { constraint, .. } => assert_eq!(constraint, "checksum"),
+        finetype_core::Grade::Fails { constraint, .. } => assert_eq!(constraint, "checksum"),
         other => panic!("bad check digit should fail, got {other:?}"),
     }
 }
@@ -858,4 +858,2253 @@ fn npi_detector_requires_issued_range_and_check_digit() {
     assert!(!detect(&npi_valid_starting_with_3()));
     assert!(!detect("1234567890"));
     assert!(!detect("123456789"));
+}
+
+const JSON_LABEL: &str = "container.object.json";
+
+/// RFC 8259: insignificant whitespace, line breaks included, may surround and
+/// sit inside the object.
+#[test]
+fn json_accepts_source_forms() {
+    assert_pattern_boundary(
+        JSON_LABEL,
+        &["{\"a\": 1}", " {\"a\": 1} ", "{\n  \"a\": 1\n}"],
+        &[],
+    );
+}
+
+#[test]
+fn json_rejects_undefined_forms() {
+    assert_pattern_boundary(JSON_LABEL, &[], &["[1, 2]", "{\"a\": 1", "a {}"]);
+}
+
+/// The detector keeps the single-line `{...}` shape the type had first and
+/// counts a multi-line value only when it parses as a JSON object, so braced
+/// multi-line text (a GraphQL query, a Python dict, a CSS block) conforms but
+/// is not counted.
+#[test]
+fn json_detector_counts_multi_line_text_only_when_it_parses() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(JSON_LABEL, &tax).expect("json rule");
+    let detector = detector_for(JSON_LABEL);
+    assert!(detector.is_some());
+    for ok in [
+        "{\"a\": 1}",
+        " {\"a\": 1} ",
+        "{'a': 1}",
+        "{\n  \"user\": \"john\",\n  \"age\": 30\n}",
+        "{\r\n  \"a\": [1, 2]\r\n}",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for bad in [
+        "{\n  hero {\n    name\n  }\n}",
+        "{'a': 1,\n 'b': 2}",
+        "{\n  color: red;\n}",
+    ] {
+        assert!(rule.is_valid(bad), "{bad:?} conforms");
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
+const XML_LABEL: &str = "container.object.xml";
+
+/// XML 1.0: an optional declaration, Misc (comments, processing instructions,
+/// whitespace), an optional DOCTYPE with an internal subset, one root element
+/// (an empty-element tag, or a start tag through its end tag, across lines),
+/// then trailing Misc.
+#[test]
+fn xml_accepts_source_forms() {
+    assert_pattern_boundary(
+        XML_LABEL,
+        &[
+            "<root/>",
+            "<br />",
+            "<?xml version=\"1.0\"?><a>1</a>",
+            "<a>\n  <b>1</b>\n</a>",
+            "<?xml version=\"1.0\"?>\n<a>\n  <b>1</b>\n</a>",
+            "<gr\u{f6}\u{df}e>1</gr\u{f6}\u{df}e>",
+            "<!DOCTYPE note><note>x</note>",
+            "<!DOCTYPE note [<!ENTITY e \"v\">]>\n<note>&e;</note>",
+            "<?xml version=\"1.0\"?><!-- generated --><a>1</a>",
+            "<a/><!-- end -->",
+            "<a>1</a>\n<?pi data?>\n",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn xml_rejects_undefined_forms() {
+    assert_pattern_boundary(XML_LABEL, &[], &["<a>1", "a <b/>", "<>", "<1a/>"]);
+}
+
+/// The detector keeps HTML documents out of discrimination: they conform to
+/// the XML rule (XHTML is XML) but must not count as xml.
+#[test]
+fn xml_detector_keeps_out_html() {
+    let detect = finetype_core::discrimination::detector_for(XML_LABEL).expect("xml detector");
+    for bad in [
+        "<!DOCTYPE html><html><body>x</body></html>",
+        "<html>\n<body>x</body>\n</html>",
+        "<!doctype HTML>\n<HTML lang=\"en\"><body>x</body></HTML>",
+    ] {
+        assert!(!detect(bad), "{bad:?}");
+    }
+    // A DOCTYPE with an internal subset is skipped to find the root.
+    assert!(!detect(
+        "<!DOCTYPE x [<!ENTITY e \"v\">]><html><b>1</b></html>"
+    ));
+    for ok in [
+        "<a>1</a>",
+        "<?xml version=\"1.0\"?><a>1</a>",
+        "<!DOCTYPE x [<!ENTITY e \"v\">]><a>1</a>",
+    ] {
+        assert!(detect(ok), "{ok:?}");
+    }
+}
+
+/// The newly accepted forms conform but do not count for discrimination, so
+/// multi-line HTML fragments and empty-element tags are not promoted.
+#[test]
+fn xml_detector_keeps_the_old_single_line_shape() {
+    let detect = finetype_core::discrimination::detector_for(XML_LABEL).expect("xml detector");
+    for new_form in [
+        "<root/>",
+        "<a>\n  <b>1</b>\n</a>",
+        "<p>Hello</p>\n<p>World</p>",
+        "<a/><!-- end -->",
+    ] {
+        assert!(!detect(new_form), "{new_form:?}");
+    }
+}
+
+/// Newly rejected, source-required: XML 1.0 is case-sensitive about
+/// `<!DOCTYPE`, a root must be an element, and an end tag is `</Name S?>`.
+#[test]
+fn xml_rejects_forms_the_source_forbids() {
+    assert_pattern_boundary(
+        XML_LABEL,
+        &[],
+        &[
+            "<!doctype note><a>1</a>",
+            "<![CDATA[x]]><a>1</a>",
+            // U+10000 in a name: rejected by the ECMA-262 ruling (no supplementary-plane name characters).
+            "<a\u{10000}>1</a\u{10000}>",
+            "<a>x</a b>",
+            "<a>x</ a>",
+            "<>x</>",
+        ],
+    );
+}
+
+const YAML_LABEL: &str = "container.object.yaml";
+
+/// YAML 1.2.2: a document may open with `---`, a comment line, or a top-level
+/// sequence; keys may contain `-` and `.`.
+#[test]
+fn yaml_accepts_source_forms() {
+    assert_pattern_boundary(
+        YAML_LABEL,
+        &[
+            "---\nname: x",
+            "# c\nname: x",
+            "- a\n- b",
+            "my-key.v2: 1",
+            "name: John\nage: 30",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn yaml_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        YAML_LABEL,
+        &[],
+        &["#hashtag", "- just a bullet", "hello world", ": x"],
+    );
+}
+
+/// The detector keeps the old `key:` first-line shape, so the newly accepted
+/// forms conform in grading but do not count for discrimination.
+#[test]
+fn container_object_yaml_detector_keeps_old_shape() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(YAML_LABEL, &tax).expect("yaml rule");
+    let detector = detector_for(YAML_LABEL);
+    assert!(detector.is_some());
+    assert!(passes_detector_or_rule(
+        detector,
+        &rule,
+        "name: John\nage: 30"
+    ));
+    assert!(passes_detector_or_rule(detector, &rule, "user:"));
+    for new_form in ["---\nname: x", "- a\n- b", "my-key.v2: 1", "# c\nname: x"] {
+        assert!(rule.is_valid(new_form), "{new_form:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, new_form),
+            "{new_form:?}"
+        );
+    }
+}
+
+/// The detector keeps the old pairs-only shape, so the newly accepted forms
+/// conform in grading but do not count for discrimination.
+#[test]
+fn query_string_detector_keeps_old_shape() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(QUERY_STRING_LABEL, &tax).expect("query_string rule");
+    let detector = detector_for(QUERY_STRING_LABEL);
+    assert!(detector.is_some());
+    for old_form in ["name=John&age=30", "q=", "my key=1"] {
+        assert!(
+            passes_detector_or_rule(detector, &rule, old_form),
+            "{old_form:?}"
+        );
+    }
+    for new_form in ["debug&page=2", "a=1&&b=2"] {
+        assert!(rule.is_valid(new_form), "{new_form:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, new_form),
+            "{new_form:?}"
+        );
+    }
+}
+
+const CSV_LABEL: &str = "container.object.csv";
+
+/// RFC 4180: fields may be empty, and a quoted field may hold commas, doubled
+/// quotes and line breaks.
+#[test]
+fn csv_accepts_source_forms() {
+    assert_pattern_boundary(
+        CSV_LABEL,
+        &[
+            "a,,c",
+            "\"a,,b\",1",
+            "\"say \"\"hi\"\"\",2",
+            "John,30,true",
+            "\"line\nbreak\",1",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn csv_rejects_undefined_forms() {
+    assert_pattern_boundary(CSV_LABEL, &[], &["\"unterminated,1", "a\"b,c", "a,b\nc,d"]);
+}
+
+/// The detector is the published rule and either the old shape (every field
+/// non-empty) or at least one quoted field, so the rule's empty fields do not
+/// lift the type's discrimination rate on random text.
+#[test]
+fn csv_detector_keeps_empty_field_text_out() {
+    let detect = finetype_core::discrimination::detector_for(CSV_LABEL).expect("csv detector");
+    for ok in [
+        "John,30,true",
+        "\"a,,b\",1",
+        "\"say \"\"hi\"\"\",2",
+        "a,,\"c\"",
+    ] {
+        assert!(detect(ok), "{ok:?}");
+    }
+    for bad in ["a,,c", ",", "a,", "\"unterminated,1", "a\"b,c", "a,b\nc,d"] {
+        assert!(!detect(bad), "{bad:?}");
+    }
+}
+
+const QUERY_STRING_LABEL: &str = "container.key_value.query_string";
+
+/// WHATWG URL Standard: bare names and empty sequences sit beside at least one
+/// `name=value` pair.
+#[test]
+fn query_string_accepts_source_forms() {
+    assert_pattern_boundary(
+        QUERY_STRING_LABEL,
+        &["debug&page=2", "a=1&&b=2", "q=", "name=John&age=30"],
+        &[],
+    );
+}
+
+#[test]
+fn query_string_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        QUERY_STRING_LABEL,
+        &[],
+        &[
+            "debug",
+            "&&",
+            "=x",
+            "hello world",
+            "a == 1 && b == 2",
+            "status=='x' && age>18",
+            "AT&T price=5",
+        ],
+    );
+}
+
+const STATE_CODE_LABEL: &str = "geography.location.state_code";
+
+/// ISO 3166-2:AU codes are two or three letters; USPS Publication 28
+/// Appendix B lists the two-letter codes, military ones included.
+#[test]
+fn state_code_accepts_source_forms() {
+    assert_pattern_boundary(STATE_CODE_LABEL, &["NSW", "ACT", "AE", "TX"], &[]);
+}
+
+#[test]
+fn state_code_rejects_undefined_forms() {
+    assert_pattern_boundary(STATE_CODE_LABEL, &[], &["NSWX", "N", "ny"]);
+}
+
+/// Publication 28 Appendix B names the freely associated states and the
+/// military "states" beside the fifty states, so the US enum holds them.
+#[test]
+fn state_code_us_enum_has_the_pub_28_additions() {
+    let tax = load_taxonomy();
+    let def = tax.get(STATE_CODE_LABEL).expect("state_code");
+    let us = def
+        .validation_by_locale
+        .as_ref()
+        .and_then(|m| m.get("EN_US"))
+        .and_then(|v| v.enum_values.as_ref())
+        .expect("EN_US enum");
+    for code in ["FM", "MH", "PW", "AA", "AE", "AP"] {
+        assert!(us.iter().any(|c| c == code), "{code} missing from EN_US");
+    }
+}
+
+/// The detector counts two uppercase letters, or an EN_AU three-letter code,
+/// so three-letter airport and currency codes do not count for discrimination.
+#[test]
+fn state_code_detector_keeps_three_letter_codes_out() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(STATE_CODE_LABEL, &tax).expect("state_code rule");
+    let detector = detector_for(STATE_CODE_LABEL);
+    assert!(detector.is_some());
+    for ok in ["TX", "AE", "NSW", "ACT", "QLD", "TAS", "VIC"] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for bad in ["USD", "JFK", "EUR", "NSWX", "N", "ny", "N1", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
+const H3_LABEL: &str = "geography.index.h3";
+
+/// H3 docs and Snowflake output: a cell index is 15 hexadecimal digits, and
+/// Snowflake writes it in upper case.
+#[test]
+fn h3_accepts_source_forms() {
+    assert_pattern_boundary(H3_LABEL, &["881F1D4887FFFFF", "8928308280fffff"], &[]);
+}
+
+#[test]
+fn h3_rejects_undefined_forms() {
+    assert_pattern_boundary(H3_LABEL, &[], &["8928308280ffff", "8928308280fffffg"]);
+}
+
+const WKT_LABEL: &str = "geography.format.wkt";
+
+/// OGC 06-103r4, 7.2.1 and 7.2.2: keywords are case-insensitive, and the
+/// triangle, polyhedral-surface and TIN keywords are geometry types.
+#[test]
+fn wkt_accepts_source_forms() {
+    assert_pattern_boundary(
+        WKT_LABEL,
+        &[
+            "Point (10 10)",
+            "point(1 2)",
+            "TIN Z (((0 0 0, 0 1 0, 1 0 0, 0 0 0)))",
+            "TRIANGLE ((0 0, 0 1, 1 0, 0 0))",
+            "POLYGON EMPTY",
+            "POLYHEDRALSURFACE Z (((0 0 0, 0 1 0, 1 1 0, 0 0 0)))",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn wkt_rejects_undefined_forms() {
+    assert_pattern_boundary(WKT_LABEL, &[], &["POINTS (1 2)", "circle(1 2)"]);
+}
+
+/// The detector counts a keyword in any letter case with `EMPTY` or a coordinate
+/// pair, so genuine mixed-case WKT counts and parenthesised text does not.
+#[test]
+fn wkt_detector_needs_a_coordinate_pair_or_empty() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(WKT_LABEL, &tax).expect("wkt rule");
+    let detector = detector_for(WKT_LABEL);
+    assert!(detector.is_some());
+    for ok in [
+        "POINT (30 10)",
+        "POINT(30 10)",
+        "POINT EMPTY",
+        "POINT ZM (1 2 3 4)",
+        "MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)))",
+        "GEOMETRYCOLLECTION EMPTY",
+        "Point (10 10)",
+        "point(1 2)",
+        "point(-1.5 2e0)",
+        "TIN Z (((0 0 0, 0 1 0, 1 0 0, 0 0 0)))",
+        "TRIANGLE ((0 0, 0 1, 1 0, 0 0))",
+        "Polygon empty",
+        "GEOMETRYCOLLECTION (POINT (1 2))",
+        "GEOMETRYCOLLECTION (POINT EMPTY)",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    // The long s (U+017F) folds to `s` in a Unicode case-insensitive match; the
+    // published rule rejects it, so the detector must too.
+    assert!(!rule.is_valid("LINE\u{17f}TRING (1 2)"));
+    assert!(!passes_detector_or_rule(
+        detector,
+        &rule,
+        "LINE\u{17f}TRING (1 2)"
+    ));
+    for bad in [
+        "Triangle (equilateral)",
+        "Triangle (1999)",
+        "Point (of sale)",
+        "Tin (2 cans)",
+        "Polygon (regular)",
+        "Tin (small) 250 2pk",
+        "Tin (empty)",
+        "Point (empty lot)",
+        "Tin (empty box)",
+        "Point Empty Lot",
+        "Tin empty box",
+    ] {
+        assert!(rule.is_valid(bad), "{bad:?} conforms");
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
+const PLUS_CODE_LABEL: &str = "geography.coordinate.plus_code";
+
+/// Open Location Code specification: input is case-insensitive; a full code is
+/// up to 15 digits, padded only before the `+` and in pairs, with nothing after
+/// the `+` when padded, at most seven characters after it.
+#[test]
+fn plus_code_accepts_source_forms() {
+    assert_pattern_boundary(
+        PLUS_CODE_LABEL,
+        &[
+            "849VCWC8+R9",
+            "8FVC9G8F+",
+            "6P000000+",
+            "849vcwc8+r9",
+            "8FVC9G8F+6WXQRJH",
+            "6PH57V00+",
+            "6PH50000+",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn plus_code_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        PLUS_CODE_LABEL,
+        &[],
+        &[
+            // short code: no area part
+            "CWC8+R9",
+            // padded code with digits after the plus
+            "7FG49W00+2V",
+            // latitude above 90 degrees, longitude above 180 degrees
+            "X49VCWC8+R9",
+            "8WC8Q2PQ+QV",
+            // eight characters after the plus
+            "8FVC9G8F+6WXQRJHV",
+            // padding must come in pairs and only before the plus
+            "8FVC9G0F+",
+            "8FVC9G000+",
+            "8FVC0G8F+",
+            // one character after the plus names no cell
+            "849VCWC8+R",
+        ],
+    );
+}
+
+/// The detector counts the form the type was first defined by (upper case,
+/// eight characters, a refinement of two or more), so padded and bare-plus
+/// codes and lower-case input conform but do not count for discrimination.
+#[test]
+fn plus_code_detector_counts_the_first_defined_form() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(PLUS_CODE_LABEL, &tax).expect("plus_code rule");
+    let detector = detector_for(PLUS_CODE_LABEL);
+    assert!(detector.is_some());
+    for ok in ["849VCWC8+R9", "87G8Q2PQ+QV", "8FVC9G8F+6WXQRJH"] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for conforming in ["8FVC9G8F+", "6P000000+", "849vcwc8+r9", "22000000+"] {
+        assert!(rule.is_valid(conforming), "{conforming:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, conforming),
+            "{conforming:?}"
+        );
+    }
+    for bad in ["CWC8+R9", "7FG49W00+2V", "X49VCWC8+R9", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
+const MGRS_LABEL: &str = "geography.coordinate.mgrs";
+
+/// FGDC-STD-011-2001: a grid zone designator (or a UPS band letter), a 100 km
+/// square, and an equal-halved even count of digits, up to 16 (1 mm).
+#[test]
+fn mgrs_accepts_source_forms() {
+    assert_pattern_boundary(
+        MGRS_LABEL,
+        &[
+            "18SUJ2348306479",
+            "18SUJ2348316806479498",
+            "ZAH1234567890",
+            "4QFJ1234567890",
+            "18SUJ2306",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn mgrs_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        MGRS_LABEL,
+        &[],
+        &[
+            // odd digit count: easting and northing cannot be equal halves
+            "18SUJ234",
+            "18SUJ2348306",
+            // no digits at all
+            "18SUJ",
+            // I and O are not band letters
+            "18IUJ2348306479",
+            "18OUJ2348306479",
+            // 18 digits: past the 1 mm special application
+            "18SUJ123456789012345678",
+            // a UPS reference has no zone number
+            "1ZAH1234567890",
+        ],
+    );
+}
+
+/// The detector counts a grid zone designator with a band letter and 2 to 10
+/// digits, as the type was first defined, so UPS references and 12- to 16-digit
+/// references conform but do not count; neither do code-like tokens that share
+/// a UPS reference's letters.
+#[test]
+fn mgrs_detector_counts_the_first_defined_form() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(MGRS_LABEL, &tax).expect("mgrs rule");
+    let detector = detector_for(MGRS_LABEL);
+    assert!(detector.is_some());
+    for ok in [
+        "18SUJ2348306479",
+        "33UUP0490171890",
+        "4QFJ1234567890",
+        "18SUJ23",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for conforming in ["ZAH1234567890", "18SUJ2348316806479498", "ABC1234", "BMW20"] {
+        assert!(rule.is_valid(conforming), "{conforming:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, conforming),
+            "{conforming:?}"
+        );
+    }
+    for bad in ["18SUJ234", "18IUJ2348306479", "18SUJ", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
+const GEOHASH_LABEL: &str = "geography.coordinate.geohash";
+
+/// PostGIS ST_GeoHash and BigQuery ST_GEOHASH: one to twenty characters of the
+/// geohash alphabet.
+#[test]
+fn geohash_accepts_source_forms() {
+    assert_pattern_boundary(
+        GEOHASH_LABEL,
+        &["dr5r", "9q8yyk8yuvrs4kz5qqvz", "9", "ezs42e"],
+        &[],
+    );
+}
+
+#[test]
+fn geohash_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        GEOHASH_LABEL,
+        &[],
+        &["9q8yyk8yuvrs4kz5qqvzq", "dr5a", "", "DR5R"],
+    );
+}
+
+/// The detector counts six to twelve characters, so short tokens and long digit
+/// strings do not count for discrimination.
+#[test]
+fn geohash_detector_counts_the_first_defined_form() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(GEOHASH_LABEL, &tax).expect("geohash rule");
+    let detector = detector_for(GEOHASH_LABEL);
+    assert!(detector.is_some());
+    for ok in ["9q8yyk8yuv", "ezs42e", "dr5ru7c02wnm", "u4pruydqqvj"] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for conforming in [
+        "dr5r",
+        "bed",
+        "9",
+        "ezs42",
+        "9q8yyk8yuvrs4kz5qqvz",
+        "1700000000000",
+        "4111111111111111",
+    ] {
+        assert!(rule.is_valid(conforming), "{conforming:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, conforming),
+            "{conforming:?}"
+        );
+    }
+    for bad in ["9q8yyk8yuvrs4kz5qqvzq", "dr5a00", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
+const STREET_SUFFIX_LABEL: &str = "geography.address.street_suffix";
+
+/// UPU country sheets and Canada Post street-type abbreviations: the national
+/// forms of the listed locales join the English enum.
+#[test]
+fn street_suffix_accepts_source_forms() {
+    assert_pattern_boundary(
+        STREET_SUFFIX_LABEL,
+        &[
+            "CRT", "LANE", "RUE", "AV", "BOUL", "BVD", "BD", "str", "Str.", "Crescent", "Terrace",
+            "Close", "Street", "St", "Lane", "crt", "STR.",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn street_suffix_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        STREET_SUFFIX_LABEL,
+        &[],
+        &["Strasse Nord", "XYZ", "", "Str.."],
+    );
+}
+
+/// The detector keeps the English enum and the added full words, so the national
+/// abbreviations, which are also country, currency and airport codes, conform
+/// without counting.
+#[test]
+fn street_suffix_detector_keeps_out_abbreviations() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(STREET_SUFFIX_LABEL, &tax).expect("street_suffix rule");
+    let detector = detector_for(STREET_SUFFIX_LABEL);
+    assert!(detector.is_some());
+    for ok in [
+        "Street", "St", "ave", "BLVD", "Crescent", "Terrace", "Close", "Rue", "LANE",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for conforming in ["BD", "AV", "CRT", "BVD", "BOUL", "str", "Str."] {
+        assert!(rule.is_valid(conforming), "{conforming:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, conforming),
+            "{conforming:?}"
+        );
+    }
+    for bad in ["Strasse Nord", "XYZ", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
+const COORDINATES_LABEL: &str = "geography.coordinate.coordinates";
+
+/// DuckDB spatial and Frictionless Table Schema: a latitude and a longitude
+/// separated by a comma (with optional spaces) or by whitespace.
+#[test]
+fn coordinates_accepts_source_forms() {
+    assert_pattern_boundary(
+        COORDINATES_LABEL,
+        &[
+            "48.8761373390584, 2.3680844979417",
+            "40.7128,-74.0060",
+            "35.6762 139.6917",
+            "40.7128 ,-74.0060",
+            "40.7128 , -74.0060",
+            "35.6762  139.6917",
+            "35.6762\t139.6917",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn coordinates_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        COORDINATES_LABEL,
+        &[],
+        &[
+            "40.7128,,-74.0060",
+            "N40 44.0 W73 59.0",
+            "40.7128",
+            "40.7128,",
+            "40.7128;-74.0060",
+        ],
+    );
+}
+
+const EMOJI_LABEL: &str = "representation.text.emoji";
+
+/// UTS #51: keycap sequences, a digit, `#` or `*`, an optional U+FE0F and
+/// U+20E3, join the symbol class.
+#[test]
+fn emoji_accepts_source_forms() {
+    assert_pattern_boundary(
+        EMOJI_LABEL,
+        &[
+            "1\u{fe0f}\u{20e3}",
+            "#\u{fe0f}\u{20e3}",
+            "*\u{fe0f}\u{20e3}",
+            "1\u{20e3}",
+            "\u{1f600}",
+            "\u{2764}\u{fe0f}",
+            "\u{1f600}1\u{fe0f}\u{20e3}",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn emoji_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        EMOJI_LABEL,
+        &[],
+        &["1", "#", "a\u{20e3}", "10", "1\u{fe0f}", "12\u{20e3}"],
+    );
+}
+
+const SMILES_LABEL: &str = "representation.scientific.smiles";
+
+/// OpenSMILES: `*` (the wildcard atom) and `$` (the quadruple bond).
+#[test]
+fn smiles_accepts_source_forms() {
+    assert_pattern_boundary(
+        SMILES_LABEL,
+        &[
+            "[*]CC",
+            "*C",
+            "[Re]$[Re]",
+            "CC(=O)Oc1ccccc1C(=O)O",
+            "[Na+].[Cl-]",
+            "C\\C=C/C",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn smiles_rejects_undefined_forms() {
+    assert_pattern_boundary(SMILES_LABEL, &[], &["C C", "C;C", "C,C", "C{C}", ""]);
+}
+
+/// The detector keeps the old class, so `*` and `$` forms conform without
+/// counting.
+#[test]
+fn smiles_detector_keeps_old_class() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(SMILES_LABEL, &tax).expect("smiles rule");
+    let detector = detector_for(SMILES_LABEL);
+    assert!(detector.is_some());
+    for ok in ["CCO", "CC(=O)Oc1ccccc1C(=O)O", "[Na+].[Cl-]"] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for conforming in ["[*]CC", "*C", "[Re]$[Re]"] {
+        assert!(rule.is_valid(conforming), "{conforming:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, conforming),
+            "{conforming:?}"
+        );
+    }
+    for bad in ["C C", "C;C", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+    // Over the rule's maxLength of 1000: the detector never widens the rule.
+    let long = "C".repeat(1001);
+    assert!(!passes_detector_or_rule(detector, &rule, &long));
+}
+
+const PROTEIN_LABEL: &str = "representation.scientific.protein_sequence";
+
+/// IUPAC one-letter code and NCBI BLAST: B, Z, U, O and the gap `-` join the
+/// 20 standard letters, X and `*`. J is not in the IUPAC table.
+#[test]
+fn protein_sequence_accepts_source_forms() {
+    assert_pattern_boundary(
+        PROTEIN_LABEL,
+        &["MKVBZU", "MKV-LLI", "MKOVL", "MKVLLIVGS", "MKXV*"],
+        &[],
+    );
+}
+
+#[test]
+fn protein_sequence_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        PROTEIN_LABEL,
+        &[],
+        &["MKV LLI", "MKV1", "MKVJLI", "mkvlli", ""],
+    );
+}
+
+/// The detector keeps the old class (the 20 standard letters, X and `*`), so
+/// the ambiguity codes, rare residues and gap conform without counting.
+#[test]
+fn protein_sequence_detector_keeps_old_class() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(PROTEIN_LABEL, &tax).expect("protein rule");
+    let detector = detector_for(PROTEIN_LABEL);
+    assert!(detector.is_some());
+    for ok in ["MKVLLIVGS", "ACDEFGHIKLMNPQRSTVWYXX*"] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for conforming in ["MKVBZU", "MKV-LLI", "MKOVL"] {
+        assert!(rule.is_valid(conforming), "{conforming:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, conforming),
+            "{conforming:?}"
+        );
+    }
+    for bad in ["MKV LLI", "MKV1", "MKVJLI", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
+const COLOR_RGB_LABEL: &str = "representation.format.color_rgb";
+
+/// CSS Color 3 and 4: `rgb(`/`rgba(` with three integers or three percentages
+/// and an optional alpha, comma-separated or space-separated with `/ alpha`.
+/// The bare and parenthesised triples the old rule took stay.
+#[test]
+fn color_rgb_accepts_source_forms() {
+    assert_pattern_boundary(
+        COLOR_RGB_LABEL,
+        &[
+            "rgba(0, 0, 255, 0.5)",
+            "rgba(0,0,255,.5)",
+            "rgb(255, 0, 0, 50%)",
+            "rgb(100% 0% 0% / 50%)",
+            "rgb(255 0 0)",
+            "rgb(255 128 0 / 0.5)",
+            "rgb(12.5%, 0%, 100%)",
+            "rgb(255, 0, 0)",
+            "255,0,0",
+            "(255, 0, 0)",
+            // CSS Color 4 modern syntax: mixing, decimals and none.
+            "rgb(100% 0 0)",
+            "rgb(127.5 0 0)",
+            "rgb(none 0 0)",
+            "rgb(0 none 128 / none)",
+            // whitespace before a comma; a leading-dot percentage.
+            "rgb(255 , 0 , 0)",
+            "rgb(1.5, 0, 0)",
+            "rgb(.5% 0% 0%)",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn color_rgb_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        COLOR_RGB_LABEL,
+        &[],
+        &[
+            "rgb(255, 0)",
+            "(0.1, 0.2, 0.5)",
+            "rgb(255 0)",
+            "rgb(255 0 0 0.5)",
+            "rgb(255, 0, 0 / 0.5)",
+            "rgb(255 0 0, 0.5)",
+            "rgb(100%, 0, 0)",
+            "rgb(none, 0, 0)",
+            "rgba(0, 0, 255, )",
+            "",
+        ],
+    );
+}
+
+const COLOR_HSL_LABEL: &str = "representation.format.color_hsl";
+
+/// CSS Color 4 (MDN): the modern space-separated syntax with optional
+/// `/ alpha`, `deg`, bare-number saturation and lightness, decimals and `none`;
+/// the legacy comma syntax keeps percentages.
+#[test]
+fn color_hsl_accepts_source_forms() {
+    assert_pattern_boundary(
+        COLOR_HSL_LABEL,
+        &[
+            "hsl(120deg 75% 25% / 60%)",
+            "hsl(540 0 0)",
+            "hsl(120.5, 100%, 50%)",
+            "hsl(none 100% 50%)",
+            "hsl(120 none none / none)",
+            "hsla(240, 100%, 50%, 0.5)",
+            "hsla(240, 100%, 50%, 50%)",
+            "hsl(120 75% 25%)",
+            "hsl(.5 .5% .5%)",
+            "hsl(120, 100%, 50%)",
+            "hsl( 120 , 100% , 50% )",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn color_hsl_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        COLOR_HSL_LABEL,
+        &[],
+        &[
+            "hsl(120 75%)",
+            "hsl(120, 75% 25%)",
+            "hsl(120, 75, 25)",
+            "hsl(120, none, 50%)",
+            "hsl(120, 75%, 25% / 0.5)",
+            "hsl(120 75% 25%, 0.5)",
+            "hsl(120 75% 25% 0.5)",
+            "hsl(120 75% 25% /)",
+            "hsl(120 75% 25% 60%)",
+            "hsla(120, 50%, 50%, 1.)",
+            "hsl(deg 75% 25%)",
+            "",
+        ],
+    );
+}
+
+const COLOR_HEX_LABEL: &str = "representation.format.color_hex";
+
+/// CSS Color 4: `#` with 3, 4, 6 or 8 hex digits.
+#[test]
+fn color_hex_accepts_source_forms() {
+    assert_pattern_boundary(
+        COLOR_HEX_LABEL,
+        &["#0000ffcc", "#f00c", "#FF0000", "#f00", "#0000FFCC"],
+        &[],
+    );
+}
+
+#[test]
+fn color_hex_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        COLOR_HEX_LABEL,
+        &[],
+        &[
+            "0000ffcc", "f00c", "#12345", "#1234567", "#12", "12345", "#ggg", "2019", "20190101",
+        ],
+    );
+}
+
+/// The bare 3- and 6-digit forms stay accepted, with a `nonstandard` note for
+/// the missing `#`; the `#` forms conform.
+#[test]
+fn color_hex_grades_bare_forms_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in ["#FF0000", "#f00", "#f00c", "#0000ffcc"] {
+        assert_eq!(
+            grade_value_for_label(value, COLOR_HEX_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    for value in ["FF0000", "f00"] {
+        match grade_value_for_label(value, COLOR_HEX_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::Nonstandard, "{value}");
+                assert_eq!(note.detail, "leading #", "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
+        }
+    }
+}
+
+const IP_V6_LABEL: &str = "technology.internet.ip_v6";
+
+/// RFC 4291 section 2.2: the full, `::`-compressed and IPv4-mixed forms.
+#[test]
+fn ip_v6_accepts_source_forms() {
+    assert_pattern_boundary(
+        IP_V6_LABEL,
+        &[
+            "2001:db8:85a3::8a2e:370:7334",
+            "::1",
+            "::",
+            "fe80::1",
+            "::ffff:192.0.2.128",
+            "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+            "1::",
+            "::ffff:0:0",
+            "1:2:3:4:5:6:7::",
+            "::2:3:4:5:6:7:8",
+            "1:2:3:4:5:6:1.2.3.4",
+            "1::1.2.3.4",
+            "1:2:3:4:5::1.2.3.4",
+            "::1.2.3.4",
+            "64:ff9b::192.0.2.33",
+            "2001:DB8::ABCD",
+        ],
+        &[],
+    );
+}
+
+/// Two `::`, a short group count without `::`, a 9-group value, a bad octet or
+/// digit, and a zone ID are not RFC 4291 addresses.
+#[test]
+fn ip_v6_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        IP_V6_LABEL,
+        &[],
+        &[
+            "1::2::3",
+            "12:34:56:78:9a:bc",
+            "::ffff:192.0.2.256",
+            "2001:db8::g",
+            "1:2:3:4:5:6:7:8:9",
+            "1:2:3:4:5:6:7::8",
+            "::1:2:3:4:5:6:7:8",
+            "12345::1",
+            ":1",
+            "1:",
+            ":::",
+            "fe80::1%eth0",
+            "::ffff:192.0.2",
+            "::ffff:01.2.3.4",
+            "1:2:3:4:5:6:7:1.2.3.4",
+            "1:2:3:4:5:6::1.2.3.4",
+        ],
+    );
+}
+
+const HOSTNAME_LABEL: &str = "technology.internet.hostname";
+
+/// RFC 3696: an absolute name may end in one full stop.
+#[test]
+fn hostname_accepts_source_forms() {
+    assert_pattern_boundary(
+        HOSTNAME_LABEL,
+        &[
+            "example.com.",
+            "localhost",
+            "localhost.",
+            "a.b.c.",
+            "example.com",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn hostname_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        HOSTNAME_LABEL,
+        &[],
+        &[
+            "example..com",
+            ".example.com",
+            ".",
+            "example.com..",
+            "example .com.",
+            "-a.com.",
+        ],
+    );
+}
+
+/// The detector counts a trailing full stop only after a dotted name, so a lone
+/// word that ends a sentence conforms but is not counted for discrimination.
+#[test]
+fn hostname_detector_keeps_out_lone_words_with_a_stop() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(HOSTNAME_LABEL, &tax).expect("hostname rule");
+    let detector = detector_for(HOSTNAME_LABEL);
+    assert!(detector.is_some());
+    for kept in ["example.com", "localhost", "example.com.", "a.bc."] {
+        assert!(passes_detector_or_rule(detector, &rule, kept), "{kept:?}");
+    }
+    for word in [
+        "done.",
+        "inc.",
+        "localhost.",
+        "ok.",
+        "a.m.",
+        "p.m.",
+        "e.g.",
+        "u.s.",
+    ] {
+        assert!(rule.is_valid(word), "{word:?} conforms");
+        assert!(!passes_detector_or_rule(detector, &rule, word), "{word:?}");
+    }
+}
+
+const DATA_URI_LABEL: &str = "technology.internet.data_uri";
+
+/// RFC 2397: the data may be empty; the Fetch Standard matches `base64`
+/// case-insensitively.
+#[test]
+fn data_uri_accepts_source_forms() {
+    assert_pattern_boundary(
+        DATA_URI_LABEL,
+        &[
+            "data:,",
+            "data:text/plain;BASE64,SGk=",
+            "data:text/plain;Base64,SGk=",
+            "data:text/plain;base64,",
+            "data:;base64,SGk=",
+            "data:text/plain;charset=utf-8,Hi",
+            "data:image/png;base64,iVBORw0KGgo=",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn data_uri_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        DATA_URI_LABEL,
+        &[],
+        &[
+            "data:",
+            "data:text/plain",
+            "data:text/plain;base64",
+            "data:text/plain;base63,SGk=",
+            "text/plain;base64,SGk=",
+            "DATA:,",
+        ],
+    );
+}
+
+const S3_URI_LABEL: &str = "technology.cloud.s3_uri";
+
+/// AWS CLI S3Uri: an access-point ARN may stand in for the bucket.
+#[test]
+fn s3_uri_accepts_source_forms() {
+    assert_pattern_boundary(
+        S3_URI_LABEL,
+        &[
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint/mykey",
+            "s3://my-bucket/data/file.csv",
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint",
+            "s3://arn:aws-cn:s3:cn-north-1:123456789012:accesspoint/my-ap/a/b.csv",
+            "s3://arn:aws-us-gov:s3:us-gov-west-1:123456789012:accesspoint/my-ap/",
+            "s3://my-bucket",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn s3_uri_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        S3_URI_LABEL,
+        &[],
+        &[
+            "s3://arn:aws:s3:us-west-2:1234:accesspoint/x",
+            "s3://A",
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/x",
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/-bad-name",
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/UPPER",
+            "s3://arn:aws:s3:us-west-2:123456789012:accesspoint",
+            "s3://arn:aws:s3:::my-bucket",
+            "s3://arn:aws:ec2:us-west-2:123456789012:accesspoint/myaccesspoint",
+            "s3://arn:azure:s3:us-west-2:123456789012:accesspoint/myaccesspoint",
+        ],
+    );
+}
+
+/// The bare `::` conforms (grading) but is not counted for discrimination.
+#[test]
+fn ip_v6_detector_keeps_out_the_bare_double_colon() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(IP_V6_LABEL, &tax).expect("ip_v6 rule");
+    let detector = detector_for(IP_V6_LABEL);
+    assert!(detector.is_some());
+    assert!(rule.is_valid("::"));
+    assert!(!passes_detector_or_rule(detector, &rule, "::"));
+    for kept in ["::1", "1::", "fe80::1", "::ffff:192.0.2.128"] {
+        assert!(passes_detector_or_rule(detector, &rule, kept), "{kept:?}");
+    }
+}
+
+const VERSION_LABEL: &str = "technology.development.version";
+
+/// Semantic Versioning 2.0.0: pre-release and build identifiers are dot-separated
+/// runs of `[0-9A-Za-z-]`, so a hyphen may appear inside them.
+#[test]
+fn version_accepts_source_forms() {
+    assert_pattern_boundary(
+        VERSION_LABEL,
+        &[
+            "1.2.3-alpha-1",
+            "1.0.0+build-7",
+            "v1.2.3",
+            "1.2.3-beta.1+exp.sha.5114f85",
+            "1.0.0-0.3.7",
+            "1.02.3",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn version_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        VERSION_LABEL,
+        &[],
+        &[
+            "1.2",
+            "1.2.3-",
+            "1.2.3-al pha",
+            "1.2.3+",
+            // Semantic Versioning requires every identifier to be non-empty; the old
+            // rule took these.
+            "1.2.3-alpha.",
+            "1.2.3-a..b",
+            "1.2.3-.x",
+            "1.0.0+build.",
+            "1.0.0+a..b",
+        ],
+    );
+}
+
+/// A leading zero in a numeric identifier is not Semantic Versioning, so it is
+/// accepted with a note.
+#[test]
+fn version_grades_leading_zeros_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in ["1.2.3", "v1.2.3", "1.2.3-alpha-1", "1.0.0+build-7", "0.0.0"] {
+        assert_eq!(
+            grade_value_for_label(value, VERSION_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    for value in ["1.02.3", "01.2.3", "1.2.3-01"] {
+        match grade_value_for_label(value, VERSION_LABEL, &tax) {
+            Grade::Noted(note) => {
+                assert_eq!(note.kind, NoteKind::Nonstandard, "{value}");
+                assert_eq!(note.detail, "no leading zeros", "{value}");
+            }
+            other => panic!("{value} should be noted, got {other:?}"),
+        }
+    }
+}
+
+const CALVER_LABEL: &str = "technology.development.calver";
+
+/// calver.org: the month and the day are `MM`/`0M` and `DD`/`0D`, so a single
+/// digit is a calendar version too.
+#[test]
+fn calver_accepts_source_forms() {
+    assert_pattern_boundary(
+        CALVER_LABEL,
+        &[
+            "2024.2.9",
+            "2024.12.31",
+            "2024.1",
+            "2024.02",
+            "2024.01.15.1",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn calver_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        CALVER_LABEL,
+        &[],
+        &["24.2", "2024..1", "2024", "2024.", "2024.123", "2024.1x"],
+    );
+}
+
+/// `2024.1` and `2020.5` conform but are also decimals, so the detector does not
+/// count them; a two-digit month or a third component does.
+#[test]
+fn calver_detector_keeps_out_decimals() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(CALVER_LABEL, &tax).expect("calver rule");
+    let detector = detector_for(CALVER_LABEL);
+    assert!(detector.is_some());
+    for kept in [
+        "2024.02",
+        "2024.12",
+        "2024.2.9",
+        "2024.12.31",
+        "2024.01.15.1",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, kept), "{kept:?}");
+    }
+    for out in ["2024.1", "2020.5", "1999.9", "2024.1.", "24.2", "2024"] {
+        assert!(
+            !passes_detector_or_rule(detector, &rule, out),
+            "{out:?} is not counted"
+        );
+    }
+    for decimal in ["2024.1", "2020.5"] {
+        assert!(rule.is_valid(decimal), "{decimal:?} conforms");
+    }
+}
+
+const DOCKER_REF_LABEL: &str = "technology.development.docker_ref";
+
+/// OCI distribution spec: a tag is `[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}`. OCI image
+/// spec: a digest algorithm is `sha256`, `sha512` or `blake3`.
+#[test]
+fn docker_ref_accepts_source_forms() {
+    let sha512 = format!("app@sha512:{}", "a".repeat(128));
+    let blake3 = format!("app@blake3:{}", "b".repeat(64));
+    let sha256_upper = format!("app@sha256:{}", "ABCDEF01".repeat(8));
+    let tag_128 = format!("app:{}", "a".repeat(128));
+    let with_tag_and_digest = format!("ghcr.io/org/app:v1@sha512:{}", "0".repeat(128));
+    assert_pattern_boundary(
+        DOCKER_REF_LABEL,
+        &[
+            "app:_dev",
+            &sha512,
+            &blake3,
+            &sha256_upper,
+            &tag_128,
+            &with_tag_and_digest,
+            "nginx:latest",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn docker_ref_rejects_undefined_forms() {
+    let tag_129 = format!("app:{}", "a".repeat(129));
+    let md5 = format!("app@md5:{}", "a".repeat(32));
+    let short_sha512 = format!("app@sha512:{}", "a".repeat(64));
+    let long_blake3 = format!("app@blake3:{}", "a".repeat(128));
+    assert_pattern_boundary(
+        DOCKER_REF_LABEL,
+        &[],
+        &[
+            "app:.dev",
+            "app:-dev",
+            &tag_129,
+            &md5,
+            &short_sha512,
+            &long_blake3,
+        ],
+    );
+}
+
+const JWT_LABEL: &str = "technology.cryptographic.jwt";
+
+/// RFC 7519 section 6.1: the example Unsecured JWT (empty signature).
+const JWT_UNSECURED: &str = "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.";
+
+/// RFC 7516 appendix A.1.7: the complete JWE Compact Serialization example.
+const JWT_JWE: &str = "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ";
+
+const JWT_JWS: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+
+/// RFC 7519 allows an Unsecured JWT, which ends in a dot, and RFC 7516 defines the
+/// five-part JWE compact form, whose encrypted key may be empty.
+#[test]
+fn jwt_accepts_source_forms() {
+    let empty_key = JWT_JWE.replacen(
+        ".OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.",
+        "..",
+        1,
+    );
+    assert!(empty_key.contains(".."), "the encrypted key is empty");
+    assert_pattern_boundary(
+        JWT_LABEL,
+        &[JWT_UNSECURED, JWT_JWE, &empty_key, JWT_JWS],
+        &[],
+    );
+}
+
+#[test]
+fn jwt_rejects_undefined_forms() {
+    let four_part = format!("{JWT_JWS}.eyJhbGciOiJub25lIn0");
+    let two_part = "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UifQ";
+    // A JWE is exactly five parts: four segments, or the first three of a JWE.
+    let jwe_four: String = JWT_JWE.rsplitn(2, '.').last().unwrap().to_string();
+    assert_pattern_boundary(
+        JWT_LABEL,
+        &[],
+        &[
+            "a.b.c",
+            &four_part,
+            two_part,
+            &jwe_four,
+            "...",
+            "eyJhbGciOiJub25lIn0..",
+            ".eyJpc3MiOiJqb2UifQ.",
+        ],
+    );
+}
+
+/// The detector counts the three-segment shape the type was first defined by, and
+/// a JWE or an unsecured token only when its header decodes to JSON with `alg`;
+/// dotted names that fit the widened rule conform but are not counted.
+#[test]
+fn jwt_detector_keeps_out_dotted_names() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(JWT_LABEL, &tax).expect("jwt rule");
+    let detector = detector_for(JWT_LABEL);
+    assert!(detector.is_some());
+    for kept in [JWT_JWS, JWT_UNSECURED, JWT_JWE] {
+        assert!(passes_detector_or_rule(detector, &rule, kept), "{kept:?}");
+    }
+    for not_counted in [
+        "internationalization.configuration.",
+        "springframework.web.configuration.mvcdispatcher.DispatcherServlet",
+        "abcdefghijk.lmnopqrstuv.wxyzabcdefg.hijklmnopqr.stuvwxyzabc",
+    ] {
+        assert!(rule.is_valid(not_counted), "{not_counted:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, not_counted),
+            "{not_counted:?} is not counted"
+        );
+    }
+}
+
+const PG_SHORT_OFFSET_LABEL: &str = "datetime.timestamp.pg_short_offset";
+
+/// PostgreSQL's ISO output (`DateStyle` ISO) writes the fraction only when it is
+/// non-zero and trims trailing zeros, so one to six digits or none.
+#[test]
+fn pg_short_offset_accepts_source_forms() {
+    assert_pattern_boundary(
+        PG_SHORT_OFFSET_LABEL,
+        &[
+            "2022-01-06 18:00:00+03",
+            "1997-12-17 07:37:16-08",
+            "2022-01-06 18:00:00.5+03",
+            "2024-01-15 14:30:00.123456-05",
+            "2023-12-31 23:59:59.000000+00",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn pg_short_offset_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        PG_SHORT_OFFSET_LABEL,
+        &[],
+        &[
+            "2022-01-06 18:00:00+3",
+            "2022-01-06 18:00:00.1234567+03",
+            "2022-01-06 18:00:00.+03",
+            "2022-01-06 18:00:00",
+            "2022-01-06 18:00:00+03:00",
+            "2022-01-06 18:00:00+0300",
+            "2022-01-06T18:00:00+03",
+        ],
+    );
+}
+
+const ISO_DURATION_LABEL: &str = "datetime.duration.iso_8601";
+
+/// ISO 8601-1 section 5.5.2.3: the smallest component may carry a decimal
+/// fraction, with a comma (preferred) or a full stop; section 5.5.2.4 gives the
+/// alternative format `PYYYY-MM-DDThh:mm:ss`.
+#[test]
+fn iso_duration_accepts_source_forms() {
+    assert_pattern_boundary(
+        ISO_DURATION_LABEL,
+        &[
+            "P0,5Y",
+            "PT0.5S",
+            "PT1H30,5M",
+            "P0003-06-04T12:30:05",
+            "P2W",
+            "P0.5Y",
+            "P1Y2,5M",
+            "P1DT1.5H",
+            "-P1,5D",
+            "PT30M",
+            "P1Y2M3DT4H5M6.5S",
+            "P0001-12-30T24:59:59",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn iso_duration_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        ISO_DURATION_LABEL,
+        &[],
+        &[
+            "P0.5Y1M",
+            "P1,5Y2M",
+            "PT1.5H30M",
+            "PT1.5H2.5M",
+            "P0.5YT1H",
+            "P",
+            "PT",
+            "P.5Y",
+            "P1.Y",
+            "PT0,S",
+            "P0003-13-04T12:30:05",
+            "P0003-06-31T12:30:05",
+            "P0003-06-04T12:30",
+            "P0003-06-04",
+        ],
+    );
+}
+
+/// ISO 8601-1 allows 60 as the minute or second of the alternative format. The rule
+/// deliberately rejects it (a deviation from the standard) because the transform
+/// cannot cast an interval with a 60 there; `notes` say so.
+#[test]
+fn iso_duration_rejects_sixty_in_the_alternative_format_by_design() {
+    assert_pattern_boundary(
+        ISO_DURATION_LABEL,
+        &[],
+        &["P0003-06-04T12:60:05", "P0003-06-04T12:30:60"],
+    );
+}
+
+const MONTH_YEAR_ABBREV_LABEL: &str = "datetime.date.month_year_abbrev";
+
+/// The abbreviations Metadata.NSW and the US BLS write: the three-letter month
+/// in title or upper case, plus `Sept`, `June` and `July`.
+#[test]
+fn month_year_abbrev_accepts_source_forms() {
+    assert_pattern_boundary(
+        MONTH_YEAR_ABBREV_LABEL,
+        &[
+            "JAN 2024",
+            "Sept 2026",
+            "June 2026",
+            "Jan 2024",
+            "SEPT 2026",
+            "JULY 2025",
+            "July 2025",
+            "MAY 1999",
+            "Dec 2023",
+        ],
+        &[],
+    );
+}
+
+/// `Xyz 2024` and `Foo 2024` were accepted by the old rule, which took any
+/// capitalised three letters; the sources name twelve months, so they go.
+#[test]
+fn month_year_abbrev_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        MONTH_YEAR_ABBREV_LABEL,
+        &[],
+        &[
+            "Janu 2024",
+            "Jan 24",
+            "Xyz 2024",
+            "Foo 2024",
+            "jan 2024",
+            "Sep. 2024",
+            "Sept. 2024",
+            "January 2024",
+            "Jan2024",
+            "Jan 2024-01",
+        ],
+    );
+}
+
+const ISO_WEEK_LABEL: &str = "datetime.date.iso_week";
+
+/// ISO 8601-1 section 5.2.4: week 01 to 53, two digits. A one-digit week is
+/// accepted as before and graded as non-canonical.
+#[test]
+fn iso_week_accepts_source_forms() {
+    assert_pattern_boundary(
+        ISO_WEEK_LABEL,
+        &[
+            "2024-W03", "2020-W53", "2019-W52", "2024-W01", "2024-W10", "2024-W49", "2024-W50",
+            "2024-W3",
+        ],
+        &[],
+    );
+}
+
+/// ISO 8601 numbers weeks 01 to 53, so the source requires rejecting week 00 and
+/// weeks 54 to 99, which the old `\d{1,2}` accepted.
+#[test]
+fn iso_week_rejects_weeks_outside_one_to_fifty_three() {
+    assert_pattern_boundary(
+        ISO_WEEK_LABEL,
+        &[],
+        &[
+            "2024-W00",
+            "2024-W54",
+            "2024-W99",
+            "2024-W60",
+            "2024-W0",
+            "2024-W100",
+            "24-W03",
+            "2024W03",
+            "2024-w03",
+        ],
+    );
+}
+
+#[test]
+fn iso_week_grades_a_one_digit_week_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    for value in ["2024-W03", "2020-W53", "2024-W12"] {
+        assert_eq!(
+            grade_value_for_label(value, ISO_WEEK_LABEL, &tax),
+            Grade::Conforms,
+            "{value}"
+        );
+    }
+    match grade_value_for_label("2024-W3", ISO_WEEK_LABEL, &tax) {
+        Grade::Noted(note) => {
+            assert_eq!(note.kind, NoteKind::NonCanonical);
+            assert_eq!(note.detail, "two-digit week");
+        }
+        other => panic!("2024-W3 should be noted, got {other:?}"),
+    }
+}
+
+const CHINESE_YMD_LABEL: &str = "datetime.date.chinese_ymd";
+
+/// gov.cn writes month and day with or without a leading zero.
+#[test]
+fn chinese_ymd_accepts_source_forms() {
+    assert_pattern_boundary(
+        CHINESE_YMD_LABEL,
+        &[
+            "2024\u{5E74}01\u{6708}11\u{65E5}",
+            "2024\u{5E74}1\u{6708}15\u{65E5}",
+            "2024\u{5E74}12\u{6708}31\u{65E5}",
+            "2024\u{5E74}09\u{6708}05\u{65E5}",
+            "2024\u{5E74}1\u{6708}5\u{65E5}",
+            "2023\u{5E74}12\u{6708}25\u{65E5}",
+        ],
+        &[],
+    );
+}
+
+/// Month 13 to 99 and day 0 or 32 to 39 were accepted by the old rule; no
+/// calendar has them.
+#[test]
+fn chinese_ymd_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        CHINESE_YMD_LABEL,
+        &[],
+        &[
+            "2024\u{5E74}13\u{6708}01\u{65E5}",
+            "2024\u{5E74}13\u{6708}15\u{65E5}",
+            "2024\u{5E74}1\u{6708}",
+            "2024\u{5E74}1\u{6708}0\u{65E5}",
+            "2024\u{5E74}00\u{6708}10\u{65E5}",
+            "2024\u{5E74}2\u{6708}39\u{65E5}",
+            "2024\u{5E74}1\u{6708}32\u{65E5}",
+            "2024-01-11",
+        ],
+    );
+}
+
+const IANA_LABEL: &str = "datetime.offset.iana";
+
+/// The tz database names locations with hyphens (`Port-au-Prince`), and
+/// `etcetera` defines `Etc/GMT+N` for N 0 to 12 and `Etc/GMT-N` for N 0 to 14.
+#[test]
+fn iana_accepts_source_forms() {
+    assert_pattern_boundary(
+        IANA_LABEL,
+        &[
+            "America/Port-au-Prince",
+            "Etc/GMT+4",
+            "Etc/GMT-14",
+            "America/Argentina/Buenos_Aires",
+            "America/New_York",
+            "America/Blanc-Sablon",
+            "Asia/Ust-Nera",
+            "Etc/GMT+0",
+            "Etc/GMT+12",
+            "Etc/GMT-0",
+            "Etc/GMT-1",
+            "Etc/GMT+1",
+            "Etc/GMT0",
+            "America/North_Dakota/New_Salem",
+            "Etc/UTC",
+        ],
+        &[],
+    );
+}
+
+#[test]
+fn iana_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        IANA_LABEL,
+        &[],
+        &[
+            "Etc/GMT+13",
+            "Etc/GMT-15",
+            "Etc/GMT+14",
+            "Etc/GMT+",
+            "Etc/GMT+04",
+            "America/New York",
+            "GMT+4",
+            "America",
+            "America/",
+            "America/-",
+            "America/..",
+            "america/New_York",
+            "Europe/London/Soho/Street",
+            "America/New_York/",
+            "Etc/GMT+4x",
+        ],
+    );
+}
+
+const AMOUNT_MULTISYM_LABEL: &str = "finance.currency.amount_multisym";
+
+/// CLDR writes the symbol after the number for Czech (`1 234,56 Kč`), Polish
+/// (`1 234,56 zł`) and Danish (`1.234,56 kr.`), with U+00A0 or U+202F between
+/// the digit groups and before the symbol; `kr.` is a symbol. The prefix forms
+/// the type already took stay.
+#[test]
+fn amount_multisym_accepts_source_forms() {
+    assert_pattern_boundary(
+        AMOUNT_MULTISYM_LABEL,
+        &[
+            "1 234,56 K\u{10d}",
+            "1 234,56 z\u{142}",
+            "kr. 1.234,56",
+            "K\u{10d} 1 234,56",
+            // CLDR's no-break space and narrow no-break space
+            "1\u{a0}234,56\u{a0}K\u{10d}",
+            "1\u{202f}234,56\u{202f}z\u{142}",
+            "1.234,56\u{a0}kr.",
+            "1 234,56 kr",
+            "-1 234,56 K\u{10d}",
+            "1234 K\u{10d}",
+            "1234,5z\u{142}",
+            "kr.1234",
+            // the forms the type already took
+            "R$ 1.234,56",
+            "kr 1 234,56",
+        ],
+        &[],
+    );
+}
+
+/// A symbol with no amount is not an amount, and neither is an amount followed
+/// by a symbol the sources do not list after the number.
+#[test]
+fn amount_multisym_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        AMOUNT_MULTISYM_LABEL,
+        &[],
+        &[
+            "K\u{10d}",
+            "z\u{142}",
+            "kr.",
+            "1 234,56 \u{20ac}",
+            "1 234,56 K\u{10d} apple",
+            "1 234,56 K\u{10d} ",
+            "K\u{10d} 1 234,56 K\u{10d}",
+            "1 234,56 Kr",
+            "1 234, K\u{10d}",
+            "1 234,56 K\u{10d}.",
+        ],
+    );
+}
+
+const AMOUNT_LAKH_LABEL: &str = "finance.currency.amount_lakh";
+
+/// DICGC writes the rupee sign with a space before the figure (`₹ 5,00,000`);
+/// the unspaced forms the type already took stay.
+#[test]
+fn amount_lakh_accepts_source_forms() {
+    assert_pattern_boundary(
+        AMOUNT_LAKH_LABEL,
+        &[
+            "\u{20b9} 5,00,000",
+            "\u{20b9}4,99,000",
+            "\u{20b9} 12,34,567.89",
+            "\u{20b9}1,00,00,000.00",
+            "Rs. 1,23,456.78",
+            "5,00,000",
+        ],
+        &[],
+    );
+}
+
+/// Lakh grouping is two digits, then a final group of three.
+#[test]
+fn amount_lakh_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        AMOUNT_LAKH_LABEL,
+        &[],
+        &[
+            "\u{20b9} 5,0,000",
+            "\u{20b9} 500,000",
+            "\u{20b9}  5,00,000",
+            "\u{20b9} ",
+            "\u{20b9} 5,00,000 ",
+        ],
+    );
+}
+
+const TICKER_LABEL: &str = "finance.securities.ticker";
+
+/// Numeric tickers of one to six digits (Hong Kong's `0005`, Tokyo's `7203`) are
+/// published symbols (Wikipedia, Ticker symbol), alongside the alphabetic forms.
+#[test]
+fn ticker_accepts_source_forms() {
+    assert_pattern_boundary(
+        TICKER_LABEL,
+        &["5", "0005", "7203", "600519", "AAPL", "BRK-B", "BF.B", "A"],
+        &[],
+    );
+}
+
+/// Seven digits is no ticker, nor is lower case or a mix of letters and digits.
+#[test]
+fn ticker_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        TICKER_LABEL,
+        &[],
+        &["1234567", "aapl", "AAPL1", "5A", "ABCDEFGH", "BRK-", "-5"],
+    );
+}
+
+const CUSIP_LABEL: &str = "finance.securities.cusip";
+
+/// The check digit that makes `body` (eight characters) a valid CUSIP, found by
+/// the library's own checker so the test carries no literal check digit.
+fn cusip_with_check_digit(body: &str) -> String {
+    (0..=9)
+        .map(|d| format!("{body}{d}"))
+        .find(|candidate| finetype_core::checksum::cusip(candidate))
+        .expect("exactly one digit completes a CUSIP")
+}
+
+/// A different digit from the valid check digit.
+fn cusip_with_wrong_check_digit(body: &str) -> String {
+    (0..=9)
+        .map(|d| format!("{body}{d}"))
+        .find(|candidate| !finetype_core::checksum::cusip(candidate))
+        .expect("nine digits are wrong")
+}
+
+/// CUSIP Global Services reserves `*`, `@` and `#` for private placement
+/// numbers, and the check digit values them 36, 37 and 38.
+#[test]
+fn cusip_accepts_private_placement_forms() {
+    let valid: Vec<String> = ["12345*10", "12345@10", "12345#10", "1234*A12", "*2345A10"]
+        .iter()
+        .map(|body| cusip_with_check_digit(body))
+        .collect();
+    let refs: Vec<&str> = valid.iter().map(String::as_str).collect();
+    assert_pattern_boundary(CUSIP_LABEL, &refs, &[]);
+    for v in &valid {
+        assert!(finetype_core::checksum::cusip(v), "{v}");
+    }
+    // the forms the type already took
+    assert_pattern_boundary(CUSIP_LABEL, &["037833100", "17275R102"], &[]);
+}
+
+/// The check digit is a digit, and only the three reserved characters join
+/// the alphabet. A wrong check digit is the checksum's to reject.
+#[test]
+fn cusip_rejects_undefined_forms() {
+    // A pattern cannot compute a check digit, so a wrong one is graded by the
+    // `checksum: cusip` directive, not by the rule.
+    let wrong = cusip_with_wrong_check_digit("12345*10");
+    let tax = load_taxonomy();
+    match finetype_core::grade_value_for_label(&wrong, CUSIP_LABEL, &tax) {
+        finetype_core::Grade::Fails { constraint, .. } => assert_eq!(constraint, "checksum"),
+        other => panic!("{wrong:?}: expected a checksum failure, got {other:?}"),
+    }
+    assert_pattern_boundary(
+        CUSIP_LABEL,
+        &[],
+        &[
+            "12345678*",
+            "12345678@",
+            "12345678#",
+            "1234$5100",
+            "12345 100",
+            "12345*1000",
+            "1234*100",
+            "12345*1o0",
+        ],
+    );
+}
+
+const GENDER_CODE_LABEL: &str = "identity.person.gender_code";
+
+/// ICAO Doc 9303 part 4 writes an unspecified sex as the filler `<` in the
+/// machine readable zone; ISO/IEC 5218 gives `9` for not applicable.
+#[test]
+fn gender_code_accepts_source_forms() {
+    assert_pattern_boundary(GENDER_CODE_LABEL, &["<", "M", "9", "F", "X", "0", "m"], &[]);
+}
+
+/// A doubled filler or a letter outside the code sets is no sex code.
+#[test]
+fn gender_code_rejects_undefined_forms() {
+    assert_pattern_boundary(GENDER_CODE_LABEL, &[], &["<<", "U", ">", "<M", ""]);
+}
+
+const NDC_LABEL: &str = "identity.medical.ndc";
+
+/// 21 CFR 207.33: a labeler code of up to six digits, a product code and a
+/// package code. The six-digit labeler forms are 6-4-1 and 6-3-2, and RxNorm
+/// writes a twelve-digit 6-4-2.
+#[test]
+fn ndc_accepts_source_forms() {
+    assert_pattern_boundary(
+        NDC_LABEL,
+        &[
+            "123456-7890-1",
+            "123456-789-01",
+            "123456-7890-12",
+            "0002-1433-80",
+            "12345-678-90",
+            "12345-6789-0",
+            "00021433801",
+        ],
+        &[],
+    );
+}
+
+/// A bare twelve-digit number is a UPC, not an NDC, and a seven-digit labeler
+/// is longer than any labeler code.
+#[test]
+fn ndc_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        NDC_LABEL,
+        &[],
+        &[
+            "123456789012",
+            "1234567-890-1",
+            "123456-78-901",
+            "123456-7890-123",
+            "123456-7890",
+        ],
+    );
+}
+
+const NAICS_LABEL: &str = "identity.industry.naics";
+
+/// NAICS Canada 2022 v1.0 adds sectors 41 (Wholesale Trade) and 91 (Public
+/// Administration) beside the US sectors.
+#[test]
+fn naics_accepts_canadian_sectors() {
+    assert_pattern_boundary(
+        NAICS_LABEL,
+        &[
+            "41", "411110", "91", "911110", "42", "92", "541511", "31-33",
+        ],
+        &[],
+    );
+}
+
+/// 40 and 90 are no sector in either country's scheme.
+#[test]
+fn naics_rejects_undefined_sectors() {
+    assert_pattern_boundary(NAICS_LABEL, &[], &["40", "90", "400000", "900000", "11-99"]);
+}
+
+const EIN_LABEL: &str = "identity.government.ein";
+
+/// The IRS writes an EIN as `NN-NNNNNNN`; the hyphen is dropped in extracts.
+#[test]
+fn ein_accepts_source_forms() {
+    assert_pattern_boundary(EIN_LABEL, &["12-3456789", "010548657", "123456789"], &[]);
+}
+
+#[test]
+fn ein_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        EIN_LABEL,
+        &[],
+        &[
+            "12-345678",
+            "1234567890",
+            "12345678",
+            "1-23456789",
+            "12--3456789",
+        ],
+    );
+}
+
+/// The bare nine digits are accepted with a note naming the hyphenated form.
+#[test]
+fn ein_grades_the_bare_form_as_noted() {
+    use finetype_core::{grade_value_for_label, Grade, NoteKind};
+    let tax = load_taxonomy();
+    assert_eq!(
+        grade_value_for_label("12-3456789", EIN_LABEL, &tax),
+        Grade::Conforms
+    );
+    match grade_value_for_label("010548657", EIN_LABEL, &tax) {
+        Grade::Noted(note) => {
+            assert_eq!(note.kind, NoteKind::NonCanonical);
+            assert_eq!(note.detail, "hyphenated");
+        }
+        other => panic!("010548657 should be noted, got {other:?}"),
+    }
+}
+
+/// A bare nine-digit number conforms to the rule but is not counted for
+/// discrimination: it is any nine-digit integer.
+#[test]
+fn ein_detector_keeps_out_the_bare_form() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(EIN_LABEL, &tax).expect("ein rule");
+    let detector = detector_for(EIN_LABEL);
+    assert!(detector.is_some(), "ein has a detector");
+    assert!(passes_detector_or_rule(detector, &rule, "12-3456789"));
+    for bare in ["010548657", "123456789"] {
+        assert!(rule.is_valid(bare), "{bare} conforms to the rule");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, bare),
+            "{bare} is not counted"
+        );
+    }
+}
+
+const ISBN_LABEL: &str = "identity.commerce.isbn";
+
+/// The ISBN Users' Manual (7th edition) separates the parts of an ISBN with
+/// hyphens or spaces.
+#[test]
+fn isbn_accepts_source_forms() {
+    assert_pattern_boundary(
+        ISBN_LABEL,
+        &[
+            "978 0 13 110362 7",
+            "0 13 110362 8",
+            "978-0-13-110362-7",
+            "0-13-110362-8",
+            "9780131103627",
+            "013110362X",
+            "0 13 110362 X",
+        ],
+        &[],
+    );
+}
+
+/// One kind of separator per value, and one separator between parts.
+#[test]
+fn isbn_rejects_undefined_forms() {
+    assert_pattern_boundary(
+        ISBN_LABEL,
+        &[],
+        &[
+            "978-0 13-110362-7",
+            "978  0 13 110362 7",
+            "978 0-13 110362 7",
+            "978 0 13 110362 7 ",
+            " 978 0 13 110362 7",
+            "978 0 13 110362",
+        ],
+    );
+}
+
+/// The ICAO filler `<` conforms to gender_code but is not counted for
+/// discrimination; the earlier codes still are, in either case.
+#[test]
+fn gender_code_detector_keeps_out_the_filler() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(GENDER_CODE_LABEL, &tax).expect("rule");
+    let detector = detector_for(GENDER_CODE_LABEL);
+    assert!(detector.is_some());
+    assert!(rule.is_valid("<"));
+    assert!(!passes_detector_or_rule(detector, &rule, "<"));
+    for code in ["M", "f", "X", "0", "1", "2", "9"] {
+        assert!(passes_detector_or_rule(detector, &rule, code), "{code}");
+    }
+}
+
+/// The six-digit-labeler NDC forms conform to the rule but are not counted for
+/// discrimination (ndc is an attractor leaf); the earlier shapes still are.
+#[test]
+fn ndc_detector_keeps_out_the_six_digit_labeler_forms() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(NDC_LABEL, &tax).expect("rule");
+    let detector = detector_for(NDC_LABEL);
+    assert!(detector.is_some());
+    for kept in [
+        "0002-1433-80",
+        "12345-678-90",
+        "12345-6789-0",
+        "00021433801",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, kept), "{kept}");
+    }
+    for out in ["123456-7890-1", "123456-789-01", "123456-7890-12"] {
+        assert!(rule.is_valid(out), "{out} conforms");
+        assert!(!passes_detector_or_rule(detector, &rule, out), "{out}");
+    }
+}
+
+/// Placeholder, testing and pre-2010 withdrawn ISO 4217 codes conform to the published
+/// rule but are not counted for discrimination; current codes are, in any case.
+#[test]
+fn currency_code_detector_keeps_placeholder_and_historic_codes_out() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(CURRENCY_CODE_LABEL, &tax).expect("currency_code rule");
+    let detector = detector_for(CURRENCY_CODE_LABEL);
+    assert!(detector.is_some());
+    for ok in ["USD", "EUR", "GBP", "JPY", "XCG", "XAU", "usd", "CHF"] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    // The rule itself still accepts the excluded codes.
+    // Codes withdrawn since 2010 still count: data from before the withdrawal
+    // carries them as real currencies.
+    for recent in ["BGN", "HRK", "ZWL", "VEF", "hrk"] {
+        assert!(
+            passes_detector_or_rule(detector, &rule, recent),
+            "{recent:?}"
+        );
+    }
+    for excluded in ["XXX", "XTS", "TRL", "ESP", "DEM", "trl"] {
+        assert!(
+            rule.validate(excluded).is_valid,
+            "{excluded:?} conforms to the rule"
+        );
+        assert!(
+            !passes_detector_or_rule(detector, &rule, excluded),
+            "{excluded:?}"
+        );
+    }
+    for bad in ["UDP", "TCP", "US", "USDD", ""] {
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
+/// The detector counts a value only when its month token is a CLDR abbreviated
+/// month for one of the type's Latin-script locales. Full month names and
+/// ordinary words conform to the published rule but are not counted.
+#[test]
+fn abbreviated_month_detector_keeps_full_names_and_words_out() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(ABBREVIATED_MONTH_LABEL, &tax).expect("rule");
+    let detector = detector_for(ABBREVIATED_MONTH_LABEL);
+    assert!(detector.is_some());
+    for ok in [
+        "4 Feb 2023",
+        "4 janv. 2023",
+        "4 ene 2023",
+        "Feb 4, 2023",
+        "Sept 4, 2023",
+        "Feb. 4, 2023",
+        "15 Mai 2024",
+        "12 d\u{e9}c. 2023",
+        "4 ao\u{fb}t 2023",
+        "4 FEB 2023",
+        "4 okt 2023",
+        "4 mrt 2023",
+        "4 Feb 23",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for bad in [
+        "4 February 2023",
+        "February 4, 2023",
+        "Room 12, 2023",
+        "Page 12, 2023",
+        "Suite 4, 2023",
+        "4 Tuesday 2023",
+        "4 Foo 2023",
+        "4 March 2023",
+        "15 June 2024",
+        "1 July 2023",
+    ] {
+        assert!(rule.validate(bad).is_valid, "{bad:?} conforms to the rule");
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
+/// AP style spells out March through July, but a spelled-out March, April, June
+/// or July is long_full_month's form (its transform reads `%B`), so it does not
+/// count here; the dotted AP abbreviation does, and so does May, which is its
+/// own CLDR abbreviation.
+#[test]
+fn abbreviated_month_detector_leaves_spelled_out_months_to_long_full_month() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(ABBREVIATED_MONTH_LABEL, &tax).expect("rule");
+    let detector = detector_for(ABBREVIATED_MONTH_LABEL);
+    assert!(passes_detector_or_rule(detector, &rule, "Feb. 4, 2023"));
+    for spelled in [
+        "March 4, 2023",
+        "July 4, 2023",
+        "April 4, 2023",
+        "June 15, 2024",
+    ] {
+        assert!(rule.is_valid(spelled), "{spelled:?} conforms");
+        assert!(
+            !passes_detector_or_rule(detector, &rule, spelled),
+            "{spelled:?}"
+        );
+    }
 }

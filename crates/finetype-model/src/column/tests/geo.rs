@@ -1175,3 +1175,46 @@ fn ac05_alpha2_regex_rejects_country_names() {
         );
     }
 }
+
+/// Publication 28 puts `AE`, `FM`, `MH` and `PW` in the US enum, so they are now
+/// both state codes and ISO country codes. A country-code column holding `AE`
+/// among other country codes still resolves to `country_code`: the vote reads the
+/// shipped taxonomy, where the other codes are countries only.
+#[test]
+fn state_code_vote_keeps_uae_country_column() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let vals: Vec<String> = ["AE", "GB", "FR", "IT", "ES", "AE", "JP", "BR", "AE", "SE"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    // Labelled state_code, the vote moves it to country_code.
+    let r = cc
+        .compose_from_sense("code", &vals, "geography.location.state_code", 0.90)
+        .unwrap();
+    assert_eq!(r.label, "geography.location.country_code");
+    // Labelled country_code, neither the vote nor the non-membership demotion
+    // moves it.
+    let r = cc
+        .compose_from_sense("code", &vals, "geography.location.country_code", 0.90)
+        .unwrap();
+    assert_eq!(r.label, "geography.location.country_code");
+}
+
+/// A column of the new US entries alone is a column of valid location codes, so
+/// the non-membership demotion leaves it on its label.
+#[test]
+fn state_code_new_us_entries_are_not_demoted() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let vals: Vec<String> = ["AA", "AE", "AP", "AE", "AP", "AA", "FM", "MH", "PW", "AE"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense("state", &vals, "geography.location.state_code", 0.90)
+        .unwrap();
+    assert_eq!(r.label, "geography.location.state_code");
+}

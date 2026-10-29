@@ -277,7 +277,7 @@ SELECT * FROM ft_validate('people',
   '{"properties":{"email":{"type":"string","pattern":"^[^@]+@[^@]+\\.[^@]+$"}}}');
 ```
 
-`ft_validate_text` is the per-cell verb behind the macro — it returns a STRUCT naming which constraint failed (mirroring the CLI `reject_errors` shape) plus the value's `grade` (`conforms`, `noted` or `fails`) and, for a noted value, its `note`, and applies the CLI null semantics (empty / `"null"` skip). `valid` and `grade` follow the fragment's JSON Schema keywords and note extensions only: the checksum (`x-finetype-label`) and case-folded enum checks that `finetype validate` applies are not applied here, so a right-shape value with a bad check digit conforms. For example:
+`ft_validate_text` is the per-cell verb behind the macro — it returns a STRUCT naming which constraint failed (mirroring the CLI `reject_errors` shape) plus the value's `grade` (`conforms`, `noted` or `fails`) and, for a noted value, its `note`, and applies the CLI null semantics (empty / `"null"` skip). `valid` and `grade` apply the same per-value check as `finetype validate` (`finetype_core::check_value_against_property`): the fragment's JSON Schema keywords, case-folded enum membership, the check digit of the leaf named by `x-finetype-label` (constraint `checksum`), and the note extensions, so a right-shape value with a bad check digit fails. For example:
 
 ```sql
 SELECT ft_validate_text('not-an-email',

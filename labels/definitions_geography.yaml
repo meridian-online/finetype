@@ -345,9 +345,11 @@ geography.location.country_code:
 geography.location.state_code:
   title: "State/Province Code"
   description: >
-    2-letter state or province abbreviation. Locale-specific due to
-    country-dependent subdivision codes (e.g., US states, CA provinces,
-    AU states/territories).
+    Two- or three-letter state or province abbreviation. Locale-specific due
+    to country-dependent subdivision codes (e.g., US states, CA provinces,
+    AU states/territories). The US form is the USPS abbreviation; the AU form
+    is the ISO 3166-2:AU subdivision code without its country prefix
+    (AU-NSW is the ISO 3166-2 form of NSW).
   designation: locale_specific
   locales: [EN_US, EN_CA, EN_AU]
   broad_type: VARCHAR
@@ -359,7 +361,7 @@ geography.location.state_code:
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Z]{2}$"
+    pattern: "^[A-Z]{2,3}$"
   validation_by_locale:
     EN_US:
       type: string
@@ -420,6 +422,12 @@ geography.location.state_code:
         - "MP"
         - "PR"
         - "VI"
+        - "FM"
+        - "MH"
+        - "PW"
+        - "AA"
+        - "AE"
+        - "AP"
     EN_CA:
       type: string
       enum:
@@ -455,15 +463,23 @@ geography.location.state_code:
     - "TX"
     - "FL"
     - "ON"
+    - "NSW"
   icon: map-pin
   canonical: "https://www.iso.org/iso-3166-country-codes.html"
   references: null
   notes: >
     New in v13. Separated from country_code remap (state_code→country_code
     was causing US state abbreviations like OR, CA, FL to train as country
-    codes). Locale-specific: US (50 states + DC + territories), CA
-    (13 provinces/territories), AU (8 states/territories). AU codes are
-    2-3 letters but universal pattern is ^[A-Z]{2}$ for the dominant case.
+    codes). Locale-specific: US (50 states + DC + territories, the freely
+    associated states FM, MH and PW, and the military codes AA, AE and AP, as
+    in USPS Publication 28 Appendix B), CA (13 provinces/territories), AU (8
+    states/territories, ISO 3166-2:AU). AU codes are 2-3 letters, so the
+    universal pattern is ^[A-Z]{2,3}$. FM, MH, PW and AE are also ISO 3166-1
+    country codes, so a bare column of them is ambiguous between the two types
+    (geo_code_membership_vote leaves such a column alone). For discrimination
+    a value counts only as two uppercase letters or an EN_AU three-letter
+    code, so three-letter airport and currency codes do not; the other
+    three-letter forms the pattern accepts conform but are not counted.
 
 geography.location.continent:
   title: "Continent Name"
@@ -678,6 +694,18 @@ geography.address.street_suffix:
       - Place
       - Plaza
       - Square
+      - CRT
+      - LANE
+      - RUE
+      - AV
+      - BOUL
+      - BVD
+      - BD
+      - str
+      - "Str."
+      - Crescent
+      - Terrace
+      - Close
   tier: [VARCHAR, address]
   aliases: [street_type]
   samples:
@@ -685,11 +713,23 @@ geography.address.street_suffix:
     - "Avenue"
     - "Boulevard"
     - "Road"
+    - "Crescent"
   icon: home
   references: null
   notes: >
     v1 migration: Was address.street_suffix. Locale-specific for suffix naming
-    and abbreviation conventions.
+    and abbreviation conventions. The enum lists the English forms plus the
+    national forms of the listed locales that the UPU country sheets and Canada
+    Post's street-type abbreviations use: CRT (Canada, court), BOUL (Canada,
+    boulevard), BVD (Australia, boulevard), BD and AV (France), RUE (French
+    names in Canada and France), str and Str. (Germany), and Crescent, Terrace
+    and Close. Matching is case-insensitive, so LANE is the same entry as Lane.
+    The UPU sheets give examples (RUE, Str.), not a full table of suffixes, so no
+    further forms are listed. Column discrimination counts the English words and
+    their abbreviations (Street, St, Avenue, Ave, ...), Rue, Crescent, Terrace
+    and Close; the national abbreviations (CRT, AV, BOUL, BVD, BD) and str /
+    Str. conform but do not count, because they collide with country, currency
+    and airport codes.
 
 geography.address.postal_code:
   title: "Postal Code"
@@ -1101,8 +1141,9 @@ geography.format.wkt:
   title: "Well-Known Text Geometry"
   description: >
     OGC Well-Known Text (WKT) representation of geometry objects.
-    Strings begin with a geometry type keyword (POINT, LINESTRING, POLYGON,
-    MULTIPOINT, MULTILINESTRING, MULTIPOLYGON, GEOMETRYCOLLECTION) optionally
+    Strings begin with a geometry type keyword, in any letter case (POINT,
+    LINESTRING, POLYGON, MULTIPOINT, MULTILINESTRING, MULTIPOLYGON,
+    GEOMETRYCOLLECTION, TRIANGLE, POLYHEDRALSURFACE, TIN) optionally
     followed by Z/M/ZM dimension suffix.
   designation: universal
   locales: [UNIVERSAL]
@@ -1115,7 +1156,7 @@ geography.format.wkt:
   decompose: null
   validation:
     type: string
-    pattern: "^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\\s*(Z|M|ZM)?\\s*(\\(|EMPTY)"
+    pattern: "^(?:[Pp][Oo][Ii][Nn][Tt]|[Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii][Nn][Gg]|[Pp][Oo][Ll][Yy][Gg][Oo][Nn]|[Mm][Uu][Ll][Tt][Ii][Pp][Oo][Ii][Nn][Tt]|[Mm][Uu][Ll][Tt][Ii][Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii][Nn][Gg]|[Mm][Uu][Ll][Tt][Ii][Pp][Oo][Ll][Yy][Gg][Oo][Nn]|[Gg][Ee][Oo][Mm][Ee][Tt][Rr][Yy][Cc][Oo][Ll][Ll][Ee][Cc][Tt][Ii][Oo][Nn]|[Tt][Rr][Ii][Aa][Nn][Gg][Ll][Ee]|[Pp][Oo][Ll][Yy][Hh][Ee][Dd][Rr][Aa][Ll][Ss][Uu][Rr][Ff][Aa][Cc][Ee]|[Tt][Ii][Nn])\\s*(?:[Zz][Mm]|[Zz]|[Mm])?\\s*(?:\\(|[Ee][Mm][Pp][Tt][Yy])"
   tier: [VARCHAR, format]
   aliases: [well_known_text]
   samples:
@@ -1127,8 +1168,15 @@ geography.format.wkt:
   icon: map
   references: null
   notes: >
-    OGC Simple Features standard (ISO 19125). DuckDB spatial extension
-    provides ST_GeomFromText for parsing.
+    OGC Simple Features standard (ISO 19125; OGC 06-103r4, 7.2.1 and 7.2.2):
+    keywords are case-insensitive. DuckDB spatial extension provides
+    ST_GeomFromText for parsing; it reads any letter case, but not TRIANGLE,
+    TIN or POLYHEDRALSURFACE (transform_ext raises an error on those, so they
+    conform to the type but have no geometry value in DuckDB). For
+    discrimination a value counts when a geometry keyword in any letter case
+    is followed by EMPTY or a body holding a coordinate pair, so text such as
+    "Triangle (equilateral)" does not; conforming-only forms are not counted
+    for discrimination.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: index
@@ -1139,8 +1187,10 @@ geography.format.wkt:
 geography.index.h3:
   title: "H3 Hex Index"
   description: >
-    Uber H3 hierarchical hexagonal spatial index. A 15-character lowercase
-    hexadecimal string encoding resolution (0-15) and cell position.
+    Uber H3 hierarchical hexagonal spatial index. A 15-character hexadecimal
+    string encoding resolution (0-15) and cell position; the canonical form is
+    lowercase and upper case is accepted. The 15-character form is a cell
+    index (mode 1); directed-edge and vertex indexes are not this type.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -1152,7 +1202,12 @@ geography.index.h3:
   decompose: null
   validation:
     type: string
-    pattern: "^[0-9a-f]{15}$"
+    pattern: "^[0-9a-fA-F]{15}$"
+  validation_notes:
+    canonical:
+      kind: non_canonical
+      name: lowercase
+      pattern: "^[0-9a-f]{15}$"
   tier: [VARCHAR, index]
   aliases: [h3_index, h3_cell]
   samples:
@@ -1246,45 +1301,49 @@ geography.coordinate.longitude:
 geography.coordinate.coordinates:
   title: "Coordinate Pair (Lat, Lon)"
   description: >
-    Latitude and longitude as a pair, formatted as "lat,lon" or "lat lon".
-    May include degree/minute/second notation or decimal degrees.
-    Transforms to POINT geometry (requires spatial extension).
+    Latitude and longitude as a pair of decimal degrees, formatted as
+    "lat,lon", "lat, lon" or "lat lon". Transforms to POINT geometry
+    (requires spatial extension).
   designation: universal
   locales: [UNIVERSAL]
   broad_type: POINT
   frictionless:
-    type: geopoint
+    type: string
   format_string: null
-  transform: "STRUCT_PACK(lat := CAST(REGEXP_EXTRACT({col}, '^([^, ]+)', 1) AS DOUBLE), lon := CAST(REGEXP_EXTRACT({col}, '[, ]([^, ]+)$', 1) AS DOUBLE))"
-  transform_ext: "ST_Point(CAST(SPLIT_PART({col}, ',', 1) AS DOUBLE), CAST(SPLIT_PART({col}, ',', 2) AS DOUBLE))"
+  transform: "STRUCT_PACK(lat := CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(?:\\.[0-9]+)?)', 1) AS DOUBLE), lon := CAST(REGEXP_EXTRACT({col}, '(-?[0-9]+(?:\\.[0-9]+)?)$', 1) AS DOUBLE))"
+  transform_ext: "ST_Point(CAST(REGEXP_EXTRACT({col}, '(-?[0-9]+(?:\\.[0-9]+)?)$', 1) AS DOUBLE), CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(?:\\.[0-9]+)?)', 1) AS DOUBLE))"
   decompose:
-    latitude: "CAST(REGEXP_EXTRACT({col}, '^([^, ]+)', 1) AS DOUBLE)"
-    longitude: "CAST(REGEXP_EXTRACT({col}, '[, ]([^, ]+)$', 1) AS DOUBLE)"
+    latitude: "CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(?:\\.[0-9]+)?)', 1) AS DOUBLE)"
+    longitude: "CAST(REGEXP_EXTRACT({col}, '(-?[0-9]+(?:\\.[0-9]+)?)$', 1) AS DOUBLE)"
   validation:
     type: string
-    pattern: "^-?[0-9]+(\\.[0-9]+)?[, ]-?[0-9]+(\\.[0-9]+)?$"
+    pattern: "^-?[0-9]+(\\.[0-9]+)?(?:\\s*,\\s*|\\s+)-?[0-9]+(\\.[0-9]+)?$"
   tier: [POINT, coordinate]
   aliases: [lat_lon, location]
   samples:
     - "40.7128,-74.0060"
     - "51.5074,-0.1278"
     - "35.6762 139.6917"
+    - "48.8761373390584, 2.3680844979417"
   icon: current-location
   canonical: "https://www.iso.org/standard/75147.html"
   references: null
   notes: >
     v1 migration: Was address.coordinates. Spatial extension required for
     POINT type (DuckDB spatial). Decompose extracts lat and lon separately.
-    Format: "lat,lon" or "lat lon".
+    Format: "lat,lon", "lat, lon" or "lat lon" (decimal degrees; degree/minute/
+    second notation is geography.coordinate.dms). The latitude comes first;
+    transform_ext puts the longitude first, as ST_Point(x, y) takes it. Frictionless
+    geopoint is longitude-first in every format and this type is latitude-first,
+    so it maps to string.
 
 geography.coordinate.geohash:
   title: "Geohash"
   description: >
-    Base-32 encoded geographic area. 6-12 characters using the Geohash
-    alphabet (0-9, b-h, j, k, m, n, p-z — excludes a, i, l, o).
-    Longer strings represent smaller, more precise areas. The canonical
-    geohash range is 1-12 characters; FineType deliberately requires a
-    minimum of 6 (see notes) to avoid mistyping short alphanumeric codes.
+    Base-32 encoded geographic area. 1-20 characters using the Geohash
+    alphabet (0-9, b-h, j, k, m, n, p-z — excludes a, i, l, o); 12 or fewer
+    is the common precision. Longer strings represent smaller, more precise
+    areas. PostGIS ST_GeoHash and BigQuery ST_GEOHASH allow up to 20.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -1296,7 +1355,7 @@ geography.coordinate.geohash:
   decompose: null
   validation:
     type: string
-    pattern: "^[0-9b-hjkmnp-z]{6,12}$"
+    pattern: "^[0-9b-hjkmnp-z]{1,20}$"
   tier: [VARCHAR, coordinate]
   aliases: null
   samples:
@@ -1309,16 +1368,23 @@ geography.coordinate.geohash:
   references: null
   notes: >
     Invented by Gustavo Niemeyer. Public-domain algorithm. Each additional
-    character divides the cell into 32 sub-cells. v13: Minimum length
-    tightened from 4 to 6 to reduce false positives on short lowercase
-    alphanumeric strings (e.g., short IDs).
+    character divides the cell into 32 sub-cells. The rule accepts 1 to 20
+    characters (PostGIS, BigQuery); for discrimination a value counts only at
+    6 to 12 characters, so short lowercase tokens (words, short IDs) and long
+    digit strings (epoch milliseconds, card numbers) are not mistaken for a
+    geohash. Geohashes of 1 to 5 and of 13 to 20 characters conform but are not
+    counted.
 
 geography.coordinate.plus_code:
   title: "Plus Code (Open Location Code)"
   description: >
-    Google Open Location Code. 8 characters from the OLC alphabet followed
-    by '+' and 2 or more refining characters. Encodes latitude/longitude
-    into a short, human-readable string.
+    Google Open Location Code, full form (a short code that drops its area
+    part is not matched). Characters come from the 20-character OLC alphabet,
+    in either letter case. The first character is within 90 degrees of latitude
+    (2-9 or C) and the second within 180 degrees of longitude; eight characters
+    before the '+', which may be padded with pairs of '0' (a padded code has
+    nothing after the '+'); up to seven characters follow the '+', never
+    exactly one. Encodes latitude/longitude into a short, human-readable string.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -1330,7 +1396,12 @@ geography.coordinate.plus_code:
   decompose: null
   validation:
     type: string
-    pattern: "^[23456789CFGHJMPQRVWX]{8}\\+[23456789CFGHJMPQRVWX]{2,}$"
+    pattern: "^[2-9Cc][2-9CcFfGgHhJjMmPpQqRrVv](?:[23456789CFGHJMPQRVWXcfghjmpqrvwx]{6}\\+(?:[23456789CFGHJMPQRVWXcfghjmpqrvwx]{2,7})?|[23456789CFGHJMPQRVWXcfghjmpqrvwx]{4}00\\+|[23456789CFGHJMPQRVWXcfghjmpqrvwx]{2}0{4}\\+|0{6}\\+)$"
+  validation_notes:
+    canonical:
+      kind: non_canonical
+      name: upper case
+      pattern: "^[2-9C][2-9CFGHJMPQRV](?:[23456789CFGHJMPQRVWX]{6}\\+(?:[23456789CFGHJMPQRVWX]{2,7})?|[23456789CFGHJMPQRVWX]{4}00\\+|[23456789CFGHJMPQRVWX]{2}0{4}\\+|0{6}\\+)$"
   tier: [VARCHAR, coordinate]
   aliases: [open_location_code]
   samples:
@@ -1338,12 +1409,16 @@ geography.coordinate.plus_code:
     - "87G8Q2PQ+QV"
     - "8FVC9G8F+6W"
     - "9F4MGC94+MC"
-    - "7FG49W00+2V"
   icon: current-location
   references: null
   notes: >
     Google Open Location Code (github.com/google/open-location-code).
-    Apache 2.0 licensed. 20-character alphabet: 23456789CFGHJMPQRVWX.
+    Apache 2.0 licensed. 20-character alphabet: 23456789CFGHJMPQRVWX; the
+    specification reads input case-insensitively and writes upper case. A full
+    code has 2 to 15 digits: pairs up to eight, then a grid refinement. For
+    discrimination a value counts only in the first-defined form (upper case,
+    eight characters, '+', then 2 to 7 characters); padded codes, a bare '+'
+    and lower case conform but are not counted.
 
 geography.coordinate.dms:
   title: "Degrees Minutes Seconds"
@@ -1385,8 +1460,9 @@ geography.coordinate.mgrs:
   description: >
     NATO Military Grid Reference System coordinate. Composed of grid zone
     designator (1-2 digit zone number + latitude band letter C-X excluding
-    I and O), 100km grid square (2 letters), and easting/northing digits
-    (2-10 digits, equal halves).
+    I and O; polar UPS references use A, B, Y or Z with no zone number),
+    100km grid square (2 letters), and easting/northing digits (an even
+    count of 2-16 digits, equal halves).
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -1398,7 +1474,7 @@ geography.coordinate.mgrs:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{1,2}[C-X][A-HJ-NP-Z]{2}\\d{2,10}$"
+    pattern: "^(?:\\d{1,2}[C-HJ-NP-X]|[ABYZ])[A-HJ-NP-Z]{2}(?:\\d\\d){1,8}$"
   tier: [VARCHAR, coordinate]
   aliases: null
   samples:
@@ -1412,7 +1488,14 @@ geography.coordinate.mgrs:
   notes: >
     Based on UTM and UPS grids. Used by NATO military forces. Zone 1-60,
     latitude band C-X (excluding I and O), grid square AA-ZZ (excluding
-    I and O), precision 1m (10 digits) to 10km (2 digits).
+    I and O), precision usually 1 m (10 digits); special applications go to
+    1 mm (16 digits; FGDC-STD-011-2001 gives such an example). Digits come in
+    equal easting and northing halves, so an odd count is not a reference. For
+    discrimination a value counts only with a zone number and 2 to 10 digits;
+    UPS references and 12 to 16 digits conform but are not counted. A 100 km
+    reference with no digits (18SUJ) is valid MGRS but is deliberately not
+    matched, because a zone and two letters are too short to tell from other
+    codes.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: transportation

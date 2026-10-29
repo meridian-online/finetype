@@ -428,9 +428,11 @@ finance.payment.credit_card_number:
 finance.securities.cusip:
   title: "CUSIP"
   description: >
-    Committee on Uniform Securities Identification Procedures identifier.
-    9-character alphanumeric code for US and Canadian securities. Format:
-    6-character issuer code + 2-character issue number + 1 check digit.
+    Committee on Uniform Security Identification Procedures (American Bankers
+    Association, 1964) identifier. 9-character alphanumeric code for US and
+    Canadian securities. Format: 6-character issuer code + 2-character issue
+    number + 1 check digit. The special characters *, @ and # are reserved for
+    private placement numbers; the check digit values them 36, 37 and 38.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -445,7 +447,7 @@ finance.securities.cusip:
     check_digit: "SUBSTRING({col}, 9, 1)"
   validation:
     type: string
-    pattern: "^[A-Z0-9]{8}[0-9]$"
+    pattern: "^[A-Z0-9*@#]{8}[0-9]$"
   checksum: cusip
   tier: [VARCHAR, payment]
   aliases: null
@@ -453,12 +455,19 @@ finance.securities.cusip:
     - "037833100"
     - "17275R102"
     - "594918104"
+    - "12345*109"
   icon: chart-line
   references: null
   notes: >
     New in v2. CUSIP is the primary identifier for US/Canadian securities.
     Check digit uses a custom weighted algorithm where characters at even positions
     are doubled (similar to Luhn but with alphanumeric conversion).
+    Source: CUSIP Global Services and Wikipedia (CUSIP). The published rule is
+    shape-only, so it takes *, @ and # in any of the first eight characters (the
+    CGS page naming the reserved positions could not be reached, so none is
+    enforced); a discrimination detector counts a value with one of them only
+    when its check digit is right, so a column of codes like ABC*12345 is not
+    kept as cusip.
 
 finance.securities.isin:
   title: "ISIN"
@@ -615,9 +624,12 @@ finance.securities.ticker:
   description: >
     Stock ticker symbol — the short exchange identifier for a listed security
     (AAPL, MSFT, BRK-B). 1-7 uppercase letters, optionally with a class-share
-    suffix (BRK-B, BF.B). No check digit, and the shape confirms every short
-    uppercase token (a US state code, a currency, an arbitrary code all clear
-    it), so the published listed-symbol set is the substance (Precision
+    suffix (BRK-B, BF.B), or 1-6 digits for the numeric tickers of the Hong Kong,
+    Tokyo and Shanghai exchanges (0005, 7203, 600519). No check digit, and the
+    shape confirms every short uppercase token (a US state code, a currency, an
+    arbitrary code all clear it) and now every 1-6-digit integer, which is why a
+    detector keeps the alphabetic shape for discrimination. The published
+    listed-symbol set is the substance (Precision
     Principle). US-listed for now (SEC company_tickers.json); other venues
     compose additively behind this same type.
   designation: universal
@@ -631,7 +643,7 @@ finance.securities.ticker:
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Z]{1,7}([./-][A-Z]{1,4})?$"
+    pattern: "^(?:[A-Z]{1,7}(?:[./-][A-Z]{1,4})?|[0-9]{1,6})$"
   # Shape-only pattern (any 1-7 upper token); membership against the SEC listed
   # set is what distinguishes a real ticker. Set: labels/sets/us_tickers.txt.
   membership: us_tickers
@@ -652,7 +664,13 @@ finance.securities.ticker:
     recovered at profile time by the header-gated `ticker_membership_recovery`
     Sharpen guard (ticker/symbol header + >=90% set membership + >=3 distinct).
     The 2-letter state/ticker collision (MA, TX, … are both) is why the guard
-    gates on the header, not membership alone.
+    gates on the header, not membership alone. Source: Wikipedia, Ticker symbol
+    (numeric tickers). The published rule takes 1-6 digits, but a discrimination
+    detector keeps the alphabetic shape only (a bare 5 or 0005 is as much a
+    quantity as a symbol), so a column of digits conforms without being counted
+    and is demoted as before. The US set has no numeric symbols, so the
+    membership guard does not recover a digit column either; numeric tickers
+    are not in the samples for that reason.
 
 finance.banking.aba_routing:
   title: "ABA Routing Number"
@@ -921,7 +939,8 @@ finance.currency.amount_lakh:
     Indian numbering system with irregular grouping: first three digits,
     then groups of two (XX,XX,XXX pattern). Lakh = 1,00,000 (100k),
     Crore = 1,00,00,000 (10M). Serves 1.4 billion people. Rupee symbol
-    prefix. Period decimal separator.
+    prefix, with or without a space after it (DICGC writes ₹ 5,00,000).
+    Period decimal separator.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -935,20 +954,23 @@ finance.currency.amount_lakh:
     numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^(₹|Rs\\.?)\\s*', ''), ',', '', 'g') AS DECIMAL(18,2))"
   validation:
     type: string
-    pattern: "^[₹]?(?:Rs\\.?\\s?)?[0-9]{1,2}(,[0-9]{2})*(,[0-9]{3})(\\.[0-9]{1,2})?$"
+    pattern: "^(?:\u20B9\\s?)?(?:Rs\\.?\\s?)?[0-9]{1,2}(,[0-9]{2})*(,[0-9]{3})(\\.[0-9]{1,2})?$"
   tier: [VARCHAR, currency]
   aliases: [amount_indian, lakh_crore, inr_amount]
   samples:
     - "₹12,34,567.89"
     - "₹1,00,000.00"
     - "₹99,999.50"
+    - "₹ 5,00,000"
     - "Rs. 1,23,456.78"
     - "₹1,00,00,000.00"
   icon: cash
   references: null
   notes: >
     New in format coverage expansion. Indian numbering (2,2,3 grouping).
-    Key distinguishing signal is irregular comma placement.
+    Key distinguishing signal is irregular comma placement. Source: DICGC
+    (deposit insurance, writes the sign then a space). The transform and both
+    decompose parts strip a space after the symbol.
 
 finance.currency.amount_apostrophe:
   title: "Currency Amount (Swiss Apostrophe)"
@@ -1085,34 +1107,42 @@ finance.currency.amount_multisym:
   title: "Currency Amount (Multi-Character Symbol)"
   description: >
     Currency amounts with multi-character symbols: R$ (Brazilian Real),
-    HK$ (Hong Kong Dollar), kr (Nordic Krone), Kč (Czech Koruna),
-    zł (Polish Zloty). Separator conventions follow local standard.
+    HK$ (Hong Kong Dollar), kr and kr. (Nordic Krone), Kč (Czech Koruna),
+    zł (Polish Zloty). The symbol comes before the amount, or after it for
+    Czech, Polish and Danish, as CLDR writes them (1 234,56 Kč,
+    1 234,56 zł, 1.234,56 kr.), with a space, a no-break space (U+00A0) or a
+    narrow no-break space (U+202F) between the digit groups and before the
+    symbol. Separator conventions follow local standard.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
   frictionless:
     type: string
   format_string: null
-  transform: "CAST(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[^0-9-]+|\\s', '', 'g'), '[.,]([0-9]{1,2})$', 'D\\1'), '[.,]', '', 'g'), 'D', '.') AS DECIMAL(18,2))"
+  transform: "CAST(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[^0-9-]+|[^0-9]+$|[\\s\\x{A0}\\x{202F}]', '', 'g'), '[.,]([0-9]{1,2})$', 'D\\1'), '[.,]', '', 'g'), 'D', '.') AS DECIMAL(18,2))"
   transform_ext: null
   decompose:
-    symbol: "REGEXP_EXTRACT({col}, '^([^0-9\\s-]+)', 1)"
+    symbol: "COALESCE(NULLIF(REGEXP_EXTRACT({col}, '^([^0-9\\s\\x{A0}\\x{202F}-]+)', 1), ''), REGEXP_EXTRACT({col}, '([^0-9\\s\\x{A0}\\x{202F}]+)$', 1))"
   validation:
     type: string
-    pattern: "^(R\\$|HK\\$|NT\\$|S\\$|A\\$|C\\$|NZ\\$|kr|Kč|zł|Ft|lei|Rp|Rs\\.?)\\s?-?[0-9]+([.,\\s][0-9]+)*$"
+    pattern: "^(?:(?:R\\$|HK\\$|NT\\$|S\\$|A\\$|C\\$|NZ\\$|kr\\.?|K\u010d|z\u0142|Ft|lei|Rp|Rs\\.?)[\\s\u202F]?-?[0-9]+(?:[.,\\s\u202F][0-9]+)*|-?[0-9]+(?:[.,\\s\u202F][0-9]+)*[\\s\u202F]?(?:kr\\.?|K\u010d|z\u0142))$"
   tier: [VARCHAR, currency]
   aliases: []
   samples:
     - "R$ 1.234,56"
     - "HK$ 1,234.56"
-    - "kr 1 234,56"
-    - "Kč 1 234,56"
-    - "zł 1 234,56"
+    - "kr. 1.234,56"
+    - "1 234,56 K\u010d"
+    - "1 234,56 z\u0142"
   icon: cash
   references: null
   notes: >
     New in format coverage expansion. Multi-character symbols generalize
-    locale-specific parsing. Transform strips symbol, normalizes separators.
+    locale-specific parsing. Transform strips a leading or trailing symbol and
+    every space, including U+00A0 and U+202F, and normalizes separators.
+    Source: CLDR (cs, pl, da currency patterns). U+202F is spelled out in the
+    pattern so every regex engine accepts it. A trailing symbol is taken for
+    kr, kr., Kč and zł only; the other symbols are prefixes.
 
 finance.currency.amount_neg_trailing:
   title: "Currency Amount (Trailing Negative)"

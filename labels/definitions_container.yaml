@@ -57,13 +57,14 @@ container.object.json:
   decompose: null
   validation:
     type: string
-    pattern: "^\\{.*\\}$"
+    pattern: "^\\s*\\{[\\s\\S]*\\}\\s*$"
   tier: [JSON, object]
   aliases: [json_object]
   samples:
     - '{"user": "john", "age": 30}'
     - '{"name": "Alice", "email": "alice@example.com", "active": true}'
     - '{"nested": {"key": "value"}}'
+    - "{\n  \"user\": \"john\",\n  \"age\": 30\n}"
   icon: package
   canonical: "https://www.rfc-editor.org/rfc/rfc8259"
   references: null
@@ -71,6 +72,11 @@ container.object.json:
     v1 migration: New for v2. JSON objects stored as VARCHAR strings.
     CRITICAL: Classification triggers recursive field-level inference.
     DuckDB JSON type allows NULL, arrays, objects, and scalar values.
+    Whitespace, line breaks included, may surround and sit inside the object
+    (RFC 8259); the rule checks the braces, not that the text parses. For
+    discrimination (column typing), a single-line {...} value counts as before,
+    and a value with line breaks counts only when it parses as a JSON object,
+    so braced multi-line text (a GraphQL query, a Python dict) is not counted.
 
 container.object.json_array:
   title: "JSON Array"
@@ -138,7 +144,7 @@ container.object.xml:
   decompose: null
   validation:
     type: string
-    pattern: "^<.*>.*</.*>$"
+    pattern: "^(?:<\\?xml[^>]*\\?>)?(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*(?:<!DOCTYPE\\s[^\\[>]*(?:\\[[\\s\\S]*?\\]\\s*)?>(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*)?(?:<[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*(?:\\s[^<>]*)?/>|<[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*(?:\\s[^<>]*)?>[\\s\\S]*</[A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][A-Za-z_:\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*\\s*>)(?:<!--[\\s\\S]*?-->|<\\?[\\s\\S]*?\\?>|\\s+)*$"
   tier: [VARCHAR, object]
   aliases: [xml_document]
   samples:
@@ -152,6 +158,17 @@ container.object.xml:
     and adoption is decreasing.
     DuckDB has limited native XML support (xmlparse requires extension).
     Recursive inference may be partial.
+    The rule checks the XML 1.0 shape (an optional declaration, Misc such as
+    comments, processing instructions and whitespace, an optional DOCTYPE
+    with an internal subset, one root element, then trailing Misc), not that
+    the element names match or that the document is well-formed. XHTML
+    conforms. Name characters from the supplementary planes (U+10000 and
+    above) are not accepted, so the pattern compiles in ECMA-262 without the
+    u flag. A detector counts only the narrower single-line shape
+    `<...>...</...>` that is not HTML (no html root, no DOCTYPE html), so
+    multi-line documents and empty-element-only documents conform in grading
+    but not in discrimination; a single-line value with a declaration or
+    DOCTYPE still counts.
 
 container.object.html:
   title: "HTML Content"
@@ -218,7 +235,7 @@ container.object.yaml:
   decompose: null
   validation:
     type: string
-    pattern: "^[a-zA-Z_][a-zA-Z0-9_]*:\\s*.*"
+    pattern: "^(---[ \\t]*\\r?\\n)?(#[^\\n]*\\n)*([A-Za-z_][A-Za-z0-9_.-]*:\\s*.*|-[ \\t]+[^\\n]+\\r?\\n([ \\t]+[^\\n]*\\n)*[ \\t]*-[ \\t]+[\\s\\S]*)"
   tier: [VARCHAR, object]
   aliases: [yaml]
   samples:
@@ -230,8 +247,14 @@ container.object.yaml:
   notes: >
     v1 migration: New for v2. YAML is common in configuration files
     but less common in analytics data.
-    DuckDB does not have native YAML support; parsing requires
-    external crates and is slower than JSON.
+    DuckDB core does not read YAML; the `yaml` community extension adds a
+    YAML type and extraction functions.
+    A document may open with a `---` marker, comment lines, or a top-level
+    sequence over several lines. A single line of plain text is also valid
+    YAML, but only a `key:` line or a multi-line sequence is taken as a
+    document here. A detector counts only a `key:` first line, so
+    conforming-only forms (a `---` marker, comments, sequences) are not counted
+    for discrimination.
 
 container.object.csv:
   title: "CSV Record"
@@ -257,12 +280,13 @@ container.object.csv:
   decompose: null
   validation:
     type: string
-    pattern: "^[^,]+(,[^,]+)*$"
+    pattern: '^(?:"(?:[^"]|"")*"|[^,"\r\n]*)(?:,(?:"(?:[^"]|"")*"|[^,"\r\n]*))*$'
   tier: [VARCHAR, object]
   aliases: [csv_row, delimited_record]
   samples:
     - "John,30,true"
     - '"Smith, John",30,Engineer'
+    - '"say ""hi""",2'
   icon: package
   canonical: "https://www.rfc-editor.org/rfc/rfc4180"
   references: null
@@ -270,6 +294,9 @@ container.object.csv:
     v1 migration: New for v2. CSV is typically a multi-row format,
     but may appear as individual records in some contexts.
     Parsing requires explicit schema.
+    RFC 4180 fields may be empty, and a quoted field may hold commas, doubled
+    quotes and line breaks; a bare quote or line break in an unquoted field
+    is not a record.
 
 container.object.s_expression:
   title: "S-Expression"
@@ -480,7 +507,7 @@ container.key_value.query_string:
   decompose: null
   validation:
     type: string
-    pattern: "^[^=&]+=([^&]*)(&[^=&]+=[^&]*)*$"
+    pattern: "^(?:[^=&]+=[^&]*(?:&[^=&]+=[^&]*)*|(?:[^=&\\s]+&|&)*[^=&\\s]+=(?:[^=&][^&]*)?(?:&(?:[^=&\\s]+(?:=(?:[^=&][^&]*)?)?)?)*)$"
   tier: [VARCHAR, key_value]
   aliases: null
   samples:
@@ -493,6 +520,13 @@ container.key_value.query_string:
     v1 migration: New for v2. URL query string format.
     Values are typically URL-encoded. Recursive inference parses
     key-value pairs and types each value independently.
+    The WHATWG URL Standard allows bare names and empty sequences beside
+    pairs; at least one name=value pair is required here, so a column of
+    bare names is not a query string. A sequence of only name=value pairs
+    keeps the looser reading (any name text); once a bare name or an empty
+    sequence appears, names may not hold whitespace and a value may not
+    start with `=`, so expression text such as `a == 1 && b == 2` is not a
+    query string.
 
 # ═════════════════════════════════════════════════════════════════════
 # Recursive inference notes:

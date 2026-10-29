@@ -984,7 +984,20 @@ datetime.date.abbreviated_month:
     abbreviations are recognised but not castable: the transform uses DuckDB
     strptime, whose %b reads English month names, so a column of 4 janv. 2023
     validates and stays text. The transform first rewrites Sept (en-GB) to
-    Sep. Per-locale samples needed for non-EN locales.
+    Sep. Per-locale samples needed for non-EN locales. The rule also accepts
+    two forms the transform cannot cast: a day with a full stop before the
+    month (4. Feb 2023) and a month-first date with no comma (Feb 4 2023);
+    both validate and stay text. For discrimination (column typing), a value
+    counts only when its month token is a Unicode CLDR abbreviated month for
+    one of the Latin-script locales above (4 Feb 2023, 4 janv. 2023, 4 ene
+    2023); full month names (4 February 2023) and ordinary words (Room 12,
+    2023) fit the rule's shape but are not counted. AP style spells out March
+    to July; a spelled-out March, April, June or July, month-first (March 4,
+    2023) or day-first (4 March 2023), is long_full_month's form and is not
+    counted here, so an AP column counts its abbreviated months (Feb. 4, 2023)
+    and May, which is its own abbreviation. The rule's letters stop at Latin-1, so the
+    Czech and Polish abbreviations with letters outside it (bře, kvě, čvn,
+    čvc, zář, říj, paź) are not accepted yet.
 
 datetime.date.long_full_month:
   title: Long Date with Full Month Name
@@ -1174,12 +1187,18 @@ datetime.date.iso_week:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}-W\\d{1,2}$"
+    pattern: "^\\d{4}-W(?:0[1-9]|[1-4]\\d|5[0-3]|[1-9])$"
+  validation_notes:
+    canonical:
+      kind: non_canonical
+      name: two-digit week
+      pattern: "^\\d{4}-W\\d{2}$"
   tier: [DATE, date]
   aliases: [week_date]
   samples:
     - "2024-W03"
     - "2019-W52"
+    - "2020-W53"
   icon: calendar
   canonical: "https://www.iso.org/standard/70907.html"
   references:
@@ -1187,7 +1206,12 @@ datetime.date.iso_week:
       link: "https://en.wikipedia.org/wiki/ISO_week_date"
   notes: >
     v1 name: datetime.week_date. Transform appends '-1' (Monday) to
-    produce a full week-date that strptime can parse.
+    produce a full week-date that strptime can parse. ISO 8601 numbers weeks
+    01 to 53, so week 00 and weeks 54 to 99 are rejected. The standard writes
+    the week with two digits; a one-digit week (2024-W3) is accepted and
+    noted as non-canonical. The year is not checked against the weeks it has:
+    2021-W53 passes the rule, and the transform rolls it into the next ISO
+    year (2022-01-03) instead of failing.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: time
@@ -1469,13 +1493,15 @@ datetime.offset.iana:
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Z][a-zA-Z]+/[A-Za-z_]+(/[A-Za-z_]+)?$"
+    pattern: "^(?:Etc/GMT(?:0|\\+(?:[0-9]|1[0-2])|-(?:[0-9]|1[0-4]))|[A-Z][a-zA-Z]+/[A-Za-z_][A-Za-z_.-]*(?:/[A-Za-z_][A-Za-z_.-]*)?)$"
   tier: [VARCHAR, offset]
   aliases: [timezone]
   samples:
     - "America/New_York"
     - "Europe/London"
     - "Asia/Tokyo"
+    - "America/Port-au-Prince"
+    - "Etc/GMT+4"
   icon: world
   canonical: "https://www.iana.org/time-zones"
   references:
@@ -1485,8 +1511,13 @@ datetime.offset.iana:
     v1 name: datetime.timezone. Validation is pattern-only: the tz database
     has 500+ zones and ships several releases a year, so any hardcoded enum
     goes stale and silently rejects newly-added zones. The Region/City pattern
-    is the stable structural invariant. Add an enum only if generated from
-    tzdata at build time, never hand-maintained.
+    is the stable structural invariant. Name components may hold letters,
+    '.', '-' and '_' (America/Port-au-Prince, America/Argentina/Buenos_Aires).
+    The one place digits appear is the fixed-offset zones of the etcetera
+    file: Etc/GMT+N for N 0 to 12 and Etc/GMT-N for N 0 to 14, plus the
+    Etc/GMT0 link. No tz name contains a dot; the rule allows it, and the
+    recovery guard that promotes other labels to this one does not. Add an
+    enum only if generated from tzdata at build time, never hand-maintained.
 
 datetime.offset.timezone_abbreviation:
   title: Timezone Abbreviation
@@ -1569,7 +1600,9 @@ datetime.duration.iso_8601:
   description: >
     Duration in ISO 8601 format (PnYnMnDTnHnMnS or PnW for weeks). Used in
     iCalendar, XML Schema, YouTube API, Google Calendar, and many APIs.
-    Covers both compact (PT30M) and verbose (P1Y2M3DT4H5M6S) forms.
+    Covers both compact (PT30M) and verbose (P1Y2M3DT4H5M6S) forms, a decimal
+    fraction (full stop or comma) on the smallest component (PT0,5S), and the
+    alternative format PYYYY-MM-DDThh:mm:ss.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: INTERVAL
@@ -1577,20 +1610,25 @@ datetime.duration.iso_8601:
     type: duration
   format_string: null
   transform: >
-    CAST(
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)Y', 1), '') || ' years ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, 'P[^T]*?(\d+)M', 1), '') || ' months ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)W', 1), '') || ' weeks ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)D', 1), '') || ' days ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)H', 1), '') || ' hours ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, 'T.*?(\d+)M', 1), '') || ' minutes ', '') ||
-      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+(?:\.\d+)?)S', 1), '') || ' seconds', '0 seconds')
-    AS INTERVAL)
+    CAST(CASE WHEN REGEXP_MATCHES({col}, '^P\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$') THEN
+      REGEXP_EXTRACT({col}, '^P(\d{4})-', 1) || ' years ' ||
+      REGEXP_EXTRACT({col}, '^P\d{4}-(\d{2})-', 1) || ' months ' ||
+      REGEXP_EXTRACT({col}, '^P\d{4}-\d{2}-(\d{2})T', 1) || ' days ' ||
+      REGEXP_EXTRACT({col}, 'T(\d{2}:\d{2}:\d{2})$', 1)
+    ELSE
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '([\d.,]+)Y', 1), ',', '.'), '') || ' years ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '^-?P(?:[\d.,]+Y)?([\d.,]+)M', 1), ',', '.'), '') || ' months ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '([\d.,]+)W', 1), ',', '.'), '') || ' weeks ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '([\d.,]+)D', 1), ',', '.'), '') || ' days ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '([\d.,]+)H', 1), ',', '.'), '') || ' hours ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, 'T(?:[\d.,]+H)?([\d.,]+)M', 1), ',', '.'), '') || ' minutes ', '') ||
+      COALESCE(NULLIF(REPLACE(REGEXP_EXTRACT({col}, '([\d.,]+)S', 1), ',', '.'), '') || ' seconds', '0 seconds')
+    END AS INTERVAL)
   transform_ext: null
   decompose: null
   validation:
     type: string
-    pattern: "^-?P(?=\\d|T\\d)(?:(\\d+)Y)?(?:(\\d+)M)?(?:(\\d+)[DW])?(?:T(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+(?:\\.\\d+)?)S)?)?$"
+    pattern: "^(?:-?P(?=\\d|T\\d)(?!.*[.,]\\d+[A-Z]T?\\d)(?:(\\d+(?:[.,]\\d+)?)Y)?(?:(\\d+(?:[.,]\\d+)?)M)?(?:(\\d+(?:[.,]\\d+)?)[DW])?(?:T(?:(\\d+(?:[.,]\\d+)?)H)?(?:(\\d+(?:[.,]\\d+)?)M)?(?:(\\d+(?:[.,]\\d+)?)S)?)?|P\\d{4}-(?:0\\d|1[0-2])-(?:[0-2]\\d|30)T(?:[01]\\d|2[0-4]):[0-5]\\d:[0-5]\\d)$"
   tier: [INTERVAL, duration]
   aliases: [duration, iso_8601_verbose]
   samples:
@@ -1600,6 +1638,10 @@ datetime.duration.iso_8601:
     - "P1Y6M"
     - "P2W"
     - "P1Y2M3DT4H5M6S"
+    - "PT0.5S"
+    - "PT1H30,5M"
+    - "P0,5Y"
+    - "P0003-06-04T12:30:05"
   icon: hourglass
   canonical: "https://www.iso.org/standard/70907.html"
   references:
@@ -1610,6 +1652,16 @@ datetime.duration.iso_8601:
     duration spec including weeks (PnW), negative durations (-P...), and
     fractional seconds (PT1.5S). Alias iso_8601_verbose added — no separate
     type needed since same regex covers both compact and verbose forms.
+    ISO 8601-1 allows a decimal fraction (comma preferred, full stop accepted)
+    on the smallest component only, so P0.5Y1M is rejected. The alternative
+    format PYYYY-MM-DDThh:mm:ss (months up to 12, days up to 30, hours up to 24)
+    is accepted and the transform reads it as years, months, days and a time
+    of day. A negative duration (-P...) is accepted but the transform does
+    not carry the sign. A fractional year or month converts at DuckDB's
+    interval rates (a month is 30 days); a W component converts to 7 days each.
+    ISO 8601-1 also allows 60 as the minute or second of the alternative
+    format; that conforms to the standard but is rejected here, because the
+    transform cannot cast it.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: component
@@ -2285,8 +2337,10 @@ datetime.timestamp.sql_microseconds_offset:
 datetime.timestamp.pg_short_offset:
   title: PostgreSQL Short Offset
   description: >
-    PostgreSQL-specific format with 2-digit timezone offset (e.g., -05
-    instead of -05:00). Microsecond precision with abbreviated offset.
+    PostgreSQL ISO output with a 2-digit timezone offset (e.g., -05
+    instead of -05:00). The fraction of a second is written only when it is
+    non-zero, one to six digits, so both 2022-01-06 18:00:00+03 and
+    2024-01-15 14:30:00.123456-05 are in this format.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
@@ -2294,25 +2348,28 @@ datetime.timestamp.pg_short_offset:
     type: datetime
     format: "%Y-%m-%d %H:%M:%S.%f%z"
   format_string: "%Y-%m-%d %H:%M:%S.%f%z"
-  transform: "strptime({col} || ':00', '%Y-%m-%d %H:%M:%S.%f%z')"
+  transform: "COALESCE(try_strptime({col} || ':00', '%Y-%m-%d %H:%M:%S%z'), try_strptime({col} || ':00', '%Y-%m-%d %H:%M:%S.%f%z'))"
   transform_ext: null
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{6}[+-]\\d{2}$"
-    minLength: 28
-    maxLength: 29
+    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?[+-]\\d{2}$"
   tier: [TIMESTAMPTZ, timestamp]
   aliases: []
   samples:
     - "2024-01-15 14:30:00.123456-05"
     - "2023-12-31 23:59:59.000000+00"
     - "2024-06-01 08:15:30.789012+10"
+    - "2022-01-06 18:00:00+03"
+    - "2022-01-06 18:00:00.5+03"
   icon: clock
   references: null
   notes: >
     New in format coverage expansion. PostgreSQL sometimes emits short offsets
-    (-05 instead of -05:00). Transform appends :00 for strptime compatibility.
+    (-05 instead of -05:00). Transform appends :00 for strptime compatibility
+    and parses the value with a fraction (1-6 digits) or without one.
+    format_string and the Frictionless format describe the fractional form;
+    whole-second values parse through the transform, not through format_string.
 
 datetime.timestamp.dot_dmy_24h:
   title: European Dot Timestamp (DMY 24h)
@@ -3049,24 +3106,32 @@ datetime.date.month_year_abbrev:
     type: date
     format: "%b %Y"
   format_string: "%b %Y"
-  transform: "strptime('01 ' || {col}, '%d %b %Y')::DATE"
+  transform: "strptime('01 ' || upper(substr({col}, 1, 1)) || lower(substr({col}, 2, 2)) || ' ' || substr({col}, length({col}) - 3), '%d %b %Y')::DATE"
   transform_ext: null
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Z][a-z]{2} \\d{4}$"
-    minLength: 8
-    maxLength: 8
+    pattern: "^(?:Jan|JAN|Feb|FEB|Mar|MAR|Apr|APR|May|MAY|June?|JUNE?|July?|JULY?|Aug|AUG|Sept?|SEPT?|Oct|OCT|Nov|NOV|Dec|DEC) \\d{4}$"
   tier: [VARCHAR, date]
   aliases: []
   samples:
     - "Jan 2024"
     - "Dec 2023"
     - "Jun 2000"
+    - "JAN 2024"
+    - "Sept 2026"
+    - "June 2026"
   icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Financial dashboards, CLDR yMMM skeleton.
+    The twelve months in title or upper case (Jan, JAN), plus the longer forms
+    Sept, June and July that the US BLS writes. The transform reads the first
+    letter in upper case, the next two in lower case and the final four digits,
+    so Sept, June and July all read as Sep, Jun and Jul. format_string and
+    the frictionless format (%b) cover the three-letter title-case form only;
+    Sept, June, July and upper case parse through the transform. Full month names
+    (January 2024) are not this type; they are month_year_full.
 
 datetime.date.month_year_slash:
   title: Month/Year (slash-separated)
@@ -3154,18 +3219,23 @@ datetime.date.chinese_ymd:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}\u5E74[1-9]\\d?\u6708[1-3]?\\d\u65E5$"
+    pattern: "^\\d{4}\u5E74(?:0[1-9]|1[0-2]|[1-9])\u6708(?:0[1-9]|[12]\\d|3[01]|[1-9])\u65E5$"
   tier: [VARCHAR, date]
   aliases: [cn_standard]
   samples:
     - "2024\u5E741\u670815\u65E5"
     - "2023\u5E7412\u670825\u65E5"
     - "2022\u5E746\u67081\u65E5"
+    - "2024\u5E7401\u670811\u65E5"
   icon: calendar
   references: null
   notes: >
     New in format coverage expansion. Chinese standard date with Unicode
-    delimiters. Transform strips Chinese characters and parses as ISO-like.
+    delimiters. Month and day are written with or without a leading zero
+    (gov.cn writes both); month runs 1 to 12 and day 1 to 31. The calendar is
+    not checked, so a 31st of February passes the rule and the transform
+    fails to cast it (a conversion error). Transform strips Chinese characters and parses as
+    ISO-like; the parse accepts padded and unpadded fields alike.
 
 datetime.date.korean_ymd:
   title: Korean Standard Date

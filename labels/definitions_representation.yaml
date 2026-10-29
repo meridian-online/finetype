@@ -337,8 +337,9 @@ representation.text.word:
 representation.format.color_hex:
   title: "Color (Hexadecimal)"
   description: >
-    Color as hexadecimal value (e.g., #FF0000, #f00, FF0000).
-    May include # prefix. Short form (3 chars) or long form (6 chars).
+    Color as a CSS hexadecimal notation (e.g., #FF0000, #f00, #f00c, #0000ffcc).
+    A # prefix with 3, 4, 6 or 8 hex digits (red, green, blue and an optional
+    alpha). The bare 3- and 6-digit forms (FF0000) are accepted with a note.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -350,7 +351,12 @@ representation.format.color_hex:
   decompose: null
   validation:
     type: string
-    pattern: "^#?[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$"
+    pattern: "^(?:#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+  validation_notes:
+    canonical:
+      kind: nonstandard
+      name: "leading #"
+      pattern: "^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
   tier: [VARCHAR, text]
   aliases: [hex_color]
   samples:
@@ -358,18 +364,26 @@ representation.format.color_hex:
     - "#f00"
     - "0000FF"
     - "#00FF00"
+    - "#f00c"
+    - "#0000ffcc"
   icon: palette
   canonical: "https://www.w3.org/TR/css-color-4/"
   references: null
   notes: >
     v1 migration: Was text.hex_color. Transform uppercases.
-    Accepts # prefix or without. 3-digit (short) or 6-digit (long) hex.
+    CSS Color 4 writes # then 3, 4, 6 or 8 hex digits (the 4- and 8-digit forms
+    carry an alpha channel) and requires the #. The bare 3- and 6-digit forms
+    stay accepted, with a nonstandard note for the missing #; a bare 4- or
+    8-digit string is not a CSS colour (it is as likely a year or an ID) and
+    is rejected.
 
 representation.format.color_rgb:
   title: "Color (RGB)"
   description: >
-    Color as RGB tuple (0-255 for each channel).
-    Format: "rgb(255,0,0)", "255,0,0", "(255, 0, 0)", or similar.
+    Color as an RGB tuple: CSS rgb()/rgba() with three integers (0-255) or three
+    percentages and an optional alpha, comma-separated ("rgb(255, 0, 0)",
+    "rgba(0, 0, 255, 0.5)") or space-separated with the alpha after a slash
+    ("rgb(100% 0% 0% / 50%)"); also the bare "255,0,0" and "(255, 0, 0)" triples.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -379,12 +393,12 @@ representation.format.color_rgb:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    red: "CAST(REGEXP_EXTRACT({col}, '^(?:rgba?)?\\(?\\s*([0-9]{1,3})', 1) AS SMALLINT)"
-    green: "CAST(REGEXP_EXTRACT({col}, ',\\s*([0-9]{1,3})', 1) AS SMALLINT)"
-    blue: "CAST(REGEXP_EXTRACT({col}, '^[^,]*,[^,]*,\\s*([0-9]{1,3})', 1) AS SMALLINT)"
+    red: "TRY_CAST(ROUND(TRY_CAST(NULLIF(REGEXP_EXTRACT({col}, '^(?:rgba?)?\\(?\\s*([0-9]*\\.?[0-9]+)(%?)', 1), '') AS DOUBLE) * CASE WHEN REGEXP_EXTRACT({col}, '^(?:rgba?)?\\(?\\s*([0-9]*\\.?[0-9]+)(%?)', 2) = '%' THEN 255 ELSE 100 END / 100) AS SMALLINT)"
+    green: "TRY_CAST(ROUND(TRY_CAST(NULLIF(REGEXP_EXTRACT({col}, '^(?:rgba?)?\\(?\\s*(?:none|[0-9]*\\.?[0-9]+%?)[\\s,]+([0-9]*\\.?[0-9]+)(%?)', 1), '') AS DOUBLE) * CASE WHEN REGEXP_EXTRACT({col}, '^(?:rgba?)?\\(?\\s*(?:none|[0-9]*\\.?[0-9]+%?)[\\s,]+([0-9]*\\.?[0-9]+)(%?)', 2) = '%' THEN 255 ELSE 100 END / 100) AS SMALLINT)"
+    blue: "TRY_CAST(ROUND(TRY_CAST(NULLIF(REGEXP_EXTRACT({col}, '^(?:rgba?)?\\(?\\s*(?:none|[0-9]*\\.?[0-9]+%?)[\\s,]+(?:none|[0-9]*\\.?[0-9]+%?)[\\s,]+([0-9]*\\.?[0-9]+)(%?)', 1), '') AS DOUBLE) * CASE WHEN REGEXP_EXTRACT({col}, '^(?:rgba?)?\\(?\\s*(?:none|[0-9]*\\.?[0-9]+%?)[\\s,]+(?:none|[0-9]*\\.?[0-9]+%?)[\\s,]+([0-9]*\\.?[0-9]+)(%?)', 2) = '%' THEN 255 ELSE 100 END / 100) AS SMALLINT)"
   validation:
     type: string
-    pattern: "^(?:rgb)?\\(?([0-9]{1,3}),\\s*([0-9]{1,3}),\\s*([0-9]{1,3})\\)?$"
+    pattern: "^(?:(?:rgb)?\\(?([0-9]{1,3}),\\s*([0-9]{1,3}),\\s*([0-9]{1,3})\\)?|rgba?\\(\\s*(?:(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)\\s*,\\s*(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)\\s*,\\s*(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)|(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)%\\s*,\\s*(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)%\\s*,\\s*(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)%)(?:\\s*,\\s*[0-9]*\\.?[0-9]+%?)?\\s*\\)|rgba?\\(\\s*(?:none|(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)%?)\\s+(?:none|(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)%?)\\s+(?:none|(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)%?)(?:\\s*/\\s*(?:none|[0-9]*\\.?[0-9]+%?))?\\s*\\))$"
   tier: [VARCHAR, text]
   aliases: [rgb]
   # Samples are the ANCHORED rgb()/rgba() form — the self-identifying shape a
@@ -398,19 +412,34 @@ representation.format.color_rgb:
     - "rgb(128, 128, 128)"
     - "rgba(0, 0, 255, 0.5)"
     - "rgb(255, 165, 0)"
+    - "rgb(255 128 0)"
+    - "rgb(100% 0% 0% / 50%)"
   icon: palette
   canonical: "https://www.w3.org/TR/css-color-4/"
   references: null
   notes: >
     v1 migration: Was text.rgb_color. Format flexible to handle
-    "rgb(...)", "(r,g,b)", or "r,g,b" variants.
+    "rgb(...)", "(r,g,b)", or "r,g,b" variants. CSS Color 3 gives rgb() three
+    and rgba() four comma-separated arguments (numbers or percentages, not
+    mixed); CSS Color 4 makes the two functions alias each other and adds the
+    space-separated syntax with an optional slash alpha, in which each
+    component is a number, a percentage or none, mixing is allowed, and
+    decimals are valid. Mixing is allowed only in the space syntax; the comma
+    syntax keeps three numbers (decimals allowed) or three percentages. The red, green and blue
+    parts read the first three components: a percentage is scaled to 0-255,
+    decimals round to whole numbers (rgb(127.5 0 0) gives red 128) and a none
+    component gives NULL.
 
 representation.format.color_hsl:
   title: "Color (HSL)"
   description: >
-    Color in HSL (Hue, Saturation, Lightness) or HSLA (with alpha) CSS notation.
-    Hue is 0-360 degrees, saturation and lightness are percentages (0-100%),
-    optional alpha is 0-1 decimal. CSS3/CSS4 standard colour representation.
+    Color in HSL (Hue, Saturation, Lightness) or HSLA (with alpha) CSS notation,
+    in the legacy comma syntax ("hsl(120, 100%, 50%)", "hsla(240, 100%, 50%, 0.5)")
+    or the CSS Color 4 space-separated syntax with an optional slash alpha
+    ("hsl(120deg 75% 25% / 60%)"). Hue is a number or an angle in degrees,
+    saturation and lightness are percentages (numbers are also accepted in the
+    space-separated syntax), alpha is a number or a percentage, and a component
+    may be "none" in the space-separated syntax.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -420,12 +449,12 @@ representation.format.color_hsl:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    hue: "CAST(REGEXP_EXTRACT({col}, 'hsla?\\(\\s*(\\d+)', 1) AS SMALLINT)"
-    saturation: "CAST(REGEXP_EXTRACT({col}, ',\\s*(\\d+)%', 1) AS SMALLINT)"
-    lightness: "CAST(REGEXP_EXTRACT({col}, ',\\s*\\d+%\\s*,\\s*(\\d+)%', 1) AS SMALLINT)"
+    hue: "TRY_CAST(ROUND(TRY_CAST(REGEXP_EXTRACT({col}, '^hsla?\\(\\s*([0-9]*\\.?[0-9]+)', 1) AS DOUBLE)) AS SMALLINT)"
+    saturation: "TRY_CAST(ROUND(TRY_CAST(REGEXP_EXTRACT({col}, '^hsla?\\(\\s*(?:none|[0-9]*\\.?[0-9]+(?:deg)?)[\\s,]+([0-9]*\\.?[0-9]+)', 1) AS DOUBLE)) AS SMALLINT)"
+    lightness: "TRY_CAST(ROUND(TRY_CAST(REGEXP_EXTRACT({col}, '^hsla?\\(\\s*(?:none|[0-9]*\\.?[0-9]+(?:deg)?)[\\s,]+(?:none|[0-9]*\\.?[0-9]+)%?[\\s,]+([0-9]*\\.?[0-9]+)', 1) AS DOUBLE)) AS SMALLINT)"
   validation:
     type: string
-    pattern: "^hsla?\\(\\s*\\d{1,3}\\s*,\\s*\\d{1,3}%\\s*,\\s*\\d{1,3}%\\s*(,\\s*[\\d.]+\\s*)?\\)$"
+    pattern: "^hsla?\\(\\s*(?:(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)(?:deg)?\\s*,\\s*(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)%\\s*,\\s*(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)%(?:\\s*,\\s*(?:[0-9]*\\.?[0-9]+%?))?|(?:none|(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)(?:deg)?)\\s+(?:none|(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)%?)\\s+(?:none|(?:[0-9]{1,3}(?:\\.[0-9]+)?|\\.[0-9]+)%?)(?:\\s*/\\s*(?:none|[0-9]*\\.?[0-9]+%?))?)\\s*\\)$"
   tier: [VARCHAR, text]
   aliases: [hsl_color, hsla_color]
   samples:
@@ -435,6 +464,8 @@ representation.format.color_hsl:
     - "hsla(240, 100%, 50%, 0.5)"
     - "hsl(60, 75%, 60%)"
     - "hsla(300, 50%, 50%, 0.8)"
+    - "hsl(120deg 75% 25% / 60%)"
+    - "hsl(120.5 100% 50%)"
   icon: palette
   canonical: "https://www.w3.org/TR/css-color-4/"
   references: null
@@ -443,11 +474,18 @@ representation.format.color_hsl:
     representation family alongside hex and RGB. HSL is arguably more intuitive
     for designers (hue = colour wheel position, saturation = intensity,
     lightness = brightness). HSLA adds an alpha transparency channel.
+    CSS Color 4 (MDN) lets hsl() and hsla() take the same arguments, comma-
+    separated with percentage saturation and lightness (legacy) or space-
+    separated with an optional slash alpha, where saturation and lightness may
+    be percentages or numbers and any component may be none. The hue, saturation
+    and lightness parts read the first three numbers and round them to whole
+    numbers; a none component gives NULL.
 
 representation.text.emoji:
   title: "Emoji"
   description: >
-    Single emoji character or emoji sequence.
+    Single emoji character or emoji sequence, including keycap sequences
+    (a digit, # or * with an optional variation selector and U+20E3).
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -459,7 +497,7 @@ representation.text.emoji:
   decompose: null
   validation:
     type: string
-    pattern: "^[\\p{So}\\p{Sk}\\p{Mn}\\p{Cf}]+$"
+    pattern: "^(?:[0-9#*]\uFE0F?\u20E3|[\\p{So}\\p{Sk}\\p{Mn}\\p{Cf}])+$"
   tier: [VARCHAR, text]
   aliases: null
   samples:
@@ -467,12 +505,17 @@ representation.text.emoji:
     - "🎉"
     - "❤️"
     - "🚀"
+    - "1\uFE0F\u20E3"
+    - "#\uFE0F\u20E3"
   icon: abc
   canonical: "https://www.unicode.org/reports/tr51/"
   references: null
   notes: >
     v1 migration: Was text.emoji. Single emoji or emoji sequence.
     Pattern matches Unicode symbol categories. Emoji width variable.
+    Keycap sequences (UTS #51: a digit, # or * then an optional U+FE0F and
+    U+20E3) are accepted in both the fully-qualified form and the unqualified
+    form without U+FE0F. A bare digit, # or * is not an emoji.
 
 representation.text.entity_name:
   title: "Entity Name"
@@ -761,8 +804,10 @@ representation.scientific.rna_sequence:
 representation.scientific.protein_sequence:
   title: "Protein Sequence"
   description: >
-    Amino acid sequence in single-letter IUPAC notation
-    (20 standard amino acids plus ambiguity codes).
+    Amino acid sequence in single-letter IUPAC notation: the 20 standard
+    amino acids, the ambiguity codes B (D or N), Z (E or Q) and X (any), the
+    rare residues U (selenocysteine) and O (pyrrolysine), the stop codon *
+    and the alignment gap -.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -776,7 +821,7 @@ representation.scientific.protein_sequence:
     molecular_weight_estimate: "LENGTH({col}) * 110"
   validation:
     type: string
-    pattern: "^[ACDEFGHIKLMNPQRSTVWXY*]+$"
+    pattern: "^[ABCDEFGHIKLMNOPQRSTUVWXYZ*-]+$"
   tier: [VARCHAR, scientific]
   aliases: [protein, peptide, amino_acid_sequence]
   samples:
@@ -789,6 +834,12 @@ representation.scientific.protein_sequence:
     v1 migration: New for v2. Single-letter amino acid notation.
     Standard: A, C, D, E, F, G, H, I, K, L, M, N, P, Q, R, S, T, V, W, Y
     Ambiguity: B (D or N), Z (E or Q), X (any), * (stop codon)
+    Rare residues: U (selenocysteine), O (pyrrolysine); - is an alignment gap.
+    J (Leu or Ile) is not accepted: the IUPAC-IUB 1983 amino acid table lists
+    B, Z and X but not J. The decompose parts count every character, gaps and
+    stops included. For discrimination only the 20 standard letters, X and *
+    count; sequences with B, Z, U, O or - conform but are not counted, so a
+    column of them is not kept as protein_sequence by schema_fail_demotion.
 
 representation.scientific.measurement_unit:
   title: "Measurement Unit"
@@ -950,7 +1001,7 @@ representation.scientific.smiles:
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Za-z0-9@+\\-\\[\\]\\(\\)\\\\/#=%.:]+$"
+    pattern: "^[A-Za-z0-9@+\\-\\[\\]\\(\\)\\\\/#=%.:*$]+$"
     minLength: 1
     maxLength: 1000
   tier: [VARCHAR, scientific]
@@ -970,6 +1021,11 @@ representation.scientific.smiles:
     reflects that single values like "O" or "CC" are indistinguishable from
     plain text — column-level disambiguation (header hints) is essential.
     Common molecules: O=water, CCO=ethanol, c1ccccc1=benzene, CC(=O)O=acetic acid.
+    OpenSMILES also defines the wildcard atom * (unspecified atom, e.g. *C or
+    [*]CC) and $ (the quadruple bond, e.g. [Re]$[Re]); both are accepted. For
+    discrimination only the older character class counts, so values with * or $
+    conform but are not counted, and a column of them is not kept as smiles by
+    schema_fail_demotion.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: discrete
@@ -1121,6 +1177,10 @@ representation.boolean.terms:
   broad_type: BOOLEAN
   frictionless:
     type: boolean
+    trueValues: ["true", "yes", "on", "True", "Yes", "On", "TRUE", "YES", "ON",
+                 "enabled", "Enabled", "ENABLED", "active", "Active", "ACTIVE"]
+    falseValues: ["false", "no", "off", "False", "No", "Off", "FALSE", "NO", "OFF",
+                  "disabled", "Disabled", "DISABLED", "inactive", "Inactive", "INACTIVE"]
   format_string: null
   transform: "CAST(CASE WHEN lower({col}) IN ('on', 'enabled', 'active') THEN 'true' WHEN lower({col}) IN ('off', 'disabled', 'inactive') THEN 'false' ELSE {col} END AS BOOLEAN)"
   transform_ext: null

@@ -3,8 +3,7 @@
 //! Returns a [`ValueDetail`] (`valid`, `constraint`, `message`, `grade`, `note`); the `ft_validate` table macro
 //! calls it once per cell.
 
-use finetype_core::{Note, NotesMatcher};
-use jsonschema::error::ValidationErrorKind;
+use finetype_core::{check_value_against_property, Note, NotesMatcher};
 use serde_json::Value as JsonValue;
 
 /// The result of validating one value: the pass/fail verdict with its reason,
@@ -65,14 +64,14 @@ fn note_text(note: &Note) -> String {
 ///     constraint).
 ///   - `constraint` — canonical token of the first failed constraint
 ///     (`pattern` | `min_length` | `max_length` | `enum` | `type` |
-///     `required` | `other`), or `None` when valid.
-///   - `message` — human-readable `jsonschema` error, or `None` when valid.
+///     `required` | `checksum` | `other`), or `None` when valid.
+///   - `message` — the human-readable reason for the first failed constraint, or `None` when valid.
 ///
-/// Scope: `valid` and `grade` reflect the fragment's JSON Schema keywords plus
-/// its note extensions (`x-finetype-canonical`, `x-finetype-historic`). The
-/// checksum (`x-finetype-label`) and case-folded enum checks that
-/// `finetype validate` applies are NOT applied here, so a right-shape value
-/// with a bad check digit conforms.
+/// Scope: `valid` and `grade` reflect the fragment's JSON Schema keywords, its
+/// enum matched case-insensitively, the check digit of the taxonomy leaf named
+/// by `x-finetype-label` (token `checksum`), and its note extensions
+/// (`x-finetype-canonical`, `x-finetype-historic`): the per-value check
+/// `finetype validate` applies (`finetype_core::check_value_against_property`).
 ///
 ///   - `grade` / `note` — `conforms`, or `noted` with the note the fragment's
 ///     `x-finetype-canonical` / `x-finetype-historic` extensions give the value
@@ -114,20 +113,21 @@ pub fn validate_value_detail(value: Option<&str>, schema: Option<&str>) -> Value
         Err(e) => return ValueDetail::schema_error(e),
     };
 
-    let validator = match jsonschema::validator_for(&schema_json) {
-        Ok(v) => v,
-        Err(e) => return ValueDetail::schema_error(e),
-    };
-
-    // Compiled per call, like the validator above.
+    // Compiled per call, as `check_value_against_property` compiles its checks.
     let matcher = match NotesMatcher::from_schema_property(&schema_json) {
         Ok(m) => m,
         Err(e) => return ValueDetail::schema_error(e),
     };
 
-    let json_value = JsonValue::String(val.to_string());
-    if let Some(error) = validator.iter_errors(&json_value).next() {
-        return ValueDetail::fails(constraint_token(error.kind()), error.to_string());
+    // The same per-value check `finetype validate` applies: the fragment's JSON
+    // Schema keywords, case-folded enum membership, and the check digit of the
+    // taxonomy leaf its `x-finetype-label` names.
+    let check = check_value_against_property(val, &schema_json);
+    if !check.valid {
+        return ValueDetail::fails(
+            check.constraint.unwrap_or_else(|| "other".to_string()),
+            check.message.unwrap_or_default(),
+        );
     }
     let note = matcher.and_then(|m| m.note(val));
     ValueDetail {
@@ -137,24 +137,6 @@ pub fn validate_value_detail(value: Option<&str>, schema: Option<&str>) -> Value
         grade: Some(if note.is_some() { "noted" } else { "conforms" }),
         note: note.as_ref().map(note_text),
     }
-}
-
-/// Map a `jsonschema::ValidationErrorKind` to the canonical constraint token.
-///
-/// Mirror of the private `map_kind` in `finetype_core::table_validator`
-/// (kept in sync by hand — the extension validates independently of the CLI
-/// path). Unknown kinds fall through to `other`.
-fn constraint_token(kind: &ValidationErrorKind) -> String {
-    match kind {
-        ValidationErrorKind::Pattern { .. } => "pattern",
-        ValidationErrorKind::MinLength { .. } => "min_length",
-        ValidationErrorKind::MaxLength { .. } => "max_length",
-        ValidationErrorKind::Enum { .. } => "enum",
-        ValidationErrorKind::Type { .. } => "type",
-        ValidationErrorKind::Required { .. } => "required",
-        _ => "other",
-    }
-    .to_string()
 }
 
 #[cfg(test)]
@@ -269,15 +251,35 @@ mod tests {
         assert_eq!(bad.constraint.as_deref(), Some("pattern"));
     }
 
-    /// Pins the documented gap: this scalar does not apply the checksum that
-    /// `finetype validate` applies for an `x-finetype-label` type, so a
-    /// right-shape ISBN-10 with a bad check digit conforms here.
+    /// A right-shape ISBN-10 with a bad check digit fails the `checksum`
+    /// constraint, as it does under `finetype validate`; the correct digit passes.
     #[test]
-    fn test_detail_checksum_label_not_applied() {
-        let frag = r#"{"type":"string","pattern":"^[0-9]{9}[0-9X]$","x-finetype-label":"identity.media.isbn"}"#;
-        let d = validate_value_detail(Some("0306406153"), Some(frag)); // correct check digit is 2
-        assert!(d.valid);
-        assert_eq!(d.grade, Some("conforms"));
+    fn test_detail_checksum_label_applied() {
+        let frag = r#"{"type":"string","pattern":"^[0-9]{9}[0-9X]$","x-finetype-label":"identity.commerce.isbn"}"#;
+        let bad = validate_value_detail(Some("0306406153"), Some(frag)); // correct check digit is 2
+        assert!(!bad.valid);
+        assert_eq!(bad.grade, Some("fails"));
+        assert_eq!(bad.constraint.as_deref(), Some("checksum"));
+        assert!(bad.message.is_some_and(|m| m.contains("check digit")));
+        let good = validate_value_detail(Some("0306406152"), Some(frag));
+        assert!(good.valid);
+        assert_eq!(good.grade, Some("conforms"));
+    }
+
+    /// Enum membership is case-insensitive, as under `finetype validate`: a
+    /// Title-case value conforms to a lower-case enum; a non-member still fails.
+    #[test]
+    fn test_detail_enum_is_case_folded() {
+        let frag = r#"{"type":"string","enum":["male","female"]}"#;
+        for v in ["Male", "FEMALE", "male"] {
+            let d = validate_value_detail(Some(v), Some(frag));
+            assert!(d.valid, "{v} conforms");
+            assert_eq!(d.grade, Some("conforms"));
+        }
+        let d = validate_value_detail(Some("other"), Some(frag));
+        assert!(!d.valid);
+        assert_eq!(d.constraint.as_deref(), Some("enum"));
+        assert_eq!(d.grade, Some("fails"));
     }
 
     /// A historic value is noted as withdrawn.

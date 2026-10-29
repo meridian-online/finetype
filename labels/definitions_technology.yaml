@@ -93,8 +93,11 @@ technology.internet.ip_v4_with_port:
 technology.internet.ip_v6:
   title: "IPv6 Address"
   description: >
-    Standard IPv6 address format with 8 16-bit hex groups separated by colons.
-    May use :: notation for zero compression. Resolves to VARCHAR.
+    IPv6 address (RFC 4291 section 2.2; RFC 5952): eight 16-bit hex groups
+    separated by colons, with one `::` standing for one or more all-zero groups,
+    or the mixed form with a dotted-decimal IPv4 address in the last 32 bits
+    (`::ffff:192.0.2.128`). Zone IDs (`%eth0`) are not part of the address
+    and are rejected. Resolves to VARCHAR.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -106,7 +109,7 @@ technology.internet.ip_v6:
   decompose: null
   validation:
     type: string
-    pattern: "^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$"
+    pattern: "^(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|(?:[0-9a-fA-F]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9a-fA-F]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|(?:[0-9a-fA-F]{1,4}:){1}:(?:[0-9a-fA-F]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|(?:[0-9a-fA-F]{1,4}:){2}:(?:[0-9a-fA-F]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|(?:[0-9a-fA-F]{1,4}:){3}:(?:[0-9a-fA-F]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|(?:[0-9a-fA-F]{1,4}:){4}:(?:[0-9a-fA-F]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|(?:[0-9a-fA-F]{1,4}:){5}:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})$"
   tier: [INET, internet]
   aliases: [ipv6]
   samples:
@@ -114,11 +117,15 @@ technology.internet.ip_v6:
     - "2001:db8:85a3::8a2e:370:7334"
     - "::1"
     - "fe80::1"
+    - "::ffff:192.0.2.128"
   icon: world
   canonical: "https://www.rfc-editor.org/rfc/rfc4291"
   references: null
   notes: >
-    v1 migration: Was internet.ip_v6. Complex regex due to :: compression notation.
+    v1 migration: Was internet.ip_v6. The pattern is the standard
+    per-position alternation: eight groups, `::` in place of one or more
+    groups, and the mixed form where each dotted-quad octet is 0-255 without
+    leading zeros. A zone ID is not accepted (strip it first).
 
 technology.internet.mac_address:
   title: "MAC Address"
@@ -198,6 +205,8 @@ technology.internet.hostname:
   description: >
     Fully qualified domain name or simple hostname. Does not include protocol or path.
     Allows alphanumeric characters, hyphens, and dots. Subdomains supported.
+    A single trailing full stop (the root label of an absolute name,
+    `example.com.`) is accepted.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -209,7 +218,7 @@ technology.internet.hostname:
   decompose: null
   validation:
     type: string
-    pattern: "^(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$"
+    pattern: "^(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\\.?$"
   tier: [VARCHAR, internet]
   aliases: [domain_name]
   samples:
@@ -217,12 +226,15 @@ technology.internet.hostname:
     - "www.google.com"
     - "subdomain.example.org"
     - "localhost"
+    - "example.com."
   icon: world
   canonical: "https://www.rfc-editor.org/rfc/rfc1035"
   references: null
   notes: >
     v1 migration: Was internet.hostname. Pattern requires lowercase (use LOWER()
-    to normalize). Does not validate DNS resolution.
+    to normalize). Does not validate DNS resolution. A trailing full stop marks
+    a fully qualified name (RFC 3696 section 2); it is part of the value, so
+    strip it before joining against names written without it.
 
 # technology.internet.port: REMOVED
 # False positives on plain integer columns. Range 0-65535 overlaps heavily with integer_number.
@@ -555,9 +567,10 @@ technology.code.locale_code:
 technology.development.version:
   title: "Version Number"
   description: >
-    Software or document version in semantic versioning format (e.g., 1.2.3)
-    or variant formats (e.g., v1.2.3, 1.2.3-alpha, 1.2.3+build).
-    Resolves to VARCHAR.
+    Software or document version in Semantic Versioning 2.0.0 format (e.g., 1.2.3)
+    or variant formats (e.g., v1.2.3, 1.2.3-alpha-1, 1.2.3+build-7).
+    Pre-release and build identifiers are dot-separated runs of letters, digits
+    and hyphens. Resolves to VARCHAR.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -570,11 +583,16 @@ technology.development.version:
     major: "CAST(REGEXP_EXTRACT({col}, '^v?([0-9]+)', 1) AS SMALLINT)"
     minor: "CAST(REGEXP_EXTRACT({col}, '^v?[0-9]+\\.([0-9]+)', 1) AS SMALLINT)"
     patch: "CAST(REGEXP_EXTRACT({col}, '^v?[0-9]+\\.[0-9]+\\.([0-9]+)', 1) AS SMALLINT)"
-    prerelease: "REGEXP_EXTRACT({col}, '-([a-zA-Z0-9.]+)(?:\\+|$)', 1)"
-    metadata: "REGEXP_EXTRACT({col}, '\\+([a-zA-Z0-9.]+)$', 1)"
+    prerelease: "REGEXP_EXTRACT({col}, '^v?[0-9]+\\.[0-9]+\\.[0-9]+-([a-zA-Z0-9.-]+)(?:\\+|$)', 1)"
+    metadata: "REGEXP_EXTRACT({col}, '\\+([a-zA-Z0-9.-]+)$', 1)"
   validation:
     type: string
-    pattern: "^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:-[a-zA-Z0-9.]+)?(?:\\+[a-zA-Z0-9.]+)?$"
+    pattern: "^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:-[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*)?(?:\\+[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*)?$"
+  validation_notes:
+    canonical:
+      kind: nonstandard
+      name: "no leading zeros"
+      pattern: "^v?(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][a-zA-Z0-9-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][a-zA-Z0-9-]*))*)?(?:\\+[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*)?$"
   tier: [VARCHAR, development]
   aliases: null
   samples:
@@ -583,18 +601,24 @@ technology.development.version:
     - "1.2.3-alpha"
     - "1.2.3-beta.1"
     - "1.2.3+build.123"
+    - "1.2.3-alpha-1"
+    - "1.0.0+build-7"
   icon: bookmark
   canonical: "https://semver.org/"
   references: null
   notes: >
     v1 migration: Was development.version. Semantic versioning (MAJOR.MINOR.PATCH).
-    Decompose extracts major, minor, patch, prerelease, and metadata components.
+    Decompose extracts major, minor, patch, prerelease, and metadata components
+    (`1.2.3-alpha-1` gives prerelease `alpha-1`; `1.0.0+build-7` gives metadata
+    `build-7`). Semantic Versioning forbids leading zeros in the numeric
+    identifiers (`1.02.3`); such a value is accepted with a note.
 
 technology.development.calver:
   title: "Calendar Version"
   description: >
-    Calendar versioning (CalVer) following date-based patterns like YYYY.MM.DD
-    or YYYY.MM. Used by projects that version based on release calendar.
+    Calendar versioning (CalVer) following date-based patterns like YYYY.MM.DD,
+    YYYY.MM or YYYY.0M.0D, with a one- or two-digit month and day. Used by
+    projects that version based on release calendar.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -605,28 +629,35 @@ technology.development.calver:
   transform_ext: null
   decompose:
     year: "CAST(REGEXP_EXTRACT({col}, '^([0-9]{4})', 1) AS SMALLINT)"
-    month: "CAST(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.([0-9]{2})', 1) AS SMALLINT)"
-    day: "CAST(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.[0-9]{2}\\.([0-9]{2})', 1) AS SMALLINT)"
+    month: "TRY_CAST(NULLIF(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.([0-9]{1,2})(?:\\.|$)', 1), '') AS SMALLINT)"
+    day: "TRY_CAST(NULLIF(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.[0-9]{1,2}\\.([0-9]{1,2})(?:\\.|$)', 1), '') AS SMALLINT)"
   validation:
     type: string
-    pattern: "^[0-9]{4}\\.[0-9]{2}(?:\\.[0-9]{2})?(?:\\..*)?$"
+    pattern: "^[0-9]{4}\\.[0-9]{1,2}(?:\\.[0-9]{1,2})?(?:\\..*)?$"
   tier: [VARCHAR, development]
   aliases: null
   samples:
     - "2024.02.09"
     - "2023.12.31"
     - "2024.01.15.1"
+    - "2024.2.9"
   icon: bookmark
   references: null
   notes: >
     v1 migration: Was development.calver. Decompose extracts year, month, day.
-    Format: YYYY.MM or YYYY.MM.DD.
+    Format: YYYY.MM or YYYY.MM.DD, month and day of one or two digits (calver.org
+    allows both `MM` and `0M`). `day` is NULL on a value with no day (`2024.1`,
+    `2024.12`). Discrimination counts a value with a two-digit month or a third
+    component; `2024.1` and `2020.5` conform but are also decimals, so they are
+    not counted.
 
 technology.development.docker_ref:
   title: "Docker/OCI Image Reference"
   description: >
     OCI container image reference in the form [registry/]repository[:tag][@digest].
-    Used in Dockerfiles, Kubernetes manifests, and CI/CD pipelines.
+    The tag is at most 128 characters and does not start with a period or a
+    hyphen; the digest algorithm is sha256, sha512 or blake3. Used in
+    Dockerfiles, Kubernetes manifests, and CI/CD pipelines.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -639,10 +670,10 @@ technology.development.docker_ref:
     registry: "REGEXP_EXTRACT({col}, '^(?:([a-zA-Z0-9.\\-]+(?::\\d+)?)/)', 1)"
     repository: "REGEXP_EXTRACT({col}, '(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?([a-z0-9._\\-/]+?)(?::|@|$)', 1)"
     tag: "REGEXP_EXTRACT({col}, '^[^@]*:([a-zA-Z0-9_.\\-]+)(?:@|$)', 1)"
-    digest: "REGEXP_EXTRACT({col}, '@(sha256:[a-fA-F0-9]{64})', 1)"
+    digest: "REGEXP_EXTRACT({col}, '@((?:sha256:[a-fA-F0-9]{64}|sha512:[a-fA-F0-9]{128}|blake3:[a-fA-F0-9]{64}))$', 1)"
   validation:
     type: string
-    pattern: "^(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?(?:[a-z0-9._\\-/]+)(?::[a-zA-Z0-9_.\\-]+)?(?:@sha256:[a-fA-F0-9]{64})?$"
+    pattern: "^(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?(?:[a-z0-9._\\-/]+)(?::[a-zA-Z0-9_][a-zA-Z0-9._\\-]{0,127})?(?:@(?:sha256:[a-fA-F0-9]{64}|sha512:[a-fA-F0-9]{128}|blake3:[a-fA-F0-9]{64}))?$"
   tier: [VARCHAR, development]
   aliases: [oci_image_ref, container_image]
   samples:
@@ -650,11 +681,17 @@ technology.development.docker_ref:
     - "ghcr.io/myorg/myapp:v1.2.3"
     - "docker.io/library/postgres:16-alpine"
     - "gcr.io/project/service@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+    - "app:_dev"
+    - "app@blake3:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
   icon: bookmark
   references: null
   notes: >
     OCI image reference format. Includes optional registry,
-    repository path, tag, and digest components.
+    repository path, tag, and digest components (OCI distribution and image
+    specifications). `digest` returns the algorithm and the hex, for example
+    `sha512:...`. No sha512 reference is among the samples: a column of
+    them reads as plain text, because the 128-hex digest dominates the value, so
+    the sha512 branch is pinned by the accept test and the duckdb digest test.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: identifier
@@ -805,8 +842,11 @@ technology.cloud.aws_arn:
 technology.cloud.s3_uri:
   title: "S3 URI"
   description: >
-    Amazon S3 bucket/key URI in the format s3://bucket-name/key-path.
-    Used in data pipelines, ETL tools, and cloud storage references.
+    Amazon S3 bucket/key URI in the format s3://bucket-name/key-path, or with
+    an S3 access-point ARN in place of the bucket name
+    (s3://arn:aws:s3:us-west-2:123456789012:accesspoint/name/key-path), as the
+    AWS CLI accepts. Used in data pipelines, ETL tools, and cloud storage
+    references.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -816,29 +856,40 @@ technology.cloud.s3_uri:
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
   decompose:
-    bucket: "REGEXP_EXTRACT({col}, '^s3://([^/]+)', 1)"
-    key: "REGEXP_EXTRACT({col}, '^s3://[^/]+/(.*)', 1)"
+    bucket: "REGEXP_EXTRACT({col}, '^s3://(arn:[^/]+/[^/]+|[^/]+)', 1)"
+    key: "CASE WHEN {col} LIKE 's3://arn:%' THEN REGEXP_EXTRACT({col}, '^s3://arn:[^/]+/[^/]+/(.*)', 1) ELSE REGEXP_EXTRACT({col}, '^s3://[^/]+/(.*)', 1) END"
   validation:
     type: string
-    pattern: "^s3://[a-z0-9][a-z0-9.\\-]{1,61}[a-z0-9](/.*)?$"
+    pattern: "^s3://(?:[a-z0-9][a-z0-9.\\-]{1,61}[a-z0-9]|arn:aws(?:-cn|-us-gov)?:s3:[a-z0-9-]+:[0-9]{12}:accesspoint/[a-z0-9][a-z0-9\\-]{1,48}[a-z0-9])(/.*)?$"
   tier: [VARCHAR, cloud]
   aliases: null
   samples:
     - "s3://my-bucket/data/file.csv"
     - "s3://production-logs/2024/01/events.parquet"
     - "s3://data-lake-raw/ingestion/batch-001/part-00000.json"
+    - "s3://arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint/mykey"
   icon: cloud
   references: null
   notes: >
     Bucket names: 3-63 chars, lowercase, no underscores.
     Key paths can contain any characters after the bucket name.
+    An access-point ARN (partition aws, aws-cn or aws-us-gov; 12-digit account;
+    a 3-50 character lower-case name) may stand in for the bucket. For such a
+    value `bucket` returns the whole ARN up to and including the access-point
+    name (`arn:aws:s3:us-west-2:123456789012:accesspoint/myaccesspoint`), and
+    `key` the part after it (`mykey`); `key` is '' when there is none. Multi-Region
+    access-point ARNs (empty region) and S3 on Outposts ARNs are not covered.
 
 technology.cryptographic.jwt:
   title: "JSON Web Token"
   description: >
-    JSON Web Token (JWT) consisting of three base64url-encoded segments
-    separated by dots: header.payload.signature. Used for authentication
-    and information exchange.
+    JSON Web Token (JWT) in either compact serialisation. A JWS is three
+    base64url-encoded segments separated by dots, header.payload.signature;
+    an unsecured JWT (RFC 7519 section 6) ends in a dot with an empty
+    signature. A JWE (RFC 7516) is five segments (header, encrypted key,
+    initialization vector, ciphertext and tag), where the encrypted key may be
+    empty. Used for
+    authentication and information exchange.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -849,23 +900,31 @@ technology.cryptographic.jwt:
   transform_ext: null
   decompose:
     header: "REGEXP_EXTRACT({col}, '^([A-Za-z0-9_-]+)\\.', 1)"
-    payload: "REGEXP_EXTRACT({col}, '^[A-Za-z0-9_-]+\\.([A-Za-z0-9_-]+)\\.', 1)"
-    signature: "REGEXP_EXTRACT({col}, '\\.([A-Za-z0-9_-]+)$', 1)"
+    payload: "REGEXP_EXTRACT({col}, '^[A-Za-z0-9_-]+\\.([A-Za-z0-9_-]+)\\.[A-Za-z0-9_-]*$', 1)"
+    signature: "REGEXP_EXTRACT({col}, '^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.([A-Za-z0-9_-]+)$', 1)"
   validation:
     type: string
-    pattern: "^[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}$"
+    pattern: "^[A-Za-z0-9_-]{10,}\\.(?:[A-Za-z0-9_-]{10,}\\.(?:[A-Za-z0-9_-]{10,})?|[A-Za-z0-9_-]*\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]{10,})$"
   tier: [VARCHAR, cryptographic]
   aliases: [json_web_token]
   samples:
     - "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
     - "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdXRoLmV4YW1wbGUuY29tIn0.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+    - "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ."
   icon: shield-lock
   canonical: "https://www.rfc-editor.org/rfc/rfc7519"
   references: null
   notes: >
-    Each segment is at least 10 base64url chars to
-    distinguish from other dot-separated formats. Header typically starts
-    with "eyJ" (base64 for '{"').
+    Each JWS segment, and the header, initialization vector and tag of a JWE,
+    is at least 10 base64url chars to distinguish from other dot-separated
+    formats. Header typically starts with "eyJ" (base64 for '{"'). Decompose
+    reads the three JWS parts; the signature of an unsecured JWT is ''. A
+    five-part JWE is not split (its parts are header, encrypted key,
+    initialization vector, ciphertext and tag), so its payload and signature
+    read ''. Discrimination counts a JWE or an unsecured JWT only when its
+    header decodes to a JSON object with an "alg" member. An empty signature is
+    accepted for any "alg", because logs often redact signatures, although
+    RFC 7515 allows it only with "alg": "none".
 
 technology.internet.cidr:
   title: "CIDR Notation"
@@ -940,7 +999,8 @@ technology.internet.data_uri:
   title: "Data URI"
   description: >
     Inline data URI scheme embedding content directly in a string.
-    Format: data:[mediatype][;base64],data. Used for embedding small
+    Format: data:[mediatype][;base64],data. The data may be empty (`data:,`),
+    and `base64` is matched case-insensitively. Used for embedding small
     files in HTML, CSS, and API responses.
   designation: universal
   locales: [UNIVERSAL]
@@ -953,10 +1013,10 @@ technology.internet.data_uri:
   transform_ext: null
   decompose:
     media_type: "REGEXP_EXTRACT({col}, '^data:([^;,]+)', 1)"
-    is_base64: "CASE WHEN {col} LIKE '%base64,%' THEN true ELSE false END"
+    is_base64: "COALESCE(REGEXP_MATCHES({col}, '^data:[^,]*;[bB][aA][sS][eE]64,'), false)"
   validation:
     type: string
-    pattern: "^data:(?:[a-zA-Z0-9]+/[a-zA-Z0-9\\-+.]+)?(?:;[a-zA-Z0-9\\-]+=[^;,]*)*(?:;base64)?,.+$"
+    pattern: "^data:(?:[a-zA-Z0-9]+/[a-zA-Z0-9\\-+.]+)?(?:;[a-zA-Z0-9\\-]+=[^;,]*)*(?:;[bB][aA][sS][eE]64)?,.*$"
   tier: [VARCHAR, internet]
   aliases: null
   samples:
@@ -964,12 +1024,17 @@ technology.internet.data_uri:
     - "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="
     - "data:application/json,{\"key\":\"value\"}"
     - "data:text/html,%3Ch1%3EHello%3C%2Fh1%3E"
+    - "data:,"
+    - "data:text/plain;BASE64,SGk="
   icon: world
   canonical: "https://www.rfc-editor.org/rfc/rfc2397"
   references: null
   notes: >
     Media type is optional (defaults to text/plain;charset=US-ASCII).
-    Base64 encoding is indicated by ;base64 before the comma.
+    Base64 encoding is indicated by ;base64 before the comma, in any letter
+    case (RFC 2397 section 3; the Fetch Standard matches it case-insensitively).
+    The data may be empty: `data:,` has no media type, so `media_type` is ''
+    there, and `is_base64` reads only the part before the first comma.
 
 technology.filesystem.windows_path:
   title: "Windows File Path"

@@ -249,54 +249,172 @@ fn build_checksum_check(col_schema: &Value) -> Option<ChecksumCheck> {
     Some(ChecksumCheck { scheme, verify })
 }
 
-/// Split a column schema into a jsonschema validator (with `enum` removed), an
-/// optional case-folded `EnumCheck`, and an optional `ChecksumCheck`. When the
-/// schema carries no `enum`, the validator is compiled unchanged and the check
-/// is `None`; likewise for a column with no checksum-bearing label.
-fn build_column_validator(
-    col_name: &str,
-    col_schema: &Value,
-) -> Result<
-    (
-        jsonschema::Validator,
-        Option<EnumCheck>,
-        Option<ChecksumCheck>,
-    ),
-    TableValidatorError,
-> {
-    let mut schema_for_jsonschema = col_schema.clone();
-    let enum_check = if let Value::Object(map) = &mut schema_for_jsonschema {
-        match map.remove("enum") {
-            Some(Value::Array(members)) if !members.is_empty() => {
-                let folded = members
-                    .iter()
-                    .filter_map(|m| m.as_str())
-                    .map(|s| s.to_lowercase())
-                    .collect::<HashSet<String>>();
-                let options_token = Value::Array(members).to_string();
-                Some(EnumCheck {
-                    folded,
-                    options_token,
-                })
-            }
-            // Empty array or non-array enum: leave it for jsonschema to handle.
-            Some(other) => {
-                map.insert("enum".to_string(), other);
-                None
-            }
-            None => None,
-        }
-    } else {
-        None
-    };
+/// Everything that decides whether one value conforms to one column's schema:
+/// the jsonschema validator (with `enum` removed), the case-folded enum
+/// membership, and the check digit. The one implementation behind both
+/// `validate_table` and [`check_value_against_property`].
+struct ColumnChecks {
+    validator: jsonschema::Validator,
+    enum_check: Option<EnumCheck>,
+    checksum_check: Option<ChecksumCheck>,
+}
 
-    let validator = jsonschema::validator_for(&schema_for_jsonschema).map_err(|e| {
-        TableValidatorError::SchemaCompilation {
-            column: col_name.to_string(),
-            detail: e.to_string(),
+/// One failed constraint on one value.
+struct Failure {
+    /// Canonical constraint token (see `RejectRecord::constraint_failed`).
+    token: String,
+    constraint_value: Option<String>,
+    message: String,
+    /// JSON-schema path for the legacy `CellError`.
+    schema_path: String,
+}
+
+impl ColumnChecks {
+    /// Split a column schema into a jsonschema validator (with `enum` removed),
+    /// an optional case-folded `EnumCheck`, and an optional `ChecksumCheck`.
+    /// When the schema carries no `enum`, the validator is compiled unchanged
+    /// and the check is `None`; likewise for a column with no checksum-bearing
+    /// label.
+    fn build(col_name: &str, col_schema: &Value) -> Result<Self, TableValidatorError> {
+        let mut schema_for_jsonschema = col_schema.clone();
+        let enum_check = if let Value::Object(map) = &mut schema_for_jsonschema {
+            match map.remove("enum") {
+                Some(Value::Array(members)) if !members.is_empty() => {
+                    let folded = members
+                        .iter()
+                        .filter_map(|m| m.as_str())
+                        .map(|s| s.to_lowercase())
+                        .collect::<HashSet<String>>();
+                    let options_token = Value::Array(members).to_string();
+                    Some(EnumCheck {
+                        folded,
+                        options_token,
+                    })
+                }
+                // Empty array or non-array enum: leave it for jsonschema to handle.
+                Some(other) => {
+                    map.insert("enum".to_string(), other);
+                    None
+                }
+                None => None,
+            }
+        } else {
+            None
+        };
+
+        let validator = jsonschema::validator_for(&schema_for_jsonschema).map_err(|e| {
+            TableValidatorError::SchemaCompilation {
+                column: col_name.to_string(),
+                detail: e.to_string(),
+            }
+        })?;
+        Ok(Self {
+            validator,
+            enum_check,
+            checksum_check: build_checksum_check(col_schema),
+        })
+    }
+
+    /// Every constraint the value violates, in order: jsonschema's
+    /// (pattern/length/type), then case-insensitive enum membership (the `enum`
+    /// keyword was stripped before compiling `validator`), then the check digit.
+    ///
+    /// The check digit runs ONLY when every shape constraint above passed, and
+    /// the order is the point rather than an optimisation: a check digit is
+    /// defined on values that already have the type's shape. Asking whether a
+    /// 7-character string carries a valid 20-character LEI check digit has one
+    /// answer for every such string, so a second reject on a value already
+    /// rejected for `pattern` would add no information and would move reject
+    /// counts for data whose verdict has not changed. What this stage catches is
+    /// exactly the class shape cannot: a value that IS the right shape and is
+    /// still not that identifier.
+    fn failures(&self, value_str: &str) -> Vec<Failure> {
+        let json_value = Value::String(value_str.to_string());
+        let mut out: Vec<Failure> = Vec::new();
+
+        for err in self.validator.iter_errors(&json_value) {
+            let (token, value) = map_kind(err.kind());
+            out.push(Failure {
+                token,
+                constraint_value: value,
+                message: err.to_string(),
+                schema_path: err.schema_path().to_string(),
+            });
         }
-    })?;
-    Ok((validator, enum_check, build_checksum_check(col_schema)))
+
+        // Case-insensitive enum membership (scoped to enum only; any
+        // co-attached pattern stayed exact via `validator` above).
+        if let Some(check) = &self.enum_check {
+            if !check.folded.contains(&value_str.to_lowercase()) {
+                out.push(Failure {
+                    token: "enum".to_string(),
+                    constraint_value: Some(check.options_token.clone()),
+                    message: format!("{} is not one of {}", json_value, check.options_token),
+                    schema_path: "/enum".to_string(),
+                });
+            }
+        }
+
+        if out.is_empty() {
+            if let Some(check) = &self.checksum_check {
+                if !(check.verify)(value_str) {
+                    out.push(Failure {
+                        token: "checksum".to_string(),
+                        constraint_value: Some(check.scheme.to_string()),
+                        message: format!("{} fails its {} check digit", json_value, check.scheme),
+                        schema_path: "/x-finetype-label/checksum".to_string(),
+                    });
+                }
+            }
+        }
+        out
+    }
+}
+
+/// The verdict on one value against one column's schema property.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValueCheck {
+    pub valid: bool,
+    /// Canonical constraint token of the first failed constraint (`pattern` |
+    /// `min_length` | `max_length` | `enum` | `checksum` | `type` | `required` |
+    /// `other`), or `None` when valid.
+    pub constraint: Option<String>,
+    /// Human-readable reason for the first failure, or `None` when valid.
+    pub message: Option<String>,
+}
+
+/// Check one non-null value against one column's schema property, exactly as
+/// [`validate_table`] does per cell: the property's JSON Schema keywords, its
+/// enum matched case-insensitively, and the check digit of the taxonomy leaf its
+/// `x-finetype-label` names. A property that does not compile is reported as
+/// `constraint: "schema"`.
+pub fn check_value_against_property(value: &str, property: &Value) -> ValueCheck {
+    let checks = match ColumnChecks::build("value", property) {
+        Ok(c) => c,
+        Err(e) => {
+            let detail = match e {
+                TableValidatorError::SchemaCompilation { detail, .. } => detail,
+                other => other.to_string(),
+            };
+            return ValueCheck {
+                valid: false,
+                constraint: Some("schema".to_string()),
+                message: Some(format!("schema error: {detail}")),
+            };
+        }
+    };
+    match checks.failures(value).into_iter().next() {
+        None => ValueCheck {
+            valid: true,
+            constraint: None,
+            message: None,
+        },
+        Some(f) => ValueCheck {
+            valid: false,
+            constraint: Some(f.token),
+            message: Some(f.message),
+        },
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -356,32 +474,17 @@ pub fn validate_table(
     // the column order in `headers` (ac-03: byte-identical output on repeat
     // calls). `serde_json::Map` iteration is arbitrary otherwise.
     #[allow(clippy::type_complexity)]
-    let mut validators: Vec<(
-        usize,
-        String,
-        jsonschema::Validator,
-        Option<EnumCheck>,
-        Option<ChecksumCheck>,
-        Option<NotesMatcher>,
-    )> = Vec::new();
+    let mut validators: Vec<(usize, String, ColumnChecks, Option<NotesMatcher>)> = Vec::new();
     for (col_name, col_schema) in properties {
         if let Some(&col_idx) = header_index.get(col_name.as_str()) {
-            let (validator, enum_check, checksum_check) =
-                build_column_validator(col_name, col_schema)?;
+            let checks = ColumnChecks::build(col_name, col_schema)?;
             let notes_check = NotesMatcher::from_schema_property(col_schema).map_err(|e| {
                 TableValidatorError::InvalidNotes {
                     column: col_name.clone(),
                     detail: e.to_string(),
                 }
             })?;
-            validators.push((
-                col_idx,
-                col_name.clone(),
-                validator,
-                enum_check,
-                checksum_check,
-                notes_check,
-            ));
+            validators.push((col_idx, col_name.clone(), checks, notes_check));
         }
         // Columns in schema but not in data are tracked in missing_columns
     }
@@ -402,7 +505,7 @@ pub fn validate_table(
     for (row_idx, row) in rows.iter().enumerate() {
         let mut errors: Vec<CellError> = Vec::new();
 
-        for (col_idx, col_name, validator, enum_check, checksum_check, notes_check) in &validators {
+        for (col_idx, col_name, checks, notes_check) in &validators {
             let cell = row.get(*col_idx).unwrap_or(&None);
 
             if is_null(cell) {
@@ -414,19 +517,13 @@ pub fn validate_table(
             }
 
             let value_str = cell.as_deref().unwrap_or("");
-            let json_value = Value::String(value_str.to_string());
 
-            // Per-cell: collect one RejectRecord per constraint violation
-            // (ac-02). A cell can fail multiple constraints; each gets its own
-            // record so downstream SQL can count rejects by constraint token.
-            // jsonschema covers pattern/length/type; enum membership is checked
-            // here case-insensitively (the `enum` keyword was stripped before
-            // compiling `validator`).
+            // Per-cell: one RejectRecord per constraint violation (ac-02). A
+            // cell can fail multiple constraints; each gets its own record so
+            // downstream SQL can count rejects by constraint token.
             let mut cell_rejects: Vec<RejectRecord> = Vec::new();
             let mut cell_errors: Vec<CellError> = Vec::new();
-
-            for err in validator.iter_errors(&json_value) {
-                let (token, value) = map_kind(err.kind());
+            for f in checks.failures(value_str) {
                 cell_rejects.push(RejectRecord {
                     row_index: row_idx,
                     column_index: *col_idx,
@@ -434,78 +531,16 @@ pub fn validate_table(
                     value: Some(value_str.to_string()),
                     expected_type: None,
                     type_confidence: None,
-                    constraint_failed: token,
-                    constraint_value: value,
-                    error_message: err.to_string(),
+                    constraint_failed: f.token,
+                    constraint_value: f.constraint_value,
+                    error_message: f.message.clone(),
                 });
                 cell_errors.push(CellError {
                     column: col_name.clone(),
                     value: Some(value_str.to_string()),
-                    error: err.to_string(),
-                    schema_path: err.schema_path().to_string(),
+                    error: f.message,
+                    schema_path: f.schema_path,
                 });
-            }
-
-            // Case-insensitive enum membership (scoped to enum only; any
-            // co-attached pattern stayed exact via `validator` above).
-            if let Some(check) = enum_check {
-                if !check.folded.contains(&value_str.to_lowercase()) {
-                    let error_message =
-                        format!("{} is not one of {}", json_value, check.options_token);
-                    cell_rejects.push(RejectRecord {
-                        row_index: row_idx,
-                        column_index: *col_idx,
-                        column_name: col_name.clone(),
-                        value: Some(value_str.to_string()),
-                        expected_type: None,
-                        type_confidence: None,
-                        constraint_failed: "enum".to_string(),
-                        constraint_value: Some(check.options_token.clone()),
-                        error_message: error_message.clone(),
-                    });
-                    cell_errors.push(CellError {
-                        column: col_name.clone(),
-                        value: Some(value_str.to_string()),
-                        error: error_message,
-                        schema_path: "/enum".to_string(),
-                    });
-                }
-            }
-
-            // Check digit (the taxonomy's `checksum:` directive). Runs ONLY
-            // when every shape constraint above passed, and the order is the
-            // point rather than an optimisation: a check digit is defined on
-            // values that already have the type's shape. Asking whether a
-            // 7-character string carries a valid 20-character LEI check digit
-            // has one answer for every such string, so a second reject on a
-            // value already rejected for `pattern` would add no information and
-            // would move reject counts for data whose verdict has not changed.
-            // What this stage catches is exactly the class shape cannot: a
-            // value that IS the right shape and is still not that identifier.
-            if cell_rejects.is_empty() {
-                if let Some(check) = checksum_check {
-                    if !(check.verify)(value_str) {
-                        let error_message =
-                            format!("{} fails its {} check digit", json_value, check.scheme);
-                        cell_rejects.push(RejectRecord {
-                            row_index: row_idx,
-                            column_index: *col_idx,
-                            column_name: col_name.clone(),
-                            value: Some(value_str.to_string()),
-                            expected_type: None,
-                            type_confidence: None,
-                            constraint_failed: "checksum".to_string(),
-                            constraint_value: Some(check.scheme.to_string()),
-                            error_message: error_message.clone(),
-                        });
-                        cell_errors.push(CellError {
-                            column: col_name.clone(),
-                            value: Some(value_str.to_string()),
-                            error: error_message,
-                            schema_path: "/x-finetype-label/checksum".to_string(),
-                        });
-                    }
-                }
             }
 
             if cell_rejects.is_empty() {
@@ -1404,5 +1439,51 @@ mod tests {
         let result = validate_table(&headers, &rows, &schema).unwrap();
         assert_eq!(result.valid_row_indices, vec![0]);
         assert!(result.rejects.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod check_value_tests {
+    use super::*;
+    use serde_json::json;
+
+    /// `check_value_against_property` is what `validate_table` computes per
+    /// value: the same verdict and first-failure token for pattern, case-folded
+    /// enum and checksum, and a schema error for an uncompilable property.
+    #[test]
+    fn matches_validate_table_per_value() {
+        let prop = json!({
+            "type": "string",
+            "pattern": "^[0-9]{9}[0-9X]$",
+            "x-finetype-label": "identity.commerce.isbn"
+        });
+        for (value, valid, token) in [
+            ("0306406152", true, None),
+            ("0306406153", false, Some("checksum")),
+            ("abc", false, Some("pattern")),
+        ] {
+            let c = check_value_against_property(value, &prop);
+            assert_eq!(c.valid, valid, "{value}");
+            assert_eq!(c.constraint.as_deref(), token, "{value}");
+            let schema = json!({"properties": {"c": prop}});
+            let r = validate_table(
+                &["c".to_string()],
+                &[vec![Some(value.to_string())]],
+                &schema,
+            )
+            .unwrap();
+            assert_eq!(r.valid_rows == 1, valid, "{value}");
+            assert_eq!(
+                r.rejects.first().map(|x| x.constraint_failed.as_str()),
+                token,
+                "{value}"
+            );
+        }
+        let en = json!({"type": "string", "enum": ["male", "female"]});
+        assert!(check_value_against_property("Male", &en).valid);
+        let bad = check_value_against_property("x", &en);
+        assert_eq!(bad.constraint.as_deref(), Some("enum"));
+        let broken = check_value_against_property("x", &json!({"pattern": "("}));
+        assert_eq!(broken.constraint.as_deref(), Some("schema"));
     }
 }

@@ -297,7 +297,8 @@ impl ColumnClassifier {
 
     /// `protein_sequence_length_veto` (default ON). Demotes a
     /// `representation.scientific.protein_sequence` OVERCALL on a short-string
-    /// column to `unknown`. The protein pattern `^[ACDEFGHIKLMNPQRSTVWXY*]+$`
+    /// column to `unknown`. The protein discrimination class
+    /// `^[ACDEFGHIKLMNPQRSTVWXY*]+$` (the 20 standard letters, X and `*`)
     /// is a magnet for short uppercase codes — a stock-ticker column is 56%
     /// all-amino-acid on the EDGAR measurement, so when the membership
     /// recovery declines the column keeps the confidently-wrong protein
@@ -1180,9 +1181,20 @@ impl ColumnClassifier {
         if non_empty.len() < 3 {
             return;
         }
+        // checksum::isbn strips spaces as well as hyphens, so a spaced value counts
+        // only when the published rule accepts it too (one single-space separator
+        // kind); nothing validates the column after this guard. Hyphen and bare
+        // values are counted as before.
+        let rule = self
+            .taxonomy
+            .as_ref()
+            .and_then(|t| finetype_core::validator::resolve_label_validator(LEAF, t));
         let valid = non_empty
             .iter()
-            .filter(|v| finetype_core::checksum::isbn(v))
+            .filter(|v| {
+                finetype_core::checksum::isbn(v)
+                    && (!v.contains(' ') || rule.as_ref().is_some_and(|r| r.is_valid(v)))
+            })
             .count();
         // >=90% pass the ISBN check digit (valid*10 >= len*9).
         if valid * 10 < non_empty.len() * 9 {
@@ -1377,7 +1389,7 @@ impl ColumnClassifier {
     /// `cusip_checksum_recovery` (default ON). The 244-dim model cannot predict
     /// `finance.securities.cusip` (a 9-char security id: 8 issuer/issue chars + a
     /// check digit), so real CUSIP columns land on the word / alphanumeric_id /
-    /// integer_number attractor. The taxonomy shape `^[A-Z0-9]{8}[0-9]$` also
+    /// integer_number attractor. The taxonomy shape `^[A-Z0-9*@#]{8}[0-9]$` also
     /// matches any 9-char alnum id (SKUs, 9-digit account numbers), so shape alone
     /// is not enough. The CUSIP mod-10 check digit (`finetype_core::checksum::cusip`)
     /// is the discriminator the attractor cannot satisfy: a non-CUSIP id's 9th char
@@ -1396,7 +1408,8 @@ impl ColumnClassifier {
         let Some(tax) = self.taxonomy.as_ref() else {
             return;
         };
-        // Shape gate: `^[A-Z0-9]{8}[0-9]$`. Mirrors isin_checksum_recovery's use of
+        // Shape gate: `^[A-Z0-9*@#]{8}[0-9]$` (private-placement characters
+        // counted only with a valid check digit, by the cusip detector). Mirrors isin_checksum_recovery's use of
         // the leaf's own taxonomy validator before the check-digit test.
         if !label_validates_sample(tax, LEAF, sample) {
             return;
@@ -1703,8 +1716,11 @@ impl ColumnClassifier {
     }
 
     /// `color_rgb_recovery` (default ON). Recovers `representation.format.color_rgb`
-    /// (not in the 244-dim softmax) from VALUES. The taxonomy validator
-    /// `^(?:rgb)?\(?(\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)?$` is PERMISSIVE — `rgb`,
+    /// (not in the 244-dim softmax) from VALUES. A value counts when it starts
+    /// with `rgb(`/`rgba(` and passes the published rule, so the CSS Color 4 space
+    /// syntax is recovered as well as the comma syntax. Channels above 255 count:
+    /// CSS Color 4 clamps them, so `rgb(300, 0, 0)` is valid CSS. The rule's bare
+    /// alternative `^(?:rgb)?\(?(\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)?$` is PERMISSIVE — `rgb`,
     /// `(` and `)` are all optional, so a bare comma triple `255,0,0` (a coordinate, a
     /// comma_separated array, or the `word` attractor) passes; that is why color_rgb was
     /// excluded from `ceded_leaf_recovery`. This PROMOTE guard restores recall precisely
@@ -1723,24 +1739,18 @@ impl ColumnClassifier {
         if non_empty.len() < 3 {
             return;
         }
-        // Anchored substance check: literal rgb(/rgba( prefix + closing ) + 3 (rgb)
-        // or 4 (rgba) comma components whose first three are integers in 0..=255.
+        // Anchored substance check: the literal rgb(/rgba( head a bare triple cannot
+        // carry, and the published color_rgb rule (legacy comma and CSS Color 4
+        // space syntax alike). Values are lowercased first, as this guard always did.
+        let Some(tax) = self.taxonomy.as_ref() else {
+            return;
+        };
+        let Some(rule) = finetype_core::validator::resolve_label_validator(LEAF, tax) else {
+            return;
+        };
         let is_rgb = |raw: &str| -> bool {
             let lower = raw.trim().to_ascii_lowercase();
-            let inner = lower
-                .strip_prefix("rgba(")
-                .or_else(|| lower.strip_prefix("rgb("));
-            let Some(inner) = inner.and_then(|s| s.strip_suffix(')')) else {
-                return false;
-            };
-            let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
-            if parts.len() != 3 && parts.len() != 4 {
-                return false;
-            }
-            parts.iter().take(3).all(|p| {
-                let n = p.strip_suffix('%').unwrap_or(p);
-                n.parse::<u16>().map(|v| v <= 255).unwrap_or(false)
-            })
+            (lower.starts_with("rgb(") || lower.starts_with("rgba(")) && rule.is_valid(&lower)
         };
         let valid = non_empty.iter().filter(|v| is_rgb(v)).count();
         // >=90% carry the literal rgb(...) certainty.
