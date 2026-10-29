@@ -725,10 +725,11 @@ geography.address.street_suffix:
     names in Canada and France), str and Str. (Germany), and Crescent, Terrace
     and Close. Matching is case-insensitive, so LANE is the same entry as Lane.
     The UPU sheets give examples (RUE, Str.), not a full table of suffixes, so no
-    further forms are listed. Column discrimination counts only the full English
-    words and Rue; the two- and three-letter abbreviations (BD, AV, CRT, BVD, ...)
-    and str / Str. conform but do not count, because they collide with country,
-    currency and airport codes.
+    further forms are listed. Column discrimination counts the English words and
+    their abbreviations (Street, St, Avenue, Ave, ...), Rue, Crescent, Terrace
+    and Close; the national abbreviations (CRT, AV, BOUL, BVD, BD) and str /
+    Str. conform but do not count, because they collide with country, currency
+    and airport codes.
 
 geography.address.postal_code:
   title: "Postal Code"
@@ -1333,7 +1334,8 @@ geography.coordinate.coordinates:
     Format: "lat,lon", "lat, lon" or "lat lon" (decimal degrees; degree/minute/
     second notation is geography.coordinate.dms). The latitude comes first;
     transform_ext puts the longitude first, as ST_Point(x, y) takes it. Frictionless
-    has no type for a comma-separated pair, so it maps to string.
+    geopoint is longitude-first in every format and this type is latitude-first,
+    so it maps to string.
 
 geography.coordinate.geohash:
   title: "Geohash"

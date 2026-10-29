@@ -402,27 +402,16 @@ const CLDR_ABBREVIATED_MONTHS: &[(&str, &[&str])] = &[
 /// abbreviation, so they are not counted for discrimination.
 fn is_abbreviated_month_discrimination_shape(value: &str) -> bool {
     let mut parts = value.split_whitespace();
-    let (token, month_first) = match (parts.next(), parts.next()) {
-        (Some(first), _) if first.chars().next().is_some_and(char::is_alphabetic) => (first, true),
-        (Some(_), Some(second)) => (second, false),
+    let token = match (parts.next(), parts.next()) {
+        (Some(first), _) if first.chars().next().is_some_and(char::is_alphabetic) => first,
+        (Some(_), Some(second)) => second,
         _ => return false,
     };
     let token = token.trim_end_matches('.').to_lowercase();
-    (month_first && AP_SPELLED_OUT_MONTHS.contains(&token.as_str()))
-        || CLDR_ABBREVIATED_MONTHS
-            .iter()
-            .any(|(_, months)| months.contains(&token.as_str()))
+    CLDR_ABBREVIATED_MONTHS
+        .iter()
+        .any(|(_, months)| months.contains(&token.as_str()))
 }
-
-/// The months AP style spells out rather than abbreviates (March, April, May,
-/// June, July; AP Stylebook, "months"), so AP-style dates such as
-/// `March 4, 2023` count beside the `Feb. 4, 2023` the type's description
-/// names. AP writes only month-first dates, so these count only as the first
-/// token: a day-first `4 March 2023` is a full-month date, not AP style. A hand
-/// list kept apart from the generated CLDR table; `may` is also CLDR's and
-/// listed for completeness. February stays abbreviated in AP, so `February` is
-/// not here.
-const AP_SPELLED_OUT_MONTHS: &[&str] = &["march", "april", "may", "june", "july"];
 
 #[cfg(test)]
 mod abbreviated_month_locales {

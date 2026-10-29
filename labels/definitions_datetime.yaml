@@ -992,8 +992,9 @@ datetime.date.abbreviated_month:
     one of the Latin-script locales above (4 Feb 2023, 4 janv. 2023, 4 ene
     2023); full month names (4 February 2023) and ordinary words (Room 12,
     2023) fit the rule's shape but are not counted. AP style spells out March
-    to July, so those count in a month-first date (March 4, 2023) but not
-    day-first (4 March 2023). The rule's letters stop at Latin-1, so the
+    to July; a spelled-out month, month-first (March 4, 2023) or day-first
+    (4 March 2023), is long_full_month's form and is not counted here, so an AP
+    column counts only its abbreviated months (Feb. 4, 2023). The rule's letters stop at Latin-1, so the
     Czech and Polish abbreviations with letters outside it (bře, kvě, čvn,
     čvc, zář, říj, paź) are not accepted yet.
 

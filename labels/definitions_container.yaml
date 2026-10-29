@@ -283,7 +283,6 @@ container.object.csv:
   samples:
     - "John,30,true"
     - '"Smith, John",30,Engineer'
-    - 'a,,c'
     - '"say ""hi""",2'
   icon: package
   canonical: "https://www.rfc-editor.org/rfc/rfc4180"
@@ -512,7 +511,6 @@ container.key_value.query_string:
     - "name=John&age=30&city=NewYork"
     - "q=python&page=1"
     - "user_id=123&token=abc123xyz"
-    - "debug&page=2"
   icon: key
   references: null
   notes: >

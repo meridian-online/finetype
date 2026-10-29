@@ -2132,8 +2132,8 @@ fn currency_code_recently_withdrawn_column_keeps_type() {
     }
 }
 
-/// A column of day-first full-month dates in March to July is not AP style
-/// (AP writes month-first), so the veto rejects the label for it too.
+/// A column of spelled-out March to July dates is long_full_month's form, so
+/// the veto rejects abbreviated_month for it as for February.
 #[test]
 fn abbreviated_month_day_first_spelled_out_column_is_vetoed() {
     use finetype_core::validation_veto::{audited_safe_labels, evaluate_validation_veto};
