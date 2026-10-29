@@ -182,7 +182,8 @@ representation.numeric.percentage:
   title: "Percentage"
   description: >
     Number as a percentage (e.g., 50%, 99.99%, 0.5%).
-    May include % symbol or decimal representation. Transforms to DOUBLE (0-100).
+    May include % symbol or decimal representation. Transforms to DOUBLE as a
+    fraction (45% → 0.45), as finance.rate.yield does.
     The SI Brochure puts a space between number and symbol (50 %); French
     typography uses a no-break space (U+00A0) or narrow no-break space (U+202F),
     German (DIN 5008) a space, and Turkish puts the sign first (%50). All of
@@ -193,7 +194,7 @@ representation.numeric.percentage:
   frictionless:
     type: number
   format_string: null
-  transform: "CAST(REGEXP_EXTRACT({col}, '^%?(-?[0-9]+(\\.[0-9]+)?)', 1) AS DOUBLE)"
+  transform: "CAST(REGEXP_EXTRACT({col}, '^%?(-?[0-9]+(\\.[0-9]+)?)', 1) || 'e-2' AS DOUBLE)"
   transform_ext: null
   decompose:
     percent_value: "CAST(REGEXP_EXTRACT({col}, '^%?(-?[0-9]+(\\.[0-9]+)?)', 1) AS DOUBLE)"
@@ -212,7 +213,11 @@ representation.numeric.percentage:
   references: null
   notes: >
     v1 migration: New for v2. Percentage as string representation.
-    Transform extracts numeric value (0-100 range expected).
+    Transform extracts the number and stores it as a fraction (45% → 0.45),
+    the value Excel holds and d3-format's % expects. It appends 'e-2' to the
+    extracted digits and casts once rather than dividing by 100, so 99.99%
+    casts to exactly 0.9999 with no float noise. The decompose column
+    percent_value keeps the 0-100 number, as yield keeps raw_pct.
 
 # representation.numeric.increment: MOVED to representation.identifier.increment in v0.5.1
 # Increment is an identifier type, not a numeric computation type.

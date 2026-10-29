@@ -294,6 +294,7 @@ impl VScalar for FineTypeVersion {
 /// - `ft_cast('Yes')` → `'true'` (boolean normalization)
 /// - `ft_cast('550E8400-...')` → `'550e8400-...'` (UUID lowercase)
 /// - `ft_cast('1,234')` → `'1234'` (strip formatting)
+/// - `ft_cast('95.5%')` → `'0.955'` (percentage → fraction)
 struct FineTypeCast;
 
 impl VScalar for FineTypeCast {

@@ -424,14 +424,15 @@ fn normalize_numeric(value: &str, label: &str) -> Option<String> {
             Some(clean)
         }
         "representation.numeric.percentage" => {
-            // Strip % sign and normalize
+            // Strip % sign, then give the fraction (95.5% → 0.955), as the
+            // taxonomy transform does
             let clean = v.trim_end_matches('%').trim();
             let clean: String = clean
                 .chars()
                 .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-' || *c == '+')
                 .collect();
             clean.parse::<f64>().ok()?;
-            Some(clean)
+            Some(percent_to_fraction(&clean))
         }
         "representation.numeric.scientific_notation" => {
             // Validate as scientific notation
@@ -439,6 +440,27 @@ fn normalize_numeric(value: &str, label: &str) -> Option<String> {
             Some(v.to_string())
         }
         _ => Some(v.to_string()),
+    }
+}
+
+/// Move the decimal point two places left in a number's text, so the
+/// fraction is exact (99.99 → 0.9999) rather than a division's float noise.
+fn percent_to_fraction(number: &str) -> String {
+    let (sign, digits) = match number.strip_prefix('-') {
+        Some(rest) => ("-", rest),
+        None => ("", number.trim_start_matches('+')),
+    };
+    let (int_part, frac_part) = digits.split_once('.').unwrap_or((digits, ""));
+    let int_part = format!("{int_part:0>3}");
+    let (whole, cents) = int_part.split_at(int_part.len() - 2);
+    let whole = whole.trim_start_matches('0');
+    let whole = if whole.is_empty() { "0" } else { whole };
+    let frac = format!("{cents}{frac_part}");
+    let frac = frac.trim_end_matches('0');
+    if frac.is_empty() {
+        format!("{sign}{whole}")
+    } else {
+        format!("{sign}{whole}.{frac}")
     }
 }
 
@@ -695,8 +717,31 @@ mod tests {
     fn test_percentage_strip_sign() {
         assert_eq!(
             normalize("95.5%", "representation.numeric.percentage"),
-            Some("95.5".to_string())
+            Some("0.955".to_string())
         );
+    }
+
+    #[test]
+    fn test_percentage_gives_an_exact_fraction() {
+        let cases = [
+            ("50%", "0.5"),
+            ("99.99%", "0.9999"),
+            ("0.5%", "0.005"),
+            ("100", "1"),
+            ("1234.5%", "12.345"),
+            ("-12.5 %", "-0.125"),
+            ("+7%", "0.07"),
+            ("%50", "0.5"),
+            ("0%", "0"),
+        ];
+        for (value, expected) in cases {
+            assert_eq!(
+                normalize(value, "representation.numeric.percentage"),
+                Some(expected.to_string()),
+                "{value:?}"
+            );
+        }
+        assert_eq!(normalize("abc", "representation.numeric.percentage"), None);
     }
 
     // ── Internet Tests ───────────────────────────────────────────────────
