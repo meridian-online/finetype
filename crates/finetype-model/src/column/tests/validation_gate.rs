@@ -1614,8 +1614,8 @@ fn iana_does_not_recover_path_or_code_columns() {
         [
             "Europe/Sales-Report.pdf",
             "Asia/Tokyo.png",
-            "America/data.v2",
-            "Europe/Q3-Summary.xlsx",
+            "America/Data.pdf",
+            "Europe/Summary.xlsx",
             "Asia/Osaka.jpg",
         ]
         .iter()
@@ -2106,6 +2106,36 @@ fn currency_code_placeholder_column_is_demoted() {
             "a column of {value} is demoted"
         );
     }
+}
+
+/// `json` is a ceded leaf. A column of multi-line braced text that is not JSON
+/// (an anonymous GraphQL query) conforms to the published rule but is not
+/// relabelled json; pretty-printed JSON still is.
+#[test]
+fn json_does_not_recover_multi_line_braced_text() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(super::shipped_taxonomy());
+    let graphql: Vec<String> = vec!["{\n  hero {\n    name\n  }\n}".to_string(); 40];
+    let r = cc
+        .compose_from_sense("query", &graphql, "representation.text.plain_text", 1.0)
+        .unwrap();
+    assert_ne!(
+        r.label, "container.object.json",
+        "{:?}",
+        r.disambiguation_rule
+    );
+    let pretty: Vec<String> = (0..40)
+        .map(|i| format!("{{\n  \"id\": {i},\n  \"ok\": true\n}}"))
+        .collect();
+    let r = cc
+        .compose_from_sense("config", &pretty, "representation.text.plain_text", 1.0)
+        .unwrap();
+    assert_eq!(
+        r.label, "container.object.json",
+        "{:?}",
+        r.disambiguation_rule
+    );
 }
 
 /// Codes withdrawn since 2010 still count, so a column of `BGN` (until 2026-01)

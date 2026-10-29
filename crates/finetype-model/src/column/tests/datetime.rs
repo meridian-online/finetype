@@ -1467,11 +1467,13 @@ fn iana_zone_shape_takes_tz_areas_only() {
 /// versioned name, so the location class does: no tz name contains a dot.
 #[test]
 fn iana_recovery_leaves_dotted_names_under_real_areas() {
+    // Every value would match a location class that took a dot, so restoring
+    // the dot makes this column recover.
     let column = vals(&[
         "Europe/Sales-Report.pdf",
         "Asia/Tokyo.png",
-        "America/data.v2",
-        "Europe/Q3-Summary.xlsx",
+        "America/Data.pdf",
+        "Europe/Summary.xlsx",
         "Asia/Osaka.jpg",
     ]);
     let many: Vec<String> = column.iter().cycle().take(70).cloned().collect();

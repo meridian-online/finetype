@@ -20,6 +20,7 @@ pub fn detector_for(label: &str) -> Option<fn(&str) -> bool> {
         "container.object.csv" => Some(is_csv_discrimination_shape),
         "container.object.yaml" => Some(is_yaml_discrimination_shape),
         "container.object.xml" => Some(is_xml_discrimination_shape),
+        "container.object.json" => Some(is_json_discrimination_shape),
         "container.key_value.query_string" => Some(is_query_string_discrimination_shape),
         "geography.location.state_code" => Some(is_state_code_discrimination_shape),
         "geography.format.wkt" => Some(is_wkt_discrimination_shape),
@@ -188,6 +189,23 @@ fn xml_root_name(value: &str) -> Option<&str> {
         .find(|c: char| c.is_whitespace() || c == '/' || c == '>')
         .unwrap_or(rest.len());
     Some(&rest[..end])
+}
+
+/// `json`: the single-line `{...}` shape the type had first, or, for a value
+/// with line breaks, an object that parses as JSON. The published rule follows
+/// RFC 8259's whitespace and checks only the braces, so it also accepts any
+/// multi-line text wrapped in braces (a GraphQL query, a pretty-printed Python
+/// dict, a CSS block); the type is a ceded leaf, so without this such a column
+/// could be relabelled json and then cast to NULL.
+fn is_json_discrimination_shape(value: &str) -> bool {
+    let value = value.trim();
+    if !(value.starts_with('{') && value.ends_with('}')) {
+        return false;
+    }
+    if !value.contains(['\n', '\r']) {
+        return true;
+    }
+    serde_json::from_str::<serde_json::Value>(value).is_ok_and(|v| v.is_object())
 }
 
 /// `xml`: the published rule, the single-line `<...>...</...>` shape the type
@@ -886,7 +904,7 @@ const WKT_RULE: &str = "^(?:[Pp][Oo][Ii][Nn][Tt]|[Ll][Ii][Nn][Ee][Ss][Tt][Rr][Ii
 /// `)`, by a coordinate pair (a number, white space, a number) or a geometry
 /// keyword then `EMPTY`. The
 /// case-insensitive part is ASCII-only (`(?i-u:...)`).
-const WKT_BODY: &str = "(?s)^(?:[A-Za-z]+\\s*[ZMzm]{0,2}\\s*(?i-u:empty)|[^(]*\\([^)]*?(?:[-+]?[0-9]+(?:\\.[0-9]+)?\\s+[-+]?[.0-9]|(?i-u:\\b(?:point|linestring|polygon|multipoint|multilinestring|multipolygon|geometrycollection|triangle|polyhedralsurface|tin)\\s*(?:zm|z|m)?\\s*empty\\b)))";
+const WKT_BODY: &str = "(?s)^(?:[A-Za-z]+\\s*[ZMzm]{0,2}\\s*(?i-u:empty)\\s*$|[^(]*\\([^)]*?(?:[-+]?[0-9]+(?:\\.[0-9]+)?\\s+[-+]?[.0-9]|(?i-u:\\b(?:point|linestring|polygon|multipoint|multilinestring|multipolygon|geometrycollection|triangle|polyhedralsurface|tin)\\s*(?:zm|z|m)?\\s*empty\\b)))";
 
 /// `wkt`: the published rule and a body that is `EMPTY` or holds a coordinate pair
 /// or `EMPTY` inside the parentheses. The published rule stops at the opening
@@ -1103,6 +1121,7 @@ mod tests {
             "container.object.yaml",
             "container.key_value.query_string",
             "container.object.xml",
+            "container.object.json",
             "geography.location.state_code",
             "geography.format.wkt",
             "geography.coordinate.plus_code",

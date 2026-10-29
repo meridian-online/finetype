@@ -878,6 +878,37 @@ fn json_rejects_undefined_forms() {
     assert_pattern_boundary(JSON_LABEL, &[], &["[1, 2]", "{\"a\": 1", "a {}"]);
 }
 
+/// The detector keeps the single-line `{...}` shape the type had first and
+/// counts a multi-line value only when it parses as a JSON object, so braced
+/// multi-line text (a GraphQL query, a Python dict, a CSS block) conforms but
+/// is not counted.
+#[test]
+fn json_detector_counts_multi_line_text_only_when_it_parses() {
+    use finetype_core::discrimination::{detector_for, passes_detector_or_rule};
+    use finetype_core::validator::resolve_label_validator;
+    let tax = load_taxonomy();
+    let rule = resolve_label_validator(JSON_LABEL, &tax).expect("json rule");
+    let detector = detector_for(JSON_LABEL);
+    assert!(detector.is_some());
+    for ok in [
+        "{\"a\": 1}",
+        " {\"a\": 1} ",
+        "{'a': 1}",
+        "{\n  \"user\": \"john\",\n  \"age\": 30\n}",
+        "{\r\n  \"a\": [1, 2]\r\n}",
+    ] {
+        assert!(passes_detector_or_rule(detector, &rule, ok), "{ok:?}");
+    }
+    for bad in [
+        "{\n  hero {\n    name\n  }\n}",
+        "{'a': 1,\n 'b': 2}",
+        "{\n  color: red;\n}",
+    ] {
+        assert!(rule.is_valid(bad), "{bad:?} conforms");
+        assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
+    }
+}
+
 const XML_LABEL: &str = "container.object.xml";
 
 /// XML 1.0: an optional declaration, Misc (comments, processing instructions,
@@ -1254,6 +1285,8 @@ fn wkt_detector_needs_a_coordinate_pair_or_empty() {
         "Tin (empty)",
         "Point (empty lot)",
         "Tin (empty box)",
+        "Point Empty Lot",
+        "Tin empty box",
     ] {
         assert!(rule.is_valid(bad), "{bad:?} conforms");
         assert!(!passes_detector_or_rule(detector, &rule, bad), "{bad:?}");
@@ -3050,9 +3083,10 @@ fn abbreviated_month_detector_keeps_full_names_and_words_out() {
     }
 }
 
-/// AP style spells out March through July, but a spelled-out month is
-/// long_full_month's form (its transform reads `%B`), so it does not count here;
-/// the dotted AP abbreviation does.
+/// AP style spells out March through July, but a spelled-out March, April, June
+/// or July is long_full_month's form (its transform reads `%B`), so it does not
+/// count here; the dotted AP abbreviation does, and so does May, which is its
+/// own CLDR abbreviation.
 #[test]
 fn abbreviated_month_detector_leaves_spelled_out_months_to_long_full_month() {
     use finetype_core::discrimination::{detector_for, passes_detector_or_rule};

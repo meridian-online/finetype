@@ -73,7 +73,10 @@ container.object.json:
     CRITICAL: Classification triggers recursive field-level inference.
     DuckDB JSON type allows NULL, arrays, objects, and scalar values.
     Whitespace, line breaks included, may surround and sit inside the object
-    (RFC 8259); the rule checks the braces, not that the text parses.
+    (RFC 8259); the rule checks the braces, not that the text parses. For
+    discrimination (column typing), a single-line {...} value counts as before,
+    and a value with line breaks counts only when it parses as a JSON object,
+    so braced multi-line text (a GraphQL query, a Python dict) is not counted.
 
 container.object.json_array:
   title: "JSON Array"
