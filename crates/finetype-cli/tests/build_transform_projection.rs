@@ -192,8 +192,11 @@ fn epoch_nanoseconds_transform_does_not_bind_error_on_varchar() {
 
 #[test]
 #[ignore = "needs the duckdb CLI; CI runs it with --include-ignored"]
-fn percentage_transform_extracts_the_number_from_every_accepted_form() {
+fn percentage_transform_gives_a_fraction_for_every_accepted_form() {
     // Runs the published transform through the external `duckdb` CLI.
+    // A percentage stores as a fraction (50% → 0.5), as finance.rate.yield
+    // does. The comparison is exact: 99.99% must cast to the double nearest
+    // 0.9999, not the 0.9998999999999999 a division by 100 leaves.
     use std::process::Command;
     let tax = test_taxonomy();
     let label = "representation.numeric.percentage";
@@ -204,15 +207,17 @@ fn percentage_transform_extracts_the_number_from_every_accepted_form() {
         .clone()
         .expect("percentage has a transform");
     let cases: &[(&str, f64)] = &[
-        ("50%", 50.0),
-        ("50 %", 50.0),
-        ("50\u{00A0}%", 50.0),
-        ("50\u{202F}%", 50.0),
-        ("%50", 50.0),
-        ("-12.5%", -12.5),
-        ("12.5", 12.5),
-        ("%-12.5", -12.5),
-        ("-12.5 %", -12.5),
+        ("50%", 0.5),
+        ("50 %", 0.5),
+        ("50\u{00A0}%", 0.5),
+        ("50\u{202F}%", 0.5),
+        ("%50", 0.5),
+        ("-12.5%", -0.125),
+        ("12.5", 0.125),
+        ("%-12.5", -0.125),
+        ("-12.5 %", -0.125),
+        ("99.99%", 0.9999),
+        ("33.3%", 0.333),
     ];
     for (value, expected) in cases {
         let sql = format!(
