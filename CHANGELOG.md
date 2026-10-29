@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.66] - 2026-10-30
+
 ### Changed
 
 - **A percentage column now casts to a fraction, as a rate column already does.** `representation.numeric.percentage` transforms `45%` to `0.45` instead of `45`, which is the value Excel holds and the value d3-format's `%` expects, and matches `finance.rate.yield` (`4.5%` → `0.045`). This changes the value of every column typed as a percentage for anyone who reads the cast's output, in `validate` and in a vendored transform. A bare number in a percentage column divides too (`50` → `0.5`), read as percentage points, as before. The cast appends `e-2` to the digits instead of dividing, so `99.99%` gives exactly `0.9999`. The decompose column `percent_value` keeps the 0–100 number. The DuckDB extension's `ft_cast` returns the same fraction as text (`95.5%` → `0.955`).
