@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.65] - 2026-10-29
+
 ### Changed
 
 - **Forty-two more published validation rules agree with the source that defines their type.** No gold, representative or external-band column changed type. Newly accepted forms:
