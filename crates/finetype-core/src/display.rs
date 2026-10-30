@@ -4,6 +4,7 @@
 //! specifier (`time`), plus flags for facts a specifier cannot express. It
 //! holds only what the label implies; scale and precision stay with the caller.
 
+use crate::taxonomy::Definition;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
@@ -120,6 +121,91 @@ impl Display {
     }
 }
 
+/// What a definition's values are, as far as display goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DisplayKind {
+    Number,
+    Time,
+}
+
+/// Keys whose kind the storage type does not give: a snowflake id is a BIGINT
+/// that encodes a moment.
+pub const KIND_OVERRIDES: &[(&str, DisplayKind)] =
+    &[("technology.identifier.snowflake_id", DisplayKind::Time)];
+
+fn numeric_transform_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(
+            r"(?i)AS\s+(DECIMAL|DOUBLE|INTEGER|BIGINT|SMALLINT)(\(\s*\d+\s*,\s*\d+\s*\))?\s*\)\s*(/\s*\d+)?$",
+        )
+        .expect("numeric transform regex")
+    })
+}
+
+fn fraction_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r"(?i)(/\s*(100|10000)|\|\|\s*'e-(2|4)'\s+AS\s+DOUBLE\s*\))\s*$")
+            .expect("fraction transform regex")
+    })
+}
+
+/// Which kind of display block a definition takes, if any.
+pub fn display_kind_for(key: &str, def: &Definition) -> Option<DisplayKind> {
+    if let Some((_, kind)) = KIND_OVERRIDES.iter().find(|(k, _)| *k == key) {
+        return Some(*kind);
+    }
+    match def.broad_type.as_deref()?.to_ascii_uppercase().as_str() {
+        "SMALLINT" | "INTEGER" | "BIGINT" | "HUGEINT" | "DECIMAL" | "DOUBLE" | "FLOAT" | "REAL" => {
+            Some(DisplayKind::Number)
+        }
+        "DATE" | "TIME" | "TIMESTAMP" | "TIMESTAMPTZ" => Some(DisplayKind::Time),
+        "VARCHAR" => {
+            let t = def.transform.as_deref()?.trim();
+            numeric_transform_re()
+                .is_match(t)
+                .then_some(DisplayKind::Number)
+        }
+        _ => None,
+    }
+}
+
+/// Check one definition's display block against its kind. `require` makes a
+/// missing block an error.
+pub fn check_display(key: &str, def: &Definition, require: bool) -> Result<(), String> {
+    let kind = display_kind_for(key, def);
+    let Some(d) = &def.display else {
+        return match (kind, require) {
+            (Some(_), true) => Err("missing `display` block".into()),
+            _ => Ok(()),
+        };
+    };
+    let Some(kind) = kind else {
+        return Err("has a `display` block but is neither a number nor a time".into());
+    };
+    d.validate()?;
+    match kind {
+        DisplayKind::Number if d.number.is_none() => {
+            return Err("is a number but its display block has no `number`".into())
+        }
+        DisplayKind::Time if d.time.is_none() => {
+            return Err("is a time but its display block has no `time`".into())
+        }
+        _ => {}
+    }
+    if d.fraction {
+        let t = def.transform.as_deref().unwrap_or("").trim();
+        if !fraction_re().is_match(t) {
+            return Err(
+                "`fraction` needs a transform that divides by 100 or 10000 (or appends e-2 or e-4)"
+                    .into(),
+            );
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,6 +299,100 @@ mod tests {
             money: true,
             ..num("~%")
         });
+    }
+
+    fn def(yaml: &str) -> Definition {
+        serde_yaml::from_str(yaml).expect("definition yaml")
+    }
+    fn kind(broad: &str, transform: Option<&str>) -> Option<DisplayKind> {
+        let mut d = def(&format!("broad_type: {broad}"));
+        d.transform = transform.map(String::from);
+        display_kind_for("a.b.c", &d)
+    }
+
+    #[test]
+    fn kind_from_broad_type() {
+        for b in ["SMALLINT", "BIGINT", "DECIMAL", "DOUBLE"] {
+            assert_eq!(kind(b, None), Some(DisplayKind::Number), "{b}");
+        }
+        for b in ["DATE", "TIME", "TIMESTAMP", "TIMESTAMPTZ"] {
+            assert_eq!(kind(b, None), Some(DisplayKind::Time), "{b}");
+        }
+        for b in ["INTERVAL", "BOOLEAN", "UUID", "JSON", "POINT"] {
+            assert_eq!(kind(b, None), None, "{b}");
+        }
+    }
+
+    #[test]
+    fn kind_from_varchar_transform() {
+        assert_eq!(
+            kind(
+                "VARCHAR",
+                Some("CAST(REGEXP_REPLACE({col}, '%$', '') AS DECIMAL(10,4)) / 100")
+            ),
+            Some(DisplayKind::Number)
+        );
+        assert_eq!(
+            kind("VARCHAR", Some("CAST({col} AS INTEGER)")),
+            Some(DisplayKind::Number)
+        );
+        assert_eq!(kind("VARCHAR", Some("CAST({col} AS VARCHAR)")), None);
+        assert_eq!(kind("VARCHAR", None), None);
+    }
+
+    #[test]
+    fn snowflake_override() {
+        let d = def("broad_type: BIGINT");
+        assert_eq!(
+            display_kind_for("technology.identifier.snowflake_id", &d),
+            Some(DisplayKind::Time)
+        );
+    }
+
+    fn with(broad: &str, transform: Option<&str>, disp: Option<Display>) -> Definition {
+        let mut d = def(&format!("broad_type: {broad}"));
+        d.transform = transform.map(String::from);
+        d.display = disp;
+        d
+    }
+
+    #[test]
+    fn check_display_cases() {
+        let k = "a.b.c";
+        // wrong kind
+        assert!(check_display(k, &with("DATE", None, Some(num("d"))), false).is_err());
+        assert!(check_display(k, &with("BIGINT", None, Some(time("%Y"))), false).is_err());
+        // block on a kind-less definition
+        assert!(check_display(k, &with("UUID", None, Some(num("d"))), false).is_err());
+        // missing block
+        assert!(check_display(k, &with("BIGINT", None, None), true).is_err());
+        assert!(check_display(k, &with("BIGINT", None, None), false).is_ok());
+        assert!(check_display(k, &with("UUID", None, None), true).is_ok());
+        // good blocks
+        assert!(check_display(k, &with("BIGINT", None, Some(num(",d"))), true).is_ok());
+        assert!(check_display(k, &with("DATE", None, Some(time("%Y"))), true).is_ok());
+        // invalid block surfaces the validator's error
+        assert!(check_display(k, &with("BIGINT", None, Some(num("$d"))), false).is_err());
+    }
+
+    #[test]
+    fn fraction_needs_a_scaling_transform() {
+        let frac = Some(Display {
+            fraction: true,
+            ..num("~%")
+        });
+        let run = |t: Option<&str>| check_display("a.b.c", &with("DOUBLE", t, frac.clone()), false);
+        assert!(run(Some("CAST({col} AS DOUBLE) / 100")).is_ok());
+        assert!(run(Some("CAST({col} AS DOUBLE) / 10000")).is_ok());
+        assert!(run(Some("CAST({col} AS DOUBLE) / 1000")).is_err());
+        assert!(run(Some("CAST({col} AS DOUBLE)")).is_err());
+        assert!(run(None).is_err());
+        assert!(run(Some(
+            "CAST(REGEXP_EXTRACT({col}, '^%?(-?[0-9]+)', 1) || 'e-2' AS DOUBLE)"
+        ))
+        .is_ok());
+        assert!(run(Some("CAST({col} || 'e-4'  as double )")).is_ok());
+        assert!(run(Some("CAST({col} || 'e-3' AS DOUBLE)")).is_err());
     }
 
     #[test]

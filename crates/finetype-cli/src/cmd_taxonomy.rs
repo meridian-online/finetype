@@ -447,6 +447,25 @@ pub(crate) fn cmd_check(
         std::process::exit(1);
     }
 
+    // Display block gate: a block must be valid and sit on a number or time
+    // definition. Nothing requires a block yet.
+    let mut display_failures: Vec<String> = Vec::new();
+    for (key, def) in taxonomy.definitions() {
+        if let Err(e) = finetype_core::display::check_display(key, def, false) {
+            display_failures.push(format!("{key}: {e}"));
+        }
+    }
+    if !display_failures.is_empty() {
+        eprintln!(
+            "\nDisplay block check FAILED ({} definition(s)):",
+            display_failures.len()
+        );
+        for f in &display_failures {
+            eprintln!("  - {f}");
+        }
+        std::process::exit(1);
+    }
+
     // Notes and samples gate: validation_notes patterns compile, historic values
     // and each type's own samples pass the published rule.
     if let Err(problems) = taxonomy.validate() {
