@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Every number and date type now says how its values should be printed.** Each definition whose cast yields a number, date, time or timestamp carries a `display` block: a d3-format or d3-time-format specifier plus `money`, `currency`, `fraction` and `bytes` flags where the label implies them (`amount_accounting` is `(,.2f`, a percentage is `~%` as a fraction, a year is `d`, `dmy_slash` is `%d/%m/%Y`). `finetype check` fails when a numeric or temporal definition lacks a valid block, or a block disagrees with the cast. `finetype taxonomy -o json` includes `display` on each label, and `finetype profile -o datapackage` writes it as `x-finetype-display` on each field. Scale, precision, the currency symbol a file used and locale stay with the caller.
+
 ## [0.6.66] - 2026-10-30
 
 ### Changed

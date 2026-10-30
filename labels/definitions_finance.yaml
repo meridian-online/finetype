@@ -129,6 +129,9 @@ finance.currency.amount:
   broad_type: DECIMAL
   frictionless:
     type: number
+  display:
+    number: ",.2f"
+    money: true
   format_string: null
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\\-]+', ''), '[^0-9\\.\\-]', '', 'g'), ',', '', 'g'), '\\s+', '', 'g') AS DECIMAL(18,2))"
   transform_ext: null
@@ -184,6 +187,9 @@ finance.currency.amount_comma:
   broad_type: DECIMAL
   frictionless:
     type: number
+  display:
+    number: ",.2f"
+    money: true
   format_string: null
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€\\$£¥₹₩₿\\p{Sc}]', '', 'g'), '\\s+', '', 'g'), '\\.', '', 'g'), ',', '.') AS DECIMAL(18,2))"
   transform_ext: null
@@ -843,6 +849,9 @@ finance.currency.amount_accounting:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: "(,.2f"
+    money: true
   format_string: null
   transform: "CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({col}, '(', '-'), ')', ''), '$', ''), ',', ''), ' ', '') AS DECIMAL(18,2))"
   transform_ext: null
@@ -877,6 +886,9 @@ finance.currency.amount_comma_suffix:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: ",.2f"
+    money: true
   format_string: null
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€$£¥₹₩₿\\p{Sc}]', '', 'g'), '\\s+', '', 'g'), '\\.', '', 'g'), ',', '.') AS DECIMAL(18,2))"
   transform_ext: null
@@ -911,6 +923,9 @@ finance.currency.amount_space:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: ",.2f"
+    money: true
   format_string: null
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€$£¥₹₩₿\\p{Sc}]', '', 'g'), '[\\s\\x{00A0}]+', '', 'g'), ',', '.'), '\\.$', '') AS DECIMAL(18,2))"
   transform_ext: null
@@ -946,6 +961,10 @@ finance.currency.amount_lakh:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: ",.2f"
+    money: true
+    currency: INR
   format_string: null
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^(₹|Rs\\.?)\\s*', ''), ',', '', 'g') AS DECIMAL(18,2))"
   transform_ext: null
@@ -983,6 +1002,10 @@ finance.currency.amount_apostrophe:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: ",.2f"
+    money: true
+    currency: CHF
   format_string: null
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, 'CHF\\s?', ''), '[''\\x{2019}]', '', 'g'), '\\s+', '', 'g') AS DECIMAL(18,2))"
   transform_ext: null
@@ -1016,6 +1039,9 @@ finance.currency.amount_nodecimal:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: ",d"
+    money: true
   format_string: null
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[¥₩\\p{Sc}]', '', 'g'), ',', '', 'g') AS INTEGER)"
   transform_ext: null
@@ -1049,6 +1075,9 @@ finance.currency.amount_code_prefix:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: ",.2f"
+    money: true
   format_string: null
   transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[A-Z]{3}\\s?', ''), ',', '', 'g') AS DECIMAL(18,2))"
   transform_ext: null
@@ -1081,6 +1110,9 @@ finance.currency.amount_crypto:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: ",.8~f"
+    money: true
   format_string: null
   transform: "CAST(REGEXP_REPLACE({col}, '\\s*[A-Z]{2,5}$', '') AS DECIMAL(18,8))"
   transform_ext: null
@@ -1118,6 +1150,9 @@ finance.currency.amount_multisym:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: ",.2f"
+    money: true
   format_string: null
   transform: "CAST(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[^0-9-]+|[^0-9]+$|[\\s\\x{A0}\\x{202F}]', '', 'g'), '[.,]([0-9]{1,2})$', 'D\\1'), '[.,]', '', 'g'), 'D', '.') AS DECIMAL(18,2))"
   transform_ext: null
@@ -1155,6 +1190,9 @@ finance.currency.amount_neg_trailing:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: ",.2f"
+    money: true
   format_string: null
   transform: "CAST(CASE WHEN {col} LIKE '%-' OR {col} LIKE '%CR' THEN '-' || REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[-]$|\\s*(CR|DR)$', ''), '[\\$€£¥₹]', ''), ',', '', 'g') ELSE REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[-]$|\\s*(CR|DR)$', ''), '[\\$€£¥₹]', ''), ',', '', 'g') END AS DECIMAL(18,2))"
   transform_ext: null
@@ -1196,6 +1234,9 @@ finance.rate.basis_points:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: "~%"
+    fraction: true
   format_string: null
   transform: "CAST(REGEXP_REPLACE({col}, '\\s*(bps|bp)$', '') AS DECIMAL(18,4)) / 10000"
   transform_ext: null
@@ -1229,6 +1270,9 @@ finance.rate.yield:
   broad_type: VARCHAR
   frictionless:
     type: string
+  display:
+    number: "~%"
+    fraction: true
   format_string: null
   transform: "CAST(REGEXP_REPLACE({col}, '%$', '') AS DECIMAL(10,4)) / 100"
   transform_ext: null

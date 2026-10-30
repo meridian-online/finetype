@@ -462,6 +462,10 @@ pub struct Definition {
     /// fails if it is absent or invalid (spec 2026-06-24, ac-01).
     #[serde(default)]
     pub frictionless: Option<Frictionless>,
+    /// How this type's values are shown: a d3-format or d3-time-format
+    /// specifier plus money/currency/fraction/bytes flags.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<crate::display::DisplayBlock>,
     /// DuckDB strptime format string (null if not strptime-based)
     pub format_string: Option<String>,
     /// Alternative format string for type variants (e.g., ISO 8601 with fractional seconds)
@@ -2148,6 +2152,31 @@ representation.discrete.categorical:
         eprintln!(
             "All {} definitions carry a valid frictionless mapping",
             taxonomy.len()
+        );
+    }
+
+    #[test]
+    fn test_every_definition_has_valid_display() {
+        // Mirrors the `check` CLI gate: every number and date type must carry
+        // a valid `display` block, and no other type may.
+        let taxonomy = ["labels", "../../labels"]
+            .iter()
+            .find_map(|p| Taxonomy::from_directory(p).ok());
+        let Some(taxonomy) = taxonomy else {
+            eprintln!("Skipping display gate test (labels/ not found)");
+            return;
+        };
+        let mut failures = Vec::new();
+        for (key, def) in taxonomy.definitions() {
+            if let Err(e) = crate::display::check_display(key, def, true) {
+                failures.push(format!("{key}: {e}"));
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "{} definition(s) with a missing or invalid display block:\n{}",
+            failures.len(),
+            failures.join("\n")
         );
     }
 

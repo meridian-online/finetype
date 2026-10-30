@@ -168,14 +168,18 @@ pub(crate) fn cmd_taxonomy(
                     if full {
                         definition_to_full_json(key, d)
                     } else {
-                        json!({
+                        let mut short = json!({
                             "key": key,
                             "title": d.title,
                             "broad_type": d.broad_type,
                             "designation": format!("{:?}", d.designation),
                             "transform": d.transform,
                             "locales": d.locales,
-                        })
+                        });
+                        if let Some(display) = &d.display {
+                            short["display"] = to_json_value(display);
+                        }
+                        short
                     }
                 })
                 .collect();
@@ -283,6 +287,9 @@ pub(crate) fn definition_to_full_json(
     }
     if let Some(ref icon) = d.icon {
         obj.insert("icon".into(), json!(icon));
+    }
+    if let Some(ref display) = d.display {
+        obj.insert("display".into(), to_json_value(display));
     }
 
     serde_json::Value::Object(obj)
@@ -442,6 +449,25 @@ pub(crate) fn cmd_check(
             fx_failures.len()
         );
         for f in &fx_failures {
+            eprintln!("  - {f}");
+        }
+        std::process::exit(1);
+    }
+
+    // Display block gate: a block must be valid and sit on a number or time
+    // definition, and every number and time definition must have one.
+    let mut display_failures: Vec<String> = Vec::new();
+    for (key, def) in taxonomy.definitions() {
+        if let Err(e) = finetype_core::display::check_display(key, def, true) {
+            display_failures.push(format!("{key}: {e}"));
+        }
+    }
+    if !display_failures.is_empty() {
+        eprintln!(
+            "\nDisplay block check FAILED ({} definition(s)):",
+            display_failures.len()
+        );
+        for f in &display_failures {
             eprintln!("  - {f}");
         }
         std::process::exit(1);

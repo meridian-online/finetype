@@ -236,6 +236,14 @@ fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold
 
     // ── ac-03 custom properties (lossless carriers the fold drops) ──
     field.insert("x-finetype-label".into(), json!(col.label));
+    // How the type's values are shown, copied verbatim; absent when the type
+    // has no block.
+    if let Some(d) = def.and_then(|d| d.display.as_ref()) {
+        field.insert(
+            "x-finetype-display".into(),
+            serde_json::to_value(d).expect("DisplayBlock serialises"),
+        );
+    }
     // Constraints the type's own validation states but v2 has no place for on
     // THIS declared type. Kept beside the field rather than dropped: a
     // `datetime.date.iso` column really does match that pattern and really is
@@ -405,6 +413,12 @@ representation.numeric.integer_number:
     type: string
     pattern: '^-?\d+$'
     minimum: 0
+test.display.shown:
+  broad_type: DOUBLE
+  display:
+    number: "d"
+  frictionless:
+    type: number
 "#,
         )
         .expect("test taxonomy parses")
@@ -423,6 +437,14 @@ representation.numeric.integer_number:
         }];
         let dp = emit_datapackage(&cols, &meta(), &test_taxonomy(), 32);
         dp["resources"][0]["schema"]["fields"][0].clone()
+    }
+
+    #[test]
+    fn field_carries_display_block() {
+        let shown = field_for("test.display.shown", &["1"]);
+        assert_eq!(shown["x-finetype-display"], json!({"number": "d"}));
+        let bare = field_for("representation.numeric.integer_number", &["1"]);
+        assert!(bare.get("x-finetype-display").is_none());
     }
 
     fn meta() -> ResourceMeta {
