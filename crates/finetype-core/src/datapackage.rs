@@ -241,7 +241,7 @@ fn field_object(col: &DatapackageColumn<'_>, taxonomy: &Taxonomy, enum_threshold
     if let Some(d) = def.and_then(|d| d.display.as_ref()) {
         field.insert(
             "x-finetype-display".into(),
-            serde_json::to_value(d).expect("Display serialises"),
+            serde_json::to_value(d).expect("DisplayBlock serialises"),
         );
     }
     // Constraints the type's own validation states but v2 has no place for on

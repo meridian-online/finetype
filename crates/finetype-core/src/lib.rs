@@ -36,7 +36,7 @@ pub mod validator_snapshot;
 
 pub use checker::{format_report, CheckReport, Checker};
 pub use constraint_fit::{fit_pattern_to_observed, PatternFit, MAX_OBSERVED_SHAPES};
-pub use display::Display;
+pub use display::DisplayBlock;
 pub use fast_path::deterministic_fast_path;
 pub use frictionless_vocabulary::{
     constraint_allowed, constraint_vocabulary, is_profile_field_type, PROFILE_FIELD_TYPES,

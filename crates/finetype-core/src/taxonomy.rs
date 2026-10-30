@@ -465,7 +465,7 @@ pub struct Definition {
     /// How this type's values are shown: a d3-format or d3-time-format
     /// specifier plus money/currency/fraction/bytes flags.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub display: Option<crate::display::Display>,
+    pub display: Option<crate::display::DisplayBlock>,
     /// DuckDB strptime format string (null if not strptime-based)
     pub format_string: Option<String>,
     /// Alternative format string for type variants (e.g., ISO 8601 with fractional seconds)

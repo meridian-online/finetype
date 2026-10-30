@@ -16,7 +16,7 @@ fn is_false(b: &bool) -> bool {
 /// How a definition's values are displayed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
-pub struct Display {
+pub struct DisplayBlock {
     /// d3-format specifier for the stored number.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub number: Option<String>,
@@ -70,7 +70,7 @@ fn validate_time(spec: &str) -> Result<(), String> {
     Ok(())
 }
 
-impl Display {
+impl DisplayBlock {
     /// Check the block against the rules of the display design.
     pub fn validate(&self) -> Result<(), String> {
         match (&self.number, &self.time) {
@@ -211,14 +211,14 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn num(s: &str) -> Display {
-        Display {
+    fn num(s: &str) -> DisplayBlock {
+        DisplayBlock {
             number: Some(s.into()),
             ..Default::default()
         }
     }
-    fn time(s: &str) -> Display {
-        Display {
+    fn time(s: &str) -> DisplayBlock {
+        DisplayBlock {
             time: Some(s.into()),
             ..Default::default()
         }
@@ -226,20 +226,20 @@ mod tests {
 
     #[test]
     fn accepts_spec_examples() {
-        let ok = |d: Display| assert_eq!(d.validate(), Ok(()), "{d:?}");
-        ok(Display {
+        let ok = |d: DisplayBlock| assert_eq!(d.validate(), Ok(()), "{d:?}");
+        ok(DisplayBlock {
             money: true,
             ..num("(,.2f")
         });
-        ok(Display {
+        ok(DisplayBlock {
             fraction: true,
             ..num("~%")
         });
-        ok(Display {
+        ok(DisplayBlock {
             bytes: true,
             ..num(",d")
         });
-        ok(Display {
+        ok(DisplayBlock {
             money: true,
             currency: Some("INR".into()),
             ..num(",.2f")
@@ -260,41 +260,41 @@ mod tests {
 
     #[test]
     fn refuses() {
-        let bad = |d: Display| assert!(d.validate().is_err(), "{d:?}");
-        bad(Display {
+        let bad = |d: DisplayBlock| assert!(d.validate().is_err(), "{d:?}");
+        bad(DisplayBlock {
             time: Some("%Y".into()),
             ..num("d")
         });
-        bad(Display::default());
+        bad(DisplayBlock::default());
         bad(num("$,.2f"));
         bad(num("$>10,.2f"));
         bad(num(",.2q"));
         bad(time("%Y-%k"));
         bad(time("%-k"));
         bad(time("%Y%"));
-        bad(Display {
+        bad(DisplayBlock {
             fraction: true,
             ..num(",.2f")
         });
-        bad(Display {
+        bad(DisplayBlock {
             currency: Some("INR".into()),
             ..num(",.2f")
         });
-        bad(Display {
+        bad(DisplayBlock {
             money: true,
             currency: Some("inr".into()),
             ..num(",.2f")
         });
-        bad(Display {
+        bad(DisplayBlock {
             money: true,
             ..time("%Y")
         });
-        bad(Display {
+        bad(DisplayBlock {
             bytes: true,
             money: true,
             ..num(",d")
         });
-        bad(Display {
+        bad(DisplayBlock {
             fraction: true,
             money: true,
             ..num("~%")
@@ -349,7 +349,7 @@ mod tests {
         );
     }
 
-    fn with(broad: &str, transform: Option<&str>, disp: Option<Display>) -> Definition {
+    fn with(broad: &str, transform: Option<&str>, disp: Option<DisplayBlock>) -> Definition {
         let mut d = def(&format!("broad_type: {broad}"));
         d.transform = transform.map(String::from);
         d.display = disp;
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn fraction_needs_a_scaling_transform() {
-        let frac = Some(Display {
+        let frac = Some(DisplayBlock {
             fraction: true,
             ..num("~%")
         });
@@ -397,12 +397,12 @@ mod tests {
 
     #[test]
     fn unknown_key_refused() {
-        assert!(serde_yaml::from_str::<Display>("numbr: d").is_err());
+        assert!(serde_yaml::from_str::<DisplayBlock>("numbr: d").is_err());
     }
 
     #[test]
     fn round_trips_snake_case() {
-        let d = Display {
+        let d = DisplayBlock {
             bytes: true,
             ..num(",d")
         };

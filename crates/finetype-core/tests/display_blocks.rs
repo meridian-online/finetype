@@ -5,7 +5,7 @@
 
 use chrono::format::{parse, Parsed, StrftimeItems};
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Weekday};
-use finetype_core::display::{display_kind_for, Display, DisplayKind};
+use finetype_core::display::{display_kind_for, DisplayBlock, DisplayKind};
 use finetype_core::Taxonomy;
 use std::path::Path;
 
@@ -79,13 +79,13 @@ fn number_blocks_match_the_design() {
         let def = t
             .get(key)
             .unwrap_or_else(|| panic!("{key} not in taxonomy"));
-        let expected = Display {
+        let expected = DisplayBlock {
             number: Some((*number).to_string()),
             money: flags.contains(&"money"),
             fraction: flags.contains(&"fraction"),
             bytes: flags.contains(&"bytes"),
             currency: currency.map(str::to_string),
-            ..Display::default()
+            ..DisplayBlock::default()
         };
         assert_eq!(def.display.as_ref(), Some(&expected), "{key}");
     }
