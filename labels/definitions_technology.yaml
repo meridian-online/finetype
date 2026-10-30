@@ -776,6 +776,8 @@ technology.identifier.snowflake_id:
   broad_type: BIGINT
   frictionless:
     type: integer
+  display:
+    time: "%Y-%m-%d %H:%M:%S.%L"
   format_string: null
   transform: "epoch_ms(({col}::BIGINT >> 22) + 1288834974657)"
   transform_ext: null
