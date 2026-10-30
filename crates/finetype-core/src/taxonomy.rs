@@ -462,6 +462,10 @@ pub struct Definition {
     /// fails if it is absent or invalid (spec 2026-06-24, ac-01).
     #[serde(default)]
     pub frictionless: Option<Frictionless>,
+    /// How this type's values are shown: a d3-format or d3-time-format
+    /// specifier plus money/currency/fraction/bytes flags.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<crate::display::Display>,
     /// DuckDB strptime format string (null if not strptime-based)
     pub format_string: Option<String>,
     /// Alternative format string for type variants (e.g., ISO 8601 with fractional seconds)
