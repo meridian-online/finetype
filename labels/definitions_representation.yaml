@@ -35,6 +35,8 @@ representation.numeric.integer_number:
   broad_type: BIGINT
   frictionless:
     type: integer
+  display:
+    number: ",d"
   format_string: null
   transform: "CAST({col} AS BIGINT)"
   transform_ext: null
@@ -66,6 +68,8 @@ representation.numeric.decimal_number:
   broad_type: DOUBLE
   frictionless:
     type: number
+  display:
+    number: ","
   format_string: null
   transform: "CAST({col} AS DOUBLE)"
   transform_ext: null
@@ -116,6 +120,8 @@ representation.numeric.decimal_number_comma:
   broad_type: DOUBLE
   frictionless:
     type: number
+  display:
+    number: ","
   format_string: null
   transform: "CAST(REPLACE(REPLACE({col}, '.', ''), ',', '.') AS DOUBLE)"
   transform_ext: null
@@ -156,6 +162,8 @@ representation.numeric.scientific_notation:
   broad_type: DOUBLE
   frictionless:
     type: number
+  display:
+    number: "~e"
   format_string: null
   transform: "CAST({col} AS DOUBLE)"
   transform_ext: null
@@ -193,6 +201,9 @@ representation.numeric.percentage:
   broad_type: DOUBLE
   frictionless:
     type: number
+  display:
+    number: "~%"
+    fraction: true
   format_string: null
   transform: "CAST(REGEXP_EXTRACT({col}, '^%?(-?[0-9]+(\\.[0-9]+)?)', 1) || 'e-2' AS DOUBLE)"
   transform_ext: null
@@ -234,6 +245,8 @@ representation.numeric.si_number:
   broad_type: DOUBLE
   frictionless:
     type: number
+  display:
+    number: "~s"
   format_string: null
   transform: >
     CASE
@@ -650,6 +663,9 @@ representation.file.file_size:
   broad_type: BIGINT
   frictionless:
     type: integer
+  display:
+    number: ",d"
+    bytes: true
   format_string: null
   transform: >
     CASE REGEXP_EXTRACT({col}, '([A-Za-z]+)$', 1)
@@ -1314,6 +1330,8 @@ representation.identifier.increment:
   broad_type: BIGINT
   frictionless:
     type: integer
+  display:
+    number: "d"
   format_string: null
   transform: "CAST({col} AS BIGINT)"
   transform_ext: null

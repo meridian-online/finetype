@@ -1238,6 +1238,8 @@ geography.coordinate.latitude:
   broad_type: DOUBLE
   frictionless:
     type: number
+  display:
+    number: "~f"
   format_string: null
   transform: "CAST({col} AS DOUBLE)"
   transform_ext: null
@@ -1274,6 +1276,8 @@ geography.coordinate.longitude:
   broad_type: DOUBLE
   frictionless:
     type: number
+  display:
+    number: "~f"
   format_string: null
   transform: "CAST({col} AS DOUBLE)"
   transform_ext: null

@@ -1681,6 +1681,8 @@ datetime.component.year:
   broad_type: SMALLINT
   frictionless:
     type: year
+  display:
+    number: "d"
   format_string: null
   transform: "{col}::SMALLINT"
   transform_ext: null
