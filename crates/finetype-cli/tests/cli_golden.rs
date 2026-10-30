@@ -81,6 +81,48 @@ fn run_taxonomy_json() -> Value {
     })
 }
 
+/// Run `finetype taxonomy <key> -o json [--full]` and return the parsed array.
+fn run_taxonomy_key_json(key: &str, full: bool) -> Value {
+    let mut args = vec![
+        "run",
+        "-p",
+        "finetype-cli",
+        "--",
+        "taxonomy",
+        key,
+        "-o",
+        "json",
+    ];
+    if full {
+        args.push("--full");
+    }
+    let output = Command::new("cargo")
+        .args(&args)
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to run finetype taxonomy");
+    assert!(
+        output.status.success(),
+        "taxonomy failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).expect("taxonomy JSON parses")
+}
+
+#[test]
+fn taxonomy_json_includes_display() {
+    for full in [false, true] {
+        let out = run_taxonomy_key_json("finance.currency.amount_accounting", full);
+        assert_eq!(
+            out[0]["display"],
+            serde_json::json!({"number": "(,.2f", "money": true}),
+            "full={full}"
+        );
+        let out = run_taxonomy_key_json("representation.identifier.uuid", full);
+        assert!(out[0].get("display").is_none(), "full={full}");
+    }
+}
+
 /// Run `finetype infer -i <input> --mode <mode> --output json` and return
 /// parsed JSON.
 fn run_infer_json(input: &str, mode: &str) -> Value {

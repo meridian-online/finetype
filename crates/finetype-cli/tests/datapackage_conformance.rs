@@ -140,6 +140,30 @@ fn emitted_descriptor_validates_against_vendored_profile() {
         "expected the descriptor under test to carry both fit outcomes"
     );
 
+    // A field carries `x-finetype-display` exactly when its label's block
+    // exists, and it equals that block.
+    let mut shown = 0;
+    for ((_, label, _, _), field) in fixtures.iter().zip(fields) {
+        match taxonomy.get(label).and_then(|d| d.display.as_ref()) {
+            Some(d) => {
+                shown += 1;
+                assert_eq!(
+                    field["x-finetype-display"],
+                    serde_json::to_value(d).unwrap(),
+                    "display mismatch for {label}"
+                );
+            }
+            None => assert!(
+                field.get("x-finetype-display").is_none(),
+                "{label} has no display block"
+            ),
+        }
+    }
+    assert!(
+        shown >= 1,
+        "fixture should include a type with a display block"
+    );
+
     let schema = vendored_profile();
     let validator = jsonschema::validator_for(&schema).expect("compile vendored profile");
     let errors: Vec<String> = validator

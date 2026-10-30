@@ -168,14 +168,18 @@ pub(crate) fn cmd_taxonomy(
                     if full {
                         definition_to_full_json(key, d)
                     } else {
-                        json!({
+                        let mut short = json!({
                             "key": key,
                             "title": d.title,
                             "broad_type": d.broad_type,
                             "designation": format!("{:?}", d.designation),
                             "transform": d.transform,
                             "locales": d.locales,
-                        })
+                        });
+                        if let Some(display) = &d.display {
+                            short["display"] = to_json_value(display);
+                        }
+                        short
                     }
                 })
                 .collect();
@@ -283,6 +287,9 @@ pub(crate) fn definition_to_full_json(
     }
     if let Some(ref icon) = d.icon {
         obj.insert("icon".into(), json!(icon));
+    }
+    if let Some(ref display) = d.display {
+        obj.insert("display".into(), to_json_value(display));
     }
 
     serde_json::Value::Object(obj)
