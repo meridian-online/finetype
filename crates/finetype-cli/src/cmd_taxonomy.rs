@@ -448,10 +448,10 @@ pub(crate) fn cmd_check(
     }
 
     // Display block gate: a block must be valid and sit on a number or time
-    // definition. Nothing requires a block yet.
+    // definition, and every number and time definition must have one.
     let mut display_failures: Vec<String> = Vec::new();
     for (key, def) in taxonomy.definitions() {
-        if let Err(e) = finetype_core::display::check_display(key, def, false) {
+        if let Err(e) = finetype_core::display::check_display(key, def, true) {
             display_failures.push(format!("{key}: {e}"));
         }
     }

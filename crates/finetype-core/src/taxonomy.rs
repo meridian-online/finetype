@@ -2156,6 +2156,31 @@ representation.discrete.categorical:
     }
 
     #[test]
+    fn test_every_definition_has_valid_display() {
+        // Mirrors the `check` CLI gate: every number and date type must carry
+        // a valid `display` block, and no other type may.
+        let taxonomy = ["labels", "../../labels"]
+            .iter()
+            .find_map(|p| Taxonomy::from_directory(p).ok());
+        let Some(taxonomy) = taxonomy else {
+            eprintln!("Skipping display gate test (labels/ not found)");
+            return;
+        };
+        let mut failures = Vec::new();
+        for (key, def) in taxonomy.definitions() {
+            if let Err(e) = crate::display::check_display(key, def, true) {
+                failures.push(format!("{key}: {e}"));
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "{} definition(s) with a missing or invalid display block:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    }
+
+    #[test]
     fn test_labels_pass_taxonomy_validate() {
         let taxonomy = ["labels", "../../labels"]
             .iter()
