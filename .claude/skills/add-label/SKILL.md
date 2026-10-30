@@ -27,7 +27,7 @@ Add the leaf under the right `domain.category.type` key, matching the fields of 
 `locales`, `broad_type`, `frictionless`, `transform`, `validation`, `tier`,
 `aliases`, `samples`, `notes`. `samples` MUST pass the leaf's own `validation` (the check enforces it).
 
-A leaf whose cast yields a number or a date/time also needs a `display` block (see `docs/ARCHITECTURE.md`, "How a type's values are shown"), or `check` fails with "missing `display` block". Then update `crates/finetype-core/tests/display_blocks.rs`: add a row to `NUMBER_TABLE` for a number leaf, or an entry in `TIME_EXCEPTIONS` for a time leaf whose specifier is not the mechanical translation of its `format_string`; and bump the hard-coded counts there (`NUMBER_TABLE.len()` 27, the temporal count 80 in two places).
+A leaf whose cast yields a number or a date/time also needs a `display` block (see `docs/ARCHITECTURE.md`, "How a type's values are shown"), or `check` fails with "missing `display` block". Then update `crates/finetype-core/tests/display_blocks.rs`: add a row to `NUMBER_TABLE` for a number leaf, or an entry in `TIME_EXCEPTIONS` for a time leaf whose specifier is not the mechanical translation of its `format_string`, plus an entry with its reason in `ROUND_TRIP_EXEMPT` for a time leaf whose `format_string` ends in a literal `Z` (its `%Z` prints an offset, so the round-trip test cannot read it back); and bump the hard-coded counts there (`NUMBER_TABLE.len()` 27, the temporal count 80 in two places).
 
 **Precision Principle for the validator.** If the value *shape* is genuinely precise (drive-letter path,
 `<a@b>` message-id), write a tight regex/enum. If the shape is NOT precise — `word.word`, a short
