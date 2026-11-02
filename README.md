@@ -110,11 +110,11 @@ LOAD finetype;
 ```
 
 > **Version note:** the community channel builds per DuckDB version, so what you get depends on
-> which DuckDB you run, and the DuckDB 1.x builds lag this repo. Measured 2026-10-27 on `osx_arm64`:
+> which DuckDB you run, and the DuckDB 1.x builds lag this repo. Measured 2026-11-02 on `osx_arm64`:
 >
 > | DuckDB | `SELECT ft_version()` |
 > |---|---|
-> | 2.0.0 | `finetype 0.6.64` |
+> | 2.0.0 | `finetype 0.6.66` |
 > | 1.5.6 | `finetype 0.6.57` |
 > | 1.5.5 | `finetype 0.6.57` |
 > | 1.5.4 | `finetype 0.6.36` |
