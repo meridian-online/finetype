@@ -264,7 +264,7 @@ if [[ -z "$SIDECAR" || ! -f "$SIDECAR" ]]; then
     echo "      ALLOW_STALE_FTMB=1 scores without that check, or write the record from the labels of the training commit."
     exit 1
   fi
-elif "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --check "$SIDECAR" 2>/dev/null; then
+elif "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --check "$SIDECAR"; then
   LIVE_MATCHES_TRAINING=true
 elif [[ ! -f "$GOLDFTMB" ]]; then
   # The gold FTMB would be built under the live labels, whose rules differ from
