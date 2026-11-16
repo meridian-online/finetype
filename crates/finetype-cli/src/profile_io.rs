@@ -113,13 +113,13 @@ pub(crate) fn read_json_input(
     }
 }
 
-/// Tokens treated as null-ish and dropped from a column's value list,
-/// matching the historical csv-crate reader's filter (empty + these seven).
-const NULLISH_TOKENS: [&str; 7] = ["NULL", "null", "NA", "N/A", "nan", "NaN", "None"];
-
-/// True when `trimmed` is the empty string or one of the null-ish tokens.
-fn is_nullish(trimmed: &str) -> bool {
-    trimmed.is_empty() || NULLISH_TOKENS.contains(&trimmed)
+/// True when a trimmed field is missing. A value is missing only when it is
+/// NULL, which duckdb renders as the empty string under the pinned
+/// `.nullvalue ''`. A literal such as `NA`, `None` or `null` is data: `NA` is
+/// North America's continent code and Namibia's country code, so dropping it
+/// would tell a reader of the profile that those values are absent.
+fn is_missing(trimmed: &str) -> bool {
+    trimmed.is_empty()
 }
 
 /// One `sniff_csv` verdict: the dialect it settled on, how many columns it
@@ -294,8 +294,8 @@ fn choose_sniff(
 /// stdout via the `-csv` output mode (cross-platform; no Unix-only
 /// `/dev/stdout`). We parse that canonical CSV with
 /// the `csv` crate — quoting/escaping is well-defined, so no value is mangled —
-/// and apply the SAME null-ish filtering the old reader did (drop empty strings
-/// and the tokens NULL/null/NA/N/A/nan/NaN/None) into per-column `Vec<String>`.
+/// and drop only missing values (NULL, which renders as the empty string) into
+/// per-column `Vec<String>`. Literal tokens such as `NA` are kept as values.
 ///
 /// HARD DEPENDENCY: `duckdb` must be on PATH (ac-02). When it is absent we fail
 /// with the same actionable error shape validate already uses.
@@ -402,10 +402,10 @@ pub(crate) fn read_csv_input(
     //
     // `.nullvalue ''` is pinned as a leading command so a genuine NULL (an empty
     // cell, or a short row padded by `null_padding`) always renders as the empty
-    // string — which `is_nullish` drops. WITHOUT this the null rendering would
-    // inherit the user's `~/.duckdbrc` `.nullvalue`: if it were set to a token
-    // outside NULLISH_TOKENS (e.g. "\\N"), a real NULL would survive as a kept
-    // value and corrupt the column. Pinning it makes ingestion environment-
+    // string — which `is_missing` drops. WITHOUT this the null rendering would
+    // inherit the user's `~/.duckdbrc` `.nullvalue`: if it were set to a
+    // non-empty token (e.g. "\\N"), a real NULL would survive as a kept value
+    // and corrupt the column. Pinning it makes ingestion environment-
     // independent.
     let run_duckdb = |source: &str| -> Result<std::process::Output> {
         let query = format!("{source};");
@@ -465,7 +465,7 @@ pub(crate) fn read_csv_input(
         for (i, field) in record.iter().enumerate() {
             if i < n_cols {
                 let trimmed = field.trim();
-                if !is_nullish(trimmed) {
+                if !is_missing(trimmed) {
                     columns[i].push(trimmed.to_string());
                 }
             }

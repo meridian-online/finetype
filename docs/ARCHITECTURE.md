@@ -74,7 +74,7 @@ flowchart TB
 | **Feature disambiguation** | Post-vote rules using deterministic features: F1–F5 (leading-zero, slash-segments, digit-ratio, git-sha, numeric-code). |
 | **Entity demotion** | When Sense detects non-person entity subtype and CharCNN votes full_name, demotes to entity_name. |
 | **Header hints** | Hardcoded header mappings (priority) + Model2Vec semantic similarity matching. Geography protection and measurement disambiguation guards. |
-| **Profile** | CSV/Parquet parsing with null detection, then column-mode inference on each column. |
+| **Profile** | CSV/Parquet parsing with null detection, then column-mode inference on each column. A value is missing only when it is NULL (an empty CSV cell, or a Parquet NULL): literal strings such as `NA`, `N/A`, `null` and `None` are kept as values, because `NA` is North America's continent code and Namibia's country code, and dropping it told readers of a published profile those values were absent. The cost is measured: a CSV that writes `NA` for missing keeps its number and date types up to 40% `NA`, while at 50% an ISO date column reads as `country_code`. |
 
 `profile` JSON reports the validation veto's evidence as `validation_pass_rate`. For a type with a discrimination detector (`username`, `npi`, `tsid`; see `finetype_core::discrimination::detector_for`) that rate counts values by the detector, which is stricter than the type's published rule, so it can differ from what `finetype validate` reports for the same column.
 
