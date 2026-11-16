@@ -82,7 +82,7 @@ while [[ $# -gt 0 ]]; do
     --tag)        TAG="$2"; shift 2 ;;
     --epochs)     EPOCHS="$2"; shift 2 ;;
     --score-only) SCORE_ONLY=true; shift ;;
-    -h|--help)    sed -n '2,/^set -/p' "$0" | grep '^#' | sed 's/^# \?//'; exit 0 ;;
+    -h|--help)    sed -n '2,/^set -/p' "$0" | grep '^#' | sed -E 's/^# ?//'; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
