@@ -26,6 +26,20 @@
 # with a recorded sidecar, each model gets that sidecar and the keys in it (the
 # ones the file was built with); with none, each gets a snapshot of the live
 # labels, which its training features may not match.
+#
+# STEP 3 scores against a gold FTMB, whose validation features also come from the
+# live labels, so it records them in "$GOLDFTMB.validation_snapshot.json" and that
+# record must equal the training FTMB's. The training record is checked before the
+# gold FTMB is built: when the live labels no longer hold the training rules, a
+# gold FTMB built now could never match, so the run stops. Set ALLOW_STALE_FTMB=1
+# to build and score anyway, or build the gold FTMB from a checkout of the
+# training commit. Deleting the gold FTMB to rebuild it helps only when its record
+# is missing or stale and the live labels still hold the training rules.
+#
+# --score-only refuses a tag whose training FTMB has no rules record unless
+# ALLOW_STALE_FTMB=1, which scores without the gold record check. A missing keys
+# file ("$FTMB.type_index_keys.json") is rebuilt from the type_index_keys in the
+# first models/${TAG}-s*/config.json that has them, else derived from the binary.
 set -eo pipefail
 cd "$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -68,7 +82,7 @@ while [[ $# -gt 0 ]]; do
     --tag)        TAG="$2"; shift 2 ;;
     --epochs)     EPOCHS="$2"; shift 2 ;;
     --score-only) SCORE_ONLY=true; shift ;;
-    -h|--help)    sed -n '2,/^set -/p' "$0" | grep '^#' | sed 's/^# \?//'; exit 0 ;;
+    -h|--help)    sed -n '2,/^set -/p' "$0" | grep '^#' | sed -E 's/^# ?//'; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -213,53 +227,81 @@ fi
 echo "--- STEP 3: build gold FTMB (potion embed) ---"
 SV_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && SV_ARG=(--store-values "$STORE_VALUES")
 # The gold FTMB's validation features come from the live labels too, so it carries
-# a rules record like the training FTMB and must match it.
+# a rules record like the training FTMB and must match it. The training record is
+# checked first, so a gold build that could never match it is not started.
 : "${SNAP_BIN=}"; [[ -n "$SNAP_BIN" ]] || SNAP_BIN=(cargo run -q -p finetype-build-tools --bin write_validation_snapshot --)
 : "${SIDECAR=$FTMB.validation_snapshot.json}"
 KEYS_FILE="${KEYS_FILE:-$FTMB.type_index_keys.json}"
 GOLD_SIDECAR="$GOLDFTMB.validation_snapshot.json"
-if [[ ! -f "$GOLDFTMB" ]]; then
-  if [[ ! -f "$KEYS_FILE" ]]; then
-    # --score-only on a tag trained before keys were recorded: take the keys from the
-    # first trained model that has them, else derive them from $BIN as STEP 1 does.
-    for S in "${SEEDS[@]}"; do
-      "$PY" -c "
+if [[ ! -f "$KEYS_FILE" ]]; then
+  # --score-only on a tag trained before keys were recorded: take the keys from the
+  # first trained model that has them, else derive them from $BIN as STEP 1 does.
+  for S in "${SEEDS[@]}"; do
+    "$PY" -c "
 import json, sys
 k = json.load(open(sys.argv[1])).get('type_index_keys')
 if not k: sys.exit(1)
 json.dump(k, open(sys.argv[2], 'w'))
 " "models/${TAG}-s${S}/config.json" "$KEYS_FILE" 2>/dev/null && break
-    done
-    if [[ ! -f "$KEYS_FILE" ]]; then
-      echo '["test"]' | "$BIN" extract-features --json --header "test" --validation 2>/dev/null | \
-        "$PY" -c "import json,sys; print(json.dumps(json.load(sys.stdin)['type_index_keys']))" > "$KEYS_FILE" \
-        || { rm -f "$KEYS_FILE"; echo "FAIL: no model config under models/${TAG}-s* has type_index_keys and $BIN cannot derive them"; exit 1; }
-    fi
+  done
+  if [[ ! -f "$KEYS_FILE" ]]; then
+    echo '["test"]' | "$BIN" extract-features --json --header "test" --validation 2>/dev/null | \
+      "$PY" -c "import json,sys; print(json.dumps(json.load(sys.stdin)['type_index_keys']))" > "$KEYS_FILE" \
+      || { rm -f "$KEYS_FILE"; echo "FAIL: no model config under models/${TAG}-s* has type_index_keys and $BIN cannot derive them"; exit 1; }
   fi
+fi
+
+# 3a. The training record: missing, or not the rules in the live labels.
+CHECK_GOLD=true
+LIVE_MATCHES_TRAINING=false
+if [[ -z "$SIDECAR" || ! -f "$SIDECAR" ]]; then
+  # No training record to compare with (a tag trained before records existed).
+  if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
+    echo "WARN: no training rules record ($FTMB.validation_snapshot.json); ALLOW_STALE_FTMB=1, skipping the gold record check and scoring as before"
+    CHECK_GOLD=false
+  else
+    echo "FAIL: the training FTMB has no rules record ($FTMB.validation_snapshot.json), so no gold FTMB can be shown to match it."
+    echo "      ALLOW_STALE_FTMB=1 scores without that check, or write the record from the labels of the training commit."
+    exit 1
+  fi
+elif "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --check "$SIDECAR"; then
+  LIVE_MATCHES_TRAINING=true
+elif [[ ! -f "$GOLDFTMB" ]]; then
+  # The gold FTMB would be built under the live labels, whose rules differ from
+  # the training rules, so its record could never match: do not build it.
+  if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
+    echo "WARN: the live labels differ from the training rules ($SIDECAR); ALLOW_STALE_FTMB=1, building $GOLDFTMB under the live labels and scoring anyway"
+  else
+    echo "FAIL: the live labels differ from the training rules ($SIDECAR), so a gold FTMB built now cannot match them."
+    echo "      ALLOW_STALE_FTMB=1 builds and scores anyway, or build $GOLDFTMB from a checkout of the training commit."
+    exit 1
+  fi
+fi
+
+# 3b. Build the gold FTMB when it is missing.
+if [[ ! -f "$GOLDFTMB" ]]; then
   "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --out "$GOLD_SIDECAR"
   "$PY" scripts/build_gold_ftmb_potion.py --gold "$GOLD" --columns "$COLS" --binary "$BIN" \
     --potion "$POTION" "${TV_ARG[@]}" "${SV_ARG[@]}" --out "$GOLDFTMB"
   "${SNAP_BIN[@]}" --keys-from "$KEYS_FILE" --check "$GOLD_SIDECAR" \
     || { rm -f "$GOLDFTMB" "$GOLD_SIDECAR"; echo "FAIL: labels/ changed while $GOLDFTMB was being built; deleted it and its record. Rerun."; exit 1; }
 fi
-if [[ -z "$SIDECAR" || ! -f "$SIDECAR" ]]; then
-  # No training record to compare with (a tag trained before records existed).
-  if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
-    echo "WARN: no training rules record ($FTMB.validation_snapshot.json); ALLOW_STALE_FTMB=1, skipping the gold record check and scoring as before"
-  else
-    echo "FAIL: the training FTMB has no rules record ($FTMB.validation_snapshot.json), so $GOLDFTMB cannot be shown to match it."
-    echo "      ALLOW_STALE_FTMB=1 scores without that check; deleting both FTMBs and rerunning rebuilds them with records."
-    exit 1
-  fi
-elif ! "$PY" -c "
+
+# 3c. The gold record must equal the training record.
+if [[ "$CHECK_GOLD" == true ]] && ! "$PY" -c "
 import json, sys
 sys.exit(0 if json.load(open(sys.argv[1])) == json.load(open(sys.argv[2])) else 1)
 " "$GOLD_SIDECAR" "$SIDECAR" 2>/dev/null; then
   if [[ "${ALLOW_STALE_FTMB:-}" == "1" ]]; then
     echo "WARN: $GOLDFTMB has no rules record, or one that differs from the training FTMB's; ALLOW_STALE_FTMB=1, scoring anyway"
-  else
+  elif [[ "$LIVE_MATCHES_TRAINING" == true ]]; then
     echo "FAIL: $GOLDFTMB has no rules record ($GOLD_SIDECAR), or one that differs from $SIDECAR."
-    echo "      ALLOW_STALE_FTMB=1 scores anyway; deleting $GOLDFTMB rebuilds it with a record."
+    echo "      Delete $GOLDFTMB to rebuild it under the live labels, which match the training rules, or set ALLOW_STALE_FTMB=1."
+    exit 1
+  else
+    echo "FAIL: $GOLDFTMB has no rules record ($GOLD_SIDECAR), or one that differs from $SIDECAR,"
+    echo "      and the live labels differ from the training rules too, so a rebuild cannot match them."
+    echo "      ALLOW_STALE_FTMB=1 scores anyway, or rebuild $GOLDFTMB from a checkout of the training commit."
     exit 1
   fi
 fi
