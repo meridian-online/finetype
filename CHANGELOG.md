@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`profile` counts a value as missing only when it is NULL.** It used to drop the literal strings `NULL`, `null`, `NA`, `N/A`, `nan`, `NaN` and `None` as if they were missing, so a continent column holding `NA` (North America), or a country column holding Namibia's `NA`, lost that value from its enum domain, row count and null rate. On the OurAirports table the continent domain now lists all seven continents over 10,734 rows, where it listed six over 8,211. A CSV that writes one of these tokens to mean missing now profiles it as a value.
+
 ## [0.6.67] - 2026-10-30
 
 ### Added
