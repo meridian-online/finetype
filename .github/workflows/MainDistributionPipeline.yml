@@ -19,8 +19,31 @@ on:
     # Same filter as release.yml, and for the same reason: a tag that is not
     # `v` and three numbers is not a release and builds nothing here.
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  # A pull request builds the five binaries only when it changes something the
+  # build reads; every push to main and every release tag still builds all five.
+  # The build compiles finetype_duckdb and the two crates it depends on, embeds
+  # the taxonomy and membership sets from labels/, runs the SQL tests in
+  # test/sql, and the stamp job runs scripts/check_extension_stamp.py. Model
+  # weights are fetched at first use, not embedded, so models/ is not an input.
+  # No required check comes from this workflow, so a skipped run blocks no merge.
+  # Adding a workspace crate to finetype_duckdb's dependencies means adding it here.
   pull_request:
     branches: [main]
+    paths:
+      - 'crates/finetype-duckdb/**'
+      - 'crates/finetype-core/**'
+      - 'crates/finetype-model/**'
+      - 'labels/**'
+      - 'test/sql/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.cargo/**'
+      - 'Makefile'
+      - 'extension-ci-tools'
+      - '.gitmodules'
+      - 'scripts/check_extension_stamp.py'
+      - '.github/workflows/MainDistributionPipeline.yml'
   workflow_dispatch:
 
 concurrency:
@@ -63,9 +86,11 @@ jobs:
   # configure/extension_version.txt arrived with every checkout and the rule
   # that would rewrite it has no prerequisites. release.yml can only refuse that
   # on a tag, a few days a year, at the moment it is least welcome to be wrong.
-  # This job asks the same question of every pull request and every push, where
-  # the expected answer is the abbreviated commit. `0.6.23` abbreviates no
-  # commit, so the defect fails here on any diff at all.
+  # This job asks the same question of every push to main and of every pull
+  # request that changes what the build reads (the Makefile, extension-ci-tools
+  # and this check among them), where the expected answer is the abbreviated
+  # commit. `0.6.23` abbreviates no commit, so the defect fails here on any
+  # build at all.
   #
   # WHAT IT DOES NOT COVER: the community-extensions rebuild. duckdb/community-
   # extensions runs this same reusable workflow in its own repository, where no
