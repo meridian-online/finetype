@@ -46,79 +46,82 @@ pub(crate) fn cmd_validate_table(
     }
 
     // ── Read input into memory (CSV-or-Parquet) ──────────────────────────────
-    //    Parquet inputs are streamed through DuckDB's read_parquet to a
-    //    temp CSV, then read by the same csv::Reader the CSV path uses —
-    //    so the validation engine sees the same normalised Option<String>
-    //    cells regardless of source. Column names flow through verbatim
-    //    (DuckDB COPY preserves parquet schema names), matching what the
-    //    materialise path's read_parquet binding sees later.
+    //    Both CSV and Parquet inputs are streamed through duckdb to a temp
+    //    CSV, reading the same relation the materialise path's staging table
+    //    reads (`input_relation`), then parsed by csv::Reader. So the
+    //    validation engine's row N is the staging table's `__row_idx` N, and
+    //    the engine sees the same VARCHAR cells, column names included, that
+    //    the typed projection later reads.
+    //
+    //    Every row also carries a trailing constant column, dropped by
+    //    position after parsing. Without it, a one-column row whose value is
+    //    NULL is written as an empty line, which the csv crate skips, so the
+    //    engine would see one row fewer than the staging table and every
+    //    later row index would point at the wrong staging row.
     eprintln!("Reading {}", file.display());
-    let is_parquet = file
-        .extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("parquet"))
-        .unwrap_or(false);
-    // Keep the temp file alive for the duration of the read (path borrowed below).
-    let _parquet_csv_tmp: Option<tempfile::NamedTempFile>;
-    let read_path: PathBuf = if is_parquet {
-        let tmp = match tempfile::Builder::new()
-            .prefix("finetype-validate-parquet-")
-            .suffix(".csv")
-            .tempfile()
-        {
-            Ok(t) => t,
-            Err(e) => {
-                eprintln!("error: could not create temp file for parquet→csv: {}", e);
-                exit_with(2);
-            }
-        };
-        let copy_sql = format!(
-            "COPY (SELECT * FROM read_parquet({})) TO {} (HEADER, DELIMITER ',', QUOTE '\"');",
-            sql_quote(&file.to_string_lossy()),
-            sql_quote(&tmp.path().to_string_lossy()),
-        );
-        let out = std::process::Command::new("duckdb")
-            .arg("-c")
-            .arg(&copy_sql)
-            .output();
-        match out {
-            Ok(o) if o.status.success() => {}
-            Ok(o) => {
-                eprintln!(
-                    "error: duckdb parquet→csv failed: {}",
-                    String::from_utf8_lossy(&o.stderr).trim()
-                );
-                exit_with(2);
-            }
-            Err(e) => {
-                eprintln!(
-                    "error: could not invoke duckdb CLI (is duckdb on PATH?): {}",
-                    e
-                );
-                exit_with(2);
-            }
+    let relation = input_relation(&file);
+    let tmp = match tempfile::Builder::new()
+        .prefix("finetype-validate-input-")
+        .suffix(".csv")
+        .tempfile()
+    {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("error: could not create temp file for input: {}", e);
+            exit_with(2);
         }
-        let path = tmp.path().to_path_buf();
-        _parquet_csv_tmp = Some(tmp);
-        path
-    } else {
-        _parquet_csv_tmp = None;
-        file.clone()
     };
-    let mut rdr = match csv::Reader::from_path(&read_path) {
-        Ok(r) => r,
+    let copy_sql = format!(
+        "COPY (SELECT *, 1 AS {} FROM {}) TO {} (HEADER, DELIMITER ',', QUOTE '\"');",
+        sql_ident(ROW_MARKER),
+        relation,
+        sql_quote(&tmp.path().to_string_lossy()),
+    );
+    let out = std::process::Command::new("duckdb")
+        .arg("-c")
+        .arg(&copy_sql)
+        .output();
+    // Read the copy back and delete it before anything can exit: validate
+    // ends through `exit_with`, which skips destructors, so a temp file still
+    // open at that point would be left behind as a full copy of the input.
+    let copied = match out {
+        Ok(o) if o.status.success() => std::fs::read(tmp.path()),
+        Ok(o) => {
+            drop(tmp);
+            eprintln!(
+                "error: duckdb could not read {}: {}",
+                file.display(),
+                String::from_utf8_lossy(&o.stderr).trim()
+            );
+            exit_with(2);
+        }
+        Err(e) => {
+            drop(tmp);
+            eprintln!(
+                "error: could not invoke duckdb CLI (is duckdb on PATH?): {}",
+                e
+            );
+            exit_with(2);
+        }
+    };
+    drop(tmp);
+    let copied = match copied {
+        Ok(bytes) => bytes,
         Err(e) => {
             eprintln!("error: could not read input file {}: {}", file.display(), e);
             exit_with(2);
         }
     };
-    let headers: Vec<String> = match rdr.headers() {
+    let mut rdr = csv::Reader::from_reader(copied.as_slice());
+    let mut headers: Vec<String> = match rdr.headers() {
         Ok(h) => h.iter().map(|s| s.to_string()).collect(),
         Err(e) => {
             eprintln!("error: could not read CSV headers: {}", e);
             exit_with(2);
         }
     };
+    // Drop the row marker appended to the query; it is always the last column.
+    headers.pop();
     let n_cols = headers.len();
 
     let mut rows: Vec<Vec<Option<String>>> = Vec::new();
@@ -143,6 +146,9 @@ pub(crate) fn cmd_validate_table(
         rows.push(row);
     }
     eprintln!("Read {} rows, {} columns", rows.len(), n_cols);
+    // The raw copy is no longer needed once the rows are parsed.
+    drop(rdr);
+    drop(copied);
 
     // ── (5) Validate via finetype_core::table_validator ──────────────────────
     let result = match validate_table(&headers, &rows, &schema) {
@@ -154,8 +160,9 @@ pub(crate) fn cmd_validate_table(
     };
 
     // ── Materialise path (only when --db/--table supplied) ──────────────────
-    //    Check-only mode skips this entire block — no DuckDB shell-out, no
-    //    .db file written. The pass/fail decision is the validation engine
+    //    Check-only mode skips this entire block — no staging or typed
+    //    projection SQL, no .db file written. (The input read above always
+    //    goes through duckdb, in both modes.) The pass/fail decision is the validation engine
     //    output alone, governed by the exit-code grid below.
     //
     //    Returns `Some((scan_id, transform_failed_count))` on materialise,
@@ -187,27 +194,9 @@ pub(crate) fn cmd_validate_table(
         let staging_ident = format!("__finetype_staging_{}", uuid);
         let failures_ident = format!("__finetype_transform_failures_{}", uuid);
         let user_table_ident = sql_ident(table_name);
-        let input_literal = sql_quote(&file.to_string_lossy());
-
         // Build the staging projection: SELECT * from the input file, add a
         // row-index column so we can filter to valid_row_indices later.
-        let read_fn = if file
-            .extension()
-            .and_then(|s| s.to_str())
-            .map(|s| s.eq_ignore_ascii_case("parquet"))
-            .unwrap_or(false)
-        {
-            // Cast every parquet column to VARCHAR so the staging table
-            // matches the CSV path's all_varchar=true contract — typed
-            // transforms (REGEXP_REPLACE, LIKE, TRY_CAST) downstream assume
-            // VARCHAR staging cells.
-            format!(
-                "(SELECT COLUMNS(*)::VARCHAR FROM read_parquet({}))",
-                input_literal
-            )
-        } else {
-            format!("read_csv({}, header=true, all_varchar=true)", input_literal)
-        };
+        let read_fn = input_relation(&file);
 
         // Valid-indices filter. Render as an IN list when non-empty, otherwise
         // use `0=1` to select nothing. Used both by the per-column TRANSFORM
@@ -535,6 +524,34 @@ pub(crate) fn cmd_validate_table(
     }
     // Zero rejects — always exit 0.
     Ok(())
+}
+
+/// Name of the constant column appended to every row validate reads through
+/// duckdb, so that no row is written as an empty line. Dropped by position, so
+/// a source column that happens to share the name is unaffected.
+const ROW_MARKER: &str = "__finetype_row_marker";
+
+/// The duckdb relation validate reads `file` through, every column as VARCHAR.
+/// The engine's read and the materialise path's staging table both use it, so
+/// they agree on rows, columns and cell text.
+fn input_relation(file: &std::path::Path) -> String {
+    let input_literal = sql_quote(&file.to_string_lossy());
+    let is_parquet = file
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.eq_ignore_ascii_case("parquet"))
+        .unwrap_or(false);
+    if is_parquet {
+        // Cast every parquet column to VARCHAR so the staging table matches
+        // the CSV path's all_varchar=true contract — typed transforms
+        // (REGEXP_REPLACE, LIKE, TRY_CAST) downstream assume VARCHAR cells.
+        format!(
+            "(SELECT COLUMNS(*)::VARCHAR FROM read_parquet({}))",
+            input_literal
+        )
+    } else {
+        format!("read_csv({}, header=true, all_varchar=true)", input_literal)
+    }
 }
 
 /// Characters of the first example shown on a noted column's line.

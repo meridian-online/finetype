@@ -846,3 +846,123 @@ fn test_validate_json_reports_noted_values_apart_from_rejects() {
     assert!(plain.contains("  Rejects:"));
     assert!(plain.contains("id: 1 non_canonical (e.g. 550E8400-E29…)"));
 }
+
+/// One-column schema: `code` must look like `ORD-#####` when present.
+const SCHEMA_ONE_CODE: &str = r#"{
+  "type": "object",
+  "properties": {
+    "code": {"type": "string", "pattern": "^ORD-[0-9]{5}$"}
+  }
+}"#;
+
+/// A one-column Parquet with a NULL row counts that row, and the materialised
+/// table keeps it. duckdb writes such a row as an empty line, which the csv
+/// crate skips unless the row carries another column.
+#[test]
+#[ignore]
+fn test_validate_one_column_parquet_keeps_null_row() {
+    let tmp = tempfile::tempdir().unwrap();
+    let schema = write_schema(tmp.path(), SCHEMA_ONE_CODE);
+    let parquet = tmp.path().join("in.parquet");
+    let status = Command::new("duckdb")
+        .arg("-c")
+        .arg(format!(
+            "COPY (SELECT * FROM (VALUES ('ORD-11111'), ('ORD-22222'), (NULL)) t(code)) \
+             TO '{}' (FORMAT PARQUET);",
+            parquet.display()
+        ))
+        .status()
+        .expect("failed to spawn duckdb");
+    assert!(status.success());
+    let db = tmp.path().join("out.db");
+
+    let (code, stdout, stderr) = run_validate(&[
+        parquet.to_str().unwrap(),
+        schema.to_str().unwrap(),
+        "--db",
+        db.to_str().unwrap(),
+        "--table",
+        "codes",
+        "-o",
+        "json",
+    ]);
+    assert_eq!(code, 0, "no rejects expected: stderr={stderr}");
+    assert!(stderr.contains("Read 3 rows, 1 columns"), "stderr={stderr}");
+    let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["total_rows"], 3);
+    assert_eq!(
+        duckdb_query(&db, "SELECT COUNT(*), COUNT(code) FROM codes;"),
+        "3|2"
+    );
+}
+
+/// A blank line in a one-column CSV is a row with a missing value, as duckdb
+/// reads it for the materialised table. The engine must see the same rows, or
+/// every reject after the blank line points at the wrong staging row.
+#[test]
+#[ignore]
+fn test_validate_one_column_csv_blank_line_keeps_rows_aligned() {
+    let tmp = tempfile::tempdir().unwrap();
+    let schema = write_schema(tmp.path(), SCHEMA_ONE_CODE);
+    let csv = write_csv(
+        tmp.path(),
+        "in.csv",
+        "code\nORD-11111\n\nXXX-22222\nORD-33333\n",
+    );
+    let db = tmp.path().join("out.db");
+
+    let (code, stdout, stderr) = run_validate(&[
+        csv.to_str().unwrap(),
+        schema.to_str().unwrap(),
+        "--db",
+        db.to_str().unwrap(),
+        "--table",
+        "codes",
+        "-o",
+        "json",
+    ]);
+    assert_eq!(code, 1, "one reject expected: stderr={stderr}");
+    let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["total_rows"], 4);
+    assert_eq!(report["invalid_rows"], 1);
+    // The rejected row is the bad code, and the table keeps the other three.
+    assert_eq!(
+        duckdb_query(
+            &db,
+            "SELECT string_agg(coalesce(code, '<null>'), ',' ORDER BY code NULLS FIRST) FROM codes;"
+        ),
+        "<null>,ORD-11111,ORD-33333"
+    );
+    assert_eq!(
+        duckdb_query(&db, "SELECT line FROM finetype_reject_errors;"),
+        "3"
+    );
+}
+
+/// validate leaves no copy of its input behind, even when it exits with
+/// rejects (its exits skip destructors, so the temp copy must already be gone).
+#[test]
+#[ignore]
+fn test_validate_one_column_run_leaves_no_temp_copy() {
+    let tmp = tempfile::tempdir().unwrap();
+    let schema = write_schema(tmp.path(), SCHEMA_ONE_CODE);
+    let csv = write_csv(tmp.path(), "in.csv", "code\nORD-11111\nXXX-22222\n");
+    let tmpdir = tmp.path().join("tmp");
+    std::fs::create_dir(&tmpdir).unwrap();
+
+    let output = Command::new("cargo")
+        .args(["run", "-q", "-p", "finetype-cli", "--", "validate"])
+        .arg(&csv)
+        .arg(&schema)
+        .env("TMPDIR", &tmpdir)
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to spawn cargo run");
+    assert_eq!(output.status.code(), Some(1), "one reject expected");
+    let left: Vec<_> = std::fs::read_dir(&tmpdir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .filter(|n| n.to_string_lossy().starts_with("finetype-validate-"))
+        .collect();
+    assert!(left.is_empty(), "temp copies left behind: {left:?}");
+}
