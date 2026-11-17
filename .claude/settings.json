@@ -54,9 +54,9 @@
       "mcp__codegraph__codegraph_status"
     ],
     "ask": [
-      "Bash(make setup *)",
-      "Bash(git commit *--amend*)",
-      "Bash(git commit *--no-verify*)",
+      "Bash(make *setup*)",
+      "Bash(git commit *--am*)",
+      "Bash(git commit *--no-v*)",
       "Bash(git commit -n*)",
       "Bash(git commit * -n*)"
     ]
