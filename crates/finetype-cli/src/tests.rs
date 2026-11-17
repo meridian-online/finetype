@@ -91,21 +91,62 @@ fn test_ingest_parquet_keeps_literal_na_and_drops_null() {
 }
 
 #[test]
-fn test_ingest_blank_line_skipped() {
+fn test_ingest_one_column_null_row_is_counted() {
     if !duckdb_available() {
         eprintln!("duckdb not on PATH — skipping ingestion test");
         return;
     }
-    // KNOWN BENIGN DIFFERENCE vs the old csv-crate reader: duckdb's CSV reader
-    // skips a fully-blank line entirely (it is not a zero-field record), so it
-    // does NOT count toward row_count. The old reader counted a blank line as
-    // an empty row. This affects only the eprintln'd row_count diagnostic — a
-    // blank line contributed no values either way, so per-column profiling and
-    // emitted labels are unaffected.
+    // With a single column, a NULL row would re-emit as an empty line, which
+    // the csv crate skips. The row still exists, so it must count: the null
+    // rate and the enum domain's row count are measured over it.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("one_column.parquet");
+    let sql = format!(
+        "COPY (SELECT * FROM (VALUES ('EU'), ('NA'), (NULL)) t(continent)) \
+         TO '{}' (FORMAT parquet);",
+        path.display()
+    );
+    let status = std::process::Command::new("duckdb")
+        .arg("-c")
+        .arg(&sql)
+        .status()
+        .unwrap();
+    assert!(status.success(), "duckdb wrote the parquet fixture");
+    let (headers, columns, row_count) = profile_io::read_csv_input(&path, None).unwrap();
+    assert_eq!(headers, vec!["continent"]);
+    assert_eq!(row_count, 3, "the NULL row is counted");
+    assert_eq!(columns[0], vec!["EU", "NA"]);
+}
+
+#[test]
+fn test_ingest_one_column_blank_line_is_a_missing_row() {
+    if !duckdb_available() {
+        eprintln!("duckdb not on PATH — skipping ingestion test");
+        return;
+    }
+    // In a one-column CSV a blank line is the only way to write an empty
+    // cell, and duckdb reads it as a row whose value is NULL. The row counts;
+    // its value is missing. (In a multi-column CSV duckdb skips a blank line
+    // altogether, so it neither counts nor contributes a value.)
     let f = write_tmp_csv("x\nreal\n\nkept\n");
     let (_headers, columns, row_count) = profile_io::read_csv_input(f.path(), None).unwrap();
-    assert_eq!(row_count, 2, "blank line not counted (duckdb skips it)");
+    assert_eq!(row_count, 3, "the blank line is a row with a missing value");
     assert_eq!(columns[0], vec!["real", "kept"]);
+}
+
+#[test]
+fn test_ingest_multi_column_blank_line_skipped() {
+    if !duckdb_available() {
+        eprintln!("duckdb not on PATH — skipping ingestion test");
+        return;
+    }
+    let f = write_tmp_csv("x,y\n1,2\n\n3,4\n");
+    let (_headers, columns, row_count) = profile_io::read_csv_input(f.path(), None).unwrap();
+    assert_eq!(
+        row_count, 2,
+        "duckdb skips a blank line in a multi-column file"
+    );
+    assert_eq!(columns[0], vec!["1", "3"]);
 }
 
 #[test]
