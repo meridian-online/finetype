@@ -17,6 +17,8 @@ pre-flight) does **not** apply to ingestion. Any CI job that runs `profile`/
 
 A pushed tag starts a release only when it is `v` followed by three dot-separated numbers, such as `v0.6.63`. Both `release.yml` and `MainDistributionPipeline.yml` filter their tag trigger on `v[0-9]+.[0-9]+.[0-9]+`, so a tag such as `v19-train-state` or `v0.7.0-rc1` starts neither workflow.
 
+`MainDistributionPipeline.yml` builds all five extension binaries on every push to main and every version tag, but on a pull request only when the pull request changes something the build reads: the three crates the extension compiles (`finetype-duckdb`, `finetype-core`, `finetype-model`), `labels/`, `test/sql/`, the workspace manifests and toolchain files, the `Makefile`, `extension-ci-tools`, `scripts/check_extension_stamp.py` or the workflow itself. The list is the workflow's `paths` filter; a new workspace crate in the extension's dependencies has to be added to it. No required check comes from this workflow, so a pull request it skips can still merge.
+
 A version tag then has to pass `release.yml`'s first job, `tag-guard`, before anything else runs. Every other job in the workflow waits on it, so a refusal stops the run before a binary is built, a release is created or the Homebrew formula is written. `scripts/check_release_tag.py` refuses when:
 
 - the tag is not a version (exit 3), which is the second line of defence behind the trigger filter;

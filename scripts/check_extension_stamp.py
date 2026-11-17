@@ -134,7 +134,7 @@ UNTAGGED BUILDS
     extension. `--tag` is never passed on an untagged build, and it takes both
     workflows that pass it to say so. release.yml triggers only on `vX.Y.Z` tags, so
     every build it checks has one. MainDistributionPipeline.yml runs on pushes
-    to main, on pull requests and on dispatch as well, so the trigger settles
+    to main, on pull requests that change what it builds and on dispatch as well, so the trigger settles
     nothing there -- what does is the `GITHUB_REF_TYPE` test in its stamp step,
     which passes `--tag` only when the ref IS a tag and `--expect-commit`
     otherwise. A tagged build cannot
