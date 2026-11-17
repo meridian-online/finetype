@@ -938,3 +938,31 @@ fn test_validate_one_column_csv_blank_line_keeps_rows_aligned() {
         "3"
     );
 }
+
+/// validate leaves no copy of its input behind, even when it exits with
+/// rejects (its exits skip destructors, so the temp copy must already be gone).
+#[test]
+#[ignore]
+fn test_validate_one_column_run_leaves_no_temp_copy() {
+    let tmp = tempfile::tempdir().unwrap();
+    let schema = write_schema(tmp.path(), SCHEMA_ONE_CODE);
+    let csv = write_csv(tmp.path(), "in.csv", "code\nORD-11111\nXXX-22222\n");
+    let tmpdir = tmp.path().join("tmp");
+    std::fs::create_dir(&tmpdir).unwrap();
+
+    let output = Command::new("cargo")
+        .args(["run", "-q", "-p", "finetype-cli", "--", "validate"])
+        .arg(&csv)
+        .arg(&schema)
+        .env("TMPDIR", &tmpdir)
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to spawn cargo run");
+    assert_eq!(output.status.code(), Some(1), "one reject expected");
+    let left: Vec<_> = std::fs::read_dir(&tmpdir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .filter(|n| n.to_string_lossy().starts_with("finetype-validate-"))
+        .collect();
+    assert!(left.is_empty(), "temp copies left behind: {left:?}");
+}

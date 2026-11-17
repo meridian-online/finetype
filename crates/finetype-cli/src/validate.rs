@@ -81,9 +81,13 @@ pub(crate) fn cmd_validate_table(
         .arg("-c")
         .arg(&copy_sql)
         .output();
-    match out {
-        Ok(o) if o.status.success() => {}
+    // Read the copy back and delete it before anything can exit: validate
+    // ends through `exit_with`, which skips destructors, so a temp file still
+    // open at that point would be left behind as a full copy of the input.
+    let copied = match out {
+        Ok(o) if o.status.success() => std::fs::read(tmp.path()),
         Ok(o) => {
+            drop(tmp);
             eprintln!(
                 "error: duckdb could not read {}: {}",
                 file.display(),
@@ -92,20 +96,23 @@ pub(crate) fn cmd_validate_table(
             exit_with(2);
         }
         Err(e) => {
+            drop(tmp);
             eprintln!(
                 "error: could not invoke duckdb CLI (is duckdb on PATH?): {}",
                 e
             );
             exit_with(2);
         }
-    }
-    let mut rdr = match csv::Reader::from_path(tmp.path()) {
-        Ok(r) => r,
+    };
+    drop(tmp);
+    let copied = match copied {
+        Ok(bytes) => bytes,
         Err(e) => {
             eprintln!("error: could not read input file {}: {}", file.display(), e);
             exit_with(2);
         }
     };
+    let mut rdr = csv::Reader::from_reader(copied.as_slice());
     let mut headers: Vec<String> = match rdr.headers() {
         Ok(h) => h.iter().map(|s| s.to_string()).collect(),
         Err(e) => {
