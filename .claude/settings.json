@@ -58,7 +58,25 @@
       "Bash(git commit *--am*)",
       "Bash(git commit *--no-v*)",
       "Bash(git commit -n*)",
-      "Bash(git commit * -n*)"
+      "Bash(git commit * -n*)",
+      "Bash(make *=*)",
+      "Bash(make -f*)",
+      "Bash(make * -f*)",
+      "Bash(make --file*)",
+      "Bash(make * --file*)",
+      "Bash(make -C*)",
+      "Bash(make * -C*)",
+      "Bash(make --directory*)",
+      "Bash(make * --directory*)",
+      "Bash(make -E*)",
+      "Bash(make * -E*)",
+      "Bash(make --eval*)",
+      "Bash(make * --eval*)",
+      "Bash(git fetch *--upl*)",
+      "Bash(git pull *--upl*)",
+      "Bash(git diff *--ou*)",
+      "Bash(git log *--ou*)",
+      "Bash(git show *--ou*)"
     ]
   }
 }
