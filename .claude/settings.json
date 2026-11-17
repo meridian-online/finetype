@@ -5,9 +5,6 @@
   "permissions": {
     "allow": [
       "Bash(*)",
-      "Edit(*)",
-      "Write(*)",
-      "Read(*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
