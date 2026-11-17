@@ -150,8 +150,9 @@ pub(crate) fn cmd_validate_table(
     };
 
     // ── Materialise path (only when --db/--table supplied) ──────────────────
-    //    Check-only mode skips this entire block — no DuckDB shell-out, no
-    //    .db file written. The pass/fail decision is the validation engine
+    //    Check-only mode skips this entire block — no staging or typed
+    //    projection SQL, no .db file written. (The input read above always
+    //    goes through duckdb, in both modes.) The pass/fail decision is the validation engine
     //    output alone, governed by the exit-code grid below.
     //
     //    Returns `Some((scan_id, transform_failed_count))` on materialise,
