@@ -146,6 +146,9 @@ pub(crate) fn cmd_validate_table(
         rows.push(row);
     }
     eprintln!("Read {} rows, {} columns", rows.len(), n_cols);
+    // The raw copy is no longer needed once the rows are parsed.
+    drop(rdr);
+    drop(copied);
 
     // ── (5) Validate via finetype_core::table_validator ──────────────────────
     let result = match validate_table(&headers, &rows, &schema) {
