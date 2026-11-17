@@ -122,6 +122,11 @@ fn is_missing(trimmed: &str) -> bool {
     trimmed.is_empty()
 }
 
+/// Name of the constant column `read_csv_input` appends to every row it reads
+/// through duckdb, so that no row re-emits as an empty line. Dropped by
+/// position, so a source column that happens to share the name is unaffected.
+const ROW_MARKER: &str = "__finetype_row_marker";
+
 /// One `sniff_csv` verdict: the dialect it settled on, how many columns it
 /// claims, and the ready-made `read_csv(...)` call duckdb itself wrote for it.
 ///
@@ -407,8 +412,14 @@ pub(crate) fn read_csv_input(
     // non-empty token (e.g. "\\N"), a real NULL would survive as a kept value
     // and corrupt the column. Pinning it makes ingestion environment-
     // independent.
+    //
+    // Every row also carries a trailing constant column, dropped by position
+    // after parsing. Without it, a one-column row whose value is NULL renders
+    // as an empty line, which the csv crate skips, so the row would vanish
+    // from `row_count` and lower the null rate. With it, that row renders as
+    // `,1` and is read like any other.
     let run_duckdb = |source: &str| -> Result<std::process::Output> {
-        let query = format!("{source};");
+        let query = format!("SELECT *, 1 AS {ROW_MARKER} FROM ({source});");
         std::process::Command::new("duckdb")
             .arg("-csv")
             .arg("-c")
@@ -452,7 +463,9 @@ pub(crate) fn read_csv_input(
     // back losslessly.
     let mut reader = csv::ReaderBuilder::new().from_reader(out.stdout.as_slice());
 
-    let headers: Vec<String> = reader.headers()?.iter().map(|h| h.to_string()).collect();
+    let mut headers: Vec<String> = reader.headers()?.iter().map(|h| h.to_string()).collect();
+    // Drop the row marker appended to the query; it is always the last column.
+    headers.pop();
     let n_cols = headers.len();
     eprintln!("Found {} columns: {:?}", n_cols, headers);
 
