@@ -10,7 +10,8 @@ name: Weekly DuckDB compatibility
 # SIGNAL, never a gate: it does not block releases or PR merges.
 #
 # Faithful mirror of the real build (MainDistributionPipeline.yml): same
-# reusable workflow @ref, ci_tools_version, extra_toolchains and exclude_archs —
+# reusable workflow @ref, ci_tools_version, extra_toolchains and exclude_archs
+# as its untagged runs, which build no macOS binary —
 # ONLY duckdb_version varies. So a red here is "the new DuckDB broke our shipped
 # build recipe", not a build-infra mismatch.
 #
@@ -58,12 +59,13 @@ jobs:
       ci_tools_version: 78bd1e4abbd543822166d5b07644751ba1fc6e8d
       extension_name: finetype
       extra_toolchains: 'rust;python3'
-      # Every job downstream needs all five binaries. The 2.0 workflow's
-      # default `auto` mode skips platforms it judges redundant, and on the
-      # 2.0 tools osx_amd64 is opt-in, so it is named here.
+      # The 2.0 workflow's default `auto` mode skips platforms it judges
+      # redundant, so it is turned off. macOS is excluded, as it is on every
+      # untagged run of MainDistributionPipeline.yml: GitHub's free plan runs at
+      # most five macOS jobs at a time across the organisation, and the Macs
+      # every session builds on cover that platform.
       reduced_ci_mode: 'disabled'
-      opt_in_archs: 'osx_amd64'
-      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
+      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw;osx_arm64;osx_amd64'
 
   # Build against DuckDB main — earliest warning of an upstream API change.
   # Optional/noisier than build-stable; drop this job if main churn is annoying.
@@ -76,12 +78,13 @@ jobs:
       ci_tools_version: 78bd1e4abbd543822166d5b07644751ba1fc6e8d
       extension_name: finetype
       extra_toolchains: 'rust;python3'
-      # Every job downstream needs all five binaries. The 2.0 workflow's
-      # default `auto` mode skips platforms it judges redundant, and on the
-      # 2.0 tools osx_amd64 is opt-in, so it is named here.
+      # The 2.0 workflow's default `auto` mode skips platforms it judges
+      # redundant, so it is turned off. macOS is excluded, as it is on every
+      # untagged run of MainDistributionPipeline.yml: GitHub's free plan runs at
+      # most five macOS jobs at a time across the organisation, and the Macs
+      # every session builds on cover that platform.
       reduced_ci_mode: 'disabled'
-      opt_in_archs: 'osx_amd64'
-      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
+      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw;osx_arm64;osx_amd64'
 
   # File a tracking issue on failure so it survives past the owner's email.
   notify:

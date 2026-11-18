@@ -22,8 +22,15 @@ permissions:
 
 jobs:
   measure:
-    # macOS arm64: the table's rows were measured on osx_arm64.
-    runs-on: macos-15
+    # The table's rows were measured on osx_arm64; this re-measures them on
+    # linux_amd64. On 2026-11-18 this script's --measure on linux_amd64
+    # matched all 14 rows, and the registry's osx_arm64 and linux_amd64 builds
+    # of every row carried the same version stamp, with the same rows missing
+    # on both. A cell that comes to differ between the two platforms
+    # reports as stale, which is right, since the table would then be wrong
+    # for Linux users. GitHub's free plan runs at most five macOS jobs at a
+    # time across the organisation, so nothing scheduled takes one.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
