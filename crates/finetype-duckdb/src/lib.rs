@@ -739,8 +739,9 @@ pub unsafe extern "C" fn finetype_init_c_api(
 /// wherever that database cannot be written: a read-only open, or a build that
 /// runs this entry point on every database it opens. A panic here would abort
 /// the process, since DuckDB calls the entry point through a function that
-/// cannot unwind. Skipping leaves the scalars and aggregates loaded and only
-/// this macro missing on that database. Nothing is printed: in a build that
+/// cannot unwind. Skipping leaves the scalars and aggregates loaded, and the
+/// macro as the file already holds it: missing, or the definition an earlier
+/// read-write load stored. Nothing is printed: in a build that
 /// loads FineType on every open, a warning would land in every read-only run's
 /// output.
 fn register_table_macro(con: &duckdb::Connection, sql: &str) {
