@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.68] - 2026-11-18
+
 ### Fixed
 
 - **`LOAD finetype` no longer aborts on a database opened read-only.** The extension registers its `ft_validate` and `ft_profile` table macros on the database being opened, and on a read-only one that `CREATE` failed and the process aborted (exit 134), as `duckdb -readonly` with `LOAD finetype` did. A macro DuckDB refuses is now skipped: the extension loads and its scalars and aggregates work, but it cannot create or update the two table macros there: they are missing, unless an earlier read-write load stored them in the file, in which case that load's definitions are the ones the database has. A read-write open still writes both macros into the database, as before.
