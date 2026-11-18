@@ -13,6 +13,12 @@ amalgamation risk that applies to a `duckdb` *pin bump* (see the binary-release
 pre-flight) does **not** apply to ingestion. Any CI job that runs `profile`/
 `validate` end-to-end must install the `duckdb` CLI (the smoke job does).
 
+## Where macOS is built
+
+A pull request, a push to `main` and a scheduled workflow start no job on a GitHub-hosted Mac. Only a release tag does: `release.yml` builds the macOS binaries, and `MainDistributionPipeline.yml` adds the `osx_arm64` and `osx_amd64` extension builds to its tag run. Its untagged runs build the three Linux and Windows extension binaries, and its stamp job expects three binaries there and five on a tag. `weekly-duckdb-compat.yml` builds no macOS binary, and `weekly-readme-version-table.yml` re-measures the README's DuckDB table on Linux; on 2026-11-18 a Linux measurement matched every row of the table taken on `osx_arm64`.
+
+The project owner ruled this on 2026-11-18. GitHub's free plan runs at most five macOS jobs at a time across the whole organisation, and every other repository's runs queue behind them. Every development session already builds and tests on a Mac, so hosted CI covers Linux and Windows and the macOS check is local. A change that only breaks the macOS build therefore shows up on the developer's Mac or, failing that, on the release tag, before anything is published.
+
 ## What a release tag must be
 
 A pushed tag starts a release only when it is `v` followed by three dot-separated numbers, such as `v0.6.63`. Both `release.yml` and `MainDistributionPipeline.yml` filter their tag trigger on `v[0-9]+.[0-9]+.[0-9]+`, so a tag such as `v19-train-state` or `v0.7.0-rc1` starts neither workflow.

@@ -66,18 +66,24 @@ jobs:
       # The Rust toolchain builds the cdylib; python3 backs the metadata-stamp
       # venv and the sqllogictest test runner.
       extra_toolchains: 'rust;python3'
-      # Every job downstream needs all five binaries. The 2.0 workflow's
-      # default `auto` mode skips platforms it judges redundant, and on the
-      # 2.0 tools osx_amd64 is opt-in, so it is named here.
+      # The 2.0 workflow's default `auto` mode skips platforms it judges
+      # redundant, so it is turned off; on the 2.0 tools osx_amd64 is opt-in,
+      # so a tag names it here.
       reduced_ci_mode: 'disabled'
-      opt_in_archs: 'osx_amd64'
+      opt_in_archs: ${{ startsWith(github.ref, 'refs/tags/') && 'osx_amd64' || '' }}
       # Distribute Linux x86/arm, macOS x86/arm, Windows amd64. Everything else
       # is excluded: wasm_* and linux_amd64_musl per the community registry,
       # plus linux_arm64_musl, windows_arm64, and windows_amd64_mingw which the
       # project does not ship.
-      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
+      #
+      # macOS builds on a release tag alone. GitHub's free plan runs at most
+      # five macOS jobs at a time across the whole organisation, and every
+      # other run queues behind them; every development session already builds
+      # and tests on a Mac, so a pull request and a push to main build the
+      # three Linux and Windows binaries and a tag builds all five.
+      exclude_archs: ${{ startsWith(github.ref, 'refs/tags/') && 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw' || 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw;osx_arm64;osx_amd64' }}
 
-  # The version each of those five binaries actually carries, read off its own
+  # The version each of those binaries actually carries, read off its own
   # bytes after the build that produced it.
   #
   # WHY HERE AND NOT ONLY IN release.yml. The build contract derives the stamp
@@ -104,7 +110,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # No merge-multiple: all five artifacts hold a file called
+      # No merge-multiple: every artifact holds a file called
       # finetype.duckdb_extension, so flattening would leave one. Each stays in
       # artifacts/<artifact-name>/ and the glob below reads them back out.
       - uses: actions/download-artifact@v4
@@ -117,8 +123,10 @@ jobs:
         run: |
           shopt -s nullglob
           files=(artifacts/*/finetype.duckdb_extension)
-          if [ "${#files[@]}" -ne 5 ]; then
-            echo "::error::expected 5 extension binaries, found ${#files[@]}" >&2
+          # Five on a tag; three otherwise, since macOS builds on a tag alone.
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then expected=5; else expected=3; fi
+          if [ "${#files[@]}" -ne "$expected" ]; then
+            echo "::error::expected $expected extension binaries, found ${#files[@]}" >&2
             exit 1
           fi
           args=()
