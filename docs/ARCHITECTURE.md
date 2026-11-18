@@ -294,6 +294,8 @@ migration, and two of the six do not map by renaming. The `ft_detail` scalar and
 | `ft_unpack(json)` | scalar | VARCHAR | Recursively classify JSON fields |
 | `ft_version()` | scalar | VARCHAR | Version string |
 
+The two table macros are SQL, created with `CREATE OR REPLACE MACRO` on the database being opened, because DuckDB's C API cannot register a macro and its system catalog refuses one. So `LOAD finetype` writes `ft_validate` and `ft_profile` into a database opened read-write. On a database DuckDB will not let it write, such as one opened read-only, the entry point skips each macro it is refused and loads the rest; there the two table macros are missing and the scalars and aggregates work. The skip replaced a panic that aborted the process, since DuckDB calls the entry point through a function that cannot unwind. The skip was chosen as the narrow fix for a DuckDB build that compiles FineType in and so runs this entry point on every database it opens, where every read-only open aborted. `scripts/check_extension_readonly.sh` (`make check-extension-readonly`, and a CI step) loads on a read-only database and on a read-write one. Keeping the macros out of the analyst's database needs registration from C++ through DuckDB's extension loader, and is not done here.
+
 Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. The two aggregates share one state per group, a seeded reservoir of up to 100 values, so `ft_detail` explains the verdict `ft_profile` gives over the same rows.
 
 ## AI agents

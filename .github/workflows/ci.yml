@@ -459,6 +459,15 @@ jobs:
         # proves it is this extension.
         run: scripts/check_extension_stamp.py --artifact target/release/finetype.duckdb_extension --load
 
+      - name: The extension loads on a database opened read-only
+        # LOAD registers the ft_validate and ft_profile table macros on the
+        # database being opened. On a read-only database that CREATE fails, and
+        # it used to panic in a function that cannot unwind, aborting the
+        # process. The entry point now skips a macro DuckDB refuses; this opens
+        # a read-only database, loads, runs a scalar, and checks a read-write
+        # open still registers both macros.
+        run: scripts/check_extension_readonly.sh target/release/finetype.duckdb_extension
+
       # UNGUARDED, like --release-wiring above and for a stronger reason. This
       # runs the `release` job's own assemble and stamp commands — its `run:`
       # text, read out of release.yml, with GITHUB_REF_NAME supplied — against

@@ -73,7 +73,7 @@ check-gate-routing:
 
 # ─── CLI Tests ─────────────────────────────────
 .PHONY: test-smoke test-docs test-golden test-cli check-doc-counts
-.PHONY: check-duckdb-catalog check-sql-examples check-docs
+.PHONY: check-duckdb-catalog check-sql-examples check-docs check-extension-readonly
 
 test-smoke:
 	./tests/smoke.sh --skip-build
@@ -92,6 +92,12 @@ test-golden:
 check-doc-counts:
 	./scripts/check_doc_taxonomy_counts.py
 	./scripts/check_doc_taxonomy_counts.py --self-test
+
+# Fails if LOAD aborts or errors on a database opened read-only, or if a
+# read-write open stops registering the two table macros. Needs `make
+# build-extension` and the duckdb CLI. No model.
+check-extension-readonly: build-extension
+	./scripts/check_extension_readonly.sh
 
 # Fails if the documented DuckDB surface disagrees with duckdb_functions() of a
 # loaded LOCAL build — names, kinds, return types. Needs `make build-extension`
