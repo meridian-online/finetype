@@ -1,7 +1,8 @@
 name: Weekly README version table
 
 # Re-measures the per-DuckDB-version table in README.md against the community
-# registry, on the platform the table names, and files an issue when a cell is
+# registry, on linux_amd64 (the table was taken on osx_arm64; the measure job
+# says why Linux measures the same thing), and files an issue when a cell is
 # stale, a DuckDB release has no row, or the run itself fell short (a row that
 # could not be measured, an unavailable release list); the report says which.
 # A signal, never a gate: no pull-request
