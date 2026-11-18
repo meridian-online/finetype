@@ -733,6 +733,21 @@ pub unsafe extern "C" fn finetype_init_c_api(
     }
 }
 
+/// Registers one SQL table macro, and skips it when DuckDB refuses the CREATE.
+///
+/// A macro is a catalog entry of the database being opened, so the CREATE fails
+/// wherever that database cannot be written: a read-only open, or a build that
+/// runs this entry point on every database it opens. A panic here would abort
+/// the process, since DuckDB calls the entry point through a function that
+/// cannot unwind. Skipping leaves the scalars and aggregates loaded, and the
+/// macro as the file already holds it: missing, or the definition an earlier
+/// read-write load stored. Nothing is printed: in a build that
+/// loads FineType on every open, a warning would land in every read-only run's
+/// output.
+fn register_table_macro(con: &duckdb::Connection, sql: &str) {
+    let _ = con.execute_batch(sql);
+}
+
 /// # Safety
 ///
 /// Called by DuckDB when loading the extension. The Connection is valid for the
@@ -772,15 +787,13 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
     // function: the macro expands into catalog-aware SQL DuckDB runs with full
     // table access (query_table), reaching past the BindInfo catalog wall that
     // blocks Rust table functions on this pin (choice 0064).
-    con.execute_batch(FT_VALIDATE_MACRO)
-        .expect("Failed to register ft_validate table macro");
+    register_table_macro(&con, FT_VALIDATE_MACRO);
 
     // ft_profile(tbl) table macro — the table-in form, symmetric with
     // ft_validate. Shares the ft_profile name with the aggregate registered
     // after this function returns; DuckDB routes by call position (FROM →
     // macro, projection → aggregate).
-    con.execute_batch(FT_PROFILE_MACRO)
-        .expect("Failed to register ft_profile table macro");
+    register_table_macro(&con, FT_PROFILE_MACRO);
 
     Ok(())
 }
